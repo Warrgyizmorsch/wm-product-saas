@@ -55,7 +55,7 @@
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('production.overhead_cost') . ' (' . active_currency_symbol() . ')'" name="overhead_cost" inputType="number" step="0.01" placeholder="0.00" :value="old('overhead_cost', '0.00')" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.overhead_cost') . ' (' . active_currency_symbol() . ' / day)'" :helperText="__('production.overhead_cost_help')" name="overhead_cost" inputType="number" step="0.01" placeholder="0.00" :value="old('overhead_cost', '0.00')" />
                         
                         <x-ui.odoo-form-ui type="input" :label="__('production.calculation_countdown_minutes')" name="calculation_countdown_minutes" inputType="number" min="1" max="1440" step="1" placeholder="10" :value="old('calculation_countdown_minutes', 10)" :required="true" />
 

@@ -74,6 +74,9 @@ class WorkCenterCalculationService
                 'section_id'                 => $section->id,
                 'section_code'               => $section->code,
                 'section_name'               => $section->name,
+                // WC-IMPL-15: which section snapshot fed this Work Center snapshot (null in previews)
+                'section_calculation_id'     => isset($secCalc['section_calculation_id']) ? (int) $secCalc['section_calculation_id'] : null,
+                'section_snapshot_number'    => $secCalc['section_snapshot_number'] ?? null,
                 'capacity_per_hour'          => (float) ($secCalc['capacity_per_hour'] ?? 0.0),
                 'daily_capacity'             => (float) ($secCalc['daily_capacity'] ?? 0.0),
                 'labor_cost_per_hour'        => (float) ($secCalc['labor_cost_per_hour'] ?? 0.0),
@@ -120,9 +123,7 @@ class WorkCenterCalculationService
             : 0.0;
 
         // Financial Unit Cost
-        $wcCostPerUnit = $wcDailyCapacity > 0
-            ? round($wcTotalDailyCost / $wcDailyCapacity, 4)
-            : 0.0;
+        $wcCostPerUnit = cost_per_unit_value($wcTotalDailyCost, $wcDailyCapacity); // null = N/A (WC-23, WC-29)
 
         // 8. Detailed Calculation JSON
         $calculationDetails = [
@@ -198,7 +199,9 @@ class WorkCenterCalculationService
 
     /**
      * Calculate and persist Work Center Rollup Snapshot into production_work_center_calculations.
-     * Recalculates impacted sections or all active sections if none specified.
+     * Recalculates only the impacted sections (WC-IMPL-13): an empty list = Work Center roll-up only —
+     * every section reuses its latest snapshot, and only a section with no snapshot yet is calculated.
+     * Callers that want every section recalculated pass all active section IDs (CountdownCalculationEngine scope 'all').
      */
     public function calculateAndSave(
         WorkCenter $workCenter,
@@ -213,9 +216,7 @@ class WorkCenterCalculationService
         // 1. Resolve sections that need calculation
         $allSections = $workCenter->sections()->where('tenant_id', $tenantId)->active()->get();
 
-        $sectionsToRecalculate = empty($impactedSectionIds)
-            ? $allSections
-            : $allSections->whereIn('id', $impactedSectionIds);
+        $sectionsToRecalculate = $allSections->whereIn('id', array_map('intval', $impactedSectionIds));
 
         $sectionCalculationSnapshots = [];
         $sectionCalculationResults   = [];
@@ -232,6 +233,8 @@ class WorkCenterCalculationService
                 );
                 $sectionCalculationSnapshots[$sec->id] = $savedSecCalc;
                 $sectionCalculationResults[$sec->id]   = [
+                    'section_calculation_id'     => (int) $savedSecCalc->id,
+                    'section_snapshot_number'    => $savedSecCalc->snapshot_number,
                     'capacity_per_hour'          => $savedSecCalc->capacity_per_hour,
                     'daily_capacity'             => $savedSecCalc->daily_capacity,
                     'labor_cost_per_hour'        => $savedSecCalc->labor_cost_per_hour,
@@ -252,6 +255,8 @@ class WorkCenterCalculationService
                 if ($latestSecCalc) {
                     $sectionCalculationSnapshots[$sec->id] = $latestSecCalc;
                     $sectionCalculationResults[$sec->id]   = [
+                        'section_calculation_id'     => (int) $latestSecCalc->id,
+                        'section_snapshot_number'    => $latestSecCalc->snapshot_number,
                         'capacity_per_hour'          => $latestSecCalc->capacity_per_hour,
                         'daily_capacity'             => $latestSecCalc->daily_capacity,
                         'labor_cost_per_hour'        => $latestSecCalc->labor_cost_per_hour,
@@ -269,7 +274,10 @@ class WorkCenterCalculationService
                         batchId: $batchId
                     );
                     $sectionCalculationSnapshots[$sec->id] = $freshSecCalc;
-                    $sectionCalculationResults[$sec->id]   = $freshSecCalc->toArray();
+                    $sectionCalculationResults[$sec->id]   = $freshSecCalc->toArray() + [
+                        'section_calculation_id'  => (int) $freshSecCalc->id,
+                        'section_snapshot_number' => $freshSecCalc->snapshot_number,
+                    ];
                 }
             }
         }
@@ -350,13 +358,15 @@ class WorkCenterCalculationService
             $activeWcCount = max(1, (int) $activeWcCount);
 
             // 2. Base Daily Salary & Allocated Daily Cost for this Work Center
-            $monthlySalary        = (float) ($emp->current_salary ?? 0.0);
+            $monthlySalary        = $emp->monthlyCtc(); // HRMS payroll monthly CTC (current_salary is annual) — WC-17
             $baseDailySalary      = round($monthlySalary / 30, 4);
             $allocatedDailySalary = round($baseDailySalary / $activeWcCount, 4);
 
             // 3. Resolve Assigned Shift & Hourly Rate
             $empShift = $emp->defaultShift ?? $emp->shift ?? (method_exists($emp, 'resolveShiftForDate') ? $emp->resolveShiftForDate(now()) : null);
-            $shiftDurationHours = $empShift ? (float) ($empShift->working_hours ?? 8.0) : 8.0;
+            // Shift CLOCK hours, breaks included — same rule as section personnel (WC-18, WC-27).
+            // 8-hour fallback for a missing / zero shift stays until the Shift module review (WC-ISSUE-07).
+            $shiftDurationHours = $empShift ? (float) ($empShift->clock_hours ?? 8.0) : 8.0;
             if ($shiftDurationHours <= 0) {
                 $shiftDurationHours = 8.0;
             }
@@ -364,7 +374,6 @@ class WorkCenterCalculationService
             $hourlyRate = round($allocatedDailySalary / $shiftDurationHours, 4);
             $shiftName  = $empShift?->name ?? 'Standard Shift';
 
-            $formula = "Monthly CTC ($" . number_format($monthlySalary, 2) . ") / 30 days = $" . number_format($baseDailySalary, 2) . "/day / {$activeWcCount} active WCs = $" . number_format($allocatedDailySalary, 2) . "/day; / " . format_hours($shiftDurationHours) . " shift hrs = $" . number_format($hourlyRate, 2) . "/hr";
 
             $employees[] = [
                 'assignment_id'           => $assignment->id,
@@ -372,18 +381,15 @@ class WorkCenterCalculationService
                 'employee_code'           => $emp->employee_id ?? "EMP-{$emp->id}",
                 'name'                    => $emp->full_name,
                 'role'                    => $emp->job_title ?: 'Work Center Staff',
-                'hrms_net_monthly_salary' => $monthlySalary,
-                'monthly_ctc'             => $monthlySalary,
+                'annual_ctc'              => (float) ($emp->current_salary ?? 0.0), // WC-IMPL-04: formula text built at display
+                'monthly_salary'          => $monthlySalary, // WC-IMPL-19: one key (was also hrms_net_monthly_salary / monthly_ctc)
                 'base_daily_salary'       => $baseDailySalary,
                 'active_wc_count'          => $activeWcCount,
-                'total_active_work_centers' => $activeWcCount,
                 'allocation_percentage'    => $activeWcCount > 0 ? round(100 / $activeWcCount, 2) : 100.0,
-                'daily_salary'            => $allocatedDailySalary,
                 'daily_cost'              => $allocatedDailySalary,
                 'shift_name'              => $shiftName,
                 'shift_duration_hours'    => $shiftDurationHours,
                 'hourly_rate'             => $hourlyRate,
-                'formula'                 => $formula,
             ];
 
             $totalDailyCost += $allocatedDailySalary;

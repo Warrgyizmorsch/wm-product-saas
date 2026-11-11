@@ -143,22 +143,12 @@ class SectionCalculationService
 
         $peakTotalHourlyOperatingCost = round($hourlyMachineExpense + $peakHourlyLaborRate, 4);
 
-        // Unit Cost Calculations
-        $costPerUnit = $totalDailyCap > 0
-            ? round($totalDailyOperatingCost / $totalDailyCap, 4)
-            : 0.0;
-        $machineCostPerUnit = $totalDailyCap > 0
-            ? round($totalDailyMachineExpense / $totalDailyCap, 4)
-            : 0.0;
-        $internalLaborCostPerUnit = $totalDailyCap > 0
-            ? round($totalDailyInternalLabor / $totalDailyCap, 4)
-            : 0.0;
-        $externalLaborCostPerUnit = $totalDailyCap > 0
-            ? round($totalDailyExternalLabor / $totalDailyCap, 4)
-            : 0.0;
-        $totalLaborCostPerUnit = $totalDailyCap > 0
-            ? round($totalDailyLaborCost / $totalDailyCap, 4)
-            : 0.0;
+        // Unit Cost Calculations — output 0 with cost > 0 → null ("N/A"), both 0 → 0 (WC-23 rule 5)
+        $costPerUnit              = cost_per_unit_value($totalDailyOperatingCost, $totalDailyCap);
+        $machineCostPerUnit       = cost_per_unit_value($totalDailyMachineExpense, $totalDailyCap);
+        $internalLaborCostPerUnit = cost_per_unit_value($totalDailyInternalLabor, $totalDailyCap);
+        $externalLaborCostPerUnit = cost_per_unit_value($totalDailyExternalLabor, $totalDailyCap);
+        $totalLaborCostPerUnit    = cost_per_unit_value($totalDailyLaborCost, $totalDailyCap);
 
         // ── 6. Comprehensive 52-Metric JSON Audit Payload ─────────────────────
         $calculationDetails = [
@@ -368,13 +358,9 @@ class SectionCalculationService
                 $durationMin = 1440;
             }
 
+            // Breaks are informational only — never subtracted from output, cost or hours (WC-02).
             $breakMin = max(0, (int) ($shift->break_minutes ?? 0));
-            $effectiveMin = max(0, $durationMin - $breakMin);
-            if ($effectiveMin === 0) {
-                $effectiveMin = $durationMin;
-            }
 
-            $effectiveHours = round($effectiveMin / 60, 4);
             $durationHours  = round($durationMin / 60, 4);
 
             $item = [
@@ -390,8 +376,6 @@ class SectionCalculationService
                 'duration_hours'   => $durationHours,
                 'break_minutes'    => $breakMin,
                 'break_hours'      => round($breakMin / 60, 4),
-                'effective_minutes'=> $effectiveMin,
-                'effective_hours'  => $effectiveHours,
             ];
 
             $shiftData[]          = $item;
@@ -536,38 +520,38 @@ class SectionCalculationService
             // 3. Reconcile Discrepancy
             $additionalCost = 0.0;
             $deductibles    = 0.0;
-            $explanation    = '';
+            // WC-IMPL-04: store a message type + numbers; the sentence is built at display (CalculationText)
+            $explanationType = 'none';
             $finalOpCostHr  = 0.0;
 
             if ($enteredCost > 0.0 && $baseEnergyCost > 0.0) {
                 if ($enteredCost > $baseEnergyCost) {
                     $additionalCost = round($enteredCost - $baseEnergyCost, 4);
                     $finalOpCostHr  = $enteredCost;
-                    $explanation    = 'Includes $' . number_format($additionalCost, 2) . '/hr additional cost for consumables, lubricants, or tooling wear.';
+                    $explanationType = 'additional';
                 } elseif ($enteredCost < $baseEnergyCost) {
                     $deductibles   = round($baseEnergyCost - $enteredCost, 4);
                     $finalOpCostHr = $enteredCost;
-                    $explanation   = 'Includes $' . number_format($deductibles, 2) . '/hr deductibles for power subsidies, solar credits, or discounts.';
+                    $explanationType = 'deductible';
                 } else {
                     $finalOpCostHr = $enteredCost;
-                    $explanation   = 'Matches calculated base energy consumption rate ($' . number_format($finalOpCostHr, 2) . '/hr).';
+                    $explanationType = 'matches';
                 }
             } elseif ($enteredCost > 0.0) {
                 $finalOpCostHr = $enteredCost;
-                $explanation   = 'Flat operating cost specified ($' . number_format($finalOpCostHr, 2) . '/hr).';
+                $explanationType = 'flat';
             } elseif ($baseEnergyCost > 0.0) {
                 $finalOpCostHr = $baseEnergyCost;
-                $explanation   = 'Calculated from energy consumption (' . number_format($consumption, 2) . ' units @ $' . number_format($rate, 2) . '/unit = $' . number_format($finalOpCostHr, 2) . '/hr).';
+                $explanationType = 'energy';
             } else {
                 $finalOpCostHr = 0.0;
-                $explanation   = 'No energy consumption or operating cost entered ($0.00/hr).';
+                $explanationType = 'none';
             }
 
             $dailyCap  = round($capHr * $uniqueOperatingHours, 4);
             $dailyCost = round($finalOpCostHr * $uniqueOperatingHours, 4);
 
             $capFormula = number_format($capHr, 2) . ' units/hr x ' . format_hours($uniqueOperatingHours) . ' section operating hrs = ' . number_format($dailyCap, 2) . ' units/day';
-            $costFormula = '$' . number_format($finalOpCostHr, 2) . '/hr x ' . format_hours($uniqueOperatingHours) . ' section operating hrs = $' . number_format($dailyCost, 2) . '/day';
 
             $item = [
                 'id'                      => $machine->id,
@@ -582,10 +566,9 @@ class SectionCalculationService
                 'additional_cost_per_hour'=> $additionalCost,
                 'deductibles_per_hour'    => $deductibles,
                 'operating_cost_per_hour' => round($finalOpCostHr, 4),
-                'cost_explanation'        => $explanation,
+                'explanation_type'        => $explanationType,
                 'cap_hr'                  => round($capHr, 4),
                 'capacity_formula'        => $capFormula,
-                'cost_formula'            => $costFormula,
                 'section_operating_hrs'   => $uniqueOperatingHours,
                 'daily_cap'               => $dailyCap,
                 'daily_cost'              => $dailyCost,
@@ -650,12 +633,13 @@ class SectionCalculationService
             $capHr    = (float) ($batch->capacity_per_hour ?? 0.0);
 
             $shiftId  = $batch->shift_id;
-            $effHours = (float) ($shiftMap[$shiftId]['effective_hours'] ?? $shiftMap[$shiftId]['duration_hours'] ?? 0.0);
+            // Batch output = capacity/hr × full shift clock hours, breaks included (WC-02, WC-13)
+            $outputShiftHours = (float) ($shiftMap[$shiftId]['duration_hours'] ?? 0.0);
             $shiftClockHours = (float) ($shiftMap[$shiftId]['duration_hours'] ?? 8.0);
             if ($shiftClockHours <= 0) {
                 $shiftClockHours = 8.0;
             }
-            $dailyCap = round($capHr * $effHours, 4);
+            $dailyCap = round($capHr * $outputShiftHours, 4);
 
             // ── Internal Employees on Batch ──
             $empNames = [];
@@ -673,7 +657,7 @@ class SectionCalculationService
                     continue;
                 }
                 $empNames[] = $emp->full_name;
-                $monthlySalary = (float) ($emp->current_salary ?? 0.0);
+                $monthlySalary = $emp->monthlyCtc(); // HRMS payroll monthly CTC (current_salary is annual) — WC-17
                 $dailySalary = round($monthlySalary / 30, 4);
                 $hourlyRate = round($dailySalary / $shiftClockHours, 4);
 
@@ -726,11 +710,11 @@ class SectionCalculationService
             }
 
             $shiftName = $shiftMap[$shiftId]['name'] ?? ($batch->shift ? $batch->shift->name : "Shift #{$shiftId}");
-            $formula = "Batch capacity (" . number_format($capHr, 2) . " units/hr) x Shift effective hours (" . format_hours($effHours) . ") = " . number_format($dailyCap, 2) . " units/day";
+            $formula = "Batch capacity (" . number_format($capHr, 2) . " units/hr) x Shift hours (" . format_hours($outputShiftHours) . ", breaks included) = " . number_format($dailyCap, 2) . " units/day";
 
             $totalBatchHourlyCost = round($internalHourlyCost + $externalHourlyCost, 4);
             $totalBatchDailyCost  = round($internalDailyCost + $externalDailyCost, 4);
-            $batchCostPerUnit     = $dailyCap > 0 ? round($totalBatchDailyCost / $dailyCap, 4) : 0.0;
+            $batchCostPerUnit     = cost_per_unit_value($totalBatchDailyCost, $dailyCap); // null = N/A (WC-23)
 
             $item = [
                 'id'                          => $batch->id,
@@ -738,7 +722,7 @@ class SectionCalculationService
                 'shift_id'                    => $shiftId,
                 'shift_name'                  => $shiftName,
                 'cap_hr'                      => round($capHr, 4),
-                'eff_hrs'                     => $effHours,
+                'shift_hours'                 => $outputShiftHours,
                 'shift_clock_hours'           => $shiftClockHours,
                 'daily_cap'                   => $dailyCap,
                 'formula'                     => $formula,
@@ -852,12 +836,12 @@ class SectionCalculationService
             $shiftId = $manualBatchShiftId ?: ($emp->shift_id ?: (!empty($shiftsData) ? $shiftsData[0]['id'] : null));
 
             // HRMS Net Monthly CTC
-            $monthlySalary = (float) ($emp->current_salary ?? 0.0);
+            $monthlySalary = $emp->monthlyCtc(); // HRMS payroll monthly CTC (current_salary is annual) — WC-17
             $hasSalaryWarning = false;
             $salaryWarning = null;
             if ($monthlySalary <= 0.0) {
                 $hasSalaryWarning = true;
-                $salaryWarning = 'Missing HRMS salary: defaults to $0.00';
+                $salaryWarning = 'Missing HRMS salary: labor cost counted as 0';
             }
 
             // Daily Salary = Net Monthly CTC / 30 days
@@ -899,27 +883,22 @@ class SectionCalculationService
             $hourlyRate = round($dailySalary / $shiftClockHours, 4);
             $dailyCost  = $dailySalary;
 
-            $formula = "Monthly CTC ($" . number_format($monthlySalary, 2) . ") / 30 days = $" . number_format($dailySalary, 2) . "/day; $" . number_format($dailySalary, 2) . " / " . format_hours($shiftClockHours) . " shift clock hrs = $" . number_format($hourlyRate, 2) . "/hr";
 
+            // WC-IMPL-19: one key per value (views keep fallbacks for older snapshots)
             $item = [
-                'id'                      => $assignment->id,
                 'assignment_id'           => $assignment->id,
                 'employee_id'             => $emp->id,
                 'employee_code'           => $emp->employee_id,
                 'name'                    => $emp->full_name,
-                'employee_name'           => $emp->full_name,
                 'shift_id'                => $shiftId,
                 'shift_name'              => $shiftName,
                 'is_outside_section_shifts' => $isOutsideSection,
-                'hrms_net_monthly_salary' => $monthlySalary,
+                'annual_ctc'              => (float) ($emp->current_salary ?? 0.0),
                 'monthly_salary'          => $monthlySalary,
                 'daily_salary'            => $dailySalary,
                 'shift_clock_hours'       => $shiftClockHours,
-                'shift_duration_hours'    => $shiftClockHours,
                 'hourly_rate'             => $hourlyRate,
-                'hourly_salary_rate'      => $hourlyRate,
                 'daily_cost'              => $dailyCost,
-                'formula'                 => $formula,
                 'has_salary_warning'      => $hasSalaryWarning,
                 'salary_warning'          => $salaryWarning,
                 'active'                  => $isActive,
@@ -1005,7 +984,6 @@ class SectionCalculationService
 
             $shiftName = $shiftMap[$shiftId]['name'] ?? ($alloc->shift ? $alloc->shift->name : "Shift #{$shiftId}");
             $pgName = $payGrade ? ($payGrade->name ?? $payGrade->grade_name ?? 'Contractor') : 'Contractor';
-            $formula = "{$headcount} workers x $" . number_format($payGradeRate, 2) . "/hr x " . format_hours($shiftClockHours) . " shift clock hrs = $" . number_format($dailyCost, 2) . "/day";
 
             $item = [
                 'id'                   => $alloc->id,
@@ -1018,9 +996,7 @@ class SectionCalculationService
                 'pay_grade_rate'       => $payGradeRate,
                 'hourly_burn_rate'     => $hourlyBurnRate,
                 'shift_clock_hours'    => $shiftClockHours,
-                'shift_duration_hours' => $shiftClockHours,
                 'daily_cost'           => $dailyCost,
-                'formula'              => $formula,
                 'manual_production_id' => $alloc->manual_production_id,
                 'active'               => $isActive,
             ];
@@ -1202,10 +1178,11 @@ class SectionCalculationService
                     $intervalTotalCost = round($intervalTotalCostRate * $durHours, 4);
 
                     $isOverlap = count($currentActiveShifts) > 1;
+                    $explanationType = null;
                     if ($totalLaborBurn > 0) {
-                        $explanation = $isOverlap
-                            ? "Shift Overlap: " . count($currentActiveShifts) . " shifts active concurrently. Labor burn rate surges to $" . number_format($totalLaborBurn, 2) . "/hr."
-                            : "Regular Window: 1 shift active. Labor burn rate: $" . number_format($totalLaborBurn, 2) . "/hr.";
+                        // WC-IMPL-04: money sentence built at display (CalculationText::intervalExplanation)
+                        $explanationType = $isOverlap ? 'labor_overlap' : 'labor_regular';
+                        $explanation = null;
                     } else {
                         $explanation = $isOverlap
                             ? "Shift Overlap: " . count($currentActiveShifts) . " shifts active concurrently. Machine capacity: " . number_format($hourlyMachineCapacity, 1) . " u/h."
@@ -1233,6 +1210,7 @@ class SectionCalculationService
                         'interval_labor_cost'           => $intervalLaborCost,
                         'is_overlapping'                => $isOverlap,
                         'explanation'                   => $explanation,
+                        'explanation_type'              => $explanationType,
                     ];
                 }
                 $currentStart = null;
@@ -1436,7 +1414,7 @@ class SectionCalculationService
             if ($shiftClockHours <= 0) {
                 $shiftClockHours = 8.0;
             }
-            $monthlySalary = (float) ($emp->current_salary ?? 0.0);
+            $monthlySalary = $emp->monthlyCtc(); // HRMS payroll monthly CTC (current_salary is annual) — WC-17
             $dailySalary = round($monthlySalary / 30, 4);
             $hourlyRate = round($dailySalary / $shiftClockHours, 4);
             $unassignedInternalLaborHourlyCost += $hourlyRate;

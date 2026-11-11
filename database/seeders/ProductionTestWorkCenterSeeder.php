@@ -182,20 +182,20 @@ class ProductionTestWorkCenterSeeder extends Seeder
         $this->command?->info("Ensuring Internal HRMS Employees with proper CTC Salaries...");
 
         $employeesData = [
-            ['name' => 'Rajesh Sharma',    'salary' => 45000.00, 'role' => 'Lead CNC Machinist'],
-            ['name' => 'Aarti Patel',      'salary' => 38000.00, 'role' => 'CNC Milling Specialist'],
-            ['name' => 'Vikram Singhania', 'salary' => 52000.00, 'role' => 'Senior TIG Welder'],
-            ['name' => 'Rohan Kulkarni',   'salary' => 42000.00, 'role' => 'Robotic Cell Tech'],
-            ['name' => 'Devendra Verma',   'salary' => 39000.00, 'role' => 'Laser Cut Operator'],
-            ['name' => 'Manish Gupta',     'salary' => 36000.00, 'role' => 'Turret Punch Operator'],
-            ['name' => 'Sandeep Tiwari',   'salary' => 48000.00, 'role' => 'Press Brake Master'],
-            ['name' => 'Sneha Rao',        'salary' => 60000.00, 'role' => 'SMT Line Engineer'],
-            ['name' => 'Pooja Deshmukh',   'salary' => 44000.00, 'role' => 'Pneumatic System Tech'],
-            ['name' => 'Arun Joshi',       'salary' => 55000.00, 'role' => 'Night Shift Supervisor'],
-            ['name' => 'Kavita Nair',      'salary' => 34000.00, 'role' => 'Assembly Lead'],
-            ['name' => 'Deepak Chauhan',   'salary' => 32000.00, 'role' => 'Precision Assembler'],
-            ['name' => 'Suresh Reddy',     'salary' => 30000.00, 'role' => 'Packaging Specialist'],
-            ['name' => 'Kiran Mehta',      'salary' => 40000.00, 'role' => 'Quality Inspector'],
+            ['name' => 'Rajesh Sharma',    'salary' => 540000.00, 'role' => 'Lead CNC Machinist'],
+            ['name' => 'Aarti Patel',      'salary' => 456000.00, 'role' => 'CNC Milling Specialist'],
+            ['name' => 'Vikram Singhania', 'salary' => 624000.00, 'role' => 'Senior TIG Welder'],
+            ['name' => 'Rohan Kulkarni',   'salary' => 504000.00, 'role' => 'Robotic Cell Tech'],
+            ['name' => 'Devendra Verma',   'salary' => 468000.00, 'role' => 'Laser Cut Operator'],
+            ['name' => 'Manish Gupta',     'salary' => 432000.00, 'role' => 'Turret Punch Operator'],
+            ['name' => 'Sandeep Tiwari',   'salary' => 576000.00, 'role' => 'Press Brake Master'],
+            ['name' => 'Sneha Rao',        'salary' => 720000.00, 'role' => 'SMT Line Engineer'],
+            ['name' => 'Pooja Deshmukh',   'salary' => 528000.00, 'role' => 'Pneumatic System Tech'],
+            ['name' => 'Arun Joshi',       'salary' => 660000.00, 'role' => 'Night Shift Supervisor'],
+            ['name' => 'Kavita Nair',      'salary' => 408000.00, 'role' => 'Assembly Lead'],
+            ['name' => 'Deepak Chauhan',   'salary' => 384000.00, 'role' => 'Precision Assembler'],
+            ['name' => 'Suresh Reddy',     'salary' => 360000.00, 'role' => 'Packaging Specialist'],
+            ['name' => 'Kiran Mehta',      'salary' => 480000.00, 'role' => 'Quality Inspector'],
         ];
 
         $seededEmployees = [];

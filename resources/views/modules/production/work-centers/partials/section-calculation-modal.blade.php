@@ -1,5 +1,12 @@
 <!-- Calculation Breakdown Modal for Section {{ $section->id }} -->
-<div class="modal fade" id="sectionCalculationModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionCalculationModalLabel_{{ $section->id }}" aria-hidden="true">
+@php
+    // WC-IMPL-20: an explicit $snapshot shows exactly that snapshot (no live data); default = latest.
+    $latestSecSnapshot = $section->latestCalculation;
+    $viewSnapshot = $snapshot ?? null;
+    $isLatest = !$viewSnapshot || ($latestSecSnapshot && (int) $latestSecSnapshot->id === (int) $viewSnapshot->id);
+    $modalElementId = $modalElementId ?? ('sectionCalculationModal_' . $section->id);
+@endphp
+<div class="modal fade" id="{{ $modalElementId }}" tabindex="-1" aria-labelledby="sectionCalculationModalLabel_{{ $section->id }}" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg rounded-3">
             <div class="modal-header border-bottom py-3 bg-light">
@@ -10,10 +17,15 @@
                     <div>
                         <h5 class="modal-title fw-bold text-dark fs-15 mb-0 d-flex align-items-center flex-wrap gap-1" id="sectionCalculationModalLabel_{{ $section->id }}">
                             {{ __('production.calculation_breakdown') }} &mdash; <span class="font-monospace text-primary">{{ $section->code }}</span> ({{ $section->name }})
-                            @if(!$section->isActive())
+                            @if($viewSnapshot)
+                                <span class="badge {{ $isLatest ? 'bg-soft-success text-success' : 'bg-soft-warning text-warning' }} font-monospace fs-11 ms-1">Snapshot #{{ $viewSnapshot->snapshot_number ?? $viewSnapshot->id }}</span>
+                                @if(!$section->isActive())
+                                    <span class="badge bg-soft-secondary text-muted font-monospace fs-11 ms-1">Inactive</span>
+                                @endif
+                            @elseif(!$section->isActive())
                                 <span class="badge bg-soft-secondary text-muted font-monospace fs-11 ms-1">Inactive</span>
-                            @elseif($section->latestCalculation)
-                                <span class="badge bg-soft-success text-success font-monospace fs-11 ms-1">Snapshot #{{ $section->latestCalculation->snapshot_number ?? $section->latestCalculation->id }}</span>
+                            @elseif($latestSecSnapshot)
+                                <span class="badge bg-soft-success text-success font-monospace fs-11 ms-1">Snapshot #{{ $latestSecSnapshot->snapshot_number ?? $latestSecSnapshot->id }}</span>
                             @endif
                         </h5>
                         <small class="text-muted fs-11">{{ __('production.work_center') }}: {{ $workCenter->name }} [{{ $workCenter->code }}]</small>
@@ -23,7 +35,13 @@
             </div>
 
             <div class="modal-body p-4">
-                @if(!$section->isActive())
+                @if(!$isLatest)
+                    <div class="alert alert-soft-warning border border-warning-subtle d-flex align-items-center gap-2 mb-3 py-2 px-3 fs-12 snapshot-not-latest-banner">
+                        <i class="feather-clock text-warning fs-14 flex-shrink-0"></i>
+                        <span>Viewing snapshot <strong>#{{ $viewSnapshot->snapshot_number ?? $viewSnapshot->id }}</strong> from {{ $viewSnapshot->created_at?->format('Y-m-d H:i:s') }} &mdash; not the latest (latest is <strong>#{{ $latestSecSnapshot?->snapshot_number ?? $latestSecSnapshot?->id ?? '—' }}</strong>). Figures are exactly as stored in this snapshot.</span>
+                    </div>
+                @endif
+                @if(!$section->isActive() && !$viewSnapshot)
                     <div class="alert alert-soft-secondary border-secondary-subtle d-flex align-items-center gap-2 mb-3 py-2 px-3 fs-12">
                         <i class="feather-pause-circle text-secondary fs-14 flex-shrink-0"></i>
                         <span><strong>Section Inactive:</strong> This section is marked inactive. Its values are not calculated and it does not contribute to the Work Center totals.</span>
@@ -31,7 +49,7 @@
                 @endif
                 @php
                     $isSecActive = $section->isActive();
-                    $secCalc = $isSecActive ? $section->latestCalculation : null;
+                    $secCalc = $viewSnapshot ?: ($isSecActive ? $latestSecSnapshot : null);
                     // Read-only view: If $secCalc is null, values gracefully display uncalculated empty states/zeros.
                     $details = $secCalc->calculation_details ?? [];
                     $opTimeline = $details['operating_timeline'] ?? [];
@@ -51,7 +69,9 @@
                     $dailyCost = (float) ($finSummary['total_daily_operating_cost'] ?? $secCalc->total_daily_operating_cost ?? 0);
                     $avgHourlyCost = (float) ($finSummary['total_hourly_operating_cost'] ?? $secCalc->total_operating_cost_per_hour ?? 0);
                     $peakHourlyCost = (float) ($finSummary['peak_total_hourly_operating_cost'] ?? $avgHourlyCost);
-                    $costPerUnit = (float) ($finSummary['cost_per_unit'] ?? 0);
+                    // Cost-per-unit figures keep null = "N/A" (output 0, cost > 0 — WC-23); missing key (old snapshot) = 0
+                    $cpuOf = fn ($arr, string $key) => (is_array($arr) && array_key_exists($key, $arr)) ? ($arr[$key] === null ? null : (float) $arr[$key]) : 0.0;
+                    $costPerUnit = $cpuOf($finSummary, 'cost_per_unit');
 
                     // Operating Hours
                     $uniqHours = (float) ($opTimeline['section_unique_operating_hours'] ?? $secCalc->unique_operating_hours ?? 0);
@@ -83,7 +103,9 @@
                     $calcTotalPersonnel = $calcSecEmpCount + $calcSecExtCount;
                     $calcMachCount = $section->machines ? $section->machines->count() : 0;
                     $calcActiveBatches = $section->manualProductions ? $section->manualProductions->where('active', true)->count() : 0;
-                    $calcHasLaborWithoutProduction = ($calcMachCount === 0) && ($calcActiveBatches === 0) && ($calcTotalPersonnel > 0);
+                    // WC-IMPL-09: active machines only; shared reason text (live check → latest snapshot only)
+                    $calcOutStatus = $section->outputLaborStatus($secCalc ? (float) $dailyLaborCost : null);
+                    $calcHasLaborWithoutProduction = $isLatest && $section->isActive() && $calcOutStatus['zero_output'];
                 @endphp
 
                 @if(!$secCalc)
@@ -101,7 +123,7 @@
                         <i class="feather-alert-triangle text-warning fs-16 flex-shrink-0 mt-0.5"></i>
                         <div class="flex-grow-1">
                             <strong class="text-dark d-block mb-0.5">Labor Cost Incurred with Zero Production Output</strong>
-                            <span>This section has <strong>{{ $calcTotalPersonnel }} {{ \Illuminate\Support\Str::plural('personnel', $calcTotalPersonnel) }}</strong> ({{ $calcSecEmpCount }} internal, {{ $calcSecExtCount }} external) allocated, but no machines are assigned and no manual production batches are configured. Daily labor costs of <strong>{{ format_currency($dailyLaborCost) }}/day</strong> are being accrued with 0 production capacity.</span>
+                            <span>{{ $calcOutStatus['reason'] }}</span>
                         </div>
                     </div>
                 @endif
@@ -167,12 +189,12 @@
                                 <span class="badge bg-soft-info text-info font-monospace fs-10">Efficiency</span>
                             </div>
                             <div class="fs-22 fw-bolder text-dark font-monospace">
-                                {{ format_currency($costPerUnit) }}
-                                <span class="fs-11 fw-normal text-muted">/ unit</span>
+                                {!! format_cost_per_unit($costPerUnit, $dailyCost, '') !!}
+                                @if($costPerUnit !== null)<span class="fs-11 fw-normal text-muted">/ unit</span>@endif
                             </div>
                             <div class="text-muted fs-11 mt-1 d-flex justify-content-between">
-                                <span>Mach: <strong class="text-dark">{{ format_currency($machData['machine_cost_per_unit'] ?? 0) }}</strong></span>
-                                <span>Labor: <strong class="text-dark">{{ format_currency($combLabor['total_labor_cost_per_unit'] ?? 0) }}</strong></span>
+                                <span>Mach: <strong class="text-dark">{!! format_cost_per_unit($cpuOf($machData, 'machine_cost_per_unit'), null, '') !!}</strong></span>
+                                <span>Labor: <strong class="text-dark">{!! format_cost_per_unit($cpuOf($combLabor, 'total_labor_cost_per_unit'), null, '') !!}</strong></span>
                             </div>
                         </div>
                     </div>
@@ -304,8 +326,8 @@
                     <div class="tab-pane fade show active" id="audit-machines-pane-{{ $section->id }}" role="tabpanel">
                         <div class="p-2.5 rounded-3 bg-light border mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2 fs-12">
                             <div>
-                                <span class="text-muted">Total Power:</span>
-                                <strong class="text-dark font-monospace ms-1">{{ number_format($machData['sum_machine_consumption_per_hour'] ?? 0, 2) }} kW</strong>
+                                <span class="text-muted">Total Consumption:</span>
+                                <strong class="text-dark font-monospace ms-1">{{ number_format($machData['sum_machine_consumption_per_hour'] ?? 0, 2) }} / hr</strong>
                             </div>
                             <div>
                                 <span class="text-muted">Base Energy Cost:</span>
@@ -335,7 +357,7 @@
                                     <tr>
                                         <th style="width: 14%">Machine</th>
                                         <th style="width: 10%" class="text-end">Hourly Capacity</th>
-                                        <th style="width: 12%" class="text-end">Power (kW)</th>
+                                        <th style="width: 12%" class="text-end">Consumption / hr</th>
                                         <th style="width: 12%" class="text-end">Energy Rate</th>
                                         <th style="width: 12%" class="text-end">Base Energy</th>
                                         <th style="width: 12%" class="text-end">Entered Cost</th>
@@ -376,11 +398,11 @@
                                                     $mDedCost = (float) ($m['deductibles_per_hour'] ?? $m['deductibles'] ?? 0);
                                                 @endphp
                                                 @if($mAddCost > 0)
-                                                    <span class="badge bg-soft-warning text-warning fs-10" data-bs-toggle="tooltip" data-bs-placement="top" title="Additional operational expense (tooling wear, lubricants, routine maintenance): {{ $m['cost_explanation'] ?? '' }}">
+                                                    <span class="badge bg-soft-warning text-warning fs-10" data-bs-toggle="tooltip" data-bs-placement="top" title="Additional operational expense (tooling wear, lubricants, routine maintenance): {{ \App\Domains\Production\Support\CalculationText::machineExplanation($m) }}">
                                                         +{{ format_currency($mAddCost) }}/hr Expense
                                                     </span>
                                                 @elseif($mDedCost > 0)
-                                                    <span class="badge bg-soft-success text-success fs-10" data-bs-toggle="tooltip" data-bs-placement="top" title="Applied operating grant or energy subsidy: {{ $m['cost_explanation'] ?? '' }}">
+                                                    <span class="badge bg-soft-success text-success fs-10" data-bs-toggle="tooltip" data-bs-placement="top" title="Applied operating grant or energy subsidy: {{ \App\Domains\Production\Support\CalculationText::machineExplanation($m) }}">
                                                         -{{ format_currency($mDedCost) }}/hr Subsidy
                                                     </span>
                                                 @else
@@ -406,7 +428,7 @@
                                         <tr>
                                             <td>Total Active Machines:</td>
                                             <td class="text-end font-monospace text-success">{{ number_format($machData['hourly_machine_capacity'] ?? 0, 1) }} u/h</td>
-                                            <td class="text-end font-monospace">{{ number_format($machData['sum_machine_consumption_per_hour'] ?? 0, 2) }} kW</td>
+                                            <td class="text-end font-monospace">{{ number_format($machData['sum_machine_consumption_per_hour'] ?? 0, 2) }} / hr</td>
                                             <td colspan="2" class="text-end font-monospace text-muted">{{ format_currency($machData['calculated_machine_base_cost_per_hour'] ?? 0) }}/hr</td>
                                             <td class="text-end font-monospace text-primary">{{ format_currency($hourlyMachCost) }}/hr</td>
                                             <td></td>
@@ -416,6 +438,17 @@
                                 @endif
                             </table>
                         </div>
+                        {{-- WC-IMPL-17: machines in this snapshot that were not counted (hidden for old snapshots without the list) --}}
+                        @php $notCountedMachines = $details['inactive_machines'] ?? $machData['inactive_machines'] ?? []; @endphp
+                        @if(!empty($notCountedMachines))
+                            <div class="mt-2 px-3 py-2 border rounded-3 bg-light fs-11 snapshot-not-counted-machines">
+                                <strong class="text-dark"><i class="feather-slash text-secondary me-1"></i>Not counted in this snapshot:</strong>
+                                @foreach($notCountedMachines as $nm)
+                                    <span class="badge bg-white text-secondary border font-monospace fs-10 ms-1">{{ $nm['code'] ?? '—' }}</span>
+                                    <span class="text-muted">{{ $nm['name'] ?? '' }} ({{ str_replace('_', ' ', (string) ($nm['status'] ?? 'not active')) }}){{ !$loop->last ? ',' : '' }}</span>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
 
                     <!-- Pane 2: Manual Batches -->
@@ -480,10 +513,10 @@
                                         <th style="width: 32%">Batch Name</th>
                                         <th style="width: 22%">Assigned Shift</th>
                                         <th style="width: 15%" class="text-end">Hourly Capacity</th>
-                                        <th style="width: 15%" class="text-end">Shift Eff. Hours</th>
+                                        <th style="width: 15%" class="text-end">Shift Hours</th>
                                         <th style="width: 16%" class="text-end">
                                             Daily Output
-                                            <i class="feather-info text-muted ms-1 cursor-pointer" title="Daily Output = Batch Capacity/hr × Shift Effective Hours" data-bs-toggle="tooltip"></i>
+                                            <i class="feather-info text-muted ms-1 cursor-pointer" title="Daily Output = Batch Capacity/hr × Shift Hours (breaks included)" data-bs-toggle="tooltip"></i>
                                         </th>
                                     </tr>
                                 </thead>
@@ -514,10 +547,10 @@
                                             $extDailyCost  = (float) ($b['external_daily_cost'] ?? 0);
                                             $totBatchHourly = (float) ($b['total_batch_hourly_cost'] ?? ($intHourlyCost + $extHourlyCost));
                                             $totBatchDaily  = (float) ($b['total_batch_daily_cost'] ?? ($intDailyCost + $extDailyCost));
-                                            $costPerUnit    = (float) ($b['cost_per_unit'] ?? 0);
+                                            $costPerUnit    = $cpuOf($b, 'cost_per_unit'); // null = N/A (WC-23)
 
                                             // Graceful live fallback for legacy snapshot if cost details were not precalculated
-                                            if (empty($empDetails) && empty($allocDetails) && isset($b['id'])) {
+                                            if ($isLatest && empty($empDetails) && empty($allocDetails) && isset($b['id'])) { // live fallback only for the latest snapshot (WC-IMPL-20)
                                                 $liveBatch = \App\Domains\Production\Models\SectionManualProduction::with(['employees.employee.designation', 'externalWorkerAllocations.payGrade'])->find($b['id']);
                                                 if ($liveBatch) {
                                                     $shiftClock = (float) ($b['shift_clock_hours'] ?? ($shiftMap[$b['shift_id'] ?? null]['duration_hours'] ?? 8.0));
@@ -527,7 +560,7 @@
                                                         foreach ($liveBatch->employees as $be) {
                                                             $emp = $be->employee;
                                                             if ($emp) {
-                                                                $mSal = (float) ($emp->current_salary ?? 0);
+                                                                $mSal = $emp->monthlyCtc();
                                                                 $dSal = round($mSal / 30, 4);
                                                                 $hRate = round($dSal / $shiftClock, 4);
                                                                 $empDetails[] = [
@@ -563,7 +596,7 @@
                                                     $totBatchHourly = round($intHourlyCost + $extHourlyCost, 4);
                                                     $totBatchDaily = round($intDailyCost + $extDailyCost, 4);
                                                     $dailyCapVal = (float) ($b['daily_cap'] ?? 0);
-                                                    $costPerUnit = $dailyCapVal > 0 ? round($totBatchDaily / $dailyCapVal, 4) : 0;
+                                                    $costPerUnit = cost_per_unit_value($totBatchDaily, $dailyCapVal);
                                                 }
                                             }
                                         @endphp
@@ -603,7 +636,7 @@
                                                 {{ number_format((float) ($b['cap_hr'] ?? $b['capacity_per_hour'] ?? 0), 1) }} u/h
                                             </td>
                                             <td class="text-end font-monospace text-muted">
-                                                {{ format_hours((float) ($b['eff_hrs'] ?? $b['shift_effective_hours'] ?? 0)) }}
+                                                {{ format_hours((float) ($b['shift_hours'] ?? $b['eff_hrs'] ?? $b['shift_effective_hours'] ?? 0)) }}
                                             </td>
                                             <td class="text-end font-monospace fw-bold text-dark">
                                                 {{ number_format((float) ($b['daily_cap'] ?? $b['daily_output'] ?? 0), 1) }} units
@@ -893,7 +926,7 @@
                                                                         <div>
                                                                             <span class="fs-12 fw-bold text-dark d-block">Total Batch Labor Cost</span>
                                                                             <span class="text-muted fs-11">
-                                                                                Shift: {{ $b['shift_name'] ?? 'N/A' }} ({{ format_hours($b['eff_hrs'] ?? 8) }} eff. hrs) &bull; Daily Cap: {{ number_format((float) ($b['daily_cap'] ?? 0), 1) }} units
+                                                                                Shift: {{ $b['shift_name'] ?? 'N/A' }} ({{ format_hours((float) ($b['shift_hours'] ?? $b['eff_hrs'] ?? 0)) }} shift hrs) &bull; Daily Cap: {{ number_format((float) ($b['daily_cap'] ?? 0), 1) }} units
                                                                                 @if(!empty($b['formula']))
                                                                                     &bull; <span class="font-monospace text-muted fs-10" title="Daily Output Formula"><i class="feather-help-circle me-0.5"></i>{{ $b['formula'] }}</span>
                                                                                 @endif
@@ -909,10 +942,10 @@
                                                                             <span class="text-muted fs-10 text-uppercase d-block">Daily Labor Expense</span>
                                                                             <strong class="font-monospace fs-12 text-dark">{{ format_currency($totBatchDaily) }}/day</strong>
                                                                         </div>
-                                                                        @if($costPerUnit > 0)
+                                                                        @if($costPerUnit === null || $costPerUnit > 0)
                                                                             <div class="border-start ps-3">
                                                                                 <span class="text-muted fs-10 text-uppercase d-block">Cost Per Unit Output</span>
-                                                                                <strong class="font-monospace fs-12 text-success">{{ format_currency($costPerUnit) }} / unit</strong>
+                                                                                <strong class="font-monospace fs-12 text-success">{!! format_cost_per_unit($costPerUnit, $totBatchDaily) !!}</strong>
                                                                             </div>
                                                                         @endif
                                                                     </div>
@@ -946,6 +979,17 @@
                                 @endif
                             </table>
                         </div>
+                        {{-- WC-IMPL-17: batches in this snapshot that were not counted (hidden for old snapshots without the list) --}}
+                        @php $notCountedBatches = $details['inactive_manual_batches'] ?? []; @endphp
+                        @if(!empty($notCountedBatches))
+                            <div class="mt-2 px-3 py-2 border rounded-3 bg-light fs-11 snapshot-not-counted-batches">
+                                <strong class="text-dark"><i class="feather-slash text-secondary me-1"></i>Not counted in this snapshot:</strong>
+                                @foreach($notCountedBatches as $nb)
+                                    <span class="text-dark fw-semibold ms-1">{{ $nb['batch_name'] ?? 'Batch' }}</span>
+                                    <span class="text-muted">({{ $nb['shift_name'] ?? 'no shift' }}, inactive){{ !$loop->last ? ',' : '' }}</span>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
 
                     <!-- Pane 3: Personnel Labor -->
@@ -981,7 +1025,7 @@
                                                 <tr>
                                                     <td>
                                                         <span class="badge bg-soft-info text-info font-monospace fs-10">[{{ $emp['employee_code'] ?? 'N/A' }}]</span>
-                                                        <strong class="text-dark d-block">{{ $emp['employee_name'] ?? $emp['name'] ?? 'N/A' }}</strong>
+                                                        <strong class="text-dark d-block">{{ $emp['name'] ?? $emp['employee_name'] ?? 'N/A' }}</strong>
                                                     </td>
                                                     <td class="text-end font-monospace text-muted">
                                                         {{ format_currency((float) ($emp['monthly_salary'] ?? $emp['hrms_net_monthly_salary'] ?? 0)) }}
@@ -997,16 +1041,14 @@
                                                         @else
                                                             <span class="badge bg-soft-success text-success font-monospace">{{ $emp['shift_name'] ?? 'N/A' }}</span>
                                                         @endif
-                                                        <small class="text-muted d-block fs-11">{{ format_hours((float) ($emp['shift_duration_hours'] ?? $emp['shift_clock_hours'] ?? 0)) }}</small>
+                                                        <small class="text-muted d-block fs-11">{{ format_hours((float) ($emp['shift_clock_hours'] ?? $emp['shift_duration_hours'] ?? 0)) }}</small>
                                                     </td>
                                                     <td class="text-end font-monospace text-primary fw-semibold">
-                                                        {{ format_currency((float) ($emp['hourly_salary_rate'] ?? $emp['hourly_rate'] ?? 0)) }}/hr
+                                                        {{ format_currency((float) ($emp['hourly_rate'] ?? $emp['hourly_salary_rate'] ?? 0)) }}/hr
                                                     </td>
                                                     <td class="text-end font-monospace fw-bold text-dark">
                                                         {{ format_currency((float) ($emp['daily_cost'] ?? 0)) }}
-                                                        @if(!empty($emp['formula']))
-                                                            <i class="feather-info text-muted ms-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $emp['formula'] }}"></i>
-                                                        @endif
+                                                        <i class="feather-info text-muted ms-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ \App\Domains\Production\Support\CalculationText::employeeFormula($emp) }}"></i>
                                                     </td>
                                                 </tr>
                                             @empty
@@ -1081,9 +1123,7 @@
                                                     </td>
                                                     <td class="text-end font-monospace fw-bold text-dark">
                                                         {{ format_currency((float) ($alloc['daily_cost'] ?? 0)) }}
-                                                        @if(!empty($alloc['formula']))
-                                                            <i class="feather-info text-muted ms-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $alloc['formula'] }}"></i>
-                                                        @endif
+                                                        <i class="feather-info text-muted ms-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ \App\Domains\Production\Support\CalculationText::externalFormula($alloc) }}"></i>
                                                     </td>
                                                 </tr>
                                             @empty
@@ -1140,7 +1180,7 @@
                                             <td>
                                                 <span class="font-monospace fw-bold text-dark">{{ $int['window'] ?? 'N/A' }}</span>
                                                 @if(!empty($int['is_overlapping']))
-                                                    <span class="badge bg-warning text-dark fs-10 px-1.5 py-0.5 rounded-pill d-block mt-0.5" title="{{ $int['explanation'] ?? '' }}">
+                                                    <span class="badge bg-warning text-dark fs-10 px-1.5 py-0.5 rounded-pill d-block mt-0.5" title="{{ \App\Domains\Production\Support\CalculationText::intervalExplanation($int) }}">
                                                         <i class="feather-layers me-0.5"></i>Overlap Surge
                                                     </span>
                                                 @endif
@@ -1221,11 +1261,11 @@
                                             9 => ['name' => 'Inactive Gap Hours', 'cat' => 'Operating Timeline', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => '(Operational Window Duration) - (Unique Operating Hours)', 'desc' => 'Total idle clock hours between scheduled shifts.'],
 
                                             10 => ['name' => 'Active Machines Count', 'cat' => 'Machinery', 'type' => 'Collected', 'source' => 'Section Machine Assignments', 'formula' => 'Count of active assigned machines', 'desc' => 'Total operational machines currently assigned to this section.'],
-                                            11 => ['name' => 'Inactive Machines Count', 'cat' => 'Machinery', 'type' => 'Collected', 'source' => 'Section Machine Assignments', 'formula' => 'Count of disabled / offline assigned machines', 'desc' => 'Machines assigned to this section that are temporarily inactive.'],
+                                            11 => ['name' => 'Inactive Machines Count', 'cat' => 'Machinery', 'type' => 'Collected', 'source' => 'Section Machine Assignments', 'formula' => 'Count of assigned machines whose status is not active (inactive, under maintenance, decommissioned)', 'desc' => 'Machines assigned to this section that are not active; they add no capacity or cost.'],
                                             12 => ['name' => 'Hourly Machine Capacity', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Engineering Specifications', 'formula' => 'Sum of hourly rated capacities of all active machines', 'desc' => 'Combined output capacity in units produced per running machine hour.'],
                                             13 => ['name' => 'Daily Machine Capacity', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Hourly Capacity & Shift Hours', 'formula' => 'Sum of (Active Machine Hourly Capacity * Operating Shift Hours)', 'desc' => 'Total units produced by machinery across all scheduled shifts.'],
-                                            14 => ['name' => 'Sum Energy Consumption / hr', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Electrical Ratings', 'formula' => 'Sum of power consumption (kW) across all active machines', 'desc' => 'Total electrical power consumed per hour by all running machines.'],
-                                            15 => ['name' => 'Calculated Base Cost / hr', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Energy & Electricity Tariffs', 'formula' => 'Sum of (Machine Power kW * Electricity Cost per kWh)', 'desc' => 'Base electricity and fuel running expense per hour.'],
+                                            14 => ['name' => 'Sum Energy Consumption / hr', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Energy Consumption', 'formula' => 'Sum of Consumption per Hour across all active machines', 'desc' => 'Total energy consumed per hour (in each machine\'s own consumption unit, e.g. kWh, litres, m³) by all active machines.'],
+                                            15 => ['name' => 'Calculated Base Cost / hr', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine energy consumption and energy rate', 'formula' => 'Sum of (Consumption per Hour × Energy Rate per Unit) across active machines', 'desc' => 'Base energy running expense per hour (electricity, diesel, gas, etc.).'],
                                             16 => ['name' => 'Total Additional Cost / hr', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Maintenance & Consumables Rates', 'formula' => 'Sum of hourly consumables, tooling, and maintenance charges', 'desc' => 'Additional hourly operating expenses beyond electricity.'],
                                             17 => ['name' => 'Total Deductibles / hr', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Subsidies & Energy Credits', 'formula' => 'Sum of hourly credits, offsets, or operational rebates', 'desc' => 'Hourly financial deductions applied to machine operation.'],
                                             18 => ['name' => 'Hourly Machine Expense', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machinery Cost Engine', 'formula' => 'Base Cost/hr + Additional Cost/hr - Deductibles/hr', 'desc' => 'Net total operating expense per hour for all active machines.'],
@@ -1234,9 +1274,9 @@
 
                                             21 => ['name' => 'Active Manual Batches', 'cat' => 'Manual Batches', 'type' => 'Collected', 'source' => 'Manual Batch Configurations', 'formula' => 'Count of active manual production setups', 'desc' => 'Number of operational manual stations/lines configured in this section.'],
                                             22 => ['name' => 'Inactive Manual Batches', 'cat' => 'Manual Batches', 'type' => 'Collected', 'source' => 'Manual Batch Configurations', 'formula' => 'Count of disabled manual production setups', 'desc' => 'Manual stations currently deactivated or on hold.'],
-                                            23 => ['name' => 'Daily Manual Capacity', 'cat' => 'Manual Batches', 'type' => 'Calculated', 'source' => 'Manual Batch Hourly Rates & Shift Hours', 'formula' => 'Sum of (Manual Batch Speed/hr * Assigned Shift Duration Hours)', 'desc' => 'Total units produced manually across all scheduled shifts.'],
+                                            23 => ['name' => 'Daily Manual Capacity', 'cat' => 'Manual Batches', 'type' => 'Calculated', 'source' => 'Manual Batch Hourly Rates & Shift Hours', 'formula' => 'Sum of (Manual Batch Capacity/hr * Assigned Shift Hours)', 'desc' => 'Total units produced manually across all scheduled shifts.'],
                                             24 => ['name' => 'Hourly Manual Capacity [Weighted Avg]', 'cat' => 'Manual Batches', 'type' => 'Calculated', 'source' => 'Manual Production Engine', 'formula' => 'Daily Manual Capacity / Section Unique Operating Hours', 'desc' => 'Average manual output per hour across the section operating window.'],
-                                            25 => ['name' => 'Peak Hourly Manual Capacity', 'cat' => 'Manual Batches', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Maximum manual throughput achieved in any single clock interval', 'desc' => 'Peak manual production speed when multiple manual shifts overlap.'],
+                                            25 => ['name' => 'Peak Hourly Manual Capacity', 'cat' => 'Manual Batches', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Maximum manual throughput achieved in any single clock interval', 'desc' => 'Peak manual production capacity when multiple manual shifts overlap.'],
                                             26 => ['name' => 'Shift Manual Capacities Subtotals', 'cat' => 'Manual Batches', 'type' => 'Calculated', 'source' => 'Shift Roster & Batch Allocations', 'formula' => 'Breakdown of manual capacity generated within each specific shift', 'desc' => 'Subtotal of manual units produced mapped per shift.'],
 
                                             27 => ['name' => 'Internal Employees Count', 'cat' => 'Internal Labor', 'type' => 'Collected', 'source' => 'HRMS Employee Master', 'formula' => 'Count of salaried internal employees assigned to this section', 'desc' => 'Total company personnel assigned to work in this section.'],
@@ -1336,13 +1376,13 @@
                                     {!! $renderAuditMetricRow(11, (string) ($machData['inactive_machines_count'] ?? 0)) !!}
                                     {!! $renderAuditMetricRow(12, '<span class="text-success">' . number_format($machData['hourly_machine_capacity'] ?? 0, 1) . ' u/h</span>') !!}
                                     {!! $renderAuditMetricRow(13, '<span class="text-success fw-bold">' . number_format($dailyMachCap, 1) . ' units</span>') !!}
-                                    {!! $renderAuditMetricRow(14, number_format($machData['sum_machine_consumption_per_hour'] ?? 0, 2) . ' kW') !!}
+                                    {!! $renderAuditMetricRow(14, number_format($machData['sum_machine_consumption_per_hour'] ?? 0, 2) . ' / hr') !!}
                                     {!! $renderAuditMetricRow(15, format_currency($machData['calculated_machine_base_cost_per_hour'] ?? 0) . '/hr') !!}
                                     {!! $renderAuditMetricRow(16, '<span class="text-warning">+' . format_currency($machData['total_machine_additional_cost_per_hour'] ?? 0) . '/hr</span>') !!}
                                     {!! $renderAuditMetricRow(17, '<span class="text-success">-' . format_currency($machData['total_machine_deductibles_per_hour'] ?? 0) . '/hr</span>') !!}
                                     {!! $renderAuditMetricRow(18, '<span class="text-primary">' . format_currency($hourlyMachCost) . '/hr</span>') !!}
                                     {!! $renderAuditMetricRow(19, '<span class="fw-bold text-dark">' . format_currency($dailyMachCost) . '</span>') !!}
-                                    {!! $renderAuditMetricRow(20, format_currency($machData['machine_cost_per_unit'] ?? 0) . ' / unit') !!}
+                                    {!! $renderAuditMetricRow(20, format_cost_per_unit($cpuOf($machData, 'machine_cost_per_unit'))) !!}
 
                                     <!-- Category 3: Manual Batches -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">3. Manual Batch Production</td></tr>
@@ -1362,7 +1402,7 @@
                                     {!! $renderAuditMetricRow(31, '<span class="text-primary">' . format_currency($avgInternalRate) . '/hr</span>') !!}
                                     {!! $renderAuditMetricRow(32, count($intLabor['shift_internal_hourly_rates'] ?? []) . ' shifts mapped') !!}
                                     {!! $renderAuditMetricRow(33, '<span class="text-danger">' . format_currency($intLabor['peak_internal_hourly_rate'] ?? 0) . '/hr</span>') !!}
-                                    {!! $renderAuditMetricRow(34, format_currency($intLabor['internal_labor_cost_per_unit'] ?? 0) . ' / unit') !!}
+                                    {!! $renderAuditMetricRow(34, format_cost_per_unit($cpuOf($intLabor, 'internal_labor_cost_per_unit'))) !!}
 
                                     <!-- Category 5: External Labor -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">5. External Contractor Labor (Hourly Staff)</td></tr>
@@ -1372,14 +1412,14 @@
                                     {!! $renderAuditMetricRow(38, '<span class="text-primary">' . format_currency($avgExternalRate) . '/hr</span>') !!}
                                     {!! $renderAuditMetricRow(39, count($extLabor['shift_external_hourly_rates'] ?? []) . ' shifts mapped') !!}
                                     {!! $renderAuditMetricRow(40, '<span class="text-danger">' . format_currency($extLabor['peak_external_hourly_rate'] ?? 0) . '/hr</span>') !!}
-                                    {!! $renderAuditMetricRow(41, format_currency($extLabor['external_labor_cost_per_unit'] ?? 0) . ' / unit') !!}
+                                    {!! $renderAuditMetricRow(41, format_cost_per_unit($cpuOf($extLabor, 'external_labor_cost_per_unit'))) !!}
 
                                     <!-- Category 6: Combined Labor -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">6. Combined Labor Metrics</td></tr>
                                     {!! $renderAuditMetricRow(42, '<span class="fw-bold text-primary">' . format_currency($dailyLaborCost) . '</span>') !!}
                                     {!! $renderAuditMetricRow(43, format_currency($avgLaborRate) . '/hr') !!}
                                     {!! $renderAuditMetricRow(44, '<span class="text-danger fw-bold">' . format_currency($peakLaborRate) . '/hr</span>') !!}
-                                    {!! $renderAuditMetricRow(45, format_currency($combLabor['total_labor_cost_per_unit'] ?? 0) . ' / unit') !!}
+                                    {!! $renderAuditMetricRow(45, format_cost_per_unit($cpuOf($combLabor, 'total_labor_cost_per_unit'))) !!}
 
                                     <!-- Category 7: Financial Summary -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">7. Total Financial & Production Summary</td></tr>
@@ -1389,7 +1429,7 @@
                                     {!! $renderAuditMetricRow(49, '<span class="text-primary fw-bolder">' . format_currency($dailyCost) . '</span>') !!}
                                     {!! $renderAuditMetricRow(50, format_currency($avgHourlyCost) . '/hr') !!}
                                     {!! $renderAuditMetricRow(51, '<span class="text-danger fw-bold">' . format_currency($peakHourlyCost) . '/hr</span>') !!}
-                                    {!! $renderAuditMetricRow(52, '<span class="text-dark fw-bolder">' . format_currency($costPerUnit) . ' / unit</span>') !!}
+                                    {!! $renderAuditMetricRow(52, '<span class="text-dark fw-bolder">' . format_cost_per_unit($cpuOf($finSummary, 'cost_per_unit'), $dailyCost) . '</span>') !!}
                                 </tbody>
                             </table>
                         </div>

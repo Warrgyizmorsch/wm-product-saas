@@ -787,6 +787,7 @@ return array (
   'hrs_unit' => 'Hrs',
   'material_cost' => 'Material Cost',
   'overhead_cost' => 'Overhead Cost',
+  'overhead_cost_help' => 'Enter the overhead per day. If you know the monthly amount, divide it by 30.',
   'production_orders' => 'Production Orders',
   'production_order_execution' => 'Production Orders (Manufacturing Execution)',
   'create_direct_order' => 'Create Production Order',

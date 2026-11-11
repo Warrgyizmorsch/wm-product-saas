@@ -332,6 +332,46 @@ if (! function_exists('format_currency')) {
     }
 }
 
+if (! function_exists('cost_per_unit_value')) {
+    /**
+     * Cost per unit with the zero-output rule (WC-23 rule 5):
+     * output > 0 → cost ÷ output (4 decimals); output = 0 and cost > 0 → null ("N/A"); both 0 → 0.
+     */
+    function cost_per_unit_value($cost, $output): ?float
+    {
+        $cost = (float) $cost;
+        $output = (float) $output;
+        if ($output > 0) {
+            return round($cost / $output, 4);
+        }
+
+        return $cost > 0 ? null : 0.0;
+    }
+}
+
+if (! function_exists('format_cost_per_unit')) {
+    /**
+     * Display a cost-per-unit figure. null → "N/A" with an explanation tooltip (WC-23 rule 5).
+     * Not rounded to 2 decimals (no-rounding rule) — shown with 4.
+     *
+     * @param  float|null  $valueInBase  cost per unit in base currency, or null when it cannot be calculated
+     * @param  float|null  $dailyCostInBase  daily cost being incurred (for the tooltip)
+     */
+    function format_cost_per_unit($valueInBase, $dailyCostInBase = null, string $suffix = ' / unit'): string
+    {
+        if ($valueInBase === null) {
+            $tip = 'Output is 0 — cost per unit cannot be calculated.';
+            if ($dailyCostInBase !== null && (float) $dailyCostInBase > 0) {
+                $tip .= ' Daily cost ' . format_currency($dailyCostInBase) . ' is being incurred with no production.';
+            }
+
+            return '<span class="text-warning fw-semibold" data-bs-toggle="tooltip" title="' . e($tip) . '">N/A</span>';
+        }
+
+        return e(format_currency($valueInBase, 4)) . e($suffix);
+    }
+}
+
 if (! function_exists('hours_to_decimal')) {
     /**
      * Convert H.MM format (where .MM is 00-59 minutes) or H:MM into decimal hours for costing.

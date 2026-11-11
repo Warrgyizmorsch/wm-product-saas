@@ -48,7 +48,7 @@
 | WC-35 | Countdown expiry: one batch of queued sections + roll-up; empty queue = Work Center only | ✅ Agreed (fix → WC-IMPL-13; robustness → WC-IMPL-14 proposed) |
 | WC-36 | Immediate calculation only by buttons: header = all sections, banner = queued only; browser timer = countdown | ✅ Agreed (fix → WC-IMPL-13) |
 | WC-37 | Snapshots are never edited; Work Center snapshot records exactly which section snapshots it used | ✅ Agreed (fix → WC-IMPL-15) |
-| WC-38 | Snapshot numbers (#1, #2 …) per section / Work Center; never database IDs | ✅ Agreed |
+| WC-38 | Snapshot numbers (#1, #2 …) per section / Work Center; never database IDs; "#N ↗" opens that exact snapshot | ✅ Agreed (rule 3 corrected 2026-11-11 → WC-IMPL-20) |
 | WC-39 | Audit details: snapshots store numbers; UI shows plain-English formulas; 52 + 47 audit metrics; no raw JSON | ✅ Agreed |
 | WC-40 | Key figures in dedicated snapshot columns; more promoted only after testing | ✅ Agreed |
 | WC-41 | Activity log = completed calculations only (one row per snapshot, linked by batch) | ✅ Agreed (cleanup → WC-IMPL-10) |
@@ -463,9 +463,14 @@ Open items are tracked in [`work_center_implementation_tasks.md`](work_center_im
 ### WC-38: Snapshot Numbers
 1. Every snapshot gets a sequential `snapshot_number` (#1, #2 …) — **per section** for section snapshots, **per Work Center** for Work Center snapshots. Activity logs store the snapshot number too.
 2. The UI always shows the **snapshot number**, never the database ID (the ID is only a safety fallback: `snapshot_number ?? id`).
-3. Activity log buttons "View Snapshot #N" open that snapshot.
+3. Activity log buttons "View Snapshot #N" open **that exact snapshot** — never the latest. *(Corrected 2026-11-11 — see below.)*
+   * Each button loads its own snapshot (section or Work Center) into the calculation modal; all figures come from that snapshot only — **no live data is mixed in** for an older snapshot.
+   * An older snapshot shows a banner: *"Viewing snapshot #2 from {date} — not the latest (latest is #3)."*
+   * The snapshot must belong to the same tenant, Work Center (and section); otherwise 404.
+   → Task **WC-IMPL-20**.
 4. Existing snapshots were backfilled with numbers (migration `2026_10_31_000001`).
-* *Code reference:* `SectionCalculationService.php` 1321; `WorkCenterCalculationService.php` 281; UI `work-centers/show.blade.php` 654, 1716, 1720, 3417, 4264, 4268, 4489, 4927, 4931; `section-calculation-modal.blade.php` 16. Matches this decision — no change needed (concurrent-number clashes → WC-IMPL-14).
+* *Code reference:* numbering ✔ `SectionCalculationService.php` 1321; `WorkCenterCalculationService.php` 281; labels `work-centers/show.blade.php` 654, 3421, 4493; `section-calculation-modal.blade.php` 16.
+* *Correction (2026-11-11, found by the user):* rule 3 was wrongly recorded as "matches — no change needed". The buttons (`show.blade.php` 1716 / 1720, 4267 / 4271, 4930 / 4934) only open a modal rendered once at page load from the **latest** snapshot (`section-calculation-modal.blade.php` 34 `$section->latestCalculation`; Work Center modal built inline from `$latestSnapshot`, ~3180–4593), and `WorkCenterController::calculationDetails()` 351–364 returns only the latest — so every "#N ↗" opens the latest snapshot. (Concurrent-number clashes → WC-IMPL-14.)
 * *Origin:* `calculation_audit_issues_tracker.md` ISSUE-02 #14; confirmed 2026-11-10.
 
 ### WC-39: Plain-English Audit Details

@@ -316,6 +316,88 @@ class WorkCenterSection extends BaseModel
         return $this->status === self::STATUS_ACTIVE;
     }
 
+    /**
+     * WC-IMPL-09 (WC-24): one place for the "labor cost with 0 output" warnings.
+     * Triggers on ACTIVE machines only (a section whose only machine is under maintenance produces 0);
+     * the reason explains what is missing and names the non-active machines by status.
+     *
+     * @param float|null $dailyLaborCost labor cost per day in base currency (from the snapshot); null = unknown
+     * @return array{zero_output: bool, partial_unutilized: bool, active_machine_count: int, machine_count: int,
+     *               inactive_machine_statuses: array<string,int>, active_batch_count: int, total_personnel: int,
+     *               active_employee_count: int, active_external_count: int,
+     *               unassigned_internal: int, unassigned_external: int, unassigned_total: int, reason: string}
+     */
+    public function outputLaborStatus(?float $dailyLaborCost = null): array
+    {
+        $machines = $this->machines ?? collect();
+        $activeMachines = $machines->where('status', Machine::STATUS_ACTIVE);
+        $inactiveStatuses = $machines->reject(fn($m) => $m->status === Machine::STATUS_ACTIVE)
+            ->countBy(fn($m) => (string) ($m->status ?: 'unknown'))
+            ->all();
+
+        $activeBatches = ($this->manualProductions ?? collect())->where('active', true);
+        $activeBatchIds = $activeBatches->pluck('id');
+        $batchEmployeeIds = $activeBatches->flatMap(fn($b) => $b->employees ? $b->employees->pluck('id') : collect())->unique();
+
+        $activeEmployees = ($this->employeeAssignments ?? collect())->where('active', true);
+        $activeAllocations = ($this->externalWorkerAllocations ?? collect())->where('active', true);
+
+        $activeEmployeeCount = $activeEmployees->count();
+        $activeExternalCount = (int) $activeAllocations->sum('number_of_external_workers');
+        $totalPersonnel = $activeEmployeeCount + $activeExternalCount;
+
+        $unassignedInternal = $activeEmployees->reject(fn($a) => $batchEmployeeIds->contains($a->id))->count();
+        $unassignedExternal = (int) $activeAllocations
+            ->filter(fn($al) => empty($al->manual_production_id) || !$activeBatchIds->contains($al->manual_production_id))
+            ->sum('number_of_external_workers');
+        $unassignedTotal = $unassignedInternal + $unassignedExternal;
+
+        $noActiveMachine = $activeMachines->isEmpty();
+        $zeroOutput = $noActiveMachine && $activeBatches->isEmpty() && $totalPersonnel > 0;
+        $partialUnutilized = $noActiveMachine && $activeBatches->isNotEmpty() && $unassignedTotal > 0;
+
+        // Reason (rule 2): what is missing
+        if ($machines->isEmpty()) {
+            $machineReason = 'No machines assigned';
+        } else {
+            $parts = [];
+            foreach ($inactiveStatuses as $status => $n) {
+                $parts[] = $n . ' ' . str_replace('_', ' ', $status);
+            }
+            $machineReason = $machines->count() . ' ' . \Illuminate\Support\Str::plural('machine', $machines->count())
+                . ' assigned but none is active (' . implode(', ', $parts) . ')';
+        }
+
+        $reason = '';
+        if ($zeroOutput) {
+            $costText = $dailyLaborCost !== null ? 'labor cost ' . format_currency($dailyLaborCost) . '/day is' : 'labor cost is';
+            $reason = $machineReason . ' and no active manual batches. ' . $totalPersonnel . ' ' . \Illuminate\Support\Str::plural('worker', $totalPersonnel)
+                . ' ' . ($totalPersonnel === 1 ? 'is' : 'are') . ' actively assigned — ' . $costText . ' incurred with 0 output.';
+        } elseif ($partialUnutilized) {
+            $who = [];
+            if ($unassignedInternal > 0) $who[] = $unassignedInternal . ' ' . \Illuminate\Support\Str::plural('employee', $unassignedInternal);
+            if ($unassignedExternal > 0) $who[] = $unassignedExternal . ' external ' . \Illuminate\Support\Str::plural('worker', $unassignedExternal);
+            $reason = $machineReason . '. ' . implode(' and ', $who) . ' ' . ($unassignedTotal === 1 ? 'is' : 'are')
+                . ' not assigned to any active manual batch — their labor cost is incurred with 0 output.';
+        }
+
+        return [
+            'zero_output'               => $zeroOutput,
+            'partial_unutilized'        => $partialUnutilized,
+            'active_machine_count'      => $activeMachines->count(),
+            'machine_count'             => $machines->count(),
+            'inactive_machine_statuses' => $inactiveStatuses,
+            'active_batch_count'        => $activeBatches->count(),
+            'total_personnel'           => $totalPersonnel,
+            'active_employee_count'     => $activeEmployeeCount,
+            'active_external_count'     => $activeExternalCount,
+            'unassigned_internal'       => $unassignedInternal,
+            'unassigned_external'       => $unassignedExternal,
+            'unassigned_total'          => $unassignedTotal,
+            'reason'                    => $reason,
+        ];
+    }
+
     public function scopeActive(Builder $query): void
     {
         $query->where('status', self::STATUS_ACTIVE);

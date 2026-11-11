@@ -119,14 +119,14 @@ class WorkCenterController extends Controller
 
         $countdownEngine = app(CountdownCalculationEngine::class);
 
-        // Auto-process expired countdown if user opens/reloads page after timer elapsed
-        if ($workCenter->calculation_countdown_end_at 
-            && now()->gte($workCenter->calculation_countdown_end_at) 
-            && !empty($workCenter->pending_calculation_section_ids)
+        // Auto-process expired countdown if user opens/reloads page after timer elapsed.
+        // WC-IMPL-13: an empty queue (Work Center-level edit) is processed too — as a roll-up only.
+        if ($workCenter->calculation_countdown_end_at
+            && now()->gte($workCenter->calculation_countdown_end_at)
             && !$workCenter->is_calculation_running
         ) {
             try {
-                $countdownEngine->recalculateNow($workCenter, triggerType: 'countdown_timer');
+                $countdownEngine->recalculateNow($workCenter, triggerType: 'countdown_timer', scope: CountdownCalculationEngine::SCOPE_QUEUE);
                 $workCenter->refresh();
             } catch (\Throwable $e) {}
         }
@@ -308,8 +308,29 @@ class WorkCenterController extends Controller
         abort_if(!$workCenter, 404, 'Work center not found.');
         Gate::authorize('update', $workCenter);
 
+        // WC-IMPL-13: header button = scope 'all'; banner button / browser timer = scope 'queue'.
+        $scope = request()->input('scope') === CountdownCalculationEngine::SCOPE_ALL
+            ? CountdownCalculationEngine::SCOPE_ALL
+            : CountdownCalculationEngine::SCOPE_QUEUE;
+
+        // The browser timer posts trigger=countdown_timer. Accept it only when the countdown has really ended;
+        // if it has not ended yet, or was already processed (e.g. by the cron), do not calculate again.
+        $triggerType = 'manual';
+        if (request()->input('trigger') === 'countdown_timer') {
+            $endAt = $workCenter->calculation_countdown_end_at;
+            if (!$endAt || now()->lt($endAt) || $workCenter->is_calculation_running) {
+                $msg = 'Countdown already processed or not finished yet — no recalculation run.';
+                if (request()->wantsJson()) {
+                    return response()->json(['success' => true, 'skipped' => true, 'message' => $msg]);
+                }
+                return redirect()->route('production.work-centers.show', $workCenter->id);
+            }
+            $triggerType = 'countdown_timer';
+            $scope = CountdownCalculationEngine::SCOPE_QUEUE;
+        }
+
         try {
-            $snapshot = $engine->recalculateNow($workCenter, 'manual');
+            $snapshot = $engine->recalculateNow($workCenter, $triggerType, $scope);
             $msg = "Work Center '{$workCenter->name}' recalculated successfully. Daily Capacity: {$snapshot->daily_capacity} units.";
             if (request()->wantsJson()) {
                 return response()->json(['success' => true, 'message' => $msg, 'snapshot' => $snapshot]);
@@ -360,6 +381,54 @@ class WorkCenterController extends Controller
         return response()->json([
             'success'  => true,
             'snapshot' => $latestSnapshot,
+        ]);
+    }
+
+    /**
+     * WC-IMPL-20 (WC-38 rule 3): rendered breakdown modal for ONE exact Work Center snapshot.
+     * Read-only — never calculates (WC-31). Snapshot must belong to this Work Center (tenant-scoped), else 404.
+     */
+    public function workCenterSnapshotModal(int $work_center, int $snapshot): View
+    {
+        $workCenter = $this->repository->find($work_center);
+        abort_if(!$workCenter, 404, 'Work center not found.');
+        Gate::authorize('view', $workCenter);
+
+        $snapshotModel = \App\Domains\Production\Models\WorkCenterCalculation::where('id', $snapshot)
+            ->where('work_center_id', $workCenter->id)
+            ->first();
+        abort_if(!$snapshotModel, 404, 'Snapshot not found.');
+
+        return view('modules.production.work-centers.partials.work-center-calculation-modal', [
+            'workCenter'     => $workCenter,
+            'snapshot'       => $snapshotModel,
+            'modalElementId' => 'snapshotViewerModal_wc_' . $snapshotModel->id,
+        ]);
+    }
+
+    /**
+     * WC-IMPL-20 (WC-38 rule 3): rendered breakdown modal for ONE exact section snapshot.
+     * Read-only — never calculates (WC-31). Section must belong to this Work Center and the snapshot to that section, else 404.
+     */
+    public function sectionSnapshotModal(int $work_center, int $section, int $snapshot): View
+    {
+        $workCenter = $this->repository->find($work_center);
+        abort_if(!$workCenter, 404, 'Work center not found.');
+        Gate::authorize('view', $workCenter);
+
+        $sectionModel = $workCenter->sections->firstWhere('id', $section);
+        abort_if(!$sectionModel, 404, 'Section not found.');
+
+        $snapshotModel = \App\Domains\Production\Models\WorkCenterSectionCalculation::where('id', $snapshot)
+            ->where('section_id', $sectionModel->id)
+            ->first();
+        abort_if(!$snapshotModel, 404, 'Snapshot not found.');
+
+        return view('modules.production.work-centers.partials.section-calculation-modal', [
+            'workCenter'     => $workCenter,
+            'section'        => $sectionModel,
+            'snapshot'       => $snapshotModel,
+            'modalElementId' => 'snapshotViewerModal_sec_' . $snapshotModel->id,
         ]);
     }
 }

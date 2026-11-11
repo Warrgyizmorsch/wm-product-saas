@@ -20,26 +20,27 @@
 
 | Task ID | Title | Source Decision | Status |
 | :--- | :--- | :--- | :--- |
-| **WC-IMPL-01** | Manual batch output uses full shift hours (breaks included) | WC-02 rule 2 | 🟢 Agreed |
+| **WC-IMPL-01** | Manual batch output uses full shift hours (breaks included) | WC-02 rule 2 | 🛠️ Applied (code working) — awaiting user verification |
 | **WC-IMPL-02** | Shift module: handle break ≥ shift duration (0 working hours) at shift creation/edit | WC-02 | 📌 Marked for Shift Module |
 | **WC-IMPL-03** | ~~Timeline windows ignore breaks for manual batches~~ | — | ❌ Cancelled — superseded by WC-IMPL-01 |
-| **WC-IMPL-04** | Hardcoded `$` in calculation snapshot explanation texts (tenant currency not used) | WC-08, WC-46 | 🟢 Agreed — Method A |
-| **WC-IMPL-05** | Audit metric #15 described as electricity/kW only (should be generic energy) | WC-10 | 🟢 Agreed |
+| **WC-IMPL-04** | Hardcoded `$` in calculation snapshot explanation texts (tenant currency not used) | WC-08, WC-46 | 🛠️ Applied (code working) |
+| **WC-IMPL-05** | Audit metric #15 described as electricity/kW only (should be generic energy) | WC-10 | 🛠️ Applied (code working) |
 | **WC-IMPL-06** | Remove leftover code for dropped section manual-production columns | WC-12 | 🟢 Agreed |
-| **WC-IMPL-07** | Production reads annual CTC as monthly (labor 12× too high) — use HRMS monthly CTC method | WC-17 | 🟢 Agreed |
+| **WC-IMPL-07** | Production reads annual CTC as monthly (labor 12× too high) — use HRMS monthly CTC method | WC-17 | 🛠️ Applied (code working) — awaiting user verification |
 | **WC-HRMS-01** | HRMS: employee form label "Current Salary" doesn't say annual; FnF guesses annual vs monthly | WC-17 | 📌 Marked for HRMS Module |
-| **WC-IMPL-08** | Cost per unit shows 0 when output is 0 but cost > 0 — show "N/A" (null) | WC-23 | 🟢 Agreed |
-| **WC-IMPL-09** | Zero-output warning counts machines of any status — use active machines, explain reason | WC-24 | 🟢 Agreed |
+| **WC-IMPL-08** | Cost per unit shows 0 when output is 0 but cost > 0 — show "N/A" (null) | WC-23 | 🛠️ Applied (code working) — awaiting user verification |
+| **WC-IMPL-09** | Zero-output warning counts machines of any status — use active machines, explain reason | WC-24 | 🛠️ Applied (code working) |
 | **WC-IMPL-10** | Remove unused legacy code: `calculateCapacity()` / `calculateLaborCost()` (WorkCenterCalculationService), `logResourceChange()` (WorkCenterActivityLogger) | WC-25, WC-41 | 🟢 Agreed |
-| **WC-IMPL-11** | Direct staff hourly rate uses shift minus break; footer says "over 24h" | WC-27 | 🟢 Agreed |
-| **WC-IMPL-12** | Overhead unit "/ day" missing on Work Center add/edit forms (and check show page) | WC-28 | 🟢 Agreed |
-| **WC-IMPL-13** | Countdown with empty queue recalculates every section — should be Work Center roll-up only | WC-35 | 🟢 Agreed |
+| **WC-IMPL-11** | Direct staff hourly rate uses shift minus break; footer says "over 24h" | WC-27 | 🛠️ Applied (code working) — awaiting user verification |
+| **WC-IMPL-12** | Overhead unit "/ day" missing on Work Center add/edit forms (and check show page) | WC-28 | 🛠️ Applied (code working) |
+| **WC-IMPL-13** | Countdown with empty queue recalculates every section — should be Work Center roll-up only | WC-35 | 🛠️ Applied (code working) |
 | **WC-IMPL-14** | Countdown robustness: per-WC error handling in cron, lock checked by button, stuck lock, tenant context in cron | WC-35 | 🟡 Proposed |
-| **WC-IMPL-15** | Work Center snapshot doesn't record which section snapshots it used (reused older ones untraceable) | WC-37 | 🟢 Agreed |
-| **WC-IMPL-16** | Work Center hero panel: no "Calculation Pending" state; live overhead fallback shown as total cost | WC-42 | 🟢 Agreed |
-| **WC-IMPL-17** | Modal footers: Details modal counts inactive machines/batches; snapshot modal hides not-counted items | WC-43 | 🟢 Agreed |
-| **WC-IMPL-18** | Shifts tab footer and Operating Window card use different maths from the calculation | WC-44 | 🟢 Agreed |
-| **WC-IMPL-19** | Duplicate alias keys in snapshots; "Target Speed / pcs" label; final format/wording sweep | WC-45 | 🟢 Agreed |
+| **WC-IMPL-15** | Work Center snapshot doesn't record which section snapshots it used (reused older ones untraceable) | WC-37 | 🛠️ Applied (code working) |
+| **WC-IMPL-16** | Work Center hero panel: no "Calculation Pending" state; live overhead fallback shown as total cost | WC-42 | 🛠️ Applied (code working) |
+| **WC-IMPL-17** | Modal footers: Details modal counts inactive machines/batches; snapshot modal hides not-counted items | WC-43 | 🛠️ Applied (code working) |
+| **WC-IMPL-18** | Shifts tab footer and Operating Window card use different maths from the calculation | WC-44 | 🛠️ Applied (code working) |
+| **WC-IMPL-19** | Duplicate alias keys in snapshots; "Target Speed / pcs" label; final format/wording sweep | WC-45 | 🛠️ Applied (code working) |
+| **WC-IMPL-20** | "View Snapshot #N" opens that exact snapshot, not the latest (section + Work Center modals, no live data in old snapshots) | WC-38 | 🛠️ Applied (code working) |
 | **WC-MACH-01** | Idle machines: confirm status meaning so idle machines count as active (no zero-output warning) | WC-24, WC-07 | 📌 Marked for Machine Module |
 | **WC-ISSUE-11** | Machine operating cost and energy rate not converted to base currency on save | WC-46 | ⏸️ Decide Later (with WC-FINAL-01) |
 | **WC-ISSUE-12** | HRMS salary stored in tenant currency; Production treats it as base | WC-46 | ⏸️ Decide Later (with WC-FINAL-01; 📌 HRMS) |
@@ -63,7 +64,8 @@
 
 ## WC-IMPL-01: Manual Batch Output Uses Full Shift Hours (Breaks Included)
 * **Source Decision:** WC-02 rule 2 (revised 2026-11-10 — breaks are counted, not excluded)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:** `SectionCalculationService` — shift item no longer has `effective_minutes` / `effective_hours`; batch `daily_cap = capacity × duration_hours`; snapshot key renamed `eff_hrs` → **`shift_hours`** (views fall back to `eff_hrs` for old snapshots; `shift_clock_hours` kept for labor, it carries the 8 h fallback). Modal header "Shift Hours", tooltip and banner updated. New `ProductionShift::getClockHoursAttribute()` (`clock_hours`, breaks included, start = end → 24 h, no times → null) used by the Shifts tab ("Shift Hours (breaks incl.)") and the section-row shift tooltip; their `8.00 hrs` fallbacks removed. Test: `tests/Feature/Production/WorkCenterFigureFixesTest.php`.
 
 ### Current Behaviour (Conflicts with Decision)
 Batch output subtracts the shift break. In `app/Domains/Production/Services/SectionCalculationService.php`:
@@ -275,7 +277,8 @@ Ideas agreed as "not now"; recorded so they are not lost. Not to be implemented 
 
 ## WC-IMPL-04: Hardcoded `$` in Calculation Snapshot Explanation Texts
 * **Source Decision:** WC-08 rule 4, WC-46 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed — **Method A chosen (2026-11-10)**: store numbers, build text at display
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification (was: **Method A chosen (2026-11-10)**: store numbers, build text at display)
+* **Implementation notes:** New `app/Domains/Production/Support/CalculationText.php` builds every money sentence at display with `format_currency(…, 4)` (tenant currency, converted from base): `machineExplanation()`, `machineCostFormula()`, `employeeFormula()`, `externalFormula()`, `directStaffFormula()`, `intervalExplanation()`. Services now store numbers + a type instead of text: machine `explanation_type` (`additional` / `deductible` / `matches` / `flat` / `energy` / `none`; `cost_explanation` and `cost_formula` no longer stored); personnel, contractor and direct-staff `formula` no longer stored (direct staff gains `annual_ctc`); timeline labor intervals store `explanation_type` (`labor_overlap` / `labor_regular`) with `explanation = null` (the machine-capacity variant has no money and keeps its text); salary warning text has no currency ("labor cost counted as 0"). Views (section modal machines / personnel / timeline tooltips; WC modal direct-staff cost tooltip — new) call `CalculationText`. **Old snapshots keep showing their stored text.** Also: WC modal "0 output • $0 cost" → `format_currency(0)`; direct-staff "Base" daily no longer rounded to 2 (uses stored `base_daily_salary`); WC-39 outdated "Raw JSON" comment fixed. Remaining currency conversion audit → WC-FINAL-01. Test: `tests/Feature/Production/WorkCenterDisplayPartCTest.php`.
 
 ### Problem
 Explanation / formula strings are built inside the calculation services with a literal `$` and raw base-currency numbers, then stored in the snapshot JSON (`calculation_details`). A tenant using INR sees `$`, and the amount is not converted from base currency.
@@ -313,7 +316,8 @@ Currency helpers available in `app/helpers.php`: `active_currency_symbol()` (240
 
 ## WC-IMPL-05: Audit Metric #15 Described as Electricity / kW Only
 * **Source Decision:** WC-10 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:** `section-calculation-modal.blade.php`: "Total Power … kW" → "Total Consumption … / hr"; machines table header "Power (kW)" → "Consumption / hr", footer and metric #14 value "kW" → "/ hr"; metric #14 and #15 source / formula / description made generic ("Sum of (Consumption per Hour × Energy Rate per Unit) across active machines"); metric #11 wording now "status is not active (inactive, under maintenance, decommissioned)" (WC-MACH-01 item 4). Work Center modal metric #34 "Total Machine Electrical Power Consumption (kW)" → "Total Machine Energy Consumption", value "/ hr". Section Details modal machines tab "Power (kW)" → "Consumption / hr". Subsidy wording (WC-10 rule 3) untouched. Test: `tests/Feature/Production/WorkCenterDisplayPartCTest.php`.
 
 ### Problem
 `resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php` line 1228 — audit metric #15 (`calculated_machine_base_cost_per_hour`) in `$auditMetricsMeta`:
@@ -427,7 +431,8 @@ Batch workers must be on the batch's shift: employee HRMS shift = batch shift (o
 
 ## WC-IMPL-07: Production Reads Annual CTC as Monthly — Use HRMS Monthly CTC Method
 * **Source Decision:** WC-17 (agreed 2026-11-10, Option B)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:** new `App\Domains\HRMS\Models\Employee::monthlyCtc()` (= `current_salary ÷ 12`, same rule as `PayrollCalculationService.php` 268). **Payroll code is NOT changed** (user decision 2026-11-11 — payroll stays as it is; the user reverts that one-line edit). Production reads switched at `SectionCalculationService.php` (batch labor, section personnel, routing operator labor), `WorkCenterCalculationService.php` (direct staff) and the modal fallback (`section-calculation-modal.blade.php` 530). Formula texts now start *"Annual CTC (X) / 12 = Monthly CTC (Y) / 30 days …"*; section personnel details gain `annual_ctc`; `monthly_salary` / `monthly_ctc` now hold the true monthly figure. `ProductionTestWorkCenterSeeder` salaries ×12 (annual). **Old snapshots keep their old numbers — recalculate work centers to refresh.** Test: `WorkCenterFigureFixesTest`.
 
 ### Problem
 `employees.current_salary` is the **annual CTC** in HRMS, but Production treats it as **monthly** and divides by 30. Example: annual CTC ₹6,00,000 → costed at ₹20,000/day instead of ₹1,667/day. Affects section labor, work center cost, cost per unit, routing operation labor cost, and therefore BOM/routing cost.
@@ -435,7 +440,7 @@ Batch workers must be on the batch's shift: employee HRMS shift = batch shift (o
 **Evidence (HRMS = annual):** compensation tab label `hrms.employees.lbl_annual_ctc` (`resources/views/modules/hrms/employees/tabs/compensation.blade.php` 129–130); `PayrollCalculationService.php` 268 (`$monthlyCTC = current_salary / 12`), 339, 369 (daily wage = `current_salary / 12 / divisor`), 235, 242 (yearly component values); slab matching on `min_ctc`/`max_ctc` (`PayrollCalculationService.php` 211–212, `EmployeeRepository.php` 138–139, `EmployeeApiController.php` 230–231); `MaintenanceWorkOrderService.php` 1093–1125 (Production already treats it as annual there); `HrmsDemoSeeder.php` 1152–1185 (28,00,000 etc.).
 
 ### Required Change
-1. **HRMS (owner of the rule):** add one method returning payroll monthly CTC, e.g. `Employee::monthlyCtc(): float` → `current_salary / 12` (same rule as `PayrollCalculationService.php` 268). Optionally make `PayrollCalculationService` line 268 call it so there is one source.
+1. **HRMS (owner of the rule):** add one method returning payroll monthly CTC, e.g. `Employee::monthlyCtc(): float` → `current_salary / 12` (same rule as `PayrollCalculationService.php` 268). ~~Optionally make `PayrollCalculationService` line 268 call it~~ — **not done: payroll code stays unchanged (user decision 2026-11-11).**
 2. **Production:** replace every direct read of `current_salary` as monthly with the HRMS method:
 
 | # | File | Line | Context |
@@ -513,7 +518,8 @@ Workers on **different shifts** are added together. Example: 1 morning operator 
 
 ## WC-IMPL-08: Cost per Unit = "N/A" When Output Is 0 but Cost > 0
 * **Source Decision:** WC-23 rule 5 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:** new helpers in `app/helpers.php`: `cost_per_unit_value($cost, $output)` (null when output 0 and cost > 0) and `format_cost_per_unit($value, $dailyCost, $suffix)` ("N/A" + tooltip; values shown with 4 decimals). Used for section, batch and Work Center cost per unit in both services, and for every per-unit display in `work-centers/show.blade.php` (hero badge, section details tab, timeline cells, contributing sections, cost card, grand total, WC audit metrics 18/26/30/36/39/41/47) and `section-calculation-modal.blade.php` (KPI card, batch banner, audit metrics 20/34/41/45/52 — #52 now reads the section figure, not the last batch). Snapshot reads no longer fall back to live numbers when the stored value is null. Migration `2026_11_11_100000_make_work_center_calculation_cost_per_unit_nullable.php`. Test: `WorkCenterFigureFixesTest` (incl. page render showing "N/A").
 
 ### Problem
 Every cost-per-unit figure is `0` when capacity is 0, even when cost is being incurred — it reads as "free" instead of "cannot be calculated".
@@ -543,7 +549,8 @@ Every cost-per-unit figure is `0` when capacity is 0, even when cost is being in
 
 ## WC-IMPL-09: Zero-Output Warning — Count Active Machines Only, Explain the Reason
 * **Source Decision:** WC-24 rules 1–3 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:** New `WorkCenterSection::outputLaborStatus(?float $dailyLaborCost)` — one place for the flags and the reason: active machines = `status = active` (no `idle` status exists — WC-MACH-01 still open, update the filter there if one is added); reason *"No machines assigned and no active manual batches."* or *"N machine(s) assigned but none is active (1 under maintenance, …)"* + *"X workers are actively assigned — labor cost Y/day is incurred with 0 output."* (Y from the latest section snapshot, tenant currency; omitted when no snapshot); partial-unutilized reason names the unassigned employees / external workers. Used by: section row badge ("Cost with 0 Output (N)" — N = active personnel), row tooltips, Configuration Advisory banner (active sections only), Section Details modal alerts + batches-tab advisories, section calculation modal alert (latest view only). Inactive sections show no warning. Test: `tests/Feature/Production/WorkCenterDisplayPartCTest.php`.
 * **Depends on:** WC-MACH-01 (idle machines must count as active) — settle the machine status meaning first.
 
 ### Problem
@@ -614,7 +621,8 @@ An **idle** machine is technically active — available, just not running at the
 
 ## WC-IMPL-11: Direct Staff Hourly Rate Uses Shift Minus Break; Footer Says "over 24h"
 * **Source Decision:** WC-27 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:** `WorkCenterCalculationService` direct staff uses `$empShift->clock_hours` (breaks included); formula text says *"shift clock hrs (breaks included)"* and starts from Annual CTC; footer `show.blade.php` 4156 now *"/ hr over {hours} operating window"*. 8 h fallback for missing shift left for WC-ISSUE-07. Test: `WorkCenterFigureFixesTest` (1,800/day ÷ 9 h = 200/hr).
 
 ### Problem
 | # | File | Lines | Current | Required |
@@ -632,7 +640,8 @@ An **idle** machine is technically active — available, just not running at the
 
 ## WC-IMPL-12: Overhead Unit "/ day" on Work Center Forms and Show Page
 * **Source Decision:** WC-28 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:** `create.blade.php` / `edit.blade.php` label "Overhead Cost (₹ / day)" + helper text `production.overhead_cost_help` (en / hi / bg). WC modal: reconciliation "+ Mach & Overhead" and the burden callout now say "/ day". Hero card, overhead integration card and metrics #37–40 already had it. Test: `tests/Feature/Production/WorkCenterDisplayPartCTest.php`.
 
 ### Code Mapping
 | # | File | Lines | Current | Required |
@@ -684,7 +693,15 @@ An **idle** machine is technically active — available, just not running at the
 
 ## WC-IMPL-13: Countdown With Empty Queue → Work Center Roll-Up Only
 * **Source Decision:** WC-35 rules 3–4 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:**
+  * `WorkCenterCalculationService::calculateAndSave()`: `$sectionsToRecalculate = $allSections->whereIn('id', $impactedSectionIds)` — empty list = **no** section recalculated; every section reuses its latest snapshot; a section with no snapshot yet is still calculated (existing branch). Docblock updated.
+  * `CountdownCalculationEngine::recalculateNow($wc, $triggerType, $scope = 'queue')` + constants `SCOPE_ALL` / `SCOPE_QUEUE`; `all` passes every active section ID; unknown scope → exception. Cron (`processExpiredCountdowns()`) uses the default `queue`.
+  * `WorkCenterController::recalculateNow()`: reads `scope` (`all` / anything else = `queue`), both recorded as `manual`. `trigger=countdown_timer` is accepted only when `calculation_countdown_end_at` has passed and no calculation is running; otherwise nothing runs (already processed by the cron, or not finished) and the page just reloads. A timer run always uses the queue.
+  * `show()` page-reload auto-process: the `!empty(pending_calculation_section_ids)` condition removed, so an expired Work Center-only countdown is also completed on reload (roll-up only, `countdown_timer`). Before, only the cron finished it.
+  * `show.blade.php`: header "Recalculate" form sends `scope=all` (tooltip updated); banner "Recalculate Now (Bypass)" form sends `scope=queue`; JS auto-submit at 00:00 adds `trigger=countdown_timer`. Banner text for an empty queue: "All Active Sections" → **"Work Center roll-up only"**.
+  * Activity log (item 4): a roll-up-only run writes exactly **1** Work Center entry and no section entries (reused section snapshots are not logged) — covered by a test.
+  * Tests: `tests/Feature/Production/WorkCenterCountdownScopeTest.php` (WC-IMPL-13: 7 tests). `WorkCenterSnapshotViewerTest` now uses `SCOPE_ALL` for its two full runs.
 
 ### Problem
 `app/Domains/Production/Services/WorkCenterCalculationService.php` 216–218:
@@ -707,7 +724,25 @@ An empty queue means **all sections**. Any Work Center edit arms the countdown w
 
 ## WC-IMPL-14: Countdown Robustness (Cron, Lock, Tenant Context)
 * **Source Decision:** WC-35 rule 5 (logged 2026-11-10)
-* **Status:** 🟡 **Proposed** — recommended fix; user has not confirmed yet.
+* **Status:** 🟡 **Proposed** — detailed proposal discussed 2026-11-11 (below); user asked to keep it documented and decide later. Not agreed yet — do not implement.
+
+### Detailed Proposal (discussed 2026-11-11 — awaiting decision)
+Re-checked against the current code: `processExpiredCountdowns()` loops all tenants' expired Work Centers with no `try/catch`; the buttons never check `is_calculation_running`; the lock has no start time; the cron command (`ProcessCalculationCountdowns`, scheduled every minute with `withoutOverlapping()` in `routes/console.php`) never sets a tenant, so the `BelongsToTenant` global scope is **off** during cron runs (no wrong figures found today — the calculation services filter by `tenant_id` themselves — but any helper / relation relying on the current tenant would see all tenants).
+
+| # | Area | Proposed rule |
+| :-: | :--- | :--- |
+| 1 | Cron failures | Each Work Center runs in its own `try/catch`; the error is logged; the loop continues with the next one. |
+| 2 | Cron failures | After a failure the countdown end is pushed **5 minutes** later (no retry every minute). |
+| 3 | Cron failures | After **3** failures in a row automatic retries stop; the Work Center page shows a red banner *"Automatic recalculation failed: {error}. Fix the data and press Recalculate."*; a successful run resets the count. New columns `calculation_failure_count`, `last_calculation_error`. |
+| 4 | Concurrent runs | The lock is one atomic step (`UPDATE … SET is_calculation_running = 1 WHERE id = ? AND is_calculation_running = 0`); only one run wins. |
+| 5 | Concurrent runs | Button pressed while running → refused: *"A calculation is already running for this Work Center — the page will show the new snapshot when it finishes."* Page reload and browser timer skip quietly. |
+| 6 | Concurrent runs | Section calculations only happen inside a Work Center run, so the same lock also fixes duplicate section `snapshot_number`s (WC-IMPL-15 note). |
+| 7 | Stuck lock | Store the lock time in new column `calculation_started_at`. |
+| 8 | Stuck lock | A lock older than **10 minutes** is stale and may be taken over (logged). |
+| 9 | Stuck lock | Cron `withoutOverlapping()` lock expiry set to **10 minutes** (default 24 h would block all automatic recalculation for a day after a killed run). |
+| 10 | Tenant context | Before each Work Center the cron sets that Work Center's tenant in `TenantContext` and clears it afterwards, so the calculation behaves exactly as in the browser. |
+
+**Open points for the decision:** the 5-minute retry delay, stop after 3 failures, the 10-minute stale time. Recommended priority if split: rule 10 and rules 4–6 first (they protect the figures), then 1–3 and 7–9.
 
 | # | Problem | File | Lines | Proposed Fix |
 | :-: | :--- | :--- | :--- | :--- |
@@ -720,7 +755,14 @@ An empty queue means **all sections**. Any Work Center edit arms the countdown w
 
 ## WC-IMPL-15: Work Center Snapshot Records the Section Snapshots It Used
 * **Source Decision:** WC-37 rule 4 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:**
+  * `WorkCenterCalculationService::calculateAndSave()`: every branch (fresh, reused latest, none-yet) adds `section_calculation_id` + `section_snapshot_number` to `$sectionCalculationResults`; `calculate()` copies both into each `sections_contribution` item (null when `calculate()` runs without saved snapshots, e.g. previews).
+  * `partials/work-center-calculation-modal.blade.php`: section figures come from the exact referenced section snapshot (`$usedSecCalcs`, one query) in both latest and historical views; without the key (older Work Center snapshots) the WC-IMPL-20 fallback applies (latest → section's latest; historical → linked / same batch / newest at or before).
+  * Drill-downs (Contributing Sections tab ↗ button, audit-metric `[S-1] ↗` badges): open the referenced section snapshot in the WC-IMPL-20 viewer (`data-snapshot-url`); the label shows "#N" (badge `[S-1 #N] ↗`, tooltip "— Snapshot #N"). Old Work Center snapshots without the key keep opening the page's latest section modal (tooltip "— (latest snapshot)"). This closes the drill-down gap noted in WC-IMPL-20.
+  * Item 4 (open a historical section snapshot by ID) reuses the WC-IMPL-20 route `production.work-centers.sections.snapshots.modal`.
+  * Snapshot numbering race (Note) still open → WC-IMPL-14.
+  * Tests: `WorkCenterCountdownScopeTest` — references stored for fresh (A #2) and reused (B #1) sections; drill-down opens those snapshots; old snapshot without keys falls back to the latest section modal.
 
 ### Problem
 A Work Center snapshot can reuse older section snapshots for unchanged sections (WC-25 rule 4). Only same-batch section snapshots are linked (`WorkCenterCalculationService.php` 304–309), and the Work Center snapshot's `calculation_details` does not store any section snapshot reference (`calculate()` 76–88). So you cannot tell which section snapshot fed a given Work Center snapshot.
@@ -740,7 +782,8 @@ Snapshot numbering (`max + 1`, no lock / unique index — `SectionCalculationSer
 
 ## WC-IMPL-16: Work Center Hero Panel — "Calculation Pending" State, No Live Fallback
 * **Source Decision:** WC-42 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:** `show.blade.php`: `$wcPending = !$latestSnapshot`; Column 2 (Capacity / Hour, Daily Production Capacity, Operating Window) and Column 3 (Daily Labor, Daily Machinery, Facility Overhead, Total Daily Cost) show an amber "Calculation Pending" badge instead of 0; the Avg / Effective badges and the unit-cost badge are hidden; the 4 hover popovers show a pending message. Overhead, total daily cost and cost per hour read snapshot columns only (no live overhead, no computed fallbacks); the WC modal's overhead is snapshot-only for the latest view too. Column 1 Direct Assigned Staff: names / roles stay live, the cost badge and per-person cost come from the snapshot (`direct_staff_daily_labor_cost`, matched by employee code); a person added after the snapshot shows "Not in latest snapshot"; no snapshot → "Calculation Pending". Test: `tests/Feature/Production/WorkCenterDisplayPartCTest.php`.
 
 ### Problem
 With no Work Center snapshot yet, the hero panel (`resources/views/modules/production/work-centers/show.blade.php` 3-column header, ~460–960) shows 0 for capacity / labor / machines, hides the unit-cost badge, and uses the **live** overhead:
@@ -765,7 +808,8 @@ With no Work Center snapshot yet, the hero panel (`resources/views/modules/produ
 
 ## WC-IMPL-17: Modal Footers — Count Active Only, Name What Was Not Counted
 * **Source Decision:** WC-43 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed — machine active filter depends on **WC-MACH-01** (idle = active)
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification (was: machine active filter depends on **WC-MACH-01** (idle = active))
+* **Implementation notes:** Section Details modal: machines tab gains a **Status** column (colour badge per status); footer sums active machines only, shows "(N active)" and a *"Not counted: CODE (status), …"* row; batches footer counts workers of active batches only and adds *"+N workers in inactive batch(es): name, …"*. Section calculation modal: *"Not counted in this snapshot"* lists under the Machines table (code, name, status — from `inactive_machines`) and the Manual Batches table (batch name, shift — from `inactive_manual_batches`); hidden when an old snapshot lacks the list. Item 7: both lists already store code / name / status and batch name / shift. Active machine filter = `status = active` (WC-MACH-01). Test: `tests/Feature/Production/WorkCenterDisplayPartCTest.php`.
 
 ### A. Section Details modal (`resources/views/modules/production/work-centers/show.blade.php`)
 | # | Place | Lines | Current | Required |
@@ -789,7 +833,8 @@ With no Work Center snapshot yet, the hero panel (`resources/views/modules/produ
 
 ## WC-IMPL-18: Shifts Tab Footer & Operating Window Card Use the Calculation Method
 * **Source Decision:** WC-44 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:** Shifts tab footer uses the read-only `SectionCalculationService::calculateOperatingHours($section)`: union hours of active shifts ("union of active shifts"), overlap hours if any, overnight-safe window ("24 h continuous" when ≥ 24 h), "(N active, M inactive)"; workforce = all active employee assignments + active contractor allocations of the section (so "(Ext)" employees count). Table rows show an "Inactive" badge for inactive shifts / pivots. Operating Window KPI card: snapshot `unique_operating_hours` via `format_hours()` with "Snapshot #N", else the amber "Calculation Pending" block — the "(Uncalculated Fallback)" and its `sprintf('%d:%02d')` removed. Item 5 was done in WC-IMPL-01. Test: `tests/Feature/Production/WorkCenterDisplayPartCTest.php`.
 
 ### Problem (`resources/views/modules/production/work-centers/show.blade.php`)
 | # | Place | Lines | Current | Problem |
@@ -812,7 +857,8 @@ With no Work Center snapshot yet, the hero panel (`resources/views/modules/produ
 
 ## WC-IMPL-19: Canonical Snapshot Keys, Wording & Format Sweep
 * **Source Decision:** WC-45 (agreed 2026-11-10)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:** Canonical keys (new snapshots): section personnel keep `assignment_id`, `name`, `monthly_salary`, `shift_clock_hours`, `hourly_rate` (dropped `id`, `employee_name`, `hrms_net_monthly_salary`, `shift_duration_hours`, `hourly_salary_rate`); contractor allocations keep `shift_clock_hours` (dropped `shift_duration_hours`); batch employee details already used `monthly_salary`; direct staff keep `monthly_salary`, `active_wc_count`, `daily_cost` (dropped `hrms_net_monthly_salary`, `monthly_ctc`, `total_active_work_centers`, `daily_salary`). Views read the canonical key first and keep `?? alias` fallbacks for older snapshots. No other code reads these keys (searched `app/`). Wording: "Target Speed / pcs / hr" → "Target Capacity / units / hr" (manual batch modal + input suffix); "hourly speed", "Throughput & Speed", "Hourly Speed", "rated speed", metric #9 / #10 / #23 / #25 texts → capacity. Format sweep: no `number_format()` on hours / durations left in the two views or services; the last `sprintf('%d:%02d')` went with WC-IMPL-18. Test: `tests/Feature/Production/WorkCenterDisplayPartCTest.php`.
 
 ### 1. Duplicate alias keys → keep one canonical key
 | Snapshot block | File | Lines | Duplicate pairs (keep **bold**) |
@@ -835,6 +881,47 @@ Keep `?? $old['alias']` fallbacks in views for snapshots created before the chan
 
 ### 3. Format sweep
 Search both views and the two services for `number_format(` applied to hours / durations and `sprintf('%d:%02d'` — replace with `format_hours()` (or `format_duration()` for minutes).
+
+---
+
+## WC-IMPL-20: "View Snapshot #N" Opens That Exact Snapshot (Not the Latest)
+* **Source Decision:** WC-38 rule 3 (corrected 2026-11-11 — bug found by the user)
+* **Status:** 🛠️ Applied (code working) 2026-11-11 — awaiting user verification
+* **Implementation notes:**
+  * **Section partial** `partials/section-calculation-modal.blade.php`: new optional `$snapshot` + `$modalElementId`; `$isLatest` = no snapshot given or it is the section's latest. Header badge shows the viewed snapshot (amber when not latest); banner *"Viewing snapshot #N from … — not the latest (latest is #M)"* (class `snapshot-not-latest-banner`). `$secCalc` = given snapshot (shown even if the section is now inactive). Live batch-worker fallback and the live "labor without production" warning run **only when `$isLatest`**.
+  * **New partial** `partials/work-center-calculation-modal.blade.php`: the whole WC modal block moved out of `show.blade.php` (old lines 3175–4593; `show.blade.php` now `@include`s it with the latest snapshot). Params `$workCenter`, `$snapshot`, `$modalElementId`. `$latestSnapshot` renamed `$wcSnapshot`. Historical view: overhead from the snapshot only; section list = only the sections in the snapshot's `sections_contribution`; each section's figures come from the section snapshot that WC snapshot used — resolver `$secCalcFor()`: linked `work_center_calculation_id` → same `batch_id` → newest section snapshot created at or before the WC snapshot. Live section-shift fallbacks only for the latest. Same banner. Drill-down "[S-1] ↗" buttons inside the modal still open the page's latest section modal (exact per-section drill-down = WC-IMPL-15).
+  * **Routes** (`Routes/web.php`, after `calculation-details`): `GET work-centers/{work_center}/snapshots/{snapshot}/modal` → `production.work-centers.snapshots.modal` → `WorkCenterController::workCenterSnapshotModal()`; `GET work-centers/{work_center}/sections/{section}/snapshots/{snapshot}/modal` → `production.work-centers.sections.snapshots.modal` → `sectionSnapshotModal()`. Both: `Gate::authorize('view')`, tenant-scoped (BaseModel scope), snapshot must belong to that Work Center / section of that Work Center, else 404; render only, never calculate.
+  * **Buttons** — all 6 "#N ↗" (main log ×2, "View All Logs" modal ×2, WC modal Logs tab ×2) now carry `data-snapshot-url`; old logs without `snapshot_id` keep the old toggle. **Shared viewer** `#snapshotViewerModal` in `show.blade.php` + JS: spinner → fetch → the response's `.modal-content` goes into the viewer; every id inside gets a unique suffix (tabs / collapses don't hit the page's own modals); tooltips + popovers re-initialised; 404 / error message shown in the viewer; a newer click wins over a slower earlier one; stacks above the modal it was opened from.
+  * `calculationDetails()` unchanged.
+  * **Checks:** page render before/after compared (normalised HTML) — the latest WC + section modals are identical; only the buttons, viewer and script differ. Related Work Center / Section test runs identical before/after except the new tests. New tests `tests/Feature/Production/WorkCenterSnapshotViewerTest.php` (5 passing): #1 vs #2 figures + banner (section and WC routes), show page buttons carry each snapshot's URL, foreign section / Work Center / tenant → 404, historical snapshot does not pull live batch workers (latest still does for legacy snapshots).
+  * **Not checked in a browser** (needs sign-in): the click → load → tabs/tooltips flow in the viewer.
+
+### Problem
+Every "#N ↗" button in the activity log opens the **latest** snapshot. The buttons carry no snapshot id — they only toggle a modal that was rendered once at page load from the latest snapshot.
+
+| # | Where | Lines | Today |
+| :-: | :--- | :--- | :--- |
+| 1 | Buttons — main activity log | `resources/views/modules/production/work-centers/show.blade.php` 1716 (section), 1720 (WC) | `data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{section_id}"` / `#workCenterCalculationModal` — no snapshot |
+| 2 | Buttons — "View All Logs" list | same file 4267, 4271 | same |
+| 3 | Buttons — audit / history tab | same file 4930, 4934 | same |
+| 4 | Section modal partial | `resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php` 15–16 (header badge), 34 (`$secCalc = $isSecActive ? $section->latestCalculation : null`) | always the latest section snapshot; included once per section at `show.blade.php` 2230 |
+| 5 | Section modal live fallback | same partial 521–560 (`$liveBatch = SectionManualProduction::…->find($b['id'])`) | reads **live** batch workers when the snapshot lacks cost details — would mix live data into an old snapshot |
+| 6 | Work Center modal | `show.blade.php` ~3176–4593 (`@php $latestSnapshot = $workCenter->latestCalculation; …` + `<div id="workCenterCalculationModal">`) | built inline from the latest WC snapshot; also reads live `$workCenter->overhead_cost` fallback (3185), live `$workCenter->sections` (3215) and each section's `latestCalculation` (3220) |
+| 7 | JSON endpoint | `app/Domains/Production/Controllers/WorkCenterController.php` 351–364 `calculationDetails()` | returns only `$workCenter->latestCalculation` |
+
+### Required Change
+| # | File | Change |
+| :-: | :--- | :--- |
+| 1 | `section-calculation-modal.blade.php` | Accept optional `$snapshot` (a `WorkCenterSectionCalculation`); default = `$section->latestCalculation`. Use it at 15–16 and 34. Add `$isLatest` flag; when not latest show banner *"Viewing snapshot #N from {calculated_at} — not the latest (latest is #M)."* The live fallback 521–560 runs **only when `$isLatest`**; an older snapshot shows only what it stored. Modal element id stays per section (`sectionCalculationModal_{id}`) for the page-load render; the loaded version goes into a shared container (see #4). |
+| 2 | **New partial** `resources/views/modules/production/work-centers/partials/work-center-calculation-modal.blade.php` | Move the WC modal block (`show.blade.php` ~3176–4593) here, taking `$workCenter`, `$snapshot` (a `WorkCenterCalculation`, default latest). Replace `$latestSnapshot` with `$snapshot`. Historical rule: no live fallbacks — overhead from the snapshot only (3185); section list / section figures from the snapshot's own `calculation_details` (sections it rolled up) instead of live `$workCenter->sections` + `latestCalculation` (3215, 3220). Same "not the latest" banner. `show.blade.php` includes the partial with the latest snapshot. (Exact section-snapshot drill-down per section = WC-IMPL-15.) |
+| 3 | `app/Domains/Production/Routes/web.php` (next to 116) + `WorkCenterController.php` | Two read-only GET routes returning the rendered modal body HTML: `work-centers/{work_center}/snapshots/{snapshot}/modal` → `workCenterSnapshotModal()`; `work-centers/{work_center}/sections/{section}/snapshots/{snapshot}/modal` → `sectionSnapshotModal()`. Both: `Gate::authorize('view', $workCenter)`; tenant-scoped lookup; snapshot must belong to that Work Center / section (else 404); never calculate (WC-31). |
+| 4 | Buttons (#1–#3 above) | Replace `data-bs-target` with `data-snapshot-url="{{ route(...) }}"` and a small JS handler: fetch the HTML, put it into one shared modal container (`#snapshotViewerModal`), open it; loading spinner; error message on failure. Button label stays "#N ↗". |
+| 5 | `calculationDetails()` (351–364) | Unchanged (latest only) — not used by the buttons. |
+| 6 | Tests (`tests/Feature/Production/`) | Two calculations → snapshots #1, #2: the section route for #1 shows #1's figures and the "not the latest" banner; #2 shows no banner; WC route same; snapshot of another section / Work Center / tenant → 404; historical section snapshot does not show live batch workers added after it. |
+
+### Check at Implementation
+* After the move, `show.blade.php` must still render the same latest-snapshot modal (compare figures before / after).
+* The JS also has to re-init tooltips / tabs inside the injected HTML.
 
 ---
 

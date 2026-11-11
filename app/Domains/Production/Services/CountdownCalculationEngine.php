@@ -107,12 +107,23 @@ class CountdownCalculationEngine
         return $workCenter;
     }
 
+    public const SCOPE_ALL   = 'all';
+    public const SCOPE_QUEUE = 'queue';
+
     /**
-     * Recalculate pending sections and roll up Work Center immediately.
-     * Can be invoked manually (Recalculate Now bypass) or via expired countdown timer.
+     * Recalculate and roll up the Work Center immediately (WC-IMPL-13 / WC-35 rules 3–4).
+     *
+     * Scope:
+     *  - 'queue' (default — banner button, browser timer, page reload, cron): only the queued sections are
+     *    recalculated; an empty queue = Work Center roll-up only (sections reuse their latest snapshots).
+     *  - 'all' (header "Recalculate" button): every active section is recalculated, then rolled up.
      */
-    public function recalculateNow(WorkCenter $workCenter, string $triggerType = 'manual'): WorkCenterCalculation
+    public function recalculateNow(WorkCenter $workCenter, string $triggerType = 'manual', string $scope = self::SCOPE_QUEUE): WorkCenterCalculation
     {
+        if (!in_array($scope, [self::SCOPE_ALL, self::SCOPE_QUEUE], true)) {
+            throw new InvalidArgumentException("Unknown recalculation scope '{$scope}'.");
+        }
+
         // Mutex Concurrency Lock
         $workCenter->is_calculation_running = true;
         $workCenter->save();
@@ -121,6 +132,15 @@ class CountdownCalculationEngine
             $pendingSectionIds = is_array($workCenter->pending_calculation_section_ids)
                 ? $workCenter->pending_calculation_section_ids
                 : [];
+
+            if ($scope === self::SCOPE_ALL) {
+                $pendingSectionIds = $workCenter->sections()
+                    ->where('tenant_id', $workCenter->tenant_id)
+                    ->active()
+                    ->pluck('id')
+                    ->map(fn($id) => (int) $id)
+                    ->all();
+            }
 
             $calculation = $this->workCenterCalculationService->calculateAndSave(
                 workCenter: $workCenter,

@@ -150,6 +150,18 @@ class Employee extends BaseModel
         });
     }
 
+    /**
+     * Monthly CTC as used by payroll.
+     *
+     * `current_salary` holds the ANNUAL CTC; payroll's monthly CTC is annual ÷ 12.
+     * Other modules (e.g. Production costing) must call this method instead of
+     * dividing `current_salary` themselves, so they follow payroll's rule.
+     */
+    public function monthlyCtc(): float
+    {
+        return ((float) ($this->current_salary ?? 0.0)) / 12;
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class);

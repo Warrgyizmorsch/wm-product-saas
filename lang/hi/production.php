@@ -1803,6 +1803,7 @@ return [
   'scrapped' => 'स्क्रैप मात्रा',
   'material_cost' => 'सामग्री लागत',
   'overhead_cost' => 'ओवरहेड लागत',
+  'overhead_cost_help' => 'प्रति दिन का ओवरहेड दर्ज करें। यदि आपको मासिक राशि पता है, तो उसे 30 से भाग दें।',
   'operational_overview' => 'परिचालन पूर्वावलोकन',
   'horizon' => 'अवधि:',
   'this_week' => 'इस सप्ताह',

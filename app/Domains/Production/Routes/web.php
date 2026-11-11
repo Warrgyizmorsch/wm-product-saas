@@ -114,6 +114,11 @@ Route::prefix('production')
         Route::post('work-centers/{work_center}/recalculate-now', [WorkCenterController::class, 'recalculateNow'])->name('work-centers.recalculate-now');
         Route::post('work-centers/{work_center}/countdown-duration', [WorkCenterController::class, 'updateCountdownDuration'])->name('work-centers.countdown-duration');
         Route::get('work-centers/{work_center}/calculation-details', [WorkCenterController::class, 'calculationDetails'])->name('work-centers.calculation-details');
+        // WC-IMPL-20: read-only rendered modal for one exact snapshot (never calculates)
+        Route::get('work-centers/{work_center}/snapshots/{snapshot}/modal', [WorkCenterController::class, 'workCenterSnapshotModal'])
+            ->whereNumber(['work_center', 'snapshot'])->name('work-centers.snapshots.modal');
+        Route::get('work-centers/{work_center}/sections/{section}/snapshots/{snapshot}/modal', [WorkCenterController::class, 'sectionSnapshotModal'])
+            ->whereNumber(['work_center', 'section', 'snapshot'])->name('work-centers.sections.snapshots.modal');
         Route::resource('work-centers', WorkCenterController::class);
 
         // ── Work Center Sections ──────────────────────────────────────────────
