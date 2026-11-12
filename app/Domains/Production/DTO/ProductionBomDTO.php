@@ -22,6 +22,8 @@ class ProductionBomDTO
         public readonly ?string $notes = null,
         public readonly array $items = [],
         public readonly ?string $usage_context = 'manufacturing',
+        // BM-IMPL-03: set when saving a Duplicate / Revise copy (not a column)
+        public readonly ?int $source_bom_id = null,
     ) {
     }
 
@@ -49,6 +51,7 @@ class ProductionBomDTO
             notes: $data['notes'] ?? null,
             items: $items,
             usage_context: $data['usage_context'] ?? 'manufacturing',
+            source_bom_id: !empty($data['source_bom_id']) ? (int) $data['source_bom_id'] : null,
         );
     }
 

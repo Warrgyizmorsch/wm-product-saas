@@ -297,17 +297,24 @@ class ProductionReadinessService
 
         $bomItems = collect();
         if ($op->source_bom_id) {
+            // PO-IMPL-02: production_bom_items.is_alternative was dropped (master rows = one per material)
             $bomItems = ProductionBomItem::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('bom_id', $op->source_bom_id)
-                ->where('is_alternative', false)
                 ->get();
         }
 
         $routingOpMaterials = collect();
         if ($op->routing_operation_id) {
+            // PO-IMPL-02 (PO-12): this BOM's allocations only, limited to the materials chosen on the order
             $routingOpMaterials = \App\Domains\Production\Models\RoutingOperationMaterial::withoutGlobalScopes()
                 ->where('routing_operation_id', $op->routing_operation_id)
+                ->when($op->source_bom_id, fn ($q) => $q->where('bom_id', $op->source_bom_id))
+                ->when(
+                    is_array($op->selected_routing_material_ids),
+                    fn ($q) => $q->whereIn('id', $op->selected_routing_material_ids ?: [0]),
+                    fn ($q) => $q->where('is_alternative', false)
+                )
                 ->get();
         }
 
@@ -315,6 +322,7 @@ class ProductionReadinessService
         $hasRoutingAllocations = false;
         if ($op->source_routing_id) {
             $hasRoutingAllocations = \App\Domains\Production\Models\RoutingOperationMaterial::withoutGlobalScopes()
+                ->when($op->source_bom_id, fn ($q) => $q->where('bom_id', $op->source_bom_id))
                 ->whereHas('routingOperation', function ($q) use ($op) {
                     $q->where('routing_id', $op->source_routing_id);
                 })->exists();
@@ -372,18 +380,12 @@ class ProductionReadinessService
         foreach ($reservations as $res) {
             $rom = $routingOpMaterials->firstWhere('material_id', $res->product_id);
             if ($rom && (float) $rom->quantity > 0) {
-                $routing = $op->routingOperation?->routing ?: \App\Domains\Production\Models\Routing::find($op->source_routing_id);
                 $bom = $op->source_bom_id ? \App\Domains\Production\Models\ProductionBom::find($op->source_bom_id) : null;
                 $baseQty = ($bom && (float) $bom->base_quantity > 0) ? (float) $bom->base_quantity : 1.0;
 
-                $normalizedOpAlloc = ($routing && $routing->isPerBomBaseQuantity())
-                    ? ((float) $rom->quantity / $baseQty)
-                    : (float) $rom->quantity;
+                $grossRomQty = (float) ($rom->gross_quantity ?? $rom->calculateGrossQuantity());
+                $bomRatio = $grossRomQty / $baseQty;
 
-                $bomItem = $bomItems->firstWhere('material_id', $res->product_id);
-                $scrapFactor = $bomItem ? (1.0 + ((float) ($bomItem->material_scrap_percentage ?? 0) / 100.0)) : 1.0;
-
-                $bomRatio = $normalizedOpAlloc * $scrapFactor;
                 $req = round($bomRatio * $orderQty, 4);
             } else {
                 $bomItem = $bomItems->firstWhere('material_id', $res->product_id);
@@ -607,11 +609,18 @@ class ProductionReadinessService
             $childProductId = $predOp->source_product_id;
             if (!$childProductId) continue;
 
-            $bomItem = ProductionBomItem::withoutGlobalScopes()
+            $targetBomId = $op->source_bom_id ?? $op->order->bom_id;
+            $bomAlloc = \App\Domains\Production\Models\RoutingOperationMaterial::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
-                ->where('bom_id', $op->source_bom_id ?? $op->order->bom_id)
+                ->where('bom_id', $targetBomId)
                 ->where('material_id', $childProductId)
+                ->where('is_alternative', false)
                 ->first();
+            $bomItem = $bomAlloc ?: ProductionBomItem::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('bom_id', $targetBomId)
+                ->where('material_id', $childProductId)
+                ->first(); // PO-IMPL-02: no is_alternative on master rows
             $bomRatio = ($bomItem && (float) $bomItem->quantity > 0) ? (float) $bomItem->quantity : 1.0;
 
             $issuedToOrder = (float) ProductionOrderReservation::withoutGlobalScopes()

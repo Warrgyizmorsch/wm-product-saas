@@ -143,7 +143,7 @@ class RoutingRemainingTasksTest extends TestCase
         $this->assertStringStartsWith('No change', $impact['B-DRA']['effect']);
         $this->web()->get(route('production.routing.show', $routing->id))->assertOk()->assertSee('B-PEN')->assertSee('Goes back to draft');
 
-        $this->assertNull($draft->fresh()->routing_advisory, 'active routing → no advisory');
+        $this->assertSame([], $draft->fresh()->routing_advisory, 'active routing → no advisory');
 
         $this->web()->post(route('production.routing.cancel', $routing->id), ['comments' => 'obsolete'])->assertSessionHasNoErrors();
 
@@ -157,7 +157,10 @@ class RoutingRemainingTasksTest extends TestCase
 
         // live advisory on the draft BOM, still there after the BOM warning refresh
         $draft->fresh()->refreshWarningStatus();
-        $this->assertStringContainsString('is cancelled', $draft->fresh()->routing_advisory);
+        $advisory = $draft->fresh()->routing_advisory;
+        $this->assertNotEmpty($advisory);
+        $this->assertSame('not_active', $advisory[0]['code']);
+        $this->assertStringContainsString('is cancelled', $advisory[0]['message']);
         $this->web()->get(route('production.boms.show', $draft->id))->assertOk()->assertSee("can't be approved until the routing is active");
     }
 

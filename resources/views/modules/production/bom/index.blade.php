@@ -308,13 +308,26 @@
                                     <span class="erp-badge-draft text-uppercase">{{ __('production.' . $bom->status) }}</span>
                                 @endif
 
-                                @if($bom->routing_advisory)
+                                @foreach($bom->routing_advisory as $advisory)
+                                    @php
+                                        $advClass = match ($advisory['code'] ?? '') {
+                                            'operation_removed' => 'bg-soft-danger text-danger border-danger-subtle',
+                                            'not_active'        => 'bg-soft-warning text-warning border-warning-subtle',
+                                            default             => 'bg-soft-info text-info border-info-subtle',
+                                        };
+                                        $advLabel = match ($advisory['code'] ?? '') {
+                                            'operation_removed' => __('production.routing_op_removed'),
+                                            'not_active'        => __('production.routing_not_active'),
+                                            'routing_outdated'  => __('production.routing_outdated'),
+                                            default             => __('production.routing_advisory'),
+                                        };
+                                    @endphp
                                     <div class="mt-1">
-                                        <span class="badge bg-soft-info text-info border border-info-subtle fs-10 px-1.5 py-0.5 rounded-pill d-inline-flex align-items-center gap-1" title="{{ $bom->routing_advisory }}">
-                                            <i class="feather-git-branch fs-10"></i> {{ __('production.routing_not_active') }}
+                                        <span class="badge {{ $advClass }} border fs-10 px-1.5 py-0.5 rounded-pill d-inline-flex align-items-center gap-1" title="{{ $advisory['message'] ?? '' }}">
+                                            <i class="feather-git-branch fs-10"></i> {{ $advLabel }}
                                         </span>
                                     </div>
-                                @endif
+                                @endforeach
                                 @if(!in_array($bom->status, ['cancelled', 'inactive']) && ($bom->has_warning || $bom->hasComponentWarning()))
                                     <div class="mt-1">
                                         <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1.5 py-0.5 rounded-pill d-inline-flex align-items-center gap-1"

@@ -475,7 +475,7 @@ class BomRoutingInversionTest extends TestCase
 
         // Attempt to approve BOM while routing is still in 'draft' status
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('The linked Routing must be approved and active first');
+        $this->expectExceptionMessage('the BOM can only be approved when the Routing is active'); // BM-IMPL-02 #3 wording
 
         $this->bomService->approve($bom->id, $this->engineer->id);
     }
@@ -592,11 +592,12 @@ class BomRoutingInversionTest extends TestCase
 
         $activeBom->refresh();
         $this->assertEquals(ProductionBom::STATUS_INACTIVE, $activeBom->status);
-        $this->assertTrue($activeBom->has_warning);
+        $this->assertSame([], $activeBom->routing_advisory);
 
         $draftBom->refresh();
         $this->assertEquals(ProductionBom::STATUS_DRAFT, $draftBom->status);
-        $this->assertTrue($draftBom->has_warning);
+        $this->assertNotEmpty($draftBom->routing_advisory);
+        $this->assertSame('not_active', $draftBom->routing_advisory[0]['code']);
     }
 
     /**
@@ -631,7 +632,8 @@ class BomRoutingInversionTest extends TestCase
         $srcBom = $this->bomService->create($dto, $this->engineer->id);
         $this->bomService->submitApproval($srcBom->id);
 
-        $clonedBom = $this->bomService->duplicateVersion($srcBom->id, '1.1.0', $this->engineer->id);
+        // BM-IMPL-03: copy built without saving, saved through the normal create
+        $clonedBom = $this->bomService->create(\App\Domains\Production\DTO\ProductionBomDTO::fromArray($this->bomService->buildCopyPayload($srcBom->id, '1.1.0')), $this->engineer->id);
 
         $this->assertEquals($routing->id, $clonedBom->routing_id);
         $this->assertCount(1, $clonedBom->items);
@@ -708,7 +710,7 @@ class BomRoutingInversionTest extends TestCase
 
         $bomItem2 = $bomItems->where('material_id', $this->rawMaterial2->id)->first();
         $this->assertNotNull($bomItem2);
-        $this->assertEquals(4.0, $bomItem2->quantity);
+        $this->assertEquals(0.0, $bomItem2->quantity);
         $this->assertEquals('alternative', $bomItem2->allocation_role);
 
         // 2. Assert Table 2 (production_routing_operation_materials): 3 workstation allocations

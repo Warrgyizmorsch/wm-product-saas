@@ -26,6 +26,11 @@ Schedule::command('production:process-routing-dates')
     ->dailyAt('00:05')
     ->withoutOverlapping();
 
+// BM-IMPL-02: BOM status by dates — scheduled → approved on start date, expired → inactive.
+Schedule::command('production:process-bom-dates')
+    ->dailyAt('00:10')
+    ->withoutOverlapping();
+
 // Process expired Work Center calculation debounce countdowns.
 Schedule::command('production:process-calculation-countdowns')
     ->everyMinute()

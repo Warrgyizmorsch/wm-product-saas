@@ -231,8 +231,8 @@ class MrpShortageService
         $bom = ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('product_id', $product->id)
-            ->where('status', 'approved')
-            ->with(['items.material', 'items.uom'])
+            ->whereIn('status', ['approved', 'active'])
+            ->with(['operationMaterials.material', 'operationMaterials.uom', 'items.material', 'items.uom'])
             ->first();
 
         $isManufactured = ($bom !== null || in_array($product->supplier_method, ['manufacture', 'both'], true) || $product->type === 'finished_good' || $product->type === 'semi_finished');
@@ -282,22 +282,20 @@ class MrpShortageService
             $baseQty = $bom->base_quantity > 0 ? $bom->base_quantity : 1.0;
             $multiplier = $mfgRequiredQty / $baseQty;
 
-            $evaluator = app(BomFormulaEvaluatorService::class);
+            $sourceRows = ($bom->operationMaterials->isNotEmpty() ? $bom->operationMaterials : $bom->items)
+                ->where('is_alternative', false);
 
-            foreach ($bom->items as $item) {
+            foreach ($sourceRows as $item) {
                 $childMaterial = $item->material;
                 if (!$childMaterial) continue;
 
-                $scrapPct = (float) $item->material_scrap_percentage;
-                $scrapFactor = 1.0 + ($scrapPct / 100.0);
+                $scrapPct = (float) ($item->material_scrap_percentage ?? 0);
+                $unitQty = (float) $item->quantity;
+                $grossUnitQty = method_exists($item, 'calculateGrossQuantity')
+                    ? (float) ($item->gross_quantity ?? $item->calculateGrossQuantity())
+                    : ($unitQty * (1.0 + ($scrapPct / 100.0)));
 
-                if ($item->isFormula()) {
-                    $unitQty = $evaluator->evaluate($item->formula, $parameters ?? [], $bom->product);
-                } else {
-                    $unitQty = (float) $item->quantity;
-                }
-
-                $childRequiredQty = $unitQty * $multiplier * $scrapFactor;
+                $childRequiredQty = $grossUnitQty * $multiplier;
 
                 // Child inherits required date from parent
                 $childNode = $this->explodeNode(

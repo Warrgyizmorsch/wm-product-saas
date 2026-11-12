@@ -60,6 +60,7 @@ class MultiModelPhase1Test extends TestCase
             'name' => 'Hybrid Pump',
             'sku' => 'PUMP-HYB-01',
             'type' => 'finished_good',
+            'supplier_method' => 'manufacture', // PO-02
             'planning_type' => 'manufacture',
             'default_production_model' => Product::MODEL_HYBRID,
             'uom_id' => $this->uom->id,
@@ -77,6 +78,7 @@ class MultiModelPhase1Test extends TestCase
             'name' => 'Subcontract Assembly',
             'sku' => 'SUB-ASSY-01',
             'type' => 'finished_good',
+            'supplier_method' => 'manufacture', // PO-02
             'planning_type' => 'manufacture',
             'default_production_model' => Product::MODEL_SUBCONTRACT_COMPANY_MATERIAL,
             'uom_id' => $this->uom->id,
@@ -124,6 +126,7 @@ class MultiModelPhase1Test extends TestCase
             'name' => 'Prototype Engine',
             'sku' => 'ENG-PROTO-01',
             'type' => 'finished_good',
+            'supplier_method' => 'manufacture', // PO-02
             'uom_id' => $this->uom->id,
             'status' => 'active',
         ]);
@@ -172,6 +175,7 @@ class MultiModelPhase1Test extends TestCase
             'name' => 'Pro Bicycle',
             'sku' => 'BIKE-01',
             'type' => 'finished_good',
+            'supplier_method' => 'manufacture', // PO-02
             'uom_id' => $this->uom->id,
             'status' => 'active',
         ]);
@@ -182,6 +186,7 @@ class MultiModelPhase1Test extends TestCase
             'name' => 'Wheel Kit (Phantom)',
             'sku' => 'KIT-WHEEL-PHANTOM',
             'type' => 'semi_finished',
+            'supplier_method' => 'manufacture', // PO-02
             'uom_id' => $this->uom->id,
             'status' => 'active',
         ]);
@@ -309,6 +314,7 @@ class MultiModelPhase1Test extends TestCase
             'name' => 'Shaft Hardened',
             'sku' => 'SHAFT-01',
             'type' => 'finished_good',
+            'supplier_method' => 'manufacture', // PO-02
             'default_production_model' => Product::MODEL_HYBRID,
             'uom_id' => $this->uom->id,
             'status' => 'active',

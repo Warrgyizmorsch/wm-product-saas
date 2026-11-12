@@ -6,6 +6,9 @@ use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionBomItem;
+use App\Domains\Production\Models\Routing;
+use App\Domains\Production\Models\RoutingOperation;
+use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Services\ProductionBomService;
 use App\Models\Tenant;
 use App\Models\User;
@@ -265,6 +268,20 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'uom_id' => $this->uomPcs->id,
         ]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-WARN-001',
+            'name' => 'Warning Test Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         // Create child BOM
         $childBom = ProductionBom::create([
             'tenant_id' => $this->tenant->id,
@@ -272,6 +289,7 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'bom_name' => 'Child BOM v1',
             'bom_type' => 'manufacturing',
             'product_id' => $compProduct->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomPcs->id,
             'version' => '1.0.0',
@@ -287,6 +305,7 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'bom_name' => 'Parent Table BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $parentProduct->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomPcs->id,
             'version' => '1.0.0',
@@ -296,12 +315,24 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'created_by' => $this->user->id,
         ]);
 
-        ProductionBomItem::create([
+        $bomItem = ProductionBomItem::create([
             'tenant_id' => $this->tenant->id,
             'bom_id' => $parentBom->id,
             'material_id' => $compProduct->id,
             'child_bom_id' => $childBom->id,
             'quantity' => 1.0,
+            'uom_id' => $this->uomPcs->id,
+            'sequence' => 1,
+        ]);
+        RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $parentBom->id,
+            'bom_item_id' => $bomItem->id,
+            'routing_operation_id' => $op->id,
+            'material_id' => $compProduct->id,
+            'child_bom_id' => $childBom->id,
+            'quantity' => 1.0,
+            'gross_quantity' => 1.0,
             'uom_id' => $this->uomPcs->id,
             'sequence' => 1,
         ]);
@@ -338,6 +369,20 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'uom_id' => $this->uomPcs->id,
         ]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-WARN-002',
+            'name' => 'Panel Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         // Create child BOM v1.0.0
         $childBomV1 = ProductionBom::create([
             'tenant_id' => $this->tenant->id,
@@ -345,6 +390,7 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'bom_name' => 'Panel BOM v1',
             'bom_type' => 'manufacturing',
             'product_id' => $compProduct->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomPcs->id,
             'version' => '1.0.0',
@@ -360,6 +406,7 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'bom_name' => 'Desk BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $parentProduct->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomPcs->id,
             'version' => '1.0.0',
@@ -369,12 +416,24 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'created_by' => $this->user->id,
         ]);
 
-        ProductionBomItem::create([
+        $bomItem = ProductionBomItem::create([
             'tenant_id' => $this->tenant->id,
             'bom_id' => $parentBom->id,
             'material_id' => $compProduct->id,
             'child_bom_id' => $childBomV1->id,
             'quantity' => 2.0,
+            'uom_id' => $this->uomPcs->id,
+            'sequence' => 1,
+        ]);
+        RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $parentBom->id,
+            'bom_item_id' => $bomItem->id,
+            'routing_operation_id' => $op->id,
+            'material_id' => $compProduct->id,
+            'child_bom_id' => $childBomV1->id,
+            'quantity' => 2.0,
+            'gross_quantity' => 2.0,
             'uom_id' => $this->uomPcs->id,
             'sequence' => 1,
         ]);
@@ -389,6 +448,7 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'bom_name' => 'Panel BOM v2',
             'bom_type' => 'manufacturing',
             'product_id' => $compProduct->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomPcs->id,
             'version' => '2.0.0',
@@ -427,12 +487,27 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'uom_id' => $this->uomPcs->id,
         ]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-WARN-003',
+            'name' => 'Wall Unit Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         $childBom = ProductionBom::create([
             'tenant_id' => $this->tenant->id,
             'bom_number' => 'BOM-BRACKET-001',
             'bom_name' => 'Bracket BOM v1',
             'bom_type' => 'manufacturing',
             'product_id' => $compProduct->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomPcs->id,
             'version' => '1.0.0',
@@ -448,6 +523,7 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'bom_name' => 'Wall Unit BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $parentProduct->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomPcs->id,
             'version' => '1.0.0',
@@ -457,12 +533,24 @@ class BomComponentWarningAndDropdownFilterTest extends TestCase
             'created_by' => $this->user->id,
         ]);
 
-        ProductionBomItem::create([
+        $bomItem = ProductionBomItem::create([
             'tenant_id' => $this->tenant->id,
             'bom_id' => $parentBom->id,
             'material_id' => $compProduct->id,
             'child_bom_id' => $childBom->id,
             'quantity' => 4.0,
+            'uom_id' => $this->uomPcs->id,
+            'sequence' => 1,
+        ]);
+        RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $parentBom->id,
+            'bom_item_id' => $bomItem->id,
+            'routing_operation_id' => $op->id,
+            'material_id' => $compProduct->id,
+            'child_bom_id' => $childBom->id,
+            'quantity' => 4.0,
+            'gross_quantity' => 4.0,
             'uom_id' => $this->uomPcs->id,
             'sequence' => 1,
         ]);

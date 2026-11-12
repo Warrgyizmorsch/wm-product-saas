@@ -20,32 +20,19 @@ class ProductionBomItem extends BaseModel
         'bom_id',
         'material_id',
         'quantity',
-        'quantity_type', // fixed, formula
-        'formula',
+        'alternative_quantity', // BM-IMPL-04
+        'gross_quantity',       // BM-IMPL-04
         'uom_id',
         'allocation_role', // primary, alternative, mixed
         'material_scrap_percentage',
-        'is_alternative',
-        'replaces_item_id',
-        'priority',
-        'sequence',
-        'notes',
     ];
 
     protected $casts = [
         'quantity' => 'float',
+        'alternative_quantity' => 'float',
+        'gross_quantity' => 'float',
         'material_scrap_percentage' => 'float',
     ];
-
-    public function isFormula(): bool
-    {
-        return $this->quantity_type === 'formula' && !empty($this->formula);
-    }
-
-    public function isFixed(): bool
-    {
-        return !$this->isFormula();
-    }
 
     public function isPrimary(): bool
     {

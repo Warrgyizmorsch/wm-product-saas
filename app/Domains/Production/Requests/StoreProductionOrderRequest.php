@@ -5,9 +5,12 @@ namespace App\Domains\Production\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 use Illuminate\Validation\Rule;
+use App\Domains\Production\Requests\Concerns\ValidatesProductionOrderEngineering;
 
 class StoreProductionOrderRequest extends FormRequest
 {
+    use ValidatesProductionOrderEngineering;
+
     public function authorize(): bool
     {
         return true;
@@ -33,13 +36,16 @@ class StoreProductionOrderRequest extends FormRequest
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'description' => 'nullable|string|max:1000',
-        ];
+        ] + $this->engineeringSelectionRules(); // PO-IMPL-05
     }
 
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
             $tenantId = require_tenant_id();
+
+            // PO-IMPL-05 (PO-02 / PO-07): blocking BOM / Routing checks + selection completeness
+            $this->validateProductionOrderEngineering($validator, $tenantId);
             $targetCompanyId = $this->input('company_id') ?? company_id() ?? (class_exists(\App\Core\Company\CompanyContext::class) ? app(\App\Core\Company\CompanyContext::class)->id() : null);
             $targetBranchId = $this->input('branch_id') ?? branch_id() ?? (class_exists(\App\Core\Branch\BranchContext::class) ? app(\App\Core\Branch\BranchContext::class)->id() : null);
 

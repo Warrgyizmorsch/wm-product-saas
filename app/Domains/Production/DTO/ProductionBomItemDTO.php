@@ -9,8 +9,6 @@ class ProductionBomItemDTO
         public readonly float $quantity,
         public readonly int $uom_id,
         public readonly ?int $routing_operation_id = null,
-        public readonly string $quantity_type = 'fixed',
-        public readonly ?string $formula = null,
         public readonly float $material_scrap_percentage = 0.00,
         public readonly bool $is_alternative = false,
         public readonly ?int $replaces_item_id = null,
@@ -30,9 +28,9 @@ class ProductionBomItemDTO
             quantity: (float) $data['quantity'],
             uom_id: (int) $data['uom_id'],
             routing_operation_id: !empty($data['routing_operation_id']) ? (int) $data['routing_operation_id'] : null,
-            quantity_type: in_array($data['quantity_type'] ?? '', ['fixed', 'formula'], true) ? $data['quantity_type'] : 'fixed',
-            formula: !empty($data['formula']) ? trim($data['formula']) : null,
-            material_scrap_percentage: isset($data['material_scrap_percentage']) ? (float) $data['material_scrap_percentage'] : (isset($data['wastage_percentage']) ? (float) $data['wastage_percentage'] : 0.00),
+            material_scrap_percentage: isset($data['material_scrap_percentage'])
+                ? (float) $data['material_scrap_percentage']
+                : (isset($data['wastage_percentage']) ? (float) $data['wastage_percentage'] : 0.00),
             is_alternative: !empty($data['is_alternative']),
             replaces_item_id: !empty($data['replaces_item_id']) ? (int) $data['replaces_item_id'] : null,
             replaces_row_uid: !empty($data['replaces_row_uid']) ? (string) $data['replaces_row_uid'] : null,
@@ -44,6 +42,11 @@ class ProductionBomItemDTO
         );
     }
 
+    public function grossQuantity(): float
+    {
+        return round($this->quantity * (1.0 + ($this->material_scrap_percentage / 100.0)), 4);
+    }
+
     public function toArray(): array
     {
         return [
@@ -51,9 +54,8 @@ class ProductionBomItemDTO
             'routing_operation_id' => $this->routing_operation_id,
             'quantity' => $this->quantity,
             'uom_id' => $this->uom_id,
-            'quantity_type' => $this->quantity_type,
-            'formula' => $this->formula,
             'material_scrap_percentage' => $this->material_scrap_percentage,
+            'gross_quantity' => $this->grossQuantity(),
             'is_alternative' => $this->is_alternative,
             'replaces_item_id' => $this->replaces_item_id,
             'priority' => $this->priority,

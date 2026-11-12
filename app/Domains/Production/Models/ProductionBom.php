@@ -23,6 +23,7 @@ class ProductionBom extends BaseModel
 
     public const STATUS_DRAFT = 'draft';
     public const STATUS_PENDING_APPROVAL = 'pending_approval';
+    public const STATUS_SCHEDULED = 'scheduled';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_ACTIVE = 'approved';
     public const STATUS_INACTIVE = 'inactive';
@@ -89,24 +90,75 @@ class ProductionBom extends BaseModel
     }
 
     /**
-     * RT-IMPL-05 (RT-04 rules 2–3): routing advisory worked out live from the linked routing's current status —
-     * never stored. null when the routing is active (or the BOM is cancelled / inactive / has no routing).
+     * BM-IMPL-14 / RT-IMPL-05: live routing advisories worked out from the linked routing's current status,
+     * removed operations carrying materials, and outdated routing cost snapshots — never stored.
+     *
+     * @return array<int, array{code: string, message: string, blocks_approval: bool}>
      */
-    public function getRoutingAdvisoryAttribute(): ?string
+    public function getRoutingAdvisoryAttribute(): array
     {
         if (!$this->routing_id || in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_INACTIVE], true)) {
-            return null;
+            return [];
         }
-        $routing = $this->routing;
-        if (!$routing) {
-            return "The linked routing no longer exists. This BOM can't be approved until an active routing is linked.";
-        }
-        if ($routing->status === Routing::STATUS_ACTIVE) {
-            return null;
-        }
-        $status = str_replace('_', ' ', $routing->status);
 
-        return "Linked routing {$routing->routing_number} is {$status}. This BOM can't be approved until the routing is active.";
+        $deletedMsgs = $this->exists ? self::deletedOperationMessages($this->id) : [];
+
+        return self::buildRoutingAdvisories($this->routing, $deletedMsgs);
+    }
+
+    /**
+     * Build structured live routing advisories for a BOM header + deleted-operation list.
+     *
+     * @param  array<int, string>  $deletedOpMessages
+     * @return array<int, array{code: string, message: string, blocks_approval: bool}>
+     */
+    public static function buildRoutingAdvisories(?Routing $routing, array $deletedOpMessages = []): array
+    {
+        $advisories = [];
+
+        if (!$routing) {
+            $advisories[] = [
+                'code'            => 'not_active',
+                'message'         => "The linked routing no longer exists. This BOM can't be approved until an active routing is linked.",
+                'blocks_approval' => true,
+            ];
+        } elseif ($routing->status !== Routing::STATUS_ACTIVE) {
+            $status = str_replace('_', ' ', $routing->status);
+            $advisories[] = [
+                'code'            => 'not_active',
+                'message'         => "Linked routing {$routing->routing_number} is {$status}. This BOM can't be approved until the routing is active.",
+                'blocks_approval' => true,
+            ];
+        }
+
+        foreach ($deletedOpMessages as $msg) {
+            $advisories[] = [
+                'code'            => 'operation_removed',
+                'message'         => $msg,
+                'blocks_approval' => true,
+            ];
+        }
+
+        if ($routing) {
+            $costStatus = app(\App\Domains\Production\Services\RoutingCostStatusService::class)->check($routing);
+            if (!empty($costStatus['outdated'])) {
+                $advisories[] = [
+                    'code'            => 'routing_outdated',
+                    'message'         => "Linked routing {$routing->routing_number} has outdated operation costs. {$costStatus['action']}",
+                    'blocks_approval' => false,
+                ];
+            }
+            // BM-IMPL-14 #2: check c also covers inactive resources (RT-IMPL-18) — same shared routing check, warning only
+            if (!empty($costStatus['inactive'])) {
+                $advisories[] = [
+                    'code'            => 'routing_outdated',
+                    'message'         => "Linked routing {$routing->routing_number}: " . collect($costStatus['inactive'])->pluck('message')->implode(' ') . ' ' . ($costStatus['inactive_header'] ?? ''),
+                    'blocks_approval' => false,
+                ];
+            }
+        }
+
+        return $advisories;
     }
 
     /**
@@ -139,6 +191,36 @@ class ProductionBom extends BaseModel
             ->all();
     }
 
+    /** @return array<int, string> */
+    public static function deletedOperationNumbers(int $bomId): array
+    {
+        $opIds = RoutingOperationMaterial::where('bom_id', $bomId)->pluck('routing_operation_id')->unique()->filter();
+        if ($opIds->isEmpty()) {
+            return [];
+        }
+
+        return RoutingOperation::onlyTrashed()
+            ->whereIn('id', $opIds)
+            ->orderBy('sequence')
+            ->pluck('operation_number')
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * BM-IMPL-08 #7: the ONE sub-BOM chosen for a material in this BOM (stored on its allocations), or null.
+     */
+    public function subBomFor(int $materialId): ?self
+    {
+        $childId = RoutingOperationMaterial::where('bom_id', $this->id)
+            ->where('material_id', $materialId)
+            ->whereNotNull('child_bom_id')
+            ->value('child_bom_id');
+
+        return $childId ? self::withoutGlobalScopes()->find($childId) : null;
+    }
+
     public function getActiveRoutingAttribute(): ?Routing
     {
         return $this->routing;
@@ -152,6 +234,11 @@ class ProductionBom extends BaseModel
     public function operationMaterials(): HasMany
     {
         return $this->hasMany(RoutingOperationMaterial::class, 'bom_id');
+    }
+
+    public function allocations(): HasMany
+    {
+        return $this->operationMaterials();
     }
 
     public function approvals(): HasMany
@@ -236,11 +323,12 @@ class ProductionBom extends BaseModel
     public function scopeActive(Builder $query): void
     {
         $today = Carbon::today()->toDateString();
+        // PO-IMPL-02: a NULL start date means "active now" (same as isCurrentlyActive())
         $query->whereIn('status', ['approved', 'active', 'scheduled'])
-            ->where('effective_date', '<=', $today)
+            ->where(fn (Builder $q) => $q->whereNull('effective_date')->orWhereDate('effective_date', '<=', $today))
             ->where(function (Builder $q) use ($today): void {
                 $q->whereNull('expiry_date')
-                    ->orWhere('expiry_date', '>=', $today);
+                    ->orWhereDate('expiry_date', '>=', $today);
             })
             ->orderBy('effective_date', 'desc')
             ->orderBy('id', 'desc');
@@ -260,32 +348,48 @@ class ProductionBom extends BaseModel
         }
 
         $warnings = [];
-        $this->loadMissing(['items.material', 'items.childBom']);
+        $this->loadMissing([
+            'operationMaterials.material',
+            'operationMaterials.childBom',
+            'operationMaterials.routingOperation',
+            'items.material',
+        ]);
+
+        // Prefer 2-tier operation allocations; fall back to master items only for legacy BOMs without allocations
+        $sourceRows = $this->operationMaterials->isNotEmpty()
+            ? $this->operationMaterials
+            : $this->items;
 
         $today = Carbon::today()->toDateString();
 
-        foreach ($this->items as $item) {
-            if (!$item->material_id) {
+        foreach ($sourceRows as $row) {
+            if (!$row->material_id) {
                 continue;
             }
 
-            $materialName = $item->material?->name ?? 'Component';
-            $materialSku = $item->material?->sku ?? '';
+            $material = $row->material;
+            $materialName = $material?->name ?? 'Component';
+            $materialSku = $material?->sku ?? '';
+            $opNumber = $row->routingOperation?->operation_number;
+            $explicitChildBomId = $row->child_bom_id;
+            $rowId = $row instanceof RoutingOperationMaterial ? $row->id : $row->id;
+            $bomItemId = $row instanceof RoutingOperationMaterial ? $row->bom_item_id : $row->id;
 
-            // Check if item has an explicit child_bom_id
-            if ($item->child_bom_id) {
-                $childBom = $item->childBom ?? self::withoutGlobalScopes()->find($item->child_bom_id);
+            // Check if allocation has an explicit child_bom_id
+            if ($explicitChildBomId) {
+                $childBom = ($row instanceof RoutingOperationMaterial ? $row->childBom : null)
+                    ?? self::withoutGlobalScopes()->find($explicitChildBomId);
 
                 if ($childBom) {
                     $childStatusStr = ucfirst($childBom->status);
                     $isChildCancelled = ($childBom->status === 'cancelled');
-                    $isChildInactive = in_array($childBom->status, ['inactive', 'superseded'], true) 
+                    $isChildInactive = in_array($childBom->status, ['inactive', 'superseded'], true)
                         || ($childBom->expiry_date && Carbon::parse($childBom->expiry_date)->toDateString() < $today);
 
                     // Check if a newer approved version exists for this component product
                     $latestApprovedBom = self::withoutGlobalScopes()
                         ->where('tenant_id', $this->tenant_id)
-                        ->where('product_id', $item->material_id)
+                        ->where('product_id', $row->material_id)
                         ->whereIn('status', ['approved', 'active'])
                         ->where(function ($q) use ($today) {
                             $q->whereNull('expiry_date')
@@ -304,7 +408,9 @@ class ProductionBom extends BaseModel
 
                         $warnings[] = [
                             'type'                => 'cancelled',
-                            'item_id'             => $item->id,
+                            'item_id'             => $bomItemId,
+                            'allocation_id'       => $rowId,
+                            'operation_number'    => $opNumber,
                             'material_name'       => $materialName,
                             'material_sku'        => $materialSku,
                             'child_bom_id'        => $childBom->id,
@@ -324,7 +430,9 @@ class ProductionBom extends BaseModel
 
                         $warnings[] = [
                             'type'                => 'inactive',
-                            'item_id'             => $item->id,
+                            'item_id'             => $bomItemId,
+                            'allocation_id'       => $rowId,
+                            'operation_number'    => $opNumber,
                             'material_name'       => $materialName,
                             'material_sku'        => $materialSku,
                             'child_bom_id'        => $childBom->id,
@@ -340,7 +448,9 @@ class ProductionBom extends BaseModel
                     } elseif ($hasNewerVersion) {
                         $warnings[] = [
                             'type'                => 'version_updated',
-                            'item_id'             => $item->id,
+                            'item_id'             => $bomItemId,
+                            'allocation_id'       => $rowId,
+                            'operation_number'    => $opNumber,
                             'material_name'       => $materialName,
                             'material_sku'        => $materialSku,
                             'child_bom_id'        => $childBom->id,
@@ -356,17 +466,21 @@ class ProductionBom extends BaseModel
                     }
                 }
             } else {
-                // If material has BOMs, but child_bom_id was not explicitly set on this item
+                // If material has BOMs, but child_bom_id was not explicitly set on this row
                 $activeChildBom = self::withoutGlobalScopes()
                     ->where('tenant_id', $this->tenant_id)
-                    ->where('product_id', $item->material_id)
-                    ->whereIn('status', ['approved', 'active'])
+                    ->where('product_id', $row->material_id)
+                    ->whereIn('status', ['approved', 'active', 'scheduled'])
+                    ->where(function ($q) use ($today) {
+                        $q->whereNull('expiry_date')
+                          ->orWhere('expiry_date', '>=', $today);
+                    })
                     ->orderByDesc('id')
                     ->first();
 
                 $oldChildBom = self::withoutGlobalScopes()
                     ->where('tenant_id', $this->tenant_id)
-                    ->where('product_id', $item->material_id)
+                    ->where('product_id', $row->material_id)
                     ->whereIn('status', ['cancelled', 'inactive', 'superseded'])
                     ->where(function ($q) use ($activeChildBom) {
                         if ($activeChildBom) {
@@ -380,7 +494,9 @@ class ProductionBom extends BaseModel
                     $oldStatusStr = ucfirst($oldChildBom->status);
                     $warnings[] = [
                         'type'                => 'version_updated',
-                        'item_id'             => $item->id,
+                        'item_id'             => $bomItemId,
+                        'allocation_id'       => $rowId,
+                        'operation_number'    => $opNumber,
                         'material_name'       => $materialName,
                         'material_sku'        => $materialSku,
                         'child_bom_id'        => $oldChildBom->id,
@@ -397,7 +513,9 @@ class ProductionBom extends BaseModel
                     $oldStatusStr = ucfirst($oldChildBom->status);
                     $warnings[] = [
                         'type'              => 'cancelled',
-                        'item_id'           => $item->id,
+                        'item_id'           => $bomItemId,
+                        'allocation_id'     => $rowId,
+                        'operation_number'  => $opNumber,
                         'material_name'     => $materialName,
                         'material_sku'      => $materialSku,
                         'child_bom_id'      => $oldChildBom->id,
@@ -405,6 +523,25 @@ class ProductionBom extends BaseModel
                         'child_bom_version' => $oldChildBom->version,
                         'child_bom_status'  => $oldChildBom->status,
                         'message'           => "Sub-BOM {$oldChildBom->bom_number} v{$oldChildBom->version} [Status: {$oldStatusStr}] for '{$materialName}' was " . strtolower($oldStatusStr) . " and has no active replacement.",
+                    ];
+                } elseif (
+                    !$activeChildBom
+                    && $material
+                    && in_array($material->type, ['semi_finished', 'semi_finished_goods'], true)
+                    && in_array($material->supplier_method ?? 'manufacture', ['manufacture', 'both'], true)
+                ) {
+                    $warnings[] = [
+                        'type'              => 'missing_sub_bom',
+                        'item_id'           => $bomItemId,
+                        'allocation_id'     => $rowId,
+                        'operation_number'  => $opNumber,
+                        'material_name'     => $materialName,
+                        'material_sku'      => $materialSku,
+                        'child_bom_id'      => null,
+                        'child_bom_number'  => null,
+                        'child_bom_version' => null,
+                        'child_bom_status'  => null,
+                        'message'           => "Manufactured sub-assembly '{$materialName}' has no active or scheduled approved sub-BOM.",
                     ];
                 }
             }

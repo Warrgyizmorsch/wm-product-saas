@@ -12,15 +12,20 @@ class ProductionCostService
      */
     public function calculateMaterialCost(ProductionBom $bom): float
     {
-        $bom->loadMissing('items.material');
+        $bom->loadMissing(['operationMaterials.material', 'items.material']);
+
+        $sourceRows = $bom->operationMaterials->isNotEmpty()
+            ? $bom->operationMaterials
+            : $bom->items;
 
         $totalCost = 0.0;
-        foreach ($bom->items as $item) {
+        foreach ($sourceRows as $item) {
             if ($item->is_alternative) {
                 continue;
             }
-            $scrapFactor = 1 + ($item->material_scrap_percentage / 100);
-            $grossQty = $item->quantity * $scrapFactor;
+            $grossQty = method_exists($item, 'calculateGrossQuantity')
+                ? (float) ($item->gross_quantity ?? $item->calculateGrossQuantity())
+                : ((float) $item->quantity * (1 + (((float) ($item->material_scrap_percentage ?? 0)) / 100)));
             $unitCost = $item->material?->unit_cost ?? 0.0;
             $totalCost += $grossQty * $unitCost;
         }
@@ -126,15 +131,19 @@ class ProductionCostService
      */
     public function calculateScrapAdjustment(ProductionBom $bom): float
     {
-        $bom->loadMissing('items.material');
+        $bom->loadMissing(['operationMaterials.material', 'items.material']);
+
+        $sourceRows = $bom->operationMaterials->isNotEmpty()
+            ? $bom->operationMaterials
+            : $bom->items;
 
         $scrapCost = 0.0;
-        foreach ($bom->items as $item) {
+        foreach ($sourceRows as $item) {
             if ($item->is_alternative) {
                 continue;
             }
-            $scrapPct = $item->material_scrap_percentage ?? 0.0;
-            $scrapQty = $item->quantity * ($scrapPct / 100);
+            $scrapPct = (float) ($item->material_scrap_percentage ?? 0.0);
+            $scrapQty = (float) $item->quantity * ($scrapPct / 100);
             $unitCost = $item->material?->unit_cost ?? 0.0;
             $scrapCost += $scrapQty * $unitCost;
         }

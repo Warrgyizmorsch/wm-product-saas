@@ -6,6 +6,9 @@ use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionBomItem;
+use App\Domains\Production\Models\Routing;
+use App\Domains\Production\Models\RoutingOperation;
+use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Services\BomExplosionService;
 use App\Domains\Production\Services\MrpEngineService;
 use App\Domains\Production\Services\ProductionBomService;
@@ -178,27 +181,27 @@ class BomAlternativeComponentsTest extends TestCase
         $response->assertSessionHasNoErrors();
 
         $bom = ProductionBom::where('bom_number', 'BOM-CHAIR-001')->firstOrFail();
-        $this->assertCount(3, $bom->items);
+        $this->assertCount(3, $bom->operationMaterials);
 
-        $primaryItem = $bom->items()->where('material_id', $oakLeg->id)->first();
-        $altPine = $bom->items()->where('material_id', $pineLeg->id)->first();
-        $altSteel = $bom->items()->where('material_id', $steelLeg->id)->first();
+        $primaryMat = $bom->operationMaterials()->where('material_id', $oakLeg->id)->first();
+        $altPine = $bom->operationMaterials()->where('material_id', $pineLeg->id)->first();
+        $altSteel = $bom->operationMaterials()->where('material_id', $steelLeg->id)->first();
 
-        $this->assertFalse((bool)$primaryItem->is_alternative);
-        $this->assertNull($primaryItem->replaces_item_id);
+        $this->assertFalse((bool) $primaryMat->is_alternative);
+        $this->assertNull($primaryMat->replaces_routing_material_id);
 
-        $this->assertTrue((bool)$altPine->is_alternative);
-        $this->assertEquals($primaryItem->id, $altPine->replaces_item_id);
+        $this->assertTrue((bool) $altPine->is_alternative);
+        $this->assertEquals($primaryMat->id, $altPine->replaces_routing_material_id);
         $this->assertEquals(1, $altPine->priority);
 
-        $this->assertTrue((bool)$altSteel->is_alternative);
-        $this->assertEquals($primaryItem->id, $altSteel->replaces_item_id);
+        $this->assertTrue((bool) $altSteel->is_alternative);
+        $this->assertEquals($primaryMat->id, $altSteel->replaces_routing_material_id);
         $this->assertEquals(2, $altSteel->priority);
 
         // Test model relations
-        $this->assertCount(2, $primaryItem->alternatives);
-        $this->assertEquals($altPine->id, $primaryItem->alternatives->first()->id);
-        $this->assertEquals($primaryItem->id, $altPine->primaryItem->id);
+        $this->assertCount(2, $primaryMat->replacements);
+        $this->assertEquals($altPine->id, $primaryMat->replacements->first()->id);
+        $this->assertEquals($primaryMat->id, $altPine->replacesMaterial->id);
     }
 
     /** @test */
@@ -206,9 +209,23 @@ class BomAlternativeComponentsTest extends TestCase
     {
         $fg = $this->createProduct('Table', 'FG-TBL', 'finished_good');
         $top = $this->createProduct('Table Top', 'RM-TOP');
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-TBL-ERR',
+            'name' => 'Table Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
 
         $payloadSelf = [
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'bom_number' => 'BOM-TBL-ERR1',
             'bom_name' => 'Table BOM',
             'bom_type' => 'manufacturing',
@@ -219,6 +236,7 @@ class BomAlternativeComponentsTest extends TestCase
             'items' => [
                 [
                     'row_uid' => 'row_1',
+                    'routing_operation_id' => $op->id,
                     'material_id' => $top->id,
                     'quantity' => 1,
                     'uom_id' => $this->uom->id,
@@ -237,6 +255,7 @@ class BomAlternativeComponentsTest extends TestCase
 
         $payloadMissing = [
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'bom_number' => 'BOM-TBL-ERR2',
             'bom_name' => 'Table BOM',
             'bom_type' => 'manufacturing',
@@ -247,6 +266,7 @@ class BomAlternativeComponentsTest extends TestCase
             'items' => [
                 [
                     'row_uid' => 'row_1',
+                    'routing_operation_id' => $op->id,
                     'material_id' => $top->id,
                     'quantity' => 1,
                     'uom_id' => $this->uom->id,
@@ -271,9 +291,23 @@ class BomAlternativeComponentsTest extends TestCase
         $p1 = $this->createProduct('Part 1', 'P1');
         $p2 = $this->createProduct('Part 2', 'P2');
         $p3 = $this->createProduct('Part 3', 'P3');
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-CAB-ERR',
+            'name' => 'Cabinet Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
 
         $payload = [
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'bom_number' => 'BOM-CAB-ERR',
             'bom_name' => 'Cabinet BOM',
             'bom_type' => 'manufacturing',
@@ -284,6 +318,7 @@ class BomAlternativeComponentsTest extends TestCase
             'items' => [
                 [
                     'row_uid' => 'row_primary',
+                    'routing_operation_id' => $op->id,
                     'material_id' => $p1->id,
                     'quantity' => 1,
                     'uom_id' => $this->uom->id,
@@ -291,6 +326,7 @@ class BomAlternativeComponentsTest extends TestCase
                 ],
                 [
                     'row_uid' => 'row_alt1',
+                    'routing_operation_id' => $op->id,
                     'material_id' => $p2->id,
                     'quantity' => 1,
                     'uom_id' => $this->uom->id,
@@ -300,6 +336,7 @@ class BomAlternativeComponentsTest extends TestCase
                 ],
                 [
                     'row_uid' => 'row_alt2',
+                    'routing_operation_id' => $op->id,
                     'material_id' => $p3->id,
                     'quantity' => 1,
                     'uom_id' => $this->uom->id,
@@ -317,6 +354,100 @@ class BomAlternativeComponentsTest extends TestCase
         $response->assertSessionHasErrors(['items.2.replaces_row_uid']);
     }
 
+    /**
+     * Create an allocated BOM with one primary material and one alternative material.
+     *
+     * @return array{bom: ProductionBom, routing: Routing, op: RoutingOperation, primaryMat: RoutingOperationMaterial, altMat: RoutingOperationMaterial}
+     */
+    private function createAllocatedBomWithAlternative(
+        Product $fg,
+        Product $primaryProduct,
+        Product $altProduct,
+        float $qty = 1.0,
+        string $status = 'active',
+        string $bomNumber = 'BOM-ALLOC-001'
+    ): array {
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-' . $bomNumber,
+            'name' => $bomNumber . ' Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
+        $bom = ProductionBom::create([
+            'tenant_id' => $this->tenant->id,
+            'product_id' => $fg->id,
+            'routing_id' => $routing->id,
+            'bom_number' => $bomNumber,
+            'bom_name' => $fg->name . ' BOM',
+            'bom_type' => 'manufacturing',
+            'base_quantity' => 1,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+            'status' => $status,
+            'created_by' => $this->user->id,
+        ]);
+
+        $primaryItem = ProductionBomItem::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $bom->id,
+            'material_id' => $primaryProduct->id,
+            'quantity' => $qty,
+            'uom_id' => $this->uom->id,
+            'allocation_role' => 'primary',
+            'priority' => 1,
+            'sequence' => 1,
+        ]);
+        $altItem = ProductionBomItem::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $bom->id,
+            'material_id' => $altProduct->id,
+            'quantity' => 0,
+            'uom_id' => $this->uom->id,
+            'allocation_role' => 'alternative',
+            'priority' => 1,
+            'sequence' => 2,
+        ]);
+
+        $primaryMat = RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $bom->id,
+            'bom_item_id' => $primaryItem->id,
+            'routing_operation_id' => $op->id,
+            'material_id' => $primaryProduct->id,
+            'quantity' => $qty,
+            'gross_quantity' => $qty,
+            'uom_id' => $this->uom->id,
+            'is_alternative' => false,
+            'priority' => 1,
+            'sequence' => 1,
+        ]);
+        $altMat = RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $bom->id,
+            'bom_item_id' => $altItem->id,
+            'routing_operation_id' => $op->id,
+            'material_id' => $altProduct->id,
+            'quantity' => $qty,
+            'gross_quantity' => $qty,
+            'uom_id' => $this->uom->id,
+            'is_alternative' => true,
+            'replaces_routing_material_id' => $primaryMat->id,
+            'priority' => 1,
+            'sequence' => 2,
+        ]);
+
+        return compact('bom', 'routing', 'op', 'primaryMat', 'altMat');
+    }
+
     /** @test */
     public function costing_service_excludes_alternative_components_from_total_cost()
     {
@@ -324,44 +455,7 @@ class BomAlternativeComponentsTest extends TestCase
         $frame = $this->createProduct('Wood Frame', 'RM-FRAME', 'raw_material', 100.0);
         $altFrame = $this->createProduct('Metal Frame', 'RM-MFRAME', 'raw_material', 200.0);
 
-        $bom = ProductionBom::create([
-            'tenant_id' => $this->tenant->id,
-            'product_id' => $fg->id,
-            'bom_number' => 'BOM-SOFA-001',
-            'bom_name' => 'Sofa BOM',
-            'bom_type' => 'manufacturing',
-            'base_quantity' => 1,
-            'base_uom_id' => $this->uom->id,
-            'version' => '1.0.0',
-            'effective_date' => now()->toDateString(),
-            'status' => 'active',
-            'created_by' => $this->user->id,
-        ]);
-
-        $primaryItem = ProductionBomItem::create([
-            'tenant_id' => $this->tenant->id,
-            'bom_id' => $bom->id,
-            'material_id' => $frame->id,
-            'quantity' => 1,
-            'uom_id' => $this->uom->id,
-            'material_scrap_percentage' => 0,
-            'is_alternative' => false,
-            'priority' => 1,
-            'sequence' => 1,
-        ]);
-
-        ProductionBomItem::create([
-            'tenant_id' => $this->tenant->id,
-            'bom_id' => $bom->id,
-            'material_id' => $altFrame->id,
-            'quantity' => 1,
-            'uom_id' => $this->uom->id,
-            'material_scrap_percentage' => 0,
-            'is_alternative' => true,
-            'replaces_item_id' => $primaryItem->id,
-            'priority' => 1,
-            'sequence' => 2,
-        ]);
+        ['bom' => $bom] = $this->createAllocatedBomWithAlternative($fg, $frame, $altFrame, 1.0, 'active', 'BOM-SOFA-001');
 
         $costService = app(ProductionCostService::class);
         $materialCost = $costService->calculateMaterialCost($bom);
@@ -377,44 +471,7 @@ class BomAlternativeComponentsTest extends TestCase
         $panel = $this->createProduct('Wood Panel', 'RM-PANEL', 'raw_material');
         $altPanel = $this->createProduct('Composite Panel', 'RM-CPANEL', 'raw_material');
 
-        $bom = ProductionBom::create([
-            'tenant_id' => $this->tenant->id,
-            'product_id' => $fg->id,
-            'bom_number' => 'BOM-DOOR-001',
-            'bom_name' => 'Door BOM',
-            'bom_type' => 'manufacturing',
-            'base_quantity' => 1,
-            'base_uom_id' => $this->uom->id,
-            'version' => '1.0.0',
-            'effective_date' => now()->toDateString(),
-            'status' => 'active',
-            'created_by' => $this->user->id,
-        ]);
-
-        $primary = ProductionBomItem::create([
-            'tenant_id' => $this->tenant->id,
-            'bom_id' => $bom->id,
-            'material_id' => $panel->id,
-            'quantity' => 2,
-            'uom_id' => $this->uom->id,
-            'material_scrap_percentage' => 0,
-            'is_alternative' => false,
-            'priority' => 1,
-            'sequence' => 1,
-        ]);
-
-        ProductionBomItem::create([
-            'tenant_id' => $this->tenant->id,
-            'bom_id' => $bom->id,
-            'material_id' => $altPanel->id,
-            'quantity' => 2,
-            'uom_id' => $this->uom->id,
-            'material_scrap_percentage' => 0,
-            'is_alternative' => true,
-            'replaces_item_id' => $primary->id,
-            'priority' => 1,
-            'sequence' => 2,
-        ]);
+        $this->createAllocatedBomWithAlternative($fg, $panel, $altPanel, 2.0, 'active', 'BOM-DOOR-001');
 
         $explosionService = app(BomExplosionService::class);
         $explosion = $explosionService->explode($fg->id, 5, $this->tenant->id); // 5 Doors
@@ -432,44 +489,7 @@ class BomAlternativeComponentsTest extends TestCase
         $cardboard = $this->createProduct('Cardboard', 'RM-CB', 'raw_material');
         $altPlastic = $this->createProduct('Plastic Sheet', 'RM-PS', 'raw_material');
 
-        $bom = ProductionBom::create([
-            'tenant_id' => $this->tenant->id,
-            'product_id' => $fg->id,
-            'bom_number' => 'BOM-BOX-001',
-            'bom_name' => 'Box BOM',
-            'bom_type' => 'manufacturing',
-            'base_quantity' => 1,
-            'base_uom_id' => $this->uom->id,
-            'version' => '1.0.0',
-            'effective_date' => now()->toDateString(),
-            'status' => 'active',
-            'created_by' => $this->user->id,
-        ]);
-
-        $primary = ProductionBomItem::create([
-            'tenant_id' => $this->tenant->id,
-            'bom_id' => $bom->id,
-            'material_id' => $cardboard->id,
-            'quantity' => 3,
-            'uom_id' => $this->uom->id,
-            'material_scrap_percentage' => 0,
-            'is_alternative' => false,
-            'priority' => 1,
-            'sequence' => 1,
-        ]);
-
-        ProductionBomItem::create([
-            'tenant_id' => $this->tenant->id,
-            'bom_id' => $bom->id,
-            'material_id' => $altPlastic->id,
-            'quantity' => 3,
-            'uom_id' => $this->uom->id,
-            'material_scrap_percentage' => 0,
-            'is_alternative' => true,
-            'replaces_item_id' => $primary->id,
-            'priority' => 1,
-            'sequence' => 2,
-        ]);
+        ['bom' => $bom] = $this->createAllocatedBomWithAlternative($fg, $cardboard, $altPlastic, 3.0, 'active', 'BOM-BOX-001');
 
         $plan = \App\Domains\Production\Models\ProductionPlan::create([
             'tenant_id' => $this->tenant->id,
@@ -501,59 +521,33 @@ class BomAlternativeComponentsTest extends TestCase
         $glass = $this->createProduct('Clear Glass', 'RM-GLS', 'raw_material');
         $altTinted = $this->createProduct('Tinted Glass', 'RM-TGLS', 'raw_material');
 
-        $bom = ProductionBom::create([
-            'tenant_id' => $this->tenant->id,
-            'product_id' => $fg->id,
-            'bom_number' => 'BOM-WIN-001',
-            'bom_name' => 'Window BOM',
-            'bom_type' => 'manufacturing',
-            'base_quantity' => 1,
-            'base_uom_id' => $this->uom->id,
-            'version' => '1.0.0',
-            'effective_date' => now()->toDateString(),
-            'status' => 'draft',
-            'created_by' => $this->user->id,
-        ]);
-
-        $primary = ProductionBomItem::create([
-            'tenant_id' => $this->tenant->id,
-            'bom_id' => $bom->id,
-            'material_id' => $glass->id,
-            'quantity' => 1,
-            'uom_id' => $this->uom->id,
-            'material_scrap_percentage' => 0,
-            'is_alternative' => false,
-            'priority' => 1,
-            'sequence' => 1,
-        ]);
-
-        $alt = ProductionBomItem::create([
-            'tenant_id' => $this->tenant->id,
-            'bom_id' => $bom->id,
-            'material_id' => $altTinted->id,
-            'quantity' => 1,
-            'uom_id' => $this->uom->id,
-            'material_scrap_percentage' => 0,
-            'is_alternative' => true,
-            'replaces_item_id' => $primary->id,
-            'priority' => 1,
-            'sequence' => 2,
-        ]);
+        ['bom' => $bom, 'primaryMat' => $primary, 'altMat' => $alt] = $this->createAllocatedBomWithAlternative(
+            $fg,
+            $glass,
+            $altTinted,
+            1.0,
+            'draft',
+            'BOM-WIN-001'
+        );
 
         $bomService = app(ProductionBomService::class);
-        $newBom = $bomService->duplicateVersion($bom->id, '2.0.0', $this->user->id);
+        // BM-IMPL-03: the copy is built without saving, then saved through the normal create (as the form / API do)
+        $payload = $bomService->buildCopyPayload($bom->id, '2.0.0');
+        $newBom = $bomService->create(\App\Domains\Production\DTO\ProductionBomDTO::fromArray($payload), $this->user->id);
+        $this->assertSame($bom->bom_number, $newBom->bom_number, 'new version keeps the BOM number');
+        $this->assertSame((int) $bom->revision + 1, (int) $newBom->revision);
 
-        $this->assertCount(2, $newBom->items);
-        $newPrimary = $newBom->items()->where('material_id', $glass->id)->first();
-        $newAlt = $newBom->items()->where('material_id', $altTinted->id)->first();
+        $this->assertCount(2, $newBom->operationMaterials);
+        $newPrimary = $newBom->operationMaterials()->where('material_id', $glass->id)->first();
+        $newAlt = $newBom->operationMaterials()->where('material_id', $altTinted->id)->first();
 
         $this->assertNotEquals($primary->id, $newPrimary->id);
         $this->assertNotEquals($alt->id, $newAlt->id);
 
-        $this->assertFalse((bool)$newPrimary->is_alternative);
-        $this->assertNull($newPrimary->replaces_item_id);
+        $this->assertFalse((bool) $newPrimary->is_alternative);
+        $this->assertNull($newPrimary->replaces_routing_material_id);
 
-        $this->assertTrue((bool)$newAlt->is_alternative);
-        $this->assertEquals($newPrimary->id, $newAlt->replaces_item_id);
+        $this->assertTrue((bool) $newAlt->is_alternative);
+        $this->assertEquals($newPrimary->id, $newAlt->replaces_routing_material_id);
     }
 }

@@ -213,11 +213,12 @@ class Routing extends BaseModel
     public function scopeActive(Builder $query): void
     {
         $today = Carbon::today()->toDateString();
+        // PO-IMPL-02: a NULL start date means "active now" (same as isCurrentlyActive())
         $query->whereIn('status', [self::STATUS_ACTIVE, self::STATUS_SCHEDULED])
-            ->where('effective_from', '<=', $today)
+            ->where(fn (Builder $q) => $q->whereNull('effective_from')->orWhereDate('effective_from', '<=', $today))
             ->where(function (Builder $q) use ($today): void {
                 $q->whereNull('effective_to')
-                  ->orWhere('effective_to', '>=', $today);
+                  ->orWhereDate('effective_to', '>=', $today);
             })
             ->orderBy('effective_from', 'desc')
             ->orderBy('id', 'desc');

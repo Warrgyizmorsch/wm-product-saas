@@ -44,15 +44,19 @@ class ProductionOrderService
             $bomId = $data['bom_id'] ?? null;
             $bom = null;
             if ($bomId) {
-                $bom = ProductionBom::withoutGlobalScopes()->with(['items.material', 'product'])->find($bomId);
+                $bom = ProductionBom::withoutGlobalScopes()->with(['operationMaterials.material', 'items.material', 'product'])->find($bomId);
             } else {
                 $bom = ProductionBom::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
                     ->where('product_id', $productId)
-                    ->where('status', 'approved')
-                    ->with(['items.material', 'product'])
+                    ->whereIn('status', ['approved', 'active'])
+                    ->with(['operationMaterials.material', 'items.material', 'product'])
                     ->first();
                 $bomId = $bom?->id;
+            }
+
+            if ($bom) {
+                app(ProductionBomService::class)->validateBomTreeForExecution($bom, $tenantId);
             }
 
             $branchId = $data['branch_id'] ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
@@ -72,7 +76,6 @@ class ProductionOrderService
                 'start_date' => $data['start_date'] ?? now()->toDateString(),
                 'end_date' => $data['end_date'] ?? now()->addDays(7)->toDateString(),
                 'status' => $data['status'] ?? ProductionOrder::STATUS_RELEASED,
-                'parameters' => $data['parameters'] ?? [],
                 'created_by' => $userId,
             ]);
 
@@ -108,6 +111,17 @@ class ProductionOrderService
             $branchId = $plan->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
             $companyId = $plan->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
 
+            // PO-IMPL-04: manufactured products need a usable BOM + its Routing (same blocking rules as Create)
+            $planBomId = $plan->bom_id;
+            $planRoutingId = $plan->routing_id;
+            $engineering = app(ProductionOrderEngineeringService::class);
+            if ($product && $engineering->requiresEngineering($product)) {
+                $resolution = $engineering->resolveAndValidate($product, $plan->tenant_id, $planBomId ? (int) $planBomId : null, $planRoutingId ? (int) $planRoutingId : null);
+                $engineering->assertCanCreate($resolution);
+                $planBomId = $resolution['bom']?->id;
+                $planRoutingId = $resolution['routing']?->id;
+            }
+
             // 1. Create order header
             $order = ProductionOrder::create([
                 'tenant_id' => $plan->tenant_id,
@@ -116,8 +130,8 @@ class ProductionOrderService
                 'order_number' => $this->numberService->generateNextNumber($plan->tenant_id, $branchId),
                 'production_plan_id' => $plan->id,
                 'product_id' => $plan->product_id,
-                'bom_id' => $plan->bom_id,
-                'routing_id' => $plan->routing_id,
+                'bom_id' => $planBomId,
+                'routing_id' => $planRoutingId,
                 'sales_order_id' => $plan->sales_order_id,
                 'sales_order_item_id' => $plan->sales_order_item_id,
                 'quantity_ordered' => $plan->quantity,
@@ -154,7 +168,7 @@ class ProductionOrderService
             $bom = $order->bom ?? ProductionBom::withoutGlobalScopes()->find($order->bom_id);
             $routing = $order->routing ?? ($order->routing_id ? Routing::withoutGlobalScopes()->find($order->routing_id) : null);
 
-            $hasChildBoms = $bom && $bom->items()->whereNotNull('child_bom_id')->exists();
+            $hasChildBoms = $bom && ($bom->operationMaterials()->whereNotNull('child_bom_id')->exists() || $bom->items()->whereNotNull('child_bom_id')->exists());
 
             if ($hasChildBoms && $routing) {
                 $this->snapshotMultiLevelRoutings($order, $bom, $routing, (float) $order->quantity_ordered, $order->tenant_id, $userId);
@@ -167,18 +181,18 @@ class ProductionOrderService
                 $opSourceProductId = $order->product_id;
 
                 if ($routingOp && $bom) {
-                    $opRouting = $routing ?? $routingOp?->routing;
-                    if ($opRouting && (int) $opRouting->product_id === (int) $order->product_id) {
-                        $routingMaterials = RoutingOperationMaterial::where('routing_operation_id', $routingOp->id)->get();
+                    if ((int) $bom->product_id === (int) $order->product_id) {
+                        $routingMaterials = RoutingOperationMaterial::where('routing_operation_id', $routingOp->id)
+                            ->where(fn ($q) => $q->where('bom_id', $bom->id)->orWhereNull('bom_id'))
+                            ->where('is_alternative', false)
+                            ->get();
                         if ($routingMaterials->isNotEmpty()) {
                             foreach ($routingMaterials as $mat) {
                                 if ((int) $mat->material_id === (int) $order->product_id) {
                                     continue;
                                 }
                                 $baseQty = ($bom && (float) $bom->base_quantity > 0) ? (float) $bom->base_quantity : 1.0;
-                                $ratio = $opRouting->isPerBomBaseQuantity()
-                                    ? ((float) $mat->quantity / $baseQty)
-                                    : (float) $mat->quantity;
+                                $ratio = (float) $mat->quantity / $baseQty;
 
                                 if ($ratio <= 0) {
                                     $ratio = $this->calculateBomComponentRatio($bom, $mat->material_id);
@@ -354,44 +368,26 @@ class ProductionOrderService
             $productId = $data['product_id'];
             $quantity = (float) $data['quantity_ordered'];
 
-            // Fetch latest active BOM & Routing
-            $bomId = $data['bom_id'] ?? null;
-            $bom = $bomId
-                ? ProductionBom::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($bomId)
-                : ProductionBom::withoutGlobalScopes()
-                    ->where('tenant_id', $tenantId)
-                    ->where('product_id', $productId)
-                    ->where('status', 'approved')
-                    ->whereIn('bom_type', ['manufacturing', 'subcontracting'])
-                    ->orderByRaw("CASE WHEN bom_type = 'manufacturing' THEN 1 WHEN bom_type = 'subcontracting' THEN 2 ELSE 3 END")
-                    ->first();
-
-            if (! $bom) {
-                throw new InvalidArgumentException('Cannot create order: No approved Manufacturing or Subcontracting BOM exists for this product.');
-            }
-
-            // BOM Guardrails
-            if ($bom->bom_type === 'engineering') {
-                throw new InvalidArgumentException('Engineering BOMs cannot be selected for live Production Orders. Please convert or release as a Manufacturing BOM.');
-            }
-            if ($bom->bom_type === 'sales') {
-                throw new InvalidArgumentException('Sales BOMs are sales kits and cannot generate manufacturing orders.');
-            }
-
-            $routingId = $data['routing_id'] ?? null;
-            $routing = $routingId
-                ? Routing::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($routingId)
-                : Routing::withoutGlobalScopes()
-                    ->where('tenant_id', $tenantId)
-                    ->where('product_id', $productId)
-                    ->where('status', 'active')
-                    ->first();
-
-            if (! $routing) {
-                throw new InvalidArgumentException('Cannot create order: No active Routing exists for this product.');
-            }
-
-            $product = Product::find($productId);
+            // PO-IMPL-04 (PO-01 / PO-02 / PO-07): BOM → its Routing (never routings.product_id), blocking checks and
+            // the Tab 1 selection, through the shared engineering service (same rules as the FormRequests).
+            $branchId = $data['branch_id'] ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($productId);
+            $engineering = app(ProductionOrderEngineeringService::class);
+            $hasOps = array_key_exists('selected_operation_ids', $data);
+            $hasMats = array_key_exists('selected_material_ids', $data);
+            $requireExplicit = !empty($data['engineering_selection_submitted']) || $hasOps || $hasMats;
+            $resolution = $engineering->resolveAndValidate(
+                $product,
+                $tenantId,
+                !empty($data['bom_id']) ? (int) $data['bom_id'] : null,
+                !empty($data['routing_id']) ? (int) $data['routing_id'] : null,
+                $hasOps ? array_values((array) ($data['selected_operation_ids'] ?? [])) : null,
+                $hasMats ? array_values((array) ($data['selected_material_ids'] ?? [])) : null,
+                $requireExplicit
+            );
+            $engineering->assertCanCreate($resolution);
+            $bom = $resolution['bom'];        // null for bought / traded products (PO-02)
+            $routing = $resolution['routing'];
             $defaultMode = $product ? $product->getDefaultProductionMode() : 'standard';
             $productionMode = !empty($data['production_mode']) ? $data['production_mode'] : $defaultMode;
             $hasExplicitModel = !empty($data['production_model']);
@@ -399,7 +395,6 @@ class ProductionOrderService
                 ? $data['production_model']
                 : ProductionOrder::MODEL_PURE_MANUFACTURING;
 
-            $branchId = $data['branch_id'] ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
             $companyId = $data['company_id'] ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
 
             $projectId = $data['project_id'] ?? null;
@@ -421,8 +416,8 @@ class ProductionOrderService
                 'order_number' => $data['order_number'] ?? $this->numberService->generateNextNumber($tenantId, $branchId),
                 'production_plan_id' => null,
                 'product_id' => $productId,
-                'bom_id' => $bom->id,
-                'routing_id' => $routing->id,
+                'bom_id' => $bom?->id,
+                'routing_id' => $routing?->id,
                 'sales_order_id' => $data['sales_order_id'] ?? null,
                 'sales_order_item_id' => $data['sales_order_item_id'] ?? null,
                 'project_id' => $projectId,
@@ -479,41 +474,21 @@ class ProductionOrderService
                 }
             }
 
-            // 1. Resolve & Snapshot reservations directly from BOM items
-            $itemsToResolve = [];
-            $evaluator = app(BomFormulaEvaluatorService::class);
-            foreach ($bom->items as $item) {
-                if ($item->is_alternative) {
-                    continue;
-                }
-
-                if ($item->isFormula()) {
-                    $unitQty = $evaluator->evaluate($item->formula, $order->parameters ?? [], $order->product);
-                } else {
-                    $unitQty = (float) $item->quantity;
-                }
-
-                $plannedQty = $unitQty * ($quantity / ($bom->base_quantity ?: 1.0));
-
-                // Add scrap factor if defined
-                if ($item->material_scrap_percentage > 0) {
-                    $plannedQty *= (1 + ($item->material_scrap_percentage / 100));
-                }
-
-                $resolvedUom = $item->uom_id ?? $item->material?->uom_id ?? 1;
-                $this->createMaterialReservation($order, $item->id, $item->material_id, $plannedQty, $resolvedUom, $item->child_bom_id);
-
-                $itemsToResolve[] = [
-                    'product_id' => $item->material_id,
-                    'planned_qty' => $plannedQty,
-                    'uom_id' => $resolvedUom,
-                    'child_bom_id' => $item->child_bom_id,
-                ];
+            // PO-IMPL-04 (PO-08 / PO-10 / PO-12): multi-level plan from the chosen operations + materials —
+            // one reservation and one requisition line per product (shared materials summed), and only the chosen
+            // parent operations + the primary operations of exploded child BOMs are snapshotted.
+            if ($bom && $routing) {
+                $plan = $engineering->computeMultiLevelPlan(
+                    $bom,
+                    $resolution['selected_operation_ids'],
+                    $resolution['selected_material_ids'],
+                    $quantity,
+                    $tenantId,
+                    $order->branch_id
+                );
+                $this->persistPlannedMaterials($order, $plan['consolidated_materials']);
+                $this->snapshotPlannedOperations($order, $plan['snapshot_tree_operations'], $userId);
             }
-            $this->createRequisitionSlip($order, $itemsToResolve);
-
-            // 2. Resolve & Snapshot multi-level operations and dependencies recursively
-            $this->snapshotMultiLevelRoutings($order, $bom, $routing, $quantity, $tenantId, $userId);
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
@@ -525,7 +500,7 @@ class ProductionOrderService
                 'triggered_by' => $userId,
             ]);
 
-            app(ProductionEventService::class)->writeEvent($order->tenant_id, [
+            if ($bom) app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
                 'event_type' => 'Material Reserved',
                 'title' => 'Materials Reserved',
@@ -871,7 +846,7 @@ class ProductionOrderService
             return $existingRes;
         }
 
-        $warehouseId = $this->resolveReservationWarehouseId($order->tenant_id, $productId);
+        $warehouseId = $this->resolveReservationWarehouseId($order->tenant_id, $productId, $order->branch_id);
 
         $product = \App\Domains\Inventory\Models\Product::withoutGlobalScopes()
             ->where('tenant_id', $order->tenant_id)
@@ -916,33 +891,31 @@ class ProductionOrderService
                     $subBom = ProductionBom::withoutGlobalScopes()
                         ->where('tenant_id', $order->tenant_id)
                         ->where('id', $childBomId)
-                        ->with(['items.material'])
+                        ->with(['operationMaterials.material', 'items.material'])
                         ->first();
                 }
                 if (!$subBom) {
                     $subBom = ProductionBom::withoutGlobalScopes()
                         ->where('tenant_id', $order->tenant_id)
                         ->where('product_id', $productId)
-                        ->where('status', 'approved')
-                        ->with(['items.material'])
+                        ->whereIn('status', ['approved', 'active'])
+                        ->with(['operationMaterials.material', 'items.material'])
                         ->first();
                 }
 
-                if ($subBom && count($subBom->items) > 0) {
+                $subRows = $subBom ? $this->primaryBomRows($subBom) : collect();
+                if ($subBom && $subRows->isNotEmpty()) {
                     $baseQty = $subBom->base_quantity > 0 ? $subBom->base_quantity : 1.0;
                     $multiplier = $shortageQty / $baseQty;
 
-                    foreach ($subBom->items as $subItem) {
-                        if (!$subItem->material || $subItem->is_alternative) continue;
+                    foreach ($subRows as $subItem) {
+                        if (!$subItem->material) continue;
 
-                        $subPlannedQty = $subItem->quantity * $multiplier;
-                        if ($subItem->material_scrap_percentage > 0) {
-                            $subPlannedQty *= (1 + ($subItem->material_scrap_percentage / 100));
-                        }
+                        $subPlannedQty = $this->resolveBomRowGrossQuantity($subItem) * $multiplier;
 
                         $this->createMaterialReservation(
                             $order,
-                            $subItem->id,
+                            $this->resolveBomRowBomItemId($subItem),
                             $subItem->material_id,
                             $subPlannedQty,
                             $subItem->uom_id ?? $uomId,
@@ -956,8 +929,14 @@ class ProductionOrderService
         return $reservation ?? ProductionOrderReservation::where('production_order_id', $order->id)->first();
     }
 
-    private function resolveReservationWarehouseId(int $tenantId, int $productId): ?int
+    private function resolveReservationWarehouseId(int $tenantId, int $productId, ?int $branchId = null): ?int
     {
+        // PO-IMPL-04 (PO-04): branch active standard warehouse with the most net stock, else the branch default
+        $branchWarehouse = app(ProductionOrderEngineeringService::class)->resolvePrimaryBranchWarehouseId($tenantId, $productId, $branchId);
+        if ($branchWarehouse) {
+            return $branchWarehouse;
+        }
+
         $stock = ProductWarehouseStock::query()
             ->where('tenant_id', $tenantId)
             ->where('product_id', $productId)
@@ -1103,6 +1082,21 @@ class ProductionOrderService
 
     private function createRequisitionSlip(ProductionOrder $order, array $itemsToResolve): void
     {
+        $slip = $this->newRequisitionSlip($order);
+
+        foreach ($itemsToResolve as $item) {
+            $this->createRequisitionSlipItemsRecursively(
+                $slip,
+                $item['product_id'],
+                $item['planned_qty'],
+                $item['uom_id'],
+                $item['child_bom_id'] ?? null
+            );
+        }
+    }
+
+    private function newRequisitionSlip(ProductionOrder $order): ProductionRequisitionSlip
+    {
         $branchId = $order->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
         $companyId = $order->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
         $year = now()->format('Y');
@@ -1139,15 +1133,7 @@ class ProductionOrderService
             'notes' => 'Generated automatically from Production Order ' . $order->order_number,
         ]);
 
-        foreach ($itemsToResolve as $item) {
-            $this->createRequisitionSlipItemsRecursively(
-                $slip,
-                $item['product_id'],
-                $item['planned_qty'],
-                $item['uom_id'],
-                $item['child_bom_id'] ?? null
-            );
-        }
+        return $slip;
     }
 
     private function createRequisitionSlipItemsRecursively(
@@ -1157,7 +1143,7 @@ class ProductionOrderService
         int $uomId,
         ?int $childBomId = null
     ): void {
-        $warehouseId = $this->resolveReservationWarehouseId($slip->tenant_id, $productId);
+        $warehouseId = $this->resolveReservationWarehouseId($slip->tenant_id, $productId, $slip->branch_id);
         $availableQty = $warehouseId ? StockService::getAvailableStock($productId, $warehouseId) : 0.0;
 
         // Fetch product
@@ -1184,28 +1170,26 @@ class ProductionOrderService
                 $subBom = ProductionBom::withoutGlobalScopes()
                     ->where('tenant_id', $slip->tenant_id)
                     ->where('id', $childBomId)
-                    ->with(['items.material'])
+                    ->with(['operationMaterials.material', 'items.material'])
                     ->first();
             } else {
                 $subBom = ProductionBom::withoutGlobalScopes()
                     ->where('tenant_id', $slip->tenant_id)
                     ->where('product_id', $productId)
-                    ->where('status', 'approved')
-                    ->with(['items.material'])
+                    ->whereIn('status', ['approved', 'active'])
+                    ->with(['operationMaterials.material', 'items.material'])
                     ->first();
             }
 
-            if ($subBom && count($subBom->items) > 0) {
+            $subRows = $subBom ? $this->primaryBomRows($subBom) : collect();
+            if ($subBom && $subRows->isNotEmpty()) {
                 $baseQty = $subBom->base_quantity > 0 ? $subBom->base_quantity : 1.0;
                 $multiplier = $shortageQty / $baseQty;
 
-                foreach ($subBom->items as $subItem) {
+                foreach ($subRows as $subItem) {
                     if (!$subItem->material) continue;
 
-                    $subPlannedQty = $subItem->quantity * $multiplier;
-                    if ($subItem->material_scrap_percentage > 0) {
-                        $subPlannedQty *= (1 + ($subItem->material_scrap_percentage / 100));
-                    }
+                    $subPlannedQty = $this->resolveBomRowGrossQuantity($subItem) * $multiplier;
 
                     $this->createRequisitionSlipItemsRecursively(
                         $slip,
@@ -1320,25 +1304,32 @@ class ProductionOrderService
 
         // 1. Snapshot operations for THIS routing node (FG or SFG)
         $createdOps = [];
-        foreach ($routing->operations as $idx => $routingOp) {
+        // PO-IMPL-04 (PO-10): automatic expansion uses primary operations + primary materials only
+        foreach ($routing->operations->where('is_alternative', false)->values() as $idx => $routingOp) {
             $status = ($idx === 0) ? ProductionOrderOperation::STATUS_READY : ProductionOrderOperation::STATUS_WAITING;
+            $primaryMaterialIds = RoutingOperationMaterial::withoutGlobalScopes()
+                ->where('routing_operation_id', $routingOp->id)
+                ->where('bom_id', $bom->id)
+                ->where('is_alternative', false)
+                ->pluck('id')->map(fn ($v) => (int) $v)->values()->all();
 
             $opTargetQty = $targetQty;
             $opSourceProductId = $productId;
 
-            // Apply RoutingOperationMaterial target scaling ONLY when routing is Master FG Routing
+            // Apply RoutingOperationMaterial target scaling ONLY when snapshot node is the Master FG Product
             // and material is a component (not raw material input or FG product).
-            if ((int) $routing->product_id === (int) $order->product_id) {
-                $routingMaterials = RoutingOperationMaterial::where('routing_operation_id', $routingOp->id)->get();
+            if ((int) $productId === (int) $order->product_id) {
+                $routingMaterials = RoutingOperationMaterial::where('routing_operation_id', $routingOp->id)
+                    ->where(fn ($q) => $q->where('bom_id', $bom->id)->orWhereNull('bom_id'))
+                    ->where('is_alternative', false)
+                    ->get();
                 if ($routingMaterials->isNotEmpty()) {
                     foreach ($routingMaterials as $mat) {
                         if ((int) $mat->material_id === (int) $order->product_id) {
                             continue;
                         }
                         $baseQty = ($bom && (float) $bom->base_quantity > 0) ? (float) $bom->base_quantity : 1.0;
-                        $ratio = $routing->isPerBomBaseQuantity()
-                            ? ((float) $mat->quantity / $baseQty)
-                            : (float) $mat->quantity;
+                        $ratio = (float) $mat->quantity / $baseQty;
 
                         if ($ratio <= 0) {
                             $ratio = $this->calculateBomComponentRatio($bom, $mat->material_id);
@@ -1363,6 +1354,7 @@ class ProductionOrderService
                 'tenant_id' => $tenantId,
                 'production_order_id' => $order->id,
                 'routing_operation_id' => $routingOp->id,
+                'selected_routing_material_ids' => $primaryMaterialIds,
                 'source_product_id' => $opSourceProductId,
                 'source_bom_id' => $bom->id,
                 'source_routing_id' => $routing->id,
@@ -1448,31 +1440,13 @@ class ProductionOrderService
         $bomBaseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
         $multiplier = $targetQty / $bomBaseQty;
 
-        foreach ($bom->items as $item) {
+        foreach ($this->primaryBomRows($bom) as $item) {
             $childProductId = $item->material_id;
-            $totalRequired = $item->quantity * $multiplier;
-            if ($item->material_scrap_percentage > 0) {
-                $totalRequired *= (1 + ($item->material_scrap_percentage / 100));
-            }
+            $totalRequired = $this->resolveBomRowGrossQuantity($item) * $multiplier;
 
-            // Calculate available warehouse stock/reservation for child SFG (Clarification Rule 2)
-            $reservedStock = (float) ProductWarehouseStock::where('tenant_id', $tenantId)
-                ->where('product_id', $childProductId)
-                ->sum('reserved_qty');
-            if ($reservedStock > 0) {
-                $warehouseAvailable = $reservedStock;
-            } else {
-                $warehouseId = $this->resolveReservationWarehouseId($tenantId, $childProductId);
-                $warehouseAvailable = $warehouseId ? (float) StockService::getAvailableStock($childProductId, $warehouseId) : 0.0;
-                if ($warehouseAvailable <= 0) {
-                    $stockSum = ProductWarehouseStock::where('tenant_id', $tenantId)
-                        ->where('product_id', $childProductId)
-                        ->sum('quantity');
-                    if ($stockSum > 0) {
-                        $warehouseAvailable = (float) $stockSum;
-                    }
-                }
-            }
+            // PO-IMPL-04 (PO-04): branch available = SUM(max(0, quantity - reserved_qty)) over the branch's standard warehouses
+            $warehouseAvailable = (float) (app(ProductionOrderEngineeringService::class)
+                ->getBranchAvailableStockMap($tenantId, $order->branch_id, [$childProductId])[$childProductId] ?? 0.0);
 
             $netManufacturingQty = max(0.0, $totalRequired - $warehouseAvailable);
 
@@ -1487,17 +1461,19 @@ class ProductionOrderService
                 $childBom = ProductionBom::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
                     ->where('product_id', $childProductId)
-                    ->where('status', 'approved')
+                    ->whereIn('status', ['approved', 'active'])
                     ->whereIn('bom_type', ['manufacturing', 'subcontracting'])
                     ->first();
             }
 
             if ($childBom && $netManufacturingQty > 0) {
-                $childRouting = Routing::withoutGlobalScopes()
-                    ->where('tenant_id', $tenantId)
-                    ->where('product_id', $childProductId)
-                    ->where('status', 'active')
-                    ->first();
+                // PO-IMPL-04: the child BOM's own routing (routings.product_id no longer exists)
+                $childRouting = $childBom->routing_id
+                    ? Routing::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($childBom->routing_id)
+                    : null;
+                if ($childRouting && !$childRouting->isCurrentlyActive()) {
+                    $childRouting = null;
+                }
 
                 if ($childRouting && $childRouting->operations->isNotEmpty()) {
                     // Recursively snapshot child SFG routing
@@ -1571,50 +1547,214 @@ class ProductionOrderService
         }
         $visitedBoms[] = $bom->id;
 
-        $evaluator = app(BomFormulaEvaluatorService::class);
         $baseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
         $multiplier = $targetQty / $baseQty;
 
-        foreach ($bom->items as $item) {
+        foreach ($this->primaryBomRows($bom) as $item) {
             if (!$item->material_id) continue;
 
-            if ($item->isFormula()) {
-                $unitQty = $evaluator->evaluate($item->formula, $parameters, $bom->product);
-            } else {
-                $unitQty = (float) $item->quantity;
-            }
+            $grossUnitQty = $this->resolveBomRowGrossQuantity($item);
+            $plannedQty = max(0.0, $grossUnitQty * $multiplier);
 
-            $scrapPct = (float) ($item->material_scrap_percentage ?? 0);
-            $scrapFactor = 1.0 + ($scrapPct / 100.0);
-            $plannedQty = max(0.0, $unitQty * $multiplier * $scrapFactor);
-
-            ProductionOrderReservation::firstOrCreate(
-                [
-                    'production_order_id' => $order->id,
-                    'bom_item_id' => $item->id,
-                    'product_id' => $item->material_id,
-                ],
-                [
-                    'tenant_id' => $tenantId,
-                    'warehouse_id' => $this->resolveReservationWarehouseId($tenantId, $item->material_id),
-                    'quantity_planned' => round($plannedQty, 4),
-                    'quantity_reserved' => 0.0,
-                    'quantity_issued' => 0.0,
-                    'uom_id' => $item->uom_id ?? ($item->material?->uom_id ?? 1),
-                ]
-            );
+            // PO-IMPL-04 (PO-12): one reservation per (order, product); shared materials are summed, never skipped
+            $this->accumulateReservation($order, $item->material_id, $plannedQty, $item->uom_id ?? ($item->material?->uom_id ?? 1), $this->resolveBomRowBomItemId($item));
 
             // Recurse for child SFG BOMs
-            $childBom = ProductionBom::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('product_id', $item->material_id)
-                ->where('status', 'approved')
-                ->whereIn('bom_type', ['manufacturing', 'subcontracting'])
-                ->first();
+            $childBom = !empty($item->child_bom_id)
+                ? ProductionBom::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($item->child_bom_id)
+                : ProductionBom::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_id', $item->material_id)
+                    ->whereIn('status', ['approved', 'active'])
+                    ->whereIn('bom_type', ['manufacturing', 'subcontracting'])
+                    ->first();
 
             if ($childBom) {
                 $this->createOrderReservationsForBom($order, $childBom, $plannedQty, $tenantId, $parameters, $visitedBoms);
             }
+        }
+    }
+
+    /**
+     * PO-IMPL-04 (PO-12): one reservation per (order, product) — quantities of shared materials are added up.
+     */
+    private function accumulateReservation(ProductionOrder $order, int $productId, float $plannedQty, ?int $uomId, ?int $bomItemId = null): ProductionOrderReservation
+    {
+        $existing = ProductionOrderReservation::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->where('product_id', $productId)
+            ->first();
+
+        if ($existing) {
+            $existing->quantity_planned = round((float) $existing->quantity_planned + $plannedQty, 4);
+            $existing->save();
+
+            return $existing;
+        }
+
+        return ProductionOrderReservation::create([
+            'tenant_id' => $order->tenant_id,
+            'production_order_id' => $order->id,
+            'bom_item_id' => $bomItemId,
+            'product_id' => $productId,
+            'warehouse_id' => $this->resolveReservationWarehouseId($order->tenant_id, $productId, $order->branch_id),
+            'quantity_planned' => round($plannedQty, 4),
+            'quantity_reserved' => 0.0,
+            'quantity_issued' => 0.0,
+            'uom_id' => $uomId ?: (Product::withoutGlobalScopes()->where('id', $productId)->value('uom_id') ?? 1),
+        ]);
+    }
+
+    /**
+     * PO-IMPL-04 (PO-12): reservations + requisition slip lines straight from the multi-level plan
+     * (already consolidated per product, matching Create screen Tab 2).
+     */
+    private function persistPlannedMaterials(ProductionOrder $order, array $materials): void
+    {
+        if ($materials === []) {
+            return;
+        }
+
+        $slip = $this->newRequisitionSlip($order);
+        foreach ($materials as $m) {
+            $productId = (int) $m['product_id'];
+            $qty = (float) $m['quantity_planned'];
+            if ($qty <= 0) {
+                continue;
+            }
+            $reservation = $this->accumulateReservation($order, $productId, $qty, $m['uom_id'] ?? null, $m['bom_item_id'] ?? null);
+            $this->createRequisitionSlipItem($slip, $productId, $qty, $reservation->uom_id, $reservation->warehouse_id);
+        }
+    }
+
+    /**
+     * PO-IMPL-04 (PO-12): create order operations for the planned tree — chosen parent operations (level 1)
+     * and the primary operations of exploded child BOMs (level 2+), with dependencies inside each BOM's
+     * routing and a cross-assembly link from each child BOM's last operation to the parent operation using it.
+     */
+    private function snapshotPlannedOperations(ProductionOrder $order, array $entries, ?int $userId = null): void
+    {
+        $created = [];
+        foreach ($entries as $entry) {
+            $routingOp = $entry['routing_operation'];
+            $target = (float) $entry['target_produced_qty'];
+            $processingTime = (float) $routingOp->processing_time_minutes * $target;
+
+            $created[] = ProductionOrderOperation::create([
+                'tenant_id' => $order->tenant_id,
+                'production_order_id' => $order->id,
+                'routing_operation_id' => $routingOp->id,
+                'selected_routing_material_ids' => $entry['selected_routing_material_ids'],
+                'source_product_id' => $entry['source_product_id'],
+                'source_bom_id' => $entry['source_bom_id'],
+                'source_routing_id' => $entry['source_routing_id'],
+                'bom_level' => $entry['bom_level'],
+                'target_produced_qty' => round($target, 4),
+                'is_intermediate' => (bool) $entry['is_intermediate'],
+                'quantity_claimed' => 0.0000,
+                'sequence' => $routingOp->sequence,
+                'operation_number' => $routingOp->operation_number,
+                'name' => $routingOp->name,
+                'work_center_id' => $routingOp->work_center_id,
+                'machine_id' => $routingOp->machine_id,
+                'status' => ProductionOrderOperation::STATUS_WAITING,
+                'setup_time_planned' => $routingOp->setup_time_minutes,
+                'processing_time_planned' => $processingTime,
+                'total_time_planned' => (float) $routingOp->setup_time_minutes + $processingTime,
+                'setup_time_actual' => 0.00,
+                'processing_time_actual' => 0.00,
+                'quantity_produced' => 0.0000,
+                'quantity_rejected' => 0.0000,
+                'quantity_scrapped' => 0.0000,
+                'is_external' => (bool) ($routingOp->is_external ?? false),
+                'vendor_id' => $routingOp->vendor_id,
+                'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
+                'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
+                'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
+                'material_supply_type' => $routingOp->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
+                'subcontract_input_type' => $routingOp->subcontract_input_type ?? 'bom_raw_materials',
+                'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
+                'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
+                'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
+                'overlap_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
+                'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),
+                'transfer_lag_minutes' => (int) ($routingOp->transfer_lag_minutes ?? 0),
+                'is_parallel' => (bool) ($routingOp->is_parallel ?? false),
+                'parallel_group' => $routingOp->parallel_group,
+                'parallel_type' => $routingOp->parallel_type ?? 'AND',
+            ]);
+        }
+
+        // Dependencies inside each BOM's routing
+        $byBom = collect($created)->groupBy(fn ($op) => $op->source_bom_id . ':' . $op->bom_level);
+        foreach ($byBom as $branchOps) {
+            $sorted = $branchOps->sortBy('sequence')->values();
+            for ($i = 1; $i < $sorted->count(); $i++) {
+                $current = $sorted[$i];
+                $rOp = $current->routingOperation;
+                if ($rOp && $rOp->is_parallel) {
+                    $current->previous_operation_id = null;
+                } else {
+                    // A chosen alternative replaces its primary — link to the snapshotted predecessor, else the previous one
+                    $pred = ($rOp && $rOp->previous_operation_id) ? $sorted->firstWhere('routing_operation_id', $rOp->previous_operation_id) : null;
+                    $pred ??= $sorted[$i - 1];
+                    $current->previous_operation_id = $pred->id;
+                    if ($rOp && $rOp->previous_operation_id && (int) $pred->routing_operation_id === (int) $rOp->previous_operation_id) {
+                        ProductionOrderOperationDependency::firstOrCreate([
+                            'tenant_id' => $order->tenant_id,
+                            'production_order_id' => $order->id,
+                            'operation_id' => $current->id,
+                            'predecessor_operation_id' => $pred->id,
+                            'dependency_type' => 'FS',
+                        ]);
+                    }
+                }
+                $current->save();
+            }
+        }
+
+        // Cross-assembly: child BOM's last operation → the parent operation that consumes the child product
+        foreach ($byBom as $branchOps) {
+            $first = $branchOps->first();
+            if ((int) $first->bom_level < 2) {
+                continue;
+            }
+            $final = $branchOps->sortBy('sequence')->last();
+            $parents = collect($created)->filter(fn ($op) => (int) $op->bom_level === (int) $first->bom_level - 1);
+            $consumer = $parents->first(function ($op) use ($first) {
+                $ids = is_array($op->selected_routing_material_ids) ? $op->selected_routing_material_ids : [];
+
+                return $ids !== [] && RoutingOperationMaterial::withoutGlobalScopes()
+                    ->whereIn('id', $ids)
+                    ->where('material_id', $first->source_product_id)
+                    ->exists();
+            }) ?? $parents->sortBy('sequence')->first();
+
+            if ($final && $consumer) {
+                ProductionOrderOperationDependency::firstOrCreate(
+                    ['operation_id' => $consumer->id, 'predecessor_operation_id' => $final->id],
+                    ['tenant_id' => $order->tenant_id, 'production_order_id' => $order->id, 'dependency_type' => 'cross_assembly']
+                );
+            }
+        }
+
+        foreach ($created as $createdOp) {
+            if ($createdOp->is_external) {
+                try {
+                    app(SubcontractProcurementOrchestrator::class)->orchestrateSubcontractProcurement($createdOp, $order->tenant_id, $userId);
+                } catch (\Throwable $e) {
+                    // Procurement orchestration fallback
+                }
+            }
+        }
+
+        $this->reconcileOperationReadiness($order);
+
+        $currentModel = $order->production_model;
+        if (empty($currentModel) || $currentModel === ProductionOrder::MODEL_PURE_MANUFACTURING) {
+            $fallback = $order->product?->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING;
+            $order->production_model = ProductionOrder::determineProductionModelFromOperations($order->operations()->get(), $fallback);
+            $order->save();
         }
     }
 
@@ -1628,20 +1768,27 @@ class ProductionOrderService
         }
 
         $baseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
-        $directItem = $bom->items->firstWhere('material_id', $materialId);
-        if ($directItem && (float) $directItem->quantity > 0) {
-            return (float) $directItem->quantity / $baseQty;
+        $rows = $this->primaryBomRows($bom);
+        $directMatches = $rows->where('material_id', $materialId);
+        if ($directMatches->isNotEmpty()) {
+            $directQty = (float) $directMatches->sum('quantity');
+            if ($directQty > 0) {
+                return $directQty / $baseQty;
+            }
         }
 
         // Recursively search child BOMs
-        foreach ($bom->items as $item) {
+        foreach ($rows as $item) {
             if ((float) $item->quantity <= 0) {
                 continue;
             }
-            $childBom = ProductionBom::where('tenant_id', $bom->tenant_id)
-                ->where('product_id', $item->material_id)
-                ->where('status', 'approved')
-                ->first();
+            $childBom = !empty($item->child_bom_id)
+                ? ProductionBom::withoutGlobalScopes()->where('tenant_id', $bom->tenant_id)->find($item->child_bom_id)
+                : ProductionBom::withoutGlobalScopes()
+                    ->where('tenant_id', $bom->tenant_id)
+                    ->where('product_id', $item->material_id)
+                    ->whereIn('status', ['approved', 'active'])
+                    ->first();
 
             if ($childBom) {
                 $childRatio = $this->calculateBomComponentRatio($childBom, $materialId, $depth + 1);
@@ -1653,6 +1800,37 @@ class ProductionOrderService
         }
 
         return null;
+    }
+
+    /**
+     * Primary component rows from operation allocations, falling back to legacy BOM items when unallocated.
+     */
+    private function primaryBomRows(ProductionBom $bom): \Illuminate\Support\Collection
+    {
+        $bom->loadMissing(['operationMaterials.material', 'items.material']);
+        $rows = $bom->operationMaterials->isNotEmpty()
+            ? $bom->operationMaterials
+            : $bom->items;
+
+        return $rows->where('is_alternative', false)->values();
+    }
+
+    private function resolveBomRowBomItemId($row): ?int
+    {
+        return $row instanceof \App\Domains\Production\Models\RoutingOperationMaterial
+            ? ($row->bom_item_id ?: null)
+            : ($row->id ?? null);
+    }
+
+    private function resolveBomRowGrossQuantity($row): float
+    {
+        if (method_exists($row, 'calculateGrossQuantity')) {
+            return (float) ($row->gross_quantity ?? $row->calculateGrossQuantity());
+        }
+
+        $qty = (float) ($row->quantity ?? 0);
+        $scrapPct = (float) ($row->material_scrap_percentage ?? 0);
+        return round($qty * (1 + ($scrapPct / 100.0)), 4);
     }
 
     /**

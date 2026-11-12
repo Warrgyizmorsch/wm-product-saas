@@ -109,16 +109,21 @@ class SubcontractMaterialBalanceService
                 return 0.0;
             }
 
-            $bom = \App\Domains\Production\Models\ProductionBom::with('items')->find($order->bom_id);
+            $bom = \App\Domains\Production\Models\ProductionBom::with(['operationMaterials', 'items'])->find($order->bom_id);
             if (!$bom) {
                 return 0.0;
             }
 
             $totalBackflushed = 0.0;
+            $baseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
+            $sourceRows = ($bom->operationMaterials->isNotEmpty() ? $bom->operationMaterials : $bom->items)
+                ->where('is_alternative', false);
 
-            foreach ($bom->items as $item) {
-                $scrapFactor = 1.0 + ((float) $item->material_scrap_percentage / 100.0);
-                $reqQtyPerUnit = (float) $item->quantity * $scrapFactor;
+            foreach ($sourceRows as $item) {
+                $grossUnitQty = method_exists($item, 'calculateGrossQuantity')
+                    ? (float) ($item->gross_quantity ?? $item->calculateGrossQuantity())
+                    : ((float) $item->quantity * (1.0 + ((float) ($item->material_scrap_percentage ?? 0) / 100.0)));
+                $reqQtyPerUnit = $grossUnitQty / $baseQty;
                 $componentQtyToDeduct = round($acceptedQty * $reqQtyPerUnit, 4);
 
                 if ($componentQtyToDeduct <= 0) continue;

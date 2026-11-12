@@ -27,8 +27,12 @@ class ProductionEcoImpactAnalysisService
         $isBomChange = in_array($eco->change_type, [ProductionEco::CHANGE_TYPE_BOM, ProductionEco::CHANGE_TYPE_BOM_AND_ROUTING], true);
         $isRoutingChange = in_array($eco->change_type, [ProductionEco::CHANGE_TYPE_ROUTING, ProductionEco::CHANGE_TYPE_BOM_AND_ROUTING], true);
 
-        $currentBom = $eco->currentBom ?: ProductionBom::with('items.product')->find($eco->current_bom_id);
-        $proposedBom = $isBomChange ? ($eco->proposedBom ?: ProductionBom::with('items.product')->find($eco->proposed_bom_id)) : $currentBom;
+        $bomRelations = ['operationMaterials.material', 'items.product', 'items.material'];
+        $currentBom = $eco->currentBom?->loadMissing($bomRelations)
+            ?: ProductionBom::with($bomRelations)->find($eco->current_bom_id);
+        $proposedBom = $isBomChange
+            ? ($eco->proposedBom?->loadMissing($bomRelations) ?: ProductionBom::with($bomRelations)->find($eco->proposed_bom_id))
+            : $currentBom;
 
         $currentRouting = $eco->currentRouting ?: Routing::with('operations')->find($eco->current_routing_id);
         $proposedRouting = $isRoutingChange ? ($eco->proposedRouting ?: Routing::with('operations')->find($eco->proposed_routing_id)) : $currentRouting;
@@ -157,10 +161,37 @@ class ProductionEcoImpactAnalysisService
         ];
     }
 
+    private function aggregatePrimaryMaterials(?ProductionBom $bom)
+    {
+        if (!$bom) {
+            return collect();
+        }
+        $rows = ($bom->operationMaterials->isNotEmpty() ? $bom->operationMaterials : $bom->items)
+            ->where('is_alternative', false);
+
+        return $rows->groupBy('material_id')->map(function ($group) {
+            $first = $group->first();
+            $totalNet = (float) $group->sum('quantity');
+            $totalGross = (float) $group->sum(fn ($r) => method_exists($r, 'calculateGrossQuantity')
+                ? ($r->gross_quantity ?? $r->calculateGrossQuantity())
+                : ((float) $r->quantity * (1 + (((float) ($r->material_scrap_percentage ?? 0)) / 100))));
+            $scrapPct = $totalNet > 0 ? round((($totalGross / $totalNet) - 1) * 100, 4) : (float) ($first->material_scrap_percentage ?? 0);
+
+            return (object) [
+                'material_id'      => $first->material_id,
+                'material_name'    => $first->material?->name ?? $first->product?->name ?? "Material #{$first->material_id}",
+                'quantity'         => $totalNet,
+                'gross_quantity'   => $totalGross,
+                'scrap_percentage' => $scrapPct,
+                'unit_cost'        => $first->material?->unit_cost ?? $first->unit_cost ?? 10.0,
+            ];
+        });
+    }
+
     private function calculateMaterialImpact(?ProductionBom $currentBom, ?ProductionBom $proposedBom): array
     {
-        $currentItems = $currentBom ? $currentBom->items->keyBy('material_id') : collect();
-        $proposedItems = $proposedBom ? $proposedBom->items->keyBy('material_id') : collect();
+        $currentItems = $this->aggregatePrimaryMaterials($currentBom);
+        $proposedItems = $this->aggregatePrimaryMaterials($proposedBom);
 
         $added = [];
         $removed = [];
@@ -169,31 +200,25 @@ class ProductionEcoImpactAnalysisService
         foreach ($proposedItems as $materialId => $newItem) {
             if (!$currentItems->has($materialId)) {
                 $added[] = [
-                    'material_id' => $newItem->material_id,
-                    'material_name' => $newItem->product ? $newItem->product->name : "Material #{$newItem->material_id}",
-                    'quantity' => (float) $newItem->quantity,
+                    'material_id'      => $newItem->material_id,
+                    'material_name'    => $newItem->material_name,
+                    'quantity'         => (float) $newItem->quantity,
                     'scrap_percentage' => (float) $newItem->scrap_percentage,
                 ];
             } else {
                 $oldItem = $currentItems->get($materialId);
                 $oldQty = (float) $oldItem->quantity;
                 $newQty = (float) $newItem->quantity;
-                $oldFormula = $oldItem->formula;
-                $newFormula = $newItem->formula;
-                $isFormulaChanged = ($oldFormula !== $newFormula) || ($oldItem->quantity_type !== $newItem->quantity_type);
 
-                if (abs($oldQty - $newQty) > 0.0001 || abs((float)$oldItem->scrap_percentage - (float)$newItem->scrap_percentage) > 0.0001 || $isFormulaChanged) {
+                if (abs($oldQty - $newQty) > 0.0001 || abs((float)$oldItem->scrap_percentage - (float)$newItem->scrap_percentage) > 0.0001) {
                     $quantityChanged[] = [
-                        'material_id' => $newItem->material_id,
-                        'material_name' => $newItem->product ? $newItem->product->name : "Material #{$newItem->material_id}",
-                        'old_quantity' => $oldQty,
-                        'new_quantity' => $newQty,
-                        'delta_quantity' => round($newQty - $oldQty, 4),
+                        'material_id'          => $newItem->material_id,
+                        'material_name'        => $newItem->material_name,
+                        'old_quantity'         => $oldQty,
+                        'new_quantity'         => $newQty,
+                        'delta_quantity'       => round($newQty - $oldQty, 4),
                         'old_scrap_percentage' => (float) $oldItem->scrap_percentage,
                         'new_scrap_percentage' => (float) $newItem->scrap_percentage,
-                        'old_formula' => $oldFormula,
-                        'new_formula' => $newFormula,
-                        'is_formula_changed' => $isFormulaChanged,
                     ];
                 }
             }
@@ -202,9 +227,9 @@ class ProductionEcoImpactAnalysisService
         foreach ($currentItems as $materialId => $oldItem) {
             if (!$proposedItems->has($materialId)) {
                 $removed[] = [
-                    'material_id' => $oldItem->material_id,
-                    'material_name' => $oldItem->product ? $oldItem->product->name : "Material #{$oldItem->material_id}",
-                    'quantity' => (float) $oldItem->quantity,
+                    'material_id'      => $oldItem->material_id,
+                    'material_name'    => $oldItem->material_name,
+                    'quantity'         => (float) $oldItem->quantity,
                     'scrap_percentage' => (float) $oldItem->scrap_percentage,
                 ];
             }
@@ -351,8 +376,8 @@ class ProductionEcoImpactAnalysisService
 
     private function calculateCostImpact(?ProductionBom $currentBom, ?ProductionBom $proposedBom, ?Routing $currentRouting, ?Routing $proposedRouting): array
     {
-        $currentMaterialCost = $currentBom ? $currentBom->items->sum(fn($i) => $i->quantity * ($i->unit_cost ?? 10.0)) : 0.0;
-        $proposedMaterialCost = $proposedBom ? $proposedBom->items->sum(fn($i) => $i->quantity * ($i->unit_cost ?? 10.0)) : 0.0;
+        $currentMaterialCost = $this->aggregatePrimaryMaterials($currentBom)->sum(fn ($i) => $i->gross_quantity * $i->unit_cost);
+        $proposedMaterialCost = $this->aggregatePrimaryMaterials($proposedBom)->sum(fn ($i) => $i->gross_quantity * $i->unit_cost);
 
         $currentLaborCost = $currentRouting ? $currentRouting->operations->sum(fn($o) => ($o->processing_time_minutes / 60.0) * ($o->cost_per_hour ?? 50.0)) : 0.0;
         $proposedLaborCost = $proposedRouting ? $proposedRouting->operations->sum(fn($o) => ($o->processing_time_minutes / 60.0) * ($o->cost_per_hour ?? 50.0)) : 0.0;

@@ -93,6 +93,7 @@ class MultiModelPhase2Test extends TestCase
             'name' => 'Finished Widget',
             'sku' => 'FG-' . rand(1000, 9999),
             'type' => 'finished_good',
+            'supplier_method' => 'manufacture', // PO-02
             'status' => 'active',
             'default_production_model' => 'pure_manufacturing',
         ], $attributes));

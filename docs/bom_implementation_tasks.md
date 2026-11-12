@@ -21,25 +21,25 @@
 
 | Task ID | Title | Source Decision | Status |
 | :--- | :--- | :--- | :--- |
-| **BM-IMPL-01** | BOM routing: required on every path, tenant-scoped, no historical / cancelled routing | BM-01 | 🟢 Agreed |
-| **BM-IMPL-02** | BOM lifecycle: submit needs materials, real audit user, routing approval gate with start date, daily date job | BM-02 | 🟢 Agreed |
-| **BM-IMPL-03** | Duplicate / Revise opens pre-filled create form (no DB row), faithful copy, routing / deleted-op checks, tenant-scoped version check | BM-03 | 🟢 Agreed |
-| **BM-IMPL-04** | Master list: primary-only qty, new `alternative_quantity` + `gross_quantity`, one UoM per material, readers use gross | BM-04 | 🟢 Agreed |
-| **BM-IMPL-05** | Allocation operation: required + tenant-scoped + not deleted on form, API and import | BM-05 | 🟢 Agreed |
-| **BM-IMPL-06** | Duplicate keys: primary once per op, alternative once per replaced primary, no self-alternative; server + browser + API + import; clearOdooError fix | BM-06 | 🟢 Agreed |
-| **BM-IMPL-07** | Alternatives: same-operation primary, required unique priority, remove-with-primary in form, API + import columns | BM-07 | 🟢 Agreed |
-| **BM-IMPL-08** | Sub-BOM: one picker per material in Tab 2 written to all allocations; status rules + warnings; readers read allocations; fix dropped-column queries; inactive sub-BOM → parent warning + no new production | BM-08 | 🟢 Agreed |
-| **BM-IMPL-09** | Remove formula feature: columns, evaluator, preview route, UI, rules, readers, ECO, seeder, tests, lang | BM-09 | 🟢 Agreed |
-| **BM-IMPL-10** | BOM form: shared create/edit partial (do first), card header figures, Op number in notice, translations | BM-12 | 🟢 Agreed |
-| **BM-IMPL-11** | Material rollup tab: BM-04 columns, sub-BOM picker, no rounding, translations | BM-15 | 🟢 Agreed |
-| **BM-IMPL-12** | Draft recovery: scoped keys, stale-edit guard, copy key, no formula fields | BM-16 | 🟢 Agreed |
-| **BM-IMPL-13** | Deleted operation card: BOM additions (move, no silent drop, approve guard, show page) — with RT-IMPL-09 | BM-17 | 🟢 Agreed |
-| **BM-IMPL-14** | Routing advisory: three live checks (not active, op removed, outdated), approval guard, form / show / list / API — with RT-IMPL-05 | BM-18 | 🟢 Agreed |
-| **BM-IMPL-15** | Show page Components tab: direct materials, allocation drawer, remove recursive tree and dropped-column reads | BM-19 | 🟢 Agreed |
-| **BM-IMPL-16** | Explosion tab: explode viewed BOM, gross primary demand, chosen sub-BOMs, alternatives as info | BM-20 | 🟢 Agreed |
-| **BM-IMPL-17** | Effective scrap % on master row, "not in total" alternative badge, gross per drawer row | BM-22 / 23 / 24 | 🟢 Agreed |
-| **BM-IMPL-18** | BOM import: service-based, one row per allocation, routing + operation columns, draft-only update, template / export | BM-27 | 🟢 Agreed |
-| **BM-IMPL-19** | BOM API: shared rules, safe header-only update, materials + allocations response | BM-28 | 🟢 Agreed |
+| **BM-IMPL-01** | BOM routing: required on every path, tenant-scoped, no historical / cancelled routing | BM-01 | 🛠️ Applied (code working) |
+| **BM-IMPL-02** | BOM lifecycle: submit needs materials, real audit user, routing approval gate with start date, daily date job | BM-02 | 🛠️ Applied (code working) |
+| **BM-IMPL-03** | Duplicate / Revise opens pre-filled create form (no DB row), faithful copy, routing / deleted-op checks, tenant-scoped version check | BM-03 | 🛠️ Applied (code working) |
+| **BM-IMPL-04** | Master list: primary-only qty, new `alternative_quantity` + `gross_quantity`, one UoM per material, readers use gross | BM-04 | 🛠️ Applied (code working) |
+| **BM-IMPL-05** | Allocation operation: required + tenant-scoped + not deleted on form, API and import | BM-05 | 🛠️ Applied (code working) |
+| **BM-IMPL-06** | Duplicate keys: primary once per op, alternative once per replaced primary, no self-alternative; server + browser + API + import; clearOdooError fix | BM-06 | 🛠️ Applied (code working) |
+| **BM-IMPL-07** | Alternatives: same-operation primary, required unique priority, remove-with-primary in form, API + import columns | BM-07 | 🛠️ Applied (code working) |
+| **BM-IMPL-08** | Sub-BOM: one picker per material in Tab 2 written to all allocations; status rules + warnings; readers read allocations; fix dropped-column queries; inactive sub-BOM → parent warning + no new production | BM-08 | 🛠️ Applied (code working) |
+| **BM-IMPL-09** | Remove formula feature: columns, evaluator, preview route, UI, rules, readers, ECO, seeder, tests, lang | BM-09 | 🛠️ Applied (code working) |
+| **BM-IMPL-10** | BOM form: shared create/edit partial (do first), card header figures, Op number in notice, translations | BM-12 | 🛠️ Applied (code working) |
+| **BM-IMPL-11** | Material rollup tab: BM-04 columns, sub-BOM picker, no rounding, translations | BM-15 | 🛠️ Applied (code working) |
+| **BM-IMPL-12** | Draft recovery: scoped keys, stale-edit guard, copy key, no formula fields | BM-16 | 🛠️ Applied (code working) |
+| **BM-IMPL-13** | Deleted operation card: BOM additions (move, no silent drop, approve guard, show page) — with RT-IMPL-09 | BM-17 | 🛠️ Applied (code working) |
+| **BM-IMPL-14** | Routing advisory: three live checks (not active, op removed, outdated), approval guard, form / show / list / API — with RT-IMPL-05 | BM-18 | 🛠️ Applied (code working) |
+| **BM-IMPL-15** | Show page Components tab: direct materials, allocation drawer, remove recursive tree and dropped-column reads | BM-19 | 🛠️ Applied (code working) |
+| **BM-IMPL-16** | Explosion tab: explode viewed BOM, gross primary demand, chosen sub-BOMs, alternatives as info | BM-20 | 🛠️ Applied (code working) |
+| **BM-IMPL-17** | Effective scrap % on master row, "not in total" alternative badge, gross per drawer row | BM-22 / 23 / 24 | 🛠️ Applied (code working) |
+| **BM-IMPL-18** | BOM import: service-based, one row per allocation, routing + operation columns, draft-only update, template / export | BM-27 | 🛠️ Applied (code working) |
+| **BM-IMPL-19** | BOM API: shared rules, safe header-only update, materials + allocations response | BM-28 | 🛠️ Applied (code working) |
 | **BM-IMPL-20** | Final BOM cleanup: drop master scrap column, remove under_revision, verify leftovers — do LAST | BM-31 | 🟢 Agreed |
 | **BM-DEF-01** | Scrap rules in detail + connection with Routing operation yield | BM-10 | ⏭️ Deferred |
 | **BM-DEF-02** | All BOM costing: material cost live vs saved, cost field, sub-BOM cost, routing cost, cost columns | BM-21, 22–26 (cost parts) | ⏭️ Deferred |
@@ -49,7 +49,8 @@
 
 ## BM-IMPL-01: BOM Routing — Required, Tenant-Scoped, Allowed Status Only
 * **Source Decision:** BM-01 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Shared rule trait `Requests/Concerns/ValidatesBomAllocations.php` (web + API + import): routing required, tenant-scoped; historical / cancelled refused *"Routing RTG-X is {status} and cannot be used for a BOM."* — also when an edited BOM keeps a routing that has since become historical (fix 2026-11-12). Service `create()` / `update()` re-check. Import row error when routing missing / not allowed. #4 NOT NULL column stays Proposed. Test: `BomFixesTest::test_edit_cannot_keep_a_historical_routing`.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -63,7 +64,8 @@
 
 ## BM-IMPL-02: BOM Lifecycle — Submit / Approve Gates and Daily Date Job
 * **Source Decision:** BM-02 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Submit needs a primary allocation. History entries use the real user (`auth()->id()`, null for jobs) — controllers and `submitApproval()` no longer fall back to user 1; `approve()` / `reject()` / `cancel()` / lifecycle take `?int`. Approval: routing **active**, or **scheduled starting on / before the BOM start** (`'approved'` removed) — *"Routing RTG-X is {status} (starts {date}); the BOM can only be approved when the Routing is active or starts on or before {date}."* Daily job `production:process-bom-dates` (`ProcessBomEffectiveDates` → `BomLifecycleService::processEffectiveDates()`: scheduled → approved "Activated", expired → inactive "Expired"), scheduled in `routes/console.php`. Test: `BomFixesTest::test_approve_routing_rule`, `BomOverhaulTest` (job).
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -78,7 +80,8 @@
 
 ## BM-IMPL-03: Duplicate / Revise — Pre-filled Create Form, No DB Entry Until Save
 * **Source Decision:** BM-03 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Web Revise / Duplicate redirect to the pre-filled create form (`?copy_from=&mode=&version=`), nothing saved. The form posts hidden `source_bom_id`; `create()` then keeps the **source BOM number**, sets revision = source + 1, writes *"Revision Created"* and fires `BomVersionCreated` (fix 2026-11-12). `duplicateVersion()` removed → read-only `ProductionBomService::buildCopyPayload()` (allocations with alternative links by client key, routing only if allowed + warning, deleted-operation flag). API `POST boms/{id}/duplicate` (new route) / `clone` return the copy data (200, not saved); create endpoint accepts `source_bom_id`. Tenant-scoped version checks. Tests: `BomFixesTest::test_copy_saves_nothing_and_save_records_revision`, `ProductionBomTest`, `ProductionEnterpriseTest`, `ProductionApiWorkflowsTest`.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -96,7 +99,8 @@
 
 ## BM-IMPL-04: Master List Built Correctly From Allocations
 * **Source Decision:** BM-04 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Master row quantity = primary sum only. Migration `2026_11_12_120000_…`: `production_bom_items.alternative_quantity`, `gross_quantity` (decimal 18,6) + backfill from allocations (alternative rows and materials on alternative operations → alternative bucket). `persistBomItems()` fills both. Allocations also store `gross_quantity` (migration `2026_11_12_110000_…`, user overhaul). One UoM per material enforced. Readers (cost, MRP, explosion, ECO) use gross. Test: `BomFixesTest::test_duplicate_material_rules_follow_bm06` (alt qty 5), `BomOverhaulTest` (gross 12.5 on master + allocation).
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -112,7 +116,8 @@
 
 ## BM-IMPL-05: Allocation Operation — Required, Own Routing, Every Path
 * **Source Decision:** BM-05 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Operation required, tenant-scoped; operation removed from the routing → *"Operation OP-XXX was removed from the routing. Move or remove its materials before saving."*; API + import (`operation_sequence` / `operation_number` column) use the same trait.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -126,7 +131,8 @@
 
 ## BM-IMPL-06: Duplicate Material Rules Per Operation
 * **Source Decision:** BM-06 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Server (trait) and browser (`_form_script` `validateDuplicateMaterials()`) use the BM-06 keys: primary once per operation `P_{op}_{material}`; alternative once per replaced primary `A_{op}_{primary}_{material}`; never an alternative of itself. Messages per BM-06 rule 3. `clearOdooError()` already skips Alpine-managed feedback. Import / API via the trait. Test: `BomFixesTest::test_duplicate_material_rules_follow_bm06`.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -141,7 +147,8 @@
 
 ## BM-IMPL-07: Component Alternatives — Same Operation, Priority, All Paths
 * **Source Decision:** BM-07 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Same-operation primary, unique priority per primary (*"Priority {n} is already used for an alternative of {primary}."*), **priority required** on alternatives (no default 1 — form field required, save stores the validated value, import no longer defaults). Removing a primary in the form asks *"Remove {primary} and its {n} alternative(s)?"* and removes them together. Import columns `alternative_of`, `priority`.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -157,7 +164,8 @@
 
 ## BM-IMPL-08: Sub-BOM — One Choice Per Material, Stored Per Allocation
 * **Source Decision:** BM-08 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** **One sub-BOM per material:** Tab 1 shows the chosen sub-BOM read-only (hidden `child_bom_id` per allocation); the choice is made once per material in the Material Rollup tab (`setSubBomForMaterial()` writes it to every allocation of that material; a new allocation inherits it; the active sub-BOM is pre-selected visibly). Server: all allocations of one material must carry the same sub-BOM; **silent auto-pick removed** from `persistBomItems()`; `validateChildBomLink()` tenant + status + circular (loop checked before status) + dates; approval moves the parent start to a scheduled sub-BOM's start (parent start = max); shared resolver `ProductionBom::subBomFor()`; MRP no longer guesses a sub-BOM; explosion follows only the chosen sub-BOM (legacy BOMs with master rows only keep the old lookup); parent warning for inactive / cancelled sub-BOMs; new orders blocked by `validateBomTreeForExecution()`. Test: `BomFixesTest::test_sub_bom_one_choice_per_material_and_no_silent_pick`.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -180,7 +188,8 @@
 
 ## BM-IMPL-09: Remove the Formula Quantity Feature
 * **Source Decision:** BM-09 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Columns dropped (allocations + master; migration `2026_11_12_110000_…`), `production_orders.parameters` dropped (migration `2026_11_12_120000_…`, model + order service write removed), evaluator, controller, preview route, UI, rules, DTO, readers, ECO, test file removed; API refuses formula fields (*"Formula quantities are not supported; send a fixed quantity."*); module docs updated. *Left:* `MrpShortageService` still passes an unused `$parameters` array internally (downstream service, BM-DEF-03) — harmless.
 
 | # | File | Lines | Action |
 | :-: | :--- | :--- | :--- |
@@ -211,7 +220,8 @@
 
 ## BM-IMPL-10: BOM Form — Shared Partial, Card Header Figures, Notice, Translations
 * **Source Decision:** BM-12 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed — ⏩ **Do FIRST among BOM UI tasks** (BM-IMPL-03 / 06 / 07 / 08 / 09 UI parts build on it)
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Shared partials `bom/partials/_form.blade.php` + `_form_script.blade.php` (create / edit / copy). Card header: setup per run, setup per piece, run per unit, yield (RT-25 formatter, 4-decimal rule). Zero-material notice shows the Op number. Material rollup / draft / drawer texts translated (en / hi / bg); some older card texts still English.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -227,7 +237,8 @@
 
 ## BM-IMPL-11: Material Rollup Tab — BM-04 Columns, No Rounding
 * **Source Decision:** BM-15 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed (after BM-IMPL-10 shared partial)
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Rollup columns: material, type, role, quantity, alternative qty (*"Alternative — not in total"* badge), gross qty, effective scrap %, UoM, sub-BOM picker; numbers via `fmt4()` (4 decimals only when there are decimals); drawer per allocation; translations.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -243,7 +254,8 @@
 
 ## BM-IMPL-12: Draft Recovery — Scoped Keys, Stale-Edit Guard, Copy Key
 * **Source Decision:** BM-16 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed (after BM-IMPL-10 shared partial)
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Draft key `bom_draft_{tenant}_{user}_create | edit_{id} | copy_{source}`; edit drafts store `bom_updated_at` and are discarded when the BOM changed (*"This BOM was changed after your draft was saved; the draft was discarded."*); copy flow: pre-fill wins on first open, a reload restores the copy draft; no formula fields; banner translated.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -259,7 +271,8 @@
 
 ## BM-IMPL-13: Deleted Operation Card — BOM Additions to RT-IMPL-09
 * **Source Decision:** BM-17 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed — implement **together with RT-IMPL-09 rows 7–11** (routing file)
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Deleted card in the form with **Move to Op** selector, approval refused while an allocation sits on a removed operation, show page read-only deleted tag + advisory (with RT-IMPL-09).
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -274,7 +287,8 @@
 
 ## BM-IMPL-14: BOM Routing Advisory — Three Live Checks
 * **Source Decision:** BM-18 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed — implement **together with RT-IMPL-05** (routing file), which this extends
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** `ProductionBom::routing_advisory` returns a **list** of `{code, message, blocks_approval}` (by design — several advisories at once): `not_active`, `operation_removed` (block approval), `routing_outdated` (warning; now also lists inactive resources from RT-IMPL-18). Shown on form, show page, list, API.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -291,7 +305,8 @@
 
 ## BM-IMPL-15: Show Page Components Tab — Direct Materials + Allocation Drawer
 * **Source Decision:** BM-19 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed (cost columns finalised after BM-21 … BM-26)
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Components tab: **master materials table** (quantity, alternative qty + badge, gross, effective scrap %, UoM, role) with an expandable **allocation drawer** (operation, alternative-operation tag, role / priority / replaces, qty, scrap, gross, notes, *View in routing* jump); the per-operation cards stay below as "Allocations by operation"; numbers via `format_decimal()`. Cost columns wait for BM-DEF-02.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -307,7 +322,8 @@
 
 ## BM-IMPL-16: Explosion Tab — Explode the Viewed BOM Correctly
 * **Source Decision:** BM-20 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed (with BM-IMPL-04 gross qty and BM-IMPL-08 resolver)
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** `BomExplosionService::explodeBom($bomId)` — the show page explodes the version being viewed (drafts included); demand = gross; only the chosen sub-BOM is followed; alternatives (rows + alternative-operation materials) are info rows, not recursed or summed; status badge + warning text for scheduled / inactive / cancelled sub-BOMs; 4-decimal rule. Test: `BomFixesTest::test_explosion_of_a_draft_bom_and_alternatives_not_summed`.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -323,7 +339,8 @@
 
 ## BM-IMPL-17: Effective Scrap %, Alternative Badge, Drawer Gross
 * **Source Decision:** BM-22 / BM-23 / BM-24 (agreed 2026-11-11) — quantity parts only
-* **Status:** 🟢 Agreed (with BM-IMPL-11 form Tab 2 and BM-IMPL-15 show page)
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Effective scrap % on master rows (form rollup + show page), *"Alternative — not in total"* badge, gross per allocation in both drawers. Costs → BM-DEF-02.
 
 | # | Where | Required |
 | :-: | :--- | :--- |
@@ -337,7 +354,8 @@
 
 ## BM-IMPL-18: BOM Import — Service-Based, One Row per Allocation, Draft-Only Update
 * **Source Decision:** BM-27 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed (after BM-IMPL-01 … 09 rules exist in the shared validator)
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** Import resolves routing / operation / alternative / sub-BOM columns and saves through `ProductionBomService`; **preview now runs the shared trait** (`Requests/ImportBomRowValidation::errorsFor()`) and refuses non-draft BOMs per row (*"BOM 'X' is approved. Only draft BOMs can be updated by import."*) so one locked BOM no longer aborts the batch; priority not defaulted; template / export updated. Test: `BomFixesTest::test_import_rejects_non_draft_rows_without_aborting`.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |
@@ -354,7 +372,8 @@
 
 ## BM-IMPL-19: BOM API — Form-Equal Requests, Safe Header Update, Two-Tier Response
 * **Source Decision:** BM-28 (agreed 2026-11-11)
-* **Status:** 🟢 Agreed (with BM-IMPL-01 / 05 / 06 / 07 / 08 / 09 API rows)
+* **Status:** 🛠️ Applied (code working) 2026-11-12 — awaiting user verification
+* **Implementation notes:** API requests use the trait; **update without `items` = header-only** (`ProductionBomService::updateHeader()` — allocations and master rows untouched; changing the routing needs the items); response has `materials[]` + `allocations[]` + `routing` + `routing_advisory`; duplicate / clone return copy data. Test: `BomFixesTest::test_copy_saves_nothing_and_save_records_revision`.
 
 | # | File | Lines | Today | Required |
 | :-: | :--- | :--- | :--- | :--- |

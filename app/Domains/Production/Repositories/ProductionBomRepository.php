@@ -9,7 +9,7 @@ class ProductionBomRepository implements ProductionBomRepositoryInterface
 {
     public function getAll(array $filters = []): Collection
     {
-        $query = ProductionBom::query()->with(['product', 'creator', 'routing']); // routing: live advisory (RT-IMPL-05)
+        $query = ProductionBom::query()->with(['product', 'creator', 'routing.operations', 'operationMaterials']);
 
         if (!empty($filters['product_id'])) {
             $query->where('product_id', $filters['product_id']);
@@ -35,7 +35,7 @@ class ProductionBomRepository implements ProductionBomRepositoryInterface
 
     public function paginateAll(array $filters = [], int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $query = ProductionBom::query()->with(['product', 'creator', 'routing']); // routing: live advisory (RT-IMPL-05)
+        $query = ProductionBom::query()->with(['product', 'creator', 'routing.operations', 'operationMaterials']);
 
         if (!empty($filters['product_id'])) {
             $query->where('product_id', $filters['product_id']);
@@ -107,7 +107,7 @@ class ProductionBomRepository implements ProductionBomRepositoryInterface
                 'product',
                 'items.material',
                 'items.uom',
-                'operationMaterials.material',
+                'operationMaterials.routingOperation' => fn($q) => $q->withTrashed(),
                 'operationMaterials.uom',
                 'operationMaterials.childBom',
                 'creator',

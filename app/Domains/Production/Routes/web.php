@@ -97,8 +97,7 @@ Route::prefix('production')
             return view('modules.production.track-status');
         })->name('track-status');
 
-        // ── BOM (Frozen) ──────────────────────────────────────────────────────
-        Route::post('boms/preview-formula', [\App\Domains\Production\Controllers\BomFormulaController::class, 'preview'])->name('boms.preview-formula');
+        // ── BOM ───────────────────────────────────────────────────────────────
         Route::get('boms/check-child/{productId}', [ProductionBomController::class, 'checkChildBom'])->name('boms.check-child');
         Route::post('boms/{bom}/create-revision', [ProductionBomController::class, 'createRevision'])->name('boms.create-revision');
         Route::post('boms/{bom}/submit', [ProductionBomController::class, 'submitApproval'])->name('boms.submit');
@@ -205,6 +204,7 @@ Route::prefix('production')
 
         // ── Production Orders ─────────────────────────────────────────────────
         Route::post('plans/{plan}/create-order', [ProductionOrderController::class, 'createFromPlan'])->name('plans.create-order');
+        Route::get('orders/ajax-engineering-status', [ProductionOrderController::class, 'getEngineeringStatus'])->name('orders.engineering-status'); // PO-IMPL-05
         Route::post('orders/bulk-action', [ProductionOrderController::class, 'bulkAction'])->name('orders.bulk-action');
         Route::post('orders/{order}/release', [ProductionOrderController::class, 'release'])->name('orders.release');
         Route::post('orders/{order}/issue', [ProductionOrderController::class, 'issueMaterial'])->name('orders.issue');
@@ -400,9 +400,6 @@ Route::prefix('production')
         Route::post('ecos/{id}/close', [\App\Domains\Production\Controllers\ProductionEcoController::class, 'close'])->name('ecos.close');
         Route::post('ecos/{id}/cancel', [\App\Domains\Production\Controllers\ProductionEcoController::class, 'cancel'])->name('ecos.cancel');
         Route::resource('ecos', \App\Domains\Production\Controllers\ProductionEcoController::class);
-
-        // ── Parameterized BOM Formulas ────────────────────────────────────────
-        Route::post('boms/preview-formula', [\App\Domains\Production\Controllers\BomFormulaController::class, 'preview'])->name('boms.preview-formula');
 
         // ── Planning Exceptions & At-Risk Orders ────────────────────────────────
         Route::get('planning-exceptions', [\App\Domains\Production\Controllers\PlanningExceptionController::class, 'index'])->name('planning-exceptions.index');

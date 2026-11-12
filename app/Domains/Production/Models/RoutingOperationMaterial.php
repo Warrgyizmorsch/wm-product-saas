@@ -23,13 +23,12 @@ class RoutingOperationMaterial extends BaseModel
         'material_id',
         'child_bom_id',
         'quantity',
-        'quantity_type',
-        'formula',
         'uom_id',
         'is_alternative',
         'priority',
         'replaces_routing_material_id',
         'material_scrap_percentage',
+        'gross_quantity',
         'consumption_type',
         'sequence',
         'notes',
@@ -43,11 +42,17 @@ class RoutingOperationMaterial extends BaseModel
         'child_bom_id' => 'integer',
         'quantity' => 'float',
         'material_scrap_percentage' => 'float',
+        'gross_quantity' => 'float',
         'is_alternative' => 'boolean',
         'priority' => 'integer',
         'replaces_routing_material_id' => 'integer',
         'sequence' => 'integer',
     ];
+
+    public static function calculateGrossQuantity(float $quantity, float $scrapPercentage = 0.0): float
+    {
+        return round($quantity * (1.0 + ($scrapPercentage / 100.0)), 4);
+    }
 
     public function bom(): BelongsTo
     {

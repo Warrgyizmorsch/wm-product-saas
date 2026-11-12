@@ -129,7 +129,7 @@ class ProductionEnterpriseTest extends TestCase
     }
 
     /**
-     * Test BOM Revision Semantics.
+     * Test BOM Revision Semantics (BM-IMPL-03 copy-without-saving + auto version increment).
      */
     public function test_bom_revision_semantics(): void
     {
@@ -141,12 +141,27 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'active',
         ]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-REV-1',
+            'name' => 'Revision Routing',
+            'status' => 'active',
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Op 10',
+        ]);
+
         $bom = ProductionBom::create([
             'tenant_id' => $this->tenant->id,
             'bom_number' => 'BOM-SUB-A',
             'bom_name' => 'Subassembly BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $product->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.2.3',
@@ -154,7 +169,6 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'approved',
         ]);
 
-        // Add a component item
         $rm = Product::create([
             'tenant_id' => $this->tenant->id,
             'name' => 'Raw steel',
@@ -163,67 +177,89 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'active',
         ]);
 
-        ProductionBomItem::create([
+        RoutingOperationMaterial::create([
             'tenant_id' => $this->tenant->id,
             'bom_id' => $bom->id,
-            'sequence' => 10,
+            'routing_operation_id' => $op->id,
             'material_id' => $rm->id,
             'quantity' => 5.0,
+            'gross_quantity' => 5.0,
             'uom_id' => $this->uom->id,
         ]);
 
-        // 1. Post major bump revision
+        // 1. Major bump redirects to prefilled create form without saving DB row
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'ent-mfg')
             ->post(route('production.boms.create-revision', $bom->id), [
                 'bump_type' => 'major',
             ]);
 
-        $response->assertRedirect();
-        $this->assertDatabaseHas('production_boms', [
+        $response->assertRedirect(route('production.boms.create', [
+            'copy_from' => $bom->id,
+            'mode' => 'revision',
+            'version' => '2.0.0',
+        ]));
+        $this->assertDatabaseMissing('production_boms', [
             'tenant_id' => $this->tenant->id,
             'product_id' => $product->id,
             'version' => '2.0.0',
-            'status' => 'draft',
         ]);
 
-        $majorBom = ProductionBom::where('version', '2.0.0')->first();
-        $this->assertCount(1, $majorBom->items);
-        $this->assertEquals(5.0, $majorBom->items->first()->quantity);
+        // Submitting create form persists the new draft revision
+        $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'ent-mfg')
+            ->post(route('production.boms.store'), [
+                'bom_number' => 'BOM-SUB-A-200',
+                'bom_name' => 'Subassembly BOM',
+                'bom_type' => 'manufacturing',
+                'product_id' => $product->id,
+                'routing_id' => $routing->id,
+                'base_quantity' => 1.0,
+                'base_uom_id' => $this->uom->id,
+                'version' => '2.0.0',
+                'effective_date' => now()->toDateString(),
+                'items' => [
+                    [
+                        'routing_operation_id' => $op->id,
+                        'material_id' => $rm->id,
+                        'quantity' => 5.0,
+                        'uom_id' => $this->uom->id,
+                    ],
+                ],
+            ])->assertRedirect();
 
-        // 2. Post minor bump revision
-        $response = $this->actingAs($this->user)
+        $majorBom = ProductionBom::where('version', '2.0.0')->first();
+        $this->assertNotNull($majorBom);
+        $this->assertCount(1, $majorBom->operationMaterials);
+        $this->assertEquals(5.0, (float) $majorBom->operationMaterials->first()->quantity);
+
+        // 2. Minor bump redirects with version 1.3.0
+        $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'ent-mfg')
             ->post(route('production.boms.create-revision', $bom->id), [
                 'bump_type' => 'minor',
-            ]);
+            ])
+            ->assertRedirect(route('production.boms.create', [
+                'copy_from' => $bom->id,
+                'mode' => 'revision',
+                'version' => '1.3.0',
+            ]));
 
-        $response->assertRedirect();
-        $this->assertDatabaseHas('production_boms', [
-            'tenant_id' => $this->tenant->id,
-            'product_id' => $product->id,
-            'version' => '1.3.0',
-            'status' => 'draft',
-        ]);
-
-        // 3. Post patch bump revision
-        $response = $this->actingAs($this->user)
+        // 3. Patch bump redirects with version 1.2.4
+        $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'ent-mfg')
             ->post(route('production.boms.create-revision', $bom->id), [
                 'bump_type' => 'patch',
-            ]);
-
-        $response->assertRedirect();
-        $this->assertDatabaseHas('production_boms', [
-            'tenant_id' => $this->tenant->id,
-            'product_id' => $product->id,
-            'version' => '1.2.4',
-            'status' => 'draft',
-        ]);
+            ])
+            ->assertRedirect(route('production.boms.create', [
+                'copy_from' => $bom->id,
+                'mode' => 'revision',
+                'version' => '1.2.4',
+            ]));
     }
 
     /**
-     * Test auto-bumping version if the direct increment version already exists.
+     * Test auto-bumping version if the direct increment version already exists (BM-IMPL-03).
      */
     public function test_bom_revision_auto_bumps_if_conflict_exists(): void
     {
@@ -275,19 +311,22 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'draft',
         ]);
 
-        // Post patch revision - should automatically select 1.2.6
+        // Post patch revision - should automatically select 1.2.6 in the pre-filled create redirect
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'ent-mfg')
             ->post(route('production.boms.create-revision', $bom->id), [
                 'bump_type' => 'patch',
             ]);
 
-        $response->assertRedirect();
-        $this->assertDatabaseHas('production_boms', [
+        $response->assertRedirect(route('production.boms.create', [
+            'copy_from' => $bom->id,
+            'mode' => 'revision',
+            'version' => '1.2.6',
+        ]));
+        $this->assertDatabaseMissing('production_boms', [
             'tenant_id' => $this->tenant->id,
             'product_id' => $product->id,
             'version' => '1.2.6',
-            'status' => 'draft',
         ]);
     }
 
@@ -519,6 +558,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Chassis BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 2.0, // base quantity
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -526,7 +566,7 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'approved',
         ]);
 
-        ProductionBomItem::create([
+        $bomItem = ProductionBomItem::create([
             'tenant_id' => $this->tenant->id,
             'bom_id' => $bom->id,
             'sequence' => 10,
@@ -534,6 +574,19 @@ class ProductionEnterpriseTest extends TestCase
             'quantity' => 15.0,
             'uom_id' => $this->uom->id,
             'material_scrap_percentage' => 8.00, // 8% scrap
+        ]);
+
+        \App\Domains\Production\Models\RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $bom->id,
+            'bom_item_id' => $bomItem->id,
+            'routing_operation_id' => $op->id,
+            'material_id' => $rm->id,
+            'quantity' => 15.0,
+            'material_scrap_percentage' => 8.00,
+            'gross_quantity' => 16.2,
+            'uom_id' => $this->uom->id,
+            'sequence' => 10,
         ]);
 
         // Calculate Cost via Service
@@ -555,14 +608,16 @@ class ProductionEnterpriseTest extends TestCase
         $expectedRoutingCost = 150 * ((50.00 / 60.0) + (25.00 / 60.0)) * 2.0 * (100 / 95.0);
         $this->assertEquals(round($expectedRoutingCost, 4), round($costs['routing_cost'], 4));
 
-        // Overhead Cost: 150 mins * (25.00/60) * 2.0 * (100/95.0) = 131.5789
-        $expectedOverheadCost = 150 * (25.00 / 60.0) * 2.0 * (100 / 95.0);
-        $this->assertEquals(round($expectedOverheadCost, 4), round($costs['overhead_cost'], 4));
+        // Machine Cost (from machine_cost_rate = 25/60): 150 mins * (25.00/60) * 2.0 * (100/95.0) = 131.5789
+        $expectedMachineCost = 150 * (25.00 / 60.0) * 2.0 * (100 / 95.0);
+        $this->assertEquals(round($expectedMachineCost, 4), round($costs['machine_cost'], 4));
+        // Overhead is intentionally on hold (0.0)
+        $this->assertEquals(0.0, round($costs['overhead_cost'], 4));
 
         // Scrap Adjustment (value of scrap loss): 15.0 * (8/100) * 12.00 = 14.40
         $this->assertEquals(14.40, round($costs['scrap_adjustment'], 4));
 
-        // 3. Total Cost: Material (194.40) + Routing (394.7368) + Overhead (131.5789) = 720.7158
+        // 3. Total Cost: Material (194.40) + Routing (394.7368) + Overhead (0.0) = 589.1368
         $this->assertEquals(round($costs['material_cost'] + $costs['routing_cost'] + $costs['overhead_cost'], 4), round($costs['total_cost'], 4));
     }
 
@@ -669,6 +724,20 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'active',
         ]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-AUTO-NUM',
+            'name' => 'Auto Number Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         // Seed a BOM with the next auto number BOM-000001
         ProductionBom::create([
             'tenant_id' => $this->tenant->id,
@@ -676,6 +745,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Conflicting BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $product->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -683,7 +753,7 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'draft',
         ]);
 
-        // Submit store request with AUTO - should generate BOM-000002
+        // Submit store request with AUTO - should generate BOM-WDG-A
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'ent-mfg')
             ->post(route('production.boms.store'), [
@@ -691,6 +761,7 @@ class ProductionEnterpriseTest extends TestCase
                 'bom_name' => 'Auto Unique BOM',
                 'bom_type' => 'manufacturing',
                 'product_id' => $product->id,
+                'routing_id' => $routing->id,
                 'base_quantity' => 1.0,
                 'base_uom_id' => $this->uom->id,
                 'version' => '1.1.0',
@@ -698,6 +769,7 @@ class ProductionEnterpriseTest extends TestCase
                 'items' => [
                     [
                         'material_id' => $rm->id,
+                        'routing_operation_id' => $op->id,
                         'quantity' => 1.0,
                         'uom_id' => $this->uom->id,
                     ]
@@ -714,7 +786,7 @@ class ProductionEnterpriseTest extends TestCase
 
 
     /**
-     * Test Routing submission requires an active approved BOM first.
+     * Test BOM approval requires an active, approved Routing (Routing-first inversion).
      */
     public function test_routing_validation_context_constraints(): void
     {
@@ -726,39 +798,60 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'active',
         ]);
 
+        $rm = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Raw Plate',
+            'sku' => 'RM-PLT-1',
+            'type' => 'raw_material',
+            'status' => 'active',
+        ]);
+
         $routing = Routing::create([
             'tenant_id' => $this->tenant->id,
             'routing_number' => 'RT-DRAFT-1',
             'name' => 'Draft Routing',
-            'product_id' => $fg->id,
             'status' => 'draft',
         ]);
 
-        $wc = WorkCenter::create([
-            'tenant_id' => $this->tenant->id,
-            'name' => 'Assembly WC',
-            'code' => 'WC-ASSY-1',
-            'status' => 'active',
-        ]);
-
-        $routing->operations()->create([
+        $op = $routing->operations()->create([
             'tenant_id' => $this->tenant->id,
             'sequence' => 10,
             'operation_number' => 'OP-010',
             'name' => 'Assembly',
-            'work_center_id' => $wc->id,
         ]);
 
-        // 1. Trying to submit routing without an approved BOM should throw exception
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage("Cannot submit routing for approval: An active, approved Bill of Materials (BOM) is required for this product first.");
+        $bom = ProductionBom::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_number' => 'BOM-ENG-1',
+            'bom_name' => 'Eng BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $fg->id,
+            'routing_id' => $routing->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+            'status' => 'pending_approval',
+        ]);
 
-        $routingService = app(\App\Domains\Production\Services\RoutingService::class);
-        $routingService->submitApproval($routing->id, $this->user->id);
+        RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $bom->id,
+            'routing_operation_id' => $op->id,
+            'material_id' => $rm->id,
+            'quantity' => 1.0,
+            'gross_quantity' => 1.0,
+            'uom_id' => $this->uom->id,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("the BOM can only be approved when the Routing is active"); // BM-IMPL-02 #3 wording
+
+        app(\App\Domains\Production\Services\ProductionBomService::class)->approve($bom->id, $this->user->id);
     }
 
     /**
-     * Test BOM creation operates independently of routing and routing can be submitted once BOM is approved.
+     * Test engineering BOM creation enforces routing_id selection (BM-IMPL-01 Decision 1B).
      */
     public function test_draft_routing_is_permitted_for_engineering_context(): void
     {
@@ -778,24 +871,40 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'active',
         ]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-ENG-2',
+            'name' => 'Engineering Draft Routing',
+            'status' => 'draft',
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Cut',
+        ]);
+
         $bomService = new \App\Domains\Production\Services\ProductionBomService(
             new \App\Domains\Production\Repositories\ProductionBomRepository(),
             new \App\Domains\Production\Services\ProductionBomNumberService()
         );
 
-        // BOM is created first without needing any routing
+        // Engineering draft BOM can link a draft routing, but routing_id is strictly required
         $dto = \App\Domains\Production\DTO\ProductionBomDTO::fromArray([
             'bom_number' => 'BOM-ENG-2',
             'bom_name' => 'Engineering BOM',
             'bom_type' => 'engineering',
             'usage_context' => 'engineering',
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
             'effective_date' => now()->toDateString(),
             'items' => [
                 [
+                    'routing_operation_id' => $op->id,
                     'material_id' => $rm->id,
                     'quantity' => 1.0,
                     'uom_id' => $this->uom->id,
@@ -829,6 +938,20 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'active',
         ]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-CYCLE-01',
+            'name' => 'Cycle Test Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         // Create Parent BOM (Draft)
         $parentBom = ProductionBom::create([
             'tenant_id' => $this->tenant->id,
@@ -836,6 +959,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Parent BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -850,6 +974,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Child BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $sub->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -864,6 +989,17 @@ class ProductionEnterpriseTest extends TestCase
             'sequence' => 10,
             'material_id' => $fg->id,
             'quantity' => 1.0,
+            'uom_id' => $this->uom->id,
+            'child_bom_id' => $parentBom->id,
+        ]);
+        \App\Domains\Production\Models\RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $childBom->id,
+            'routing_operation_id' => $op->id,
+            'sequence' => 10,
+            'material_id' => $fg->id,
+            'quantity' => 1.0,
+            'gross_quantity' => 1.0,
             'uom_id' => $this->uom->id,
             'child_bom_id' => $parentBom->id,
         ]);
@@ -883,6 +1019,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_type' => 'manufacturing',
             'usage_context' => 'manufacturing',
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -890,6 +1027,7 @@ class ProductionEnterpriseTest extends TestCase
             'items' => [
                 [
                     'material_id' => $sub->id,
+                    'routing_operation_id' => $op->id,
                     'quantity' => 1.0,
                     'uom_id' => $this->uom->id,
                     'child_bom_id' => $childBom->id,
@@ -929,6 +1067,20 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'active',
         ]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-MISMATCH-01',
+            'name' => 'Mismatch Test Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         // Create BOM for Subassembly 2
         $bom2 = ProductionBom::create([
             'tenant_id' => $this->tenant->id,
@@ -936,6 +1088,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Subassembly 2 BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $sub2->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -957,6 +1110,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Invalid Link BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -964,6 +1118,7 @@ class ProductionEnterpriseTest extends TestCase
             'items' => [
                 [
                     'material_id' => $sub1->id,
+                    'routing_operation_id' => $op->id,
                     'quantity' => 1.0,
                     'uom_id' => $this->uom->id,
                     'child_bom_id' => $bom2->id, // Mismatch: bom2 belongs to sub2 but material_id is sub1
@@ -995,6 +1150,20 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'active',
         ]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-DATE-01',
+            'name' => 'Date Test Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         // Create child BOM with future effective date
         $childBom = ProductionBom::create([
             'tenant_id' => $this->tenant->id,
@@ -1002,6 +1171,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Future Child BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $sub->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -1023,6 +1193,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Parent BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -1030,6 +1201,7 @@ class ProductionEnterpriseTest extends TestCase
             'items' => [
                 [
                     'material_id' => $sub->id,
+                    'routing_operation_id' => $op->id,
                     'quantity' => 1.0,
                     'uom_id' => $this->uom->id,
                     'child_bom_id' => $childBom->id,
@@ -1061,6 +1233,20 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'active',
         ]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-EXP-01',
+            'name' => 'Expiry Test Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         // Create child BOM that expires in 2 days
         $childBom = ProductionBom::create([
             'tenant_id' => $this->tenant->id,
@@ -1068,6 +1254,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Expiring Child BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $sub->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -1090,6 +1277,7 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Parent BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
@@ -1098,6 +1286,7 @@ class ProductionEnterpriseTest extends TestCase
             'items' => [
                 [
                     'material_id' => $sub->id,
+                    'routing_operation_id' => $op->id,
                     'quantity' => 1.0,
                     'uom_id' => $this->uom->id,
                     'child_bom_id' => $childBom->id,

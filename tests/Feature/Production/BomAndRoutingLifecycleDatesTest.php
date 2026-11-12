@@ -123,6 +123,12 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
     public function test_bom_approval_with_new_version_starting_today_retires_previous_version_without_gap(): void
     {
         $today = Carbon::today()->toDateString();
+        $routing = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RT-BOM-LIFE-1',
+            'name' => 'BOM Lifecycle Routing 1',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
 
         // 1. Existing active BOM v1
         $bomV1 = ProductionBom::create([
@@ -131,6 +137,7 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
             'bom_name' => 'Widget BOM v1',
             'bom_type' => 'manufacturing',
             'product_id' => $this->productA->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'status' => 'approved',
@@ -146,6 +153,7 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
             'bom_name' => 'Widget BOM v2',
             'bom_type' => 'manufacturing',
             'product_id' => $this->productA->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'status' => 'pending_approval',
@@ -175,6 +183,12 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
     {
         $today = Carbon::today()->toDateString();
         $futureDate = Carbon::today()->addDays(15)->toDateString();
+        $routing = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RT-BOM-LIFE-2',
+            'name' => 'BOM Lifecycle Routing 2',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
 
         $bomV1 = ProductionBom::create([
             'tenant_id' => $this->tenantA->id,
@@ -182,6 +196,7 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
             'bom_name' => 'Widget BOM v1',
             'bom_type' => 'manufacturing',
             'product_id' => $this->productA->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'status' => 'approved',
@@ -196,6 +211,7 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
             'bom_name' => 'Widget BOM v2 (Future)',
             'bom_type' => 'manufacturing',
             'product_id' => $this->productA->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'status' => 'pending_approval',
@@ -550,6 +566,18 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
     public function test_tenant_and_product_isolation_for_lifecycle_dates(): void
     {
         $today = Carbon::today()->toDateString();
+        $routingA = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RT-ISO-A',
+            'name' => 'Tenant A Isolation Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $routingB = Routing::create([
+            'tenant_id' => $this->tenantB->id,
+            'routing_number' => 'RT-ISO-B',
+            'name' => 'Tenant B Isolation Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
 
         // Tenant A: BOM for Product A
         $bomA = ProductionBom::create([
@@ -558,6 +586,7 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
             'bom_name' => 'Tenant A BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $this->productA->id,
+            'routing_id' => $routingA->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'status' => 'approved',
@@ -573,6 +602,7 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
             'bom_name' => 'Tenant B BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $this->productB->id,
+            'routing_id' => $routingB->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'status' => 'approved',
@@ -588,6 +618,7 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
             'bom_name' => 'Tenant A BOM v2',
             'bom_type' => 'manufacturing',
             'product_id' => $this->productA->id,
+            'routing_id' => $routingA->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'status' => 'pending_approval',
@@ -725,6 +756,12 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
     {
         $today = Carbon::today()->toDateString();
         $pastDate = Carbon::today()->subDays(5)->toDateString();
+        $routing = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RT-BOM-PAST-1',
+            'name' => 'BOM Past Start Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
 
         $bomV1 = ProductionBom::create([
             'tenant_id' => $this->tenantA->id,
@@ -732,6 +769,7 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
             'bom_name' => 'Widget BOM v1',
             'bom_type' => 'manufacturing',
             'product_id' => $this->productA->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'status' => 'approved',
@@ -747,6 +785,7 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
             'bom_name' => 'Widget BOM v2',
             'bom_type' => 'manufacturing',
             'product_id' => $this->productA->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'status' => 'pending_approval',
@@ -847,6 +886,12 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
     public function test_same_day_approval_within_buffer_does_not_append_delay_note(): void
     {
         $today = Carbon::today()->toDateString();
+        $parentRouting = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RT-BOM-SAMEDAY',
+            'name' => 'Same Day Parent Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
 
         $bom = ProductionBom::create([
             'tenant_id' => $this->tenantA->id,
@@ -854,6 +899,7 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
             'bom_name' => 'Same Day BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $this->productA->id,
+            'routing_id' => $parentRouting->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'status' => 'pending_approval',

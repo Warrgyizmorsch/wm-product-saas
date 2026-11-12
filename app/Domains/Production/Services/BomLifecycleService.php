@@ -4,7 +4,9 @@ namespace App\Domains\Production\Services;
 
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionBomApproval;
+use App\Domains\Production\Models\RoutingOperationMaterial;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -97,7 +99,7 @@ class BomLifecycleService
      *
      * @return int[] IDs of BOMs that were deactivated
      */
-    public function transitionOnApproval(ProductionBom $bom, int $approverUserId): array
+    public function transitionOnApproval(ProductionBom $bom, ?int $approverUserId): array
     {
         $today = Carbon::today()->toDateString();
 
@@ -206,7 +208,7 @@ class BomLifecycleService
      * - Status is set to 'cancelled'.
      * - Expiry date is set to today (the cancellation date).
      */
-    public function transitionOnCancellation(ProductionBom $bom, int $userId, ?string $comments = null): void
+    public function transitionOnCancellation(ProductionBom $bom, ?int $userId, ?string $comments = null): void
     {
         $today = Carbon::now()->toDateString();
 
@@ -263,8 +265,114 @@ class BomLifecycleService
         }
 
         $proposedBom->update($updateData);
+    }
 
-        // Synchronize unsubmitted draft routings to point to the newly approved BOM
-        app(RoutingLifecycleService::class)->syncDraftRoutingsToApprovedBom($proposedBom);
+    /**
+     * BM-IMPL-02: Activate scheduled BOMs on their effective_date and retire expired approved BOMs.
+     *
+     * @return array{activated: int, expired: int}
+     */
+    public function processEffectiveDates(?string $today = null): array
+    {
+        $today = $today ?: Carbon::today()->toDateString();
+        $expired = 0;
+        $activated = 0;
+
+        // 1. Expire approved/scheduled BOMs whose expiry_date has passed first
+        ProductionBom::withoutGlobalScopes()
+            ->whereIn('status', [ProductionBom::STATUS_APPROVED, 'scheduled'])
+            ->whereNotNull('expiry_date')
+            ->whereDate('expiry_date', '<', $today)
+            ->orderBy('id')
+            ->each(function (ProductionBom $bom) use (&$expired) {
+                DB::transaction(function () use ($bom) {
+                    $bom->update([
+                        'status'         => ProductionBom::STATUS_INACTIVE,
+                        'has_warning'    => false,
+                        'warning_reason' => null,
+                    ]);
+
+                    ProductionBomApproval::create([
+                        'tenant_id' => $bom->tenant_id,
+                        'bom_id'    => $bom->id,
+                        'user_id'   => $bom->approved_by ?? $bom->created_by,
+                        'action'    => 'Expired',
+                        'comments'  => 'Expired (expiry date ' . optional($bom->expiry_date)->toDateString() . ' passed).',
+                    ]);
+
+                    $this->refreshParentsAfterChildStatusChange($bom->product_id, $bom->id);
+                });
+                $expired++;
+            });
+
+        // 2. Activate scheduled BOMs whose effective_date has arrived
+        ProductionBom::withoutGlobalScopes()
+            ->where('status', 'scheduled')
+            ->whereDate('effective_date', '<=', $today)
+            ->orderBy('id')
+            ->each(function (ProductionBom $bom) use (&$activated, $today) {
+                DB::transaction(function () use ($bom, $today) {
+                    $supersededQuery = ProductionBom::withoutGlobalScopes()
+                        ->where('tenant_id', $bom->tenant_id)
+                        ->where('product_id', $bom->product_id)
+                        ->where('status', ProductionBom::STATUS_APPROVED)
+                        ->where('id', '!=', $bom->id);
+
+                    if (! empty($bom->bom_type)) {
+                        $supersededQuery->where('bom_type', $bom->bom_type);
+                    }
+
+                    foreach ($supersededQuery->get() as $oldBom) {
+                        $oldBom->update([
+                            'status'         => ProductionBom::STATUS_INACTIVE,
+                            'expiry_date'    => $oldBom->expiry_date ?? $today,
+                            'has_warning'    => false,
+                            'warning_reason' => null,
+                        ]);
+
+                        ProductionBomApproval::create([
+                            'tenant_id' => $oldBom->tenant_id,
+                            'bom_id'    => $oldBom->id,
+                            'user_id'   => $bom->approved_by ?? $bom->created_by,
+                            'action'    => 'Deactivated',
+                            'comments'  => "Superseded on {$today} when scheduled BOM version {$bom->version} became active.",
+                        ]);
+                    }
+
+                    $bom->update(['status' => ProductionBom::STATUS_APPROVED]);
+
+                    ProductionBomApproval::create([
+                        'tenant_id' => $bom->tenant_id,
+                        'bom_id'    => $bom->id,
+                        'user_id'   => $bom->approved_by ?? $bom->created_by,
+                        'action'    => 'Activated',
+                        'comments'  => 'Activated (scheduled start date ' . optional($bom->effective_date)->toDateString() . ' reached).',
+                    ]);
+
+                    $this->refreshParentsAfterChildStatusChange($bom->product_id, $bom->id);
+                });
+                $activated++;
+            });
+
+        return ['activated' => $activated, 'expired' => $expired];
+    }
+
+    private function refreshParentsAfterChildStatusChange(int $productId, int $bomId): void
+    {
+        $parentBomIds = RoutingOperationMaterial::withoutGlobalScopes()
+            ->where(function ($q) use ($productId, $bomId) {
+                $q->where('material_id', $productId)
+                  ->orWhere('child_bom_id', $bomId);
+            })
+            ->pluck('bom_id')
+            ->unique()
+            ->filter();
+
+        foreach ($parentBomIds as $parentId) {
+            $parentBom = ProductionBom::withoutGlobalScopes()->find($parentId);
+            if ($parentBom) {
+                $parentBom->refreshWarningStatus();
+            }
+        }
     }
 }

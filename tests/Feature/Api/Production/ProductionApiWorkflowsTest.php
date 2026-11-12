@@ -150,9 +150,24 @@ class ProductionApiWorkflowsTest extends TestCase
 
     public function test_bom_lifecycle_crud_approve_and_clone(): void
     {
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-API-BOM-001',
+            'name' => 'API BOM Test Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = \App\Domains\Production\Models\RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Machining',
+        ]);
+
         // 1. Create BOM
         $createRes = $this->withHeaders($this->headers())->postJson('/api/v1/production/boms', [
             'product_id' => $this->finishedGood->id,
+            'routing_id' => $routing->id,
             'bom_name' => 'Turbine Rotor Standard BOM',
             'bom_type' => 'manufacturing',
             'base_quantity' => 1.0,
@@ -162,6 +177,7 @@ class ProductionApiWorkflowsTest extends TestCase
             'items' => [
                 [
                     'material_id' => $this->rawMaterial->id,
+                    'routing_operation_id' => $op->id,
                     'quantity' => 2.5,
                     'uom_id' => $this->uom->id,
                     'sequence' => 1,
@@ -174,6 +190,7 @@ class ProductionApiWorkflowsTest extends TestCase
                 'success' => true,
                 'data' => [
                     'bom_name' => 'Turbine Rotor Standard BOM',
+                    'routing_advisory' => [],
                 ],
             ]);
 
@@ -187,14 +204,19 @@ class ProductionApiWorkflowsTest extends TestCase
                 'data' => [
                     'id' => $bomId,
                 ],
+            ])
+            ->assertJsonStructure([
+                'data' => ['routing_advisory', 'allocations', 'items'],
             ]);
 
         // 3. Update BOM
         $updateRes = $this->withHeaders($this->headers())->putJson('/api/v1/production/boms/' . $bomId, [
             'bom_name' => 'Turbine Rotor High Precision BOM',
+            'routing_id' => $routing->id,
             'items' => [
                 [
                     'material_id' => $this->rawMaterial->id,
+                    'routing_operation_id' => $op->id,
                     'quantity' => 2.4,
                     'uom_id' => $this->uom->id,
                 ],
@@ -225,10 +247,12 @@ class ProductionApiWorkflowsTest extends TestCase
         $cloneRes = $this->withHeaders($this->headers())->postJson('/api/v1/production/boms/' . $bomId . '/clone', [
             'version_type' => 'minor',
         ]);
-        $cloneRes->assertStatus(201)
-            ->assertJson([
-                'success' => true,
-            ]);
+        // BM-IMPL-03 / 19: clone returns the copy data (nothing saved); sending it to create saves the new version
+        $cloneRes->assertStatus(200)->assertJson(['success' => true]);
+        $copy = $cloneRes->json('data');
+        $this->assertSame($bomId, $copy['source_bom_id']);
+        unset($copy['warnings'], $copy['source_version']);
+        $this->withHeaders($this->headers())->postJson('/api/v1/production/boms', $copy)->assertStatus(201);
     }
 
     public function test_routing_lifecycle_crud(): void

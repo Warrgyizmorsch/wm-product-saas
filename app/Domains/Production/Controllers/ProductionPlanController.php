@@ -182,9 +182,10 @@ class ProductionPlanController extends Controller
             ->where('status', 'approved')
             ->get();
 
+        // PO-IMPL-04: routings come from the product's BOMs (routings.product_id was dropped)
         $routings = Routing::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->where('product_id', $plan->product_id)
+            ->whereIn('id', $boms->pluck('routing_id')->filter()->unique())
             ->where('status', 'active')
             ->get();
 
@@ -360,9 +361,15 @@ class ProductionPlanController extends Controller
             ->where('status', 'approved')
             ->get(['id', 'bom_number', 'bom_name', 'version']);
 
-        $routings = Routing::withoutGlobalScopes()
+        // PO-IMPL-04: routings come from the product's BOMs (routings.product_id was dropped)
+        $routingIds = ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('product_id', $productId)
+            ->where('status', 'approved')
+            ->pluck('routing_id')->filter()->unique();
+        $routings = Routing::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('id', $routingIds)
             ->where('status', 'active')
             ->get(['id', 'routing_number', 'name', 'version']);
 
@@ -420,14 +427,14 @@ class ProductionPlanController extends Controller
             $bom = ProductionBom::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('id', $bomId)
-                ->with(['items.material', 'items.uom'])
+                ->with(['operationMaterials.material', 'operationMaterials.uom', 'items.material', 'items.uom'])
                 ->first();
         } else {
             $bom = ProductionBom::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $productId)
-                ->where('status', 'approved')
-                ->with(['items.material', 'items.uom'])
+                ->whereIn('status', ['approved', 'active'])
+                ->with(['operationMaterials.material', 'operationMaterials.uom', 'items.material', 'items.uom'])
                 ->first();
         }
 
@@ -438,11 +445,17 @@ class ProductionPlanController extends Controller
         $baseQty = $bom->base_quantity > 0 ? $bom->base_quantity : 1.0;
         $multiplier = $qty / $baseQty;
 
+        $sourceRows = ($bom->operationMaterials->isNotEmpty() ? $bom->operationMaterials : $bom->items)
+            ->where('is_alternative', false);
+
         $index = 1;
-        foreach ($bom->items as $item) {
+        foreach ($sourceRows as $item) {
             if (!$item->material) continue;
 
-            $reqQty = $item->quantity * $multiplier;
+            $grossUnitQty = method_exists($item, 'calculateGrossQuantity')
+                ? (float) ($item->gross_quantity ?? $item->calculateGrossQuantity())
+                : ((float) $item->quantity * (1.0 + ((float) ($item->material_scrap_percentage ?? 0) / 100.0)));
+            $reqQty = $grossUnitQty * $multiplier;
             $availQty = (float) \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
                 ->where('product_id', $item->material_id)
                 ->sum('available_qty');

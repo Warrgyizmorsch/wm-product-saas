@@ -197,9 +197,25 @@ class MasterDataImportExportTest extends TestCase
     /** @test */
     public function import_boms_hierarchical_saving()
     {
-        $csvContent = "bom_number,bom_name,product_code,base_quantity,base_uom_code,version,bom_type,usage_context,effective_date,expiry_date,component_code,item_quantity,item_uom_code,material_scrap_percentage,child_bom_number\n" .
-                      "BOM-TEST-01,Oak Table BOM,FG-PROD-X,1,PCS,1.0.0,manufacturing,manufacturing,2026-07-14,,RM-OAK-WD,4,PCS,5.0,\n" .
-                      "BOM-TEST-01,,,,,,,,,,RM-SCR-01,16,PCS,0.0,\n";
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-IMP-01',
+            'name' => 'Import Routing 01',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        \App\Domains\Production\Models\RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
+        // Test grouping multiple rows into 1 BOM with routing operation allocations & alternative
+        $today = Carbon::today()->toDateString();
+        $csvContent = "bom_number,bom_name,product_code,routing_number,base_quantity,base_uom_code,version,bom_type,usage_context,effective_date,expiry_date,component_code,operation_sequence,item_quantity,item_uom_code,material_scrap_percentage,is_alternative,alternative_of,priority,notes,child_bom_number\n" .
+                      "BOM-TEST-01,Oak Table BOM,FG-PROD-X,RT-IMP-01,1,PCS,1.0.0,manufacturing,manufacturing,{$today},,RM-OAK-WD,10,4,PCS,5.0,No,,1,Main frame,\n" .
+                      "BOM-TEST-01,,,RT-IMP-01,,,,,,,,RM-SCR-01,10,16,PCS,0.0,Yes,RM-OAK-WD,2,Alt screws,\n";
 
         $file = UploadedFile::fake()->createWithContent('boms.csv', $csvContent);
 
@@ -224,19 +240,42 @@ class MasterDataImportExportTest extends TestCase
         $this->assertDatabaseHas('production_boms', [
             'tenant_id' => $this->tenant->id,
             'bom_number' => 'BOM-TEST-01',
+            'routing_id' => $routing->id,
             'status' => 'draft' // Respect approval workflow (set to draft)
         ]);
 
         $bom = ProductionBom::where('bom_number', 'BOM-TEST-01')->first();
         $this->assertCount(2, $bom->items);
+        $this->assertCount(2, $bom->operationMaterials);
+
+        $primaryMat = $bom->operationMaterials()->where('material_id', $this->component1->id)->first();
+        $altMat = $bom->operationMaterials()->where('material_id', $this->component2->id)->first();
+        $this->assertEqualsWithDelta(4.2, (float) $primaryMat->gross_quantity, 0.0001);
+        $this->assertTrue((bool) $altMat->is_alternative);
+        $this->assertEquals($primaryMat->id, $altMat->replaces_routing_material_id);
+        $this->assertEquals('Alt screws', $altMat->notes);
     }
 
     /** @test */
     public function import_boms_rejects_circular_dependencies()
     {
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-IMP-CIRC',
+            'name' => 'Circular Test Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        \App\Domains\Production\Models\RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         // BOM-TEST-01 defines finished product FG-PROD-X, but includes FG-PROD-X as component!
-        $csvContent = "bom_number,bom_name,product_code,base_quantity,base_uom_code,version,bom_type,usage_context,effective_date,expiry_date,component_code,item_quantity,item_uom_code,material_scrap_percentage,child_bom_number\n" .
-                      "BOM-TEST-01,Oak Table BOM,FG-PROD-X,1,PCS,1.0.0,manufacturing,manufacturing,2026-07-14,,FG-PROD-X,1,PCS,0.0,\n";
+        $csvContent = "bom_number,bom_name,product_code,routing_number,base_quantity,base_uom_code,version,bom_type,usage_context,effective_date,expiry_date,component_code,operation_sequence,item_quantity,item_uom_code,material_scrap_percentage,child_bom_number\n" .
+                      "BOM-TEST-01,Oak Table BOM,FG-PROD-X,RT-IMP-CIRC,1,PCS,1.0.0,manufacturing,manufacturing,2026-07-14,,FG-PROD-X,10,1,PCS,0.0,\n";
 
         $file = UploadedFile::fake()->createWithContent('boms.csv', $csvContent);
 

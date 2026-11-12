@@ -140,7 +140,6 @@ class ProductionOrder extends BaseModel
         'project_id',
         'project_milestone_id',
         'project_task_id',
-        'parameters',
     ];
 
     protected $casts = [
@@ -155,7 +154,6 @@ class ProductionOrder extends BaseModel
         'released_at' => 'datetime',
         'completed_at' => 'datetime',
         'closed_at' => 'datetime',
-        'parameters' => 'array',
     ];
 
     public function plan(): BelongsTo

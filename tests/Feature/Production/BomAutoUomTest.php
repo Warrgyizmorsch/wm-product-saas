@@ -5,6 +5,8 @@ namespace Tests\Feature\Production;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Production\Models\ProductionBom;
+use App\Domains\Production\Models\Routing;
+use App\Domains\Production\Models\RoutingOperation;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -136,12 +138,27 @@ class BomAutoUomTest extends TestCase
         $this->actingAs($this->user);
         session(['tenant_id' => $this->tenant->id]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-UOM-001',
+            'name' => 'Auto UOM Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         $payload = [
             'bom_number' => 'BOM-AUTO-UOM-001',
             'bom_name' => 'Auto UOM Test',
             'bom_type' => 'manufacturing',
             'usage_context' => 'manufacturing',
             'product_id' => $this->finishedGood->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             // base_uom_id omitted on purpose to test server auto-resolution
             'version' => '1.0.0',
@@ -149,6 +166,7 @@ class BomAutoUomTest extends TestCase
             'items' => [
                 [
                     'material_id' => $this->rawMaterial->id,
+                    'routing_operation_id' => $op->id,
                     'quantity' => 2.5,
                     // uom_id omitted on purpose to test server auto-resolution
                     'priority' => 1,
@@ -174,6 +192,20 @@ class BomAutoUomTest extends TestCase
         $this->actingAs($this->user);
         session(['tenant_id' => $this->tenant->id]);
 
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-UOM-002',
+            'name' => 'Auto UOM Update Routing',
+            'status' => Routing::STATUS_ACTIVE,
+        ]);
+        $op = RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         $bom = ProductionBom::create([
             'tenant_id' => $this->tenant->id,
             'bom_number' => 'BOM-UPDATE-001',
@@ -181,6 +213,7 @@ class BomAutoUomTest extends TestCase
             'bom_type' => 'manufacturing',
             'usage_context' => 'manufacturing',
             'product_id' => $this->finishedGood->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomPcs->id,
             'version' => '1.0.0',
@@ -194,12 +227,14 @@ class BomAutoUomTest extends TestCase
             'bom_type' => 'manufacturing',
             'usage_context' => 'manufacturing',
             'product_id' => $this->finishedGood->id,
+            'routing_id' => $routing->id,
             'base_quantity' => 2.0,
             'version' => '1.0.0',
             'effective_date' => now()->toDateString(),
             'items' => [
                 [
                     'material_id' => $this->rawMaterial->id,
+                    'routing_operation_id' => $op->id,
                     'quantity' => 5.0,
                     'priority' => 1,
                 ],

@@ -33,6 +33,7 @@ class ProductionOrderOperation extends BaseModel
         'tenant_id',
         'production_order_id',
         'routing_operation_id',
+        'selected_routing_material_ids', // PO-IMPL-01
         'previous_operation_id',
         'source_product_id',
         'source_bom_id',
@@ -86,6 +87,7 @@ class ProductionOrderOperation extends BaseModel
     protected $casts = [
         'sequence'                => 'integer',
         'bom_level'               => 'integer',
+        'selected_routing_material_ids' => 'array',
         'target_produced_qty'     => 'float',
         'is_intermediate'         => 'boolean',
         'quantity_claimed'        => 'float',
@@ -477,11 +479,9 @@ class ProductionOrderOperation extends BaseModel
             ];
         };
 
-        // 1. Explicit RoutingOperationMaterial entries for this operation
+        // 1. Explicit RoutingOperationMaterial entries for this operation (PO-IMPL-01: this BOM + chosen materials only)
         if ($this->routing_operation_id) {
-            $opMaterials = RoutingOperationMaterial::where('routing_operation_id', $this->routing_operation_id)
-                ->with(['material.uom'])
-                ->get();
+            $opMaterials = $this->getExpectedComponents();
             foreach ($opMaterials as $opMat) {
                 if ($opMat->material) {
                     $formatted = $formatMaterial($opMat->material, 'Operation Input Raw Material');
@@ -492,9 +492,9 @@ class ProductionOrderOperation extends BaseModel
             }
         }
 
-        // 2. Items from the source BOM or order BOM
+        // 2. Items from the source BOM or order BOM (legacy rows without operation allocations only)
         $bomId = $this->source_bom_id ?: $this->order?->bom_id;
-        if ($bomId) {
+        if ($bomId && !$this->routing_operation_id) {
             $bomItems = ProductionBomItem::where('bom_id', $bomId)->with(['material.uom'])->get();
             foreach ($bomItems as $item) {
                 if ($item->material) {
@@ -523,5 +523,30 @@ class ProductionOrderOperation extends BaseModel
         }
 
         return $materials->unique('id')->values();
+    }
+
+    /**
+     * PO-IMPL-01 (PO-12): the routing-operation materials this order operation consumes —
+     * allocations of source_bom_id (reusable routings carry several BOMs) limited to the chosen ids;
+     * legacy rows without a stored choice fall back to the primary allocations.
+     */
+    public function getExpectedComponents(): \Illuminate\Support\Collection
+    {
+        if (!$this->routing_operation_id) {
+            return collect();
+        }
+
+        $bomId = $this->source_bom_id ?: $this->order?->bom_id;
+
+        return RoutingOperationMaterial::withoutGlobalScopes()
+            ->where('routing_operation_id', $this->routing_operation_id)
+            ->when($bomId, fn ($q) => $q->where('bom_id', $bomId))
+            ->when(
+                is_array($this->selected_routing_material_ids),
+                fn ($q) => $q->whereIn('id', $this->selected_routing_material_ids ?: [0]),
+                fn ($q) => $q->where('is_alternative', false)
+            )
+            ->with(['material.uom'])
+            ->get();
     }
 }

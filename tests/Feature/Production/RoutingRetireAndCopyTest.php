@@ -123,7 +123,10 @@ class RoutingRetireAndCopyTest extends TestCase
         $this->assertSame('draft', $draftBom->fresh()->status);
         // RT-IMPL-05: nothing stored on the draft BOM — the routing advisory is worked out live
         $this->assertFalse((bool) $draftBom->fresh()->has_warning);
-        $this->assertStringContainsString('is historical', $draftBom->fresh()->routing_advisory);
+        $advisory = $draftBom->fresh()->routing_advisory;
+        $this->assertNotEmpty($advisory);
+        $this->assertSame('not_active', $advisory[0]['code']);
+        $this->assertStringContainsString('is historical', $advisory[0]['message']);
 
         // historical can't be retired again; a draft can't be retired
         $this->web()->post(route('production.routing.retire', $routing->id))->assertForbidden();
