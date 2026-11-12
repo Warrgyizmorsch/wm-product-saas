@@ -44,19 +44,32 @@ class RoutingController extends Controller
     {
         Gate::authorize('create', Routing::class);
 
-        $products    = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
         $workCenters = \App\Domains\Production\Models\WorkCenter::with(['sections' => fn($q) => $q->where('status', 'active')])->where('status', 'active')->get();
         $vendors     = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
-        $rawMaterials    = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
         $operationTypes = config('production.operation_types', []);
-        // [INVERSION-DECOUPLE-TRACK-03] Decoupled: Routing creation is standalone; empty collection kept for view compatibility
-        $boms = collect([]);
 
-        $selectedProductId = request('product_id');
+        // RT-IMPL-20: Duplicate Version opens this create form pre-filled from the source routing — nothing is saved
+        // until the user clicks Save. The edit form's pre-fill is reused in "copy mode" (posts to store).
+        if ($request->filled('source_routing_id')) {
+            $routing = $this->routingRepository->getRoutingWithOperations((int) $request->input('source_routing_id'));
+            abort_if(!$routing, 404, 'Source routing not found.');
+            Gate::authorize('view', $routing);
+            $routing->loadMissing([
+                'operations.workCenter', 'operations.section', 'operations.machine', 'operations.manualProduction',
+                'operations.primaryOperation', 'operations.alternativeOperations',
+            ]);
+            $copyMode = true;
+            $newVersion = (string) $request->input('version', '');
+            [$workCenters, $keptResources] = $this->keepUsedInactiveResources($workCenters, $routing);
+
+            return view('modules.production.routing.edit', compact(
+                'routing', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'copyMode', 'newVersion', 'keptResources'
+            ));
+        }
 
         return view('modules.production.routing.create', compact(
-            'products', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'selectedProductId', 'rawMaterials', 'boms'
+            'workCenters', 'vendors', 'serviceProducts', 'operationTypes'
         ));
     }
 
@@ -83,6 +96,11 @@ class RoutingController extends Controller
             }
             $dto      = RoutingDTO::fromArray($data);
             $routing  = $this->routingService->create($dto, $tenantId, auth()->id() ?: 1);
+
+            // RT-IMPL-20: saved from a Duplicate Version copy → record the source (revision + audit)
+            if (!empty($data['source_routing_id'])) {
+                $routing = $this->routingService->recordRevisionSource($routing, (int) $data['source_routing_id'], auth()->id() ?: 1);
+            }
 
             $redirect = redirect()
                 ->route('production.routing.show', $routing->id)
@@ -124,7 +142,13 @@ class RoutingController extends Controller
             }
         }
 
-        return view('modules.production.routing.show', compact('routing', 'costSummary'));
+        // RT-IMPL-14 (RT-19 rule 7): outdated / not-calculated warnings — numbers compared, nothing recalculated
+        $costStatus = app(\App\Domains\Production\Services\RoutingCostStatusService::class)->check($routing);
+
+        // RT-IMPL-06: linked BOMs and the effect of Retire / Cancel, shown in the confirmations
+        $bomImpact = app(\App\Domains\Production\Services\RoutingLifecycleService::class)->bomImpact($routing);
+
+        return view('modules.production.routing.show', compact('routing', 'costSummary', 'costStatus', 'bomImpact'));
     }
 
     public function edit(int $id): View
@@ -145,18 +169,25 @@ class RoutingController extends Controller
             'operations.alternativeOperations',
         ]);
 
-        $products       = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
         $workCenters    = \App\Domains\Production\Models\WorkCenter::with(['sections' => fn($q) => $q->where('status', 'active')])->where('status', 'active')->get();
         $vendors        = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
-        $rawMaterials   = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
-        // [INVERSION-DECOUPLE-TRACK-03] Decoupled: Routing edit is standalone; empty collection kept for view compatibility
-        $boms           = collect([]);
 
         $operationTypes = config('production.operation_types', []);
 
+        [$workCenters, $keptResources] = $this->keepUsedInactiveResources($workCenters, $routing);
+
+        // RT-IMPL-09: operations BOMs still use — the form warns before removing one
+        $operationBomUsage = [];
+        $alloc = \App\Domains\Production\Models\RoutingOperationMaterial::whereIn('routing_operation_id', $routing->operations->pluck('id'))
+            ->get(['routing_operation_id', 'bom_id'])->groupBy('routing_operation_id');
+        $bomNumbers = \App\Domains\Production\Models\ProductionBom::whereIn('id', $alloc->flatten()->pluck('bom_id')->filter()->unique())->pluck('bom_number', 'id');
+        foreach ($alloc as $opId => $rows) {
+            $operationBomUsage[$opId] = 'BOM ' . $rows->pluck('bom_id')->unique()->map(fn($id) => $bomNumbers[$id] ?? ('#' . $id))->implode(', ') . ' (' . $rows->count() . ' material(s))';
+        }
+
         return view('modules.production.routing.edit', compact(
-            'routing', 'products', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'rawMaterials', 'boms'
+            'routing', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'operationBomUsage', 'keptResources'
         ));
     }
 
@@ -241,7 +272,7 @@ class RoutingController extends Controller
         try {
             $this->routingService->approve($id, auth()->id() ?: 1);
             return redirect()->back()
-                ->with('success', 'Routing approved and set as active. Previous active version archived.');
+                ->with('success', 'Routing approved. Older versions stay as they are — retire them with the Retire action when replaced.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -288,17 +319,87 @@ class RoutingController extends Controller
 
         $request->validate(['new_version' => 'required|string|max:50']);
         try {
-            $newRouting = $this->routingService->duplicateVersion(
-                $id,
-                $request->input('new_version'),
-                auth()->id() ?: 1
-            );
+            // RT-IMPL-20: nothing is saved here — check the version, then open the pre-filled create form
+            $this->routingService->checkRoutingConflicts($routing->name, $request->input('new_version'), $routing->tenant_id);
+
             return redirect()
-                ->route('production.routing.edit', $newRouting->id)
-                ->with('success', "Routing version {$newRouting->version} created as draft. Review and save operations.");
+                ->route('production.routing.create', ['source_routing_id' => $routing->id, 'version' => $request->input('new_version')])
+                ->with('info', "Copy of {$routing->routing_number} v{$routing->version} — nothing is saved until you click Save.");
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
+    }
+
+    /**
+     * RT-IMPL-02: retire an active / scheduled routing → historical (manual; approval never retires older versions).
+     */
+    public function retire(Request $request, int $id): RedirectResponse
+    {
+        $routing = $this->routingRepository->find($id);
+        abort_if(!$routing, 404, 'Routing not found.');
+
+        Gate::authorize('retire', $routing);
+
+        $request->validate(['comments' => 'nullable|string|max:1000']);
+        try {
+            $this->routingService->retire($id, auth()->id() ?: 1, $request->input('comments'));
+            return redirect()->back()->with('success', "Routing '{$routing->routing_number}' retired — it is now historical.");
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * RT-IMPL-18 (RT-29 rule 3): the routing's own work center / section / machine / batch stays in its row's
+     * dropdown even when it is inactive or deleted — tagged, never cleared silently. Names are changed in memory
+     * only (never saved). The save is refused until another resource is chosen (shared validator).
+     *
+     * @return array{0: \Illuminate\Support\Collection, 1: array<int, array{machine?: array, batch?: array}>}
+     */
+    private function keepUsedInactiveResources($workCenters, Routing $routing): array
+    {
+        $tag = fn($model) => (method_exists($model, 'trashed') && $model->trashed()) ? 'Deleted' : 'Inactive';
+        $ops = $routing->operations->where('is_external', false);
+        $kept = [];
+
+        foreach ($ops->pluck('work_center_id')->filter()->unique() as $wcId) {
+            $wc = $workCenters->firstWhere('id', $wcId);
+            if (!$wc) {
+                $wc = \App\Domains\Production\Models\WorkCenter::withTrashed()->find($wcId);
+                if (!$wc) {
+                    continue;
+                }
+                $wc->name = $wc->name . ' — ' . $tag($wc);
+                $wc->setRelation('sections', collect());
+                $workCenters->push($wc);
+            }
+            foreach ($ops->where('work_center_id', $wcId)->pluck('section_id')->filter()->unique() as $secId) {
+                if (!$wc->sections->firstWhere('id', $secId)) {
+                    $sec = \App\Domains\Production\Models\WorkCenterSection::withTrashed()->find($secId);
+                    if ($sec) {
+                        $sec->name = $sec->name . ' — ' . $tag($sec);
+                        $wc->setRelation('sections', $wc->sections->push($sec));
+                    }
+                }
+            }
+        }
+
+        foreach ($ops as $op) {
+            if ($op->machine_id) {
+                $m = \App\Domains\Production\Models\Machine::withTrashed()->find($op->machine_id);
+                if ($m && ($m->trashed() || $m->status !== \App\Domains\Production\Models\Machine::STATUS_ACTIVE)) {
+                    $kept[$op->id]['machine'] = ['id' => $m->id, 'label' => "{$m->name} ({$m->code}) — " . ($m->trashed() ? 'Deleted' : 'Inactive')];
+                }
+            }
+            if ($op->section_manual_production_id) {
+                $b = \App\Domains\Production\Models\SectionManualProduction::withTrashed()->find($op->section_manual_production_id);
+                if ($b && ($b->trashed() || !$b->active)) {
+                    $kept[$op->id]['batch'] = ['id' => $b->id, 'label' => "{$b->batch_name} — " . ($b->trashed() ? 'Deleted' : 'Inactive')];
+                }
+            }
+        }
+
+        return [$workCenters, $kept];
     }
 
     public function getOperationsForAjax(int $id): \Illuminate\Http\JsonResponse
@@ -323,6 +424,7 @@ class RoutingController extends Controller
                 'work_center_name' => $op->workCenter ? $op->workCenter->name : 'N/A',
                 'machine_name' => $op->machine ? $op->machine->name : 'N/A',
                 'setup_time_minutes' => $op->setup_time_minutes,
+                'setup_time_per_piece_minutes' => $op->setup_time_per_piece_minutes,
                 'processing_time_minutes' => $op->processing_time_minutes,
                 'expected_yield_percentage' => $op->expected_yield_percentage,
             ];

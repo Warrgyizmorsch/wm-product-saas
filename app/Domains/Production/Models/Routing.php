@@ -46,6 +46,7 @@ class Routing extends BaseModel
     // ];
 
     protected $fillable = [
+        'cost_snapshot',
         'tenant_id',
         'routing_number',
         'name',
@@ -65,6 +66,7 @@ class Routing extends BaseModel
     ];
 
     protected $casts = [
+        'cost_snapshot' => 'array', // RT-IMPL-14: costs recorded at approval
         'effective_from'         => 'date',
         'effective_to'           => 'date',
         'approved_at'            => 'datetime',
@@ -177,6 +179,12 @@ class Routing extends BaseModel
         return $this->status === self::STATUS_HISTORICAL;
     }
 
+    /** RT-IMPL-02: only active or scheduled routings can be retired (→ historical). */
+    public function canBeRetired(): bool
+    {
+        return in_array($this->status, [self::STATUS_ACTIVE, self::STATUS_SCHEDULED], true);
+    }
+
     public function isCancelled(): bool
     {
         return $this->status === self::STATUS_CANCELLED;
@@ -220,10 +228,6 @@ class Routing extends BaseModel
         $query->where('is_default', true);
     }
 
-    public function scopeForProduct(Builder $query, int $productId): void
-    {
-        $query->where('product_id', $productId);
-    }
 
     // ─── Computed Helpers ─────────────────────────────────────────────────────
 
@@ -234,7 +238,7 @@ class Routing extends BaseModel
     public function totalCycleTimeMinutes(): float
     {
         return $this->operations->where('is_alternative', false)->sum(function (RoutingOperation $op): float {
-            return $op->setup_time_minutes + $op->processing_time_minutes + $op->wait_time_minutes;
+            return $op->totalCycleTimeMinutes();
         });
     }
 

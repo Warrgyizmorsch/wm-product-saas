@@ -34,7 +34,7 @@ class CalculationText
             'deductible' => 'Includes ' . self::money($m['deductibles_per_hour'] ?? 0) . '/hr deductibles for power subsidies, solar credits, or discounts.',
             'matches'    => 'Matches calculated base energy consumption rate (' . self::money($op) . '/hr).',
             'flat'       => 'Flat operating cost specified (' . self::money($op) . '/hr).',
-            'energy'     => 'Calculated from energy consumption (' . number_format((float) ($m['consumption_per_hour'] ?? 0), 4) . ' units @ '
+            'energy'     => 'Calculated from energy consumption (' . format_decimal($m['consumption_per_hour'] ?? 0) . ' units @ '
                             . self::money($m['energy_rate_per_unit'] ?? 0) . '/unit = ' . self::money($op) . '/hr).',
             default      => 'No energy consumption or operating cost entered (' . self::money(0) . '/hr).',
         };

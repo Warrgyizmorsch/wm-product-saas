@@ -77,7 +77,8 @@ class WorkCenterSectionController extends Controller
         $tenantId = require_tenant_id();
         abort_if((int) $section->tenant_id !== (int) $tenantId, 404, 'Section not found.');
 
-        $data = $this->calculationService->getSectionResourceCosts($section);
+        // RT-IMPL-14: figures from the latest section snapshot (+ its id / number), not a live calculation
+        $data = $this->calculationService->getSnapshotResourceCosts($section);
 
         return response()->json($data);
     }

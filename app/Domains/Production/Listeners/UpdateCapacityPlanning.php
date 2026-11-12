@@ -21,7 +21,6 @@ class UpdateCapacityPlanning
             [
                 'routing_id'     => $event->routing->id,
                 'routing_number' => $event->routing->routing_number,
-                'product_id'     => $event->routing->product_id,
             ]
         );
         // Future: CapacityPlanningService::recalculate($event->routing)

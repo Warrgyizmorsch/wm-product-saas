@@ -27,6 +27,7 @@ use Tests\TestCase;
 class ProductionApiWorkflowsTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\FillsRoutingFigures; // RT-IMPL-14
 
     private Tenant $tenant;
     private User $planner;
@@ -232,10 +233,16 @@ class ProductionApiWorkflowsTest extends TestCase
 
     public function test_routing_lifecycle_crud(): void
     {
+        // RT-IMPL-07: the API applies the web form rules — an internal operation needs a section, and the machine must be in it
+        $section = \App\Domains\Production\Models\WorkCenterSection::create([
+            'tenant_id' => $this->tenant->id, 'work_center_id' => $this->workCenter->id,
+            'name' => 'Milling Bay', 'code' => 'SEC-MILL', 'status' => 'active',
+        ]);
+        $this->machine->update(['section_id' => $section->id]);
+
         // 1. Create Routing
-        $createRes = $this->withHeaders($this->headers())->postJson('/api/v1/production/routings', [
+        $createRes = $this->withHeaders($this->headers())->postJson('/api/v1/production/routings', $this->withRoutingFigures([
             'name' => 'Turbine Rotor Machining Sequence',
-            'product_id' => $this->finishedGood->id,
             'operations' => [
                 [
                     'sequence' => 10,
@@ -243,12 +250,13 @@ class ProductionApiWorkflowsTest extends TestCase
                     'name' => 'Rough Face Milling',
                     'operation_type' => 'manufacturing',
                     'work_center_id' => $this->workCenter->id,
+                    'section_id' => $section->id,
                     'machine_id' => $this->machine->id,
                     'setup_time_minutes' => 30,
                     'processing_time_minutes' => 60,
                 ],
             ],
-        ]);
+        ]));
 
         $createRes->assertStatus(201)
             ->assertJson([

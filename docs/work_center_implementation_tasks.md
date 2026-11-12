@@ -44,7 +44,7 @@
 | **WC-MACH-01** | Idle machines: confirm status meaning so idle machines count as active (no zero-output warning) | WC-24, WC-07 | 📌 Marked for Machine Module |
 | **WC-ISSUE-11** | Machine operating cost and energy rate not converted to base currency on save | WC-46 | ⏸️ Decide Later (with WC-FINAL-01) |
 | **WC-ISSUE-12** | HRMS salary stored in tenant currency; Production treats it as base | WC-46 | ⏸️ Decide Later (with WC-FINAL-01; 📌 HRMS) |
-| **WC-RTG-01** | Routing operator labor sums all non-batch workers as if on the floor at the same time | WC-18 | ✅ Decided in routing review → RT-14 / RT-IMPL-12 |
+| **WC-RTG-01** | Routing operator labor sums all non-batch workers as if on the floor at the same time | WC-18 | ✅ Decided in routing review → RT-14 / RT-IMPL-12 (🛠️ Applied 2026-11-11) |
 | **WC-RTG-02** | Inactive resource on routings: approved advisory missing; backend allows inactive; drafts drop now-inactive resources | WC-48 | ✅ Decided in routing review → RT-29 / RT-IMPL-18 |
 | **WC-FINAL-01** | **Final task:** audit that every cost field is converted from base currency at display | WC-IMPL-04, WC-46 | 🟢 Agreed — ⏭️ do LAST |
 | **WC-ISSUE-01** | Shift deactivated/deleted in Shift module leaves sections with 0 active shifts | WC-04 | ⏸️ Decide Later (📌 Shift Module) |

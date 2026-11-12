@@ -154,6 +154,11 @@ class ProductionBomService
             throw new InvalidArgumentException("Only draft BOMs can be submitted for approval.");
         }
 
+        // RT-IMPL-09: materials on an operation removed from the routing must be moved / removed first
+        if ($removed = ProductionBom::deletedOperationMessages($bom->id)) {
+            throw new InvalidArgumentException(implode(' ', $removed));
+        }
+
         return DB::transaction(function () use ($bom) {
             $bom->update(['status' => 'pending_approval']);
 
@@ -191,6 +196,11 @@ class ProductionBomService
 
             if (!$bom->isPendingApproval()) {
                 throw new InvalidArgumentException("Only BOMs pending approval can be approved.");
+            }
+
+            // RT-IMPL-09: materials on an operation removed from the routing must be moved / removed first
+            if ($removed = ProductionBom::deletedOperationMessages($bom->id)) {
+                throw new InvalidArgumentException(implode(' ', $removed));
             }
 
             // [TRACK-06] Inverted approval check: BOM requires its linked routing to be active/approved

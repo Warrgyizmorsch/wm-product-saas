@@ -23,7 +23,7 @@ class RoutingLifecycleService
      * Rules:
      * 1. Start date must not be in the past (< today).
      * 2. End date (effective_to), if specified, must be on or after the start date.
-     * 3. A new version must not start before the applicable active version's start date.
+     * (RT-IMPL-03: the old product-based rule 3 was removed — routings have no product; $productId is unused.)
      *
      * @throws InvalidArgumentException
      */
@@ -53,34 +53,38 @@ class RoutingLifecycleService
                 );
             }
         }
+    }
 
-        // Rule 3: Existing-version date rule
-        // A new version cannot start before the applicable active version's start date
-        if ($productId > 0) {
-            $resolvedTenantId = $tenantId ?: (tenant_id() ?? 1);
+    /**
+     * RT-IMPL-14 (RT-19 rule 6): routing-level approval snapshot — approver, time, Σ saved costs and every
+     * operation's saved figures with the section snapshot number they came from. Numbers only (base currency).
+     */
+    public function buildApprovalCostSnapshot(Routing $routing, int $approverUserId): array
+    {
+        $ops = $routing->operations()->get();
+        $primary = $ops->where('is_alternative', false);
 
-            $activeQuery = Routing::withoutGlobalScopes()
-                ->where('tenant_id', $resolvedTenantId)
-                ->where('product_id', $productId)
-                ->where('status', Routing::STATUS_ACTIVE);
-
-            if ($ignoreRoutingId !== null) {
-                $activeQuery->where('id', '!=', $ignoreRoutingId);
-            }
-
-            $activeRoutings = $activeQuery->get();
-
-            foreach ($activeRoutings as $activeRouting) {
-                if ($activeRouting->effective_from) {
-                    $activeStartDate = Carbon::parse($activeRouting->effective_from)->toDateString();
-                    if ($startDate < $activeStartDate) {
-                        throw new InvalidArgumentException(
-                            "The routing start date ({$startDate}) cannot be earlier than the existing active version's start date ({$activeStartDate})."
-                        );
-                    }
-                }
-            }
-        }
+        return [
+            'approved_by'        => $approverUserId,
+            'approved_at'        => Carbon::now()->toIso8601String(),
+            'cost_per_unit'      => round((float) $primary->sum(fn($o) => (float) ($o->cost_per_unit ?? 0)), 4),
+            'labor_cost_per_unit'   => round((float) $primary->sum(fn($o) => (float) ($o->labor_cost_per_unit ?? 0)), 4),
+            'machine_cost_per_unit' => round((float) $primary->sum(fn($o) => (float) ($o->machine_cost_per_unit ?? 0)), 4),
+            'setup_cost_per_run' => round((float) $primary->sum(fn($o) => $o->setupCostPerRun()), 4),
+            'operations'         => $ops->map(fn($o) => [
+                'id'                      => $o->id,
+                'operation_number'        => $o->operation_number,
+                'is_alternative'          => (bool) $o->is_alternative,
+                'cost_per_unit'           => $o->cost_per_unit,
+                'labor_cost_per_unit'     => $o->labor_cost_per_unit,
+                'machine_cost_per_unit'   => $o->machine_cost_per_unit,
+                'setup_cost_per_run'      => $o->setup_cost_per_run,
+                'labor_cost_rate'         => $o->labor_cost_rate,
+                'machine_cost_rate'       => $o->machine_cost_rate,
+                'section_calculation_id'  => $o->section_calculation_id,
+                'section_snapshot_number' => $o->section_snapshot_number,
+            ])->values()->all(),
+        ];
     }
 
     /**
@@ -128,6 +132,8 @@ class RoutingLifecycleService
             'effective_from' => $startDate,
             'approved_by'    => $approverUserId,
             'approved_at'    => Carbon::now(),
+            // RT-IMPL-14 (RT-19 rule 6): costs as they stood at approval
+            'cost_snapshot'  => $this->buildApprovalCostSnapshot($routing, $approverUserId),
         ];
 
         // If approval was granted after the planned start date (outside same-day buffer), append an explanatory note
@@ -179,100 +185,144 @@ class RoutingLifecycleService
             'comments'   => $comments ?: 'Routing cancelled.',
         ]);
 
-        // [TRACK-06] Cascade to connected BOMs when routing is cancelled
-        $this->handleBomsOnRoutingCancellation($routing, $userId, $comments);
+        // RT-IMPL-06: one BOM handler for retire / expire / cancel
+        $this->handleBomsOnRoutingEnded($routing, 'cancelled', $userId, $comments);
     }
 
     /**
-     * [TRACK-06] Handle connected BOMs when a routing is superseded/retired.
-     * Active BOMs transition to 'inactive' with warning reason & approval log.
-     * Draft BOMs stay 'draft' with warning badge/reason.
+     * RT-IMPL-06 (RT-05): one BOM handler for a routing that ended — retired, expired (end date passed) or cancelled.
+     *   approved / scheduled BOM → inactive  + audit "Inactivated"
+     *   pending approval BOM     → draft     + audit "Returned to Draft"
+     *   draft BOM                → nothing stored (live routing advisory, RT-IMPL-05)
+     * The routing reason goes into the BOM audit entry — never into the BOM warning field (component warnings only).
      */
-    public function handleBomsOnRoutingRetirement(Routing $routing, int $userId, string $reason): void
-    {
-        // 1. Active BOMs linked to the retiring routing become inactive
-        $activeBoms = ProductionBom::withoutGlobalScopes()
-            ->where('tenant_id', $routing->tenant_id)
-            ->where('routing_id', $routing->id)
-            ->whereIn('status', [ProductionBom::STATUS_APPROVED, 'active'])
-            ->get();
-
-        foreach ($activeBoms as $bom) {
-            $bom->update([
-                'status'         => ProductionBom::STATUS_INACTIVE,
-                'has_warning'    => true,
-                'warning_reason' => "Automatically inactivated because {$reason}",
-            ]);
-
-            ProductionBomApproval::create([
-                'tenant_id' => $bom->tenant_id,
-                'bom_id'    => $bom->id,
-                'user_id'   => $userId,
-                'action'    => 'Inactivated',
-                'comments'  => "Automatically inactivated because {$reason}",
-            ]);
-        }
-
-        // 2. Draft BOMs keep draft status but get warning
-        $draftBoms = ProductionBom::withoutGlobalScopes()
-            ->where('tenant_id', $routing->tenant_id)
-            ->where('routing_id', $routing->id)
-            ->where('status', ProductionBom::STATUS_DRAFT)
-            ->get();
-
-        foreach ($draftBoms as $bom) {
-            $bom->update([
-                'has_warning'    => true,
-                'warning_reason' => "The linked routing ({$routing->routing_number}) has become historical/superseded. Please review and update the BOM accordingly.",
-            ]);
-        }
-    }
-
-    /**
-     * [TRACK-06] Handle connected BOMs when a routing is cancelled.
-     * Active BOMs transition to 'inactive' with warning reason.
-     * Draft BOMs stay 'draft' with warning badge/reason.
-     */
-    public function handleBomsOnRoutingCancellation(Routing $routing, int $userId, ?string $comments = null): void
+    public function handleBomsOnRoutingEnded(Routing $routing, string $event, ?int $userId, ?string $comments = null): void
     {
         $reasonText = $comments ? " Reason: {$comments}" : '';
+        $label = "linked routing ({$routing->routing_number} v{$routing->version}) was {$event}";
 
-        // 1. Active BOMs linked to the cancelled routing become inactive
-        $activeBoms = ProductionBom::withoutGlobalScopes()
+        $boms = ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $routing->tenant_id)
             ->where('routing_id', $routing->id)
-            ->whereIn('status', [ProductionBom::STATUS_APPROVED, 'active'])
+            ->whereIn('status', [ProductionBom::STATUS_APPROVED, 'active', 'scheduled', ProductionBom::STATUS_PENDING_APPROVAL])
             ->get();
 
-        foreach ($activeBoms as $bom) {
-            $bom->update([
-                'status'         => ProductionBom::STATUS_INACTIVE,
-                'has_warning'    => true,
-                'warning_reason' => "Automatically inactivated because connected routing ({$routing->routing_number}) was cancelled.{$reasonText}",
-            ]);
+        foreach ($boms as $bom) {
+            if ($bom->status === ProductionBom::STATUS_PENDING_APPROVAL) {
+                $bom->update(['status' => ProductionBom::STATUS_DRAFT]);
+                $action = 'Returned to Draft';
+                $comment = "Automatically returned to draft because {$label}.{$reasonText}";
+            } else {
+                $bom->update(['status' => ProductionBom::STATUS_INACTIVE]);
+                $action = 'Inactivated';
+                $comment = "Automatically inactivated because {$label}.{$reasonText}";
+            }
 
             ProductionBomApproval::create([
                 'tenant_id' => $bom->tenant_id,
                 'bom_id'    => $bom->id,
                 'user_id'   => $userId,
-                'action'    => 'Inactivated',
-                'comments'  => "Automatically inactivated because connected routing ({$routing->routing_number}) was cancelled.{$reasonText}",
+                'action'    => $action,
+                'comments'  => $comment,
             ]);
         }
+    }
 
-        // 2. Draft BOMs keep draft status but get warning
-        $draftBoms = ProductionBom::withoutGlobalScopes()
+    /**
+     * RT-IMPL-06 (RT-05 rule 1): what Retire / Cancel would do to each linked BOM — shown in the confirmation.
+     *
+     * @return array<int, array{id:int, bom_number:string, version:?string, status:string, effect:string}>
+     */
+    public function bomImpact(Routing $routing): array
+    {
+        return ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $routing->tenant_id)
             ->where('routing_id', $routing->id)
-            ->where('status', ProductionBom::STATUS_DRAFT)
-            ->get();
+            ->whereNotIn('status', [ProductionBom::STATUS_CANCELLED, ProductionBom::STATUS_INACTIVE])
+            ->orderBy('bom_number')
+            ->get()
+            ->map(fn($bom) => [
+                'id'         => $bom->id,
+                'bom_number' => $bom->bom_number,
+                'version'    => $bom->version,
+                'status'     => $bom->status,
+                'effect'     => match (true) {
+                    $bom->status === ProductionBom::STATUS_PENDING_APPROVAL => 'Goes back to draft',
+                    $bom->status === ProductionBom::STATUS_DRAFT            => 'No change — shows the routing status advisory',
+                    default                                                 => 'Becomes inactive',
+                },
+            ])
+            ->all();
+    }
 
-        foreach ($draftBoms as $bom) {
-            $bom->update([
-                'has_warning'    => true,
-                'warning_reason' => "The linked routing ({$routing->routing_number}) was cancelled. Please review and update the BOM accordingly.{$reasonText}",
-            ]);
-        }
+    /**
+     * RT-IMPL-04 (RT-03 rule 5): run the date rules for every tenant (no tenant scope — explicit tenant ids).
+     * End dates are checked first, so a routing whose start and end both passed ends as historical.
+     *
+     * @return array{activated:int, expired:int}
+     */
+    public function processEffectiveDates(?string $today = null): array
+    {
+        $today = $today ?: Carbon::today()->toDateString();
+        $expired = 0;
+        $activated = 0;
+
+        Routing::withoutGlobalScopes()
+            ->whereIn('status', [Routing::STATUS_ACTIVE, Routing::STATUS_SCHEDULED])
+            ->whereNotNull('effective_to')
+            ->whereDate('effective_to', '<', $today)
+            ->orderBy('id')
+            ->each(function (Routing $routing) use (&$expired) {
+                \Illuminate\Support\Facades\DB::transaction(fn() => $this->retireExpired($routing));
+                $expired++;
+            });
+
+        Routing::withoutGlobalScopes()
+            ->where('status', Routing::STATUS_SCHEDULED)
+            ->whereDate('effective_from', '<=', $today)
+            ->orderBy('id')
+            ->each(function (Routing $routing) use (&$activated) {
+                $this->activateScheduled($routing);
+                $activated++;
+            });
+
+        return ['activated' => $activated, 'expired' => $expired];
+    }
+
+    /**
+     * RT-IMPL-04 (RT-03 rule 5): a scheduled routing whose start date has arrived becomes active.
+     */
+    public function activateScheduled(Routing $routing, ?int $userId = null): void
+    {
+        $routing->update(['status' => Routing::STATUS_ACTIVE]);
+
+        RoutingApproval::create([
+            'tenant_id'  => $routing->tenant_id,
+            'routing_id' => $routing->id,
+            'user_id'    => $userId,
+            'action'     => RoutingApproval::ACTION_ACTIVATED,
+            'comments'   => 'Activated (scheduled start date ' . optional($routing->effective_from)->toDateString() . ' reached).',
+        ]);
+    }
+
+    /**
+     * RT-IMPL-04 (RT-03 rule 5): an active / scheduled routing whose end date has passed becomes historical,
+     * with the same BOM handling as Retire (RT-05).
+     */
+    public function retireExpired(Routing $routing, ?int $userId = null): void
+    {
+        $end = optional($routing->effective_to)->toDateString();
+        $routing->update(['status' => Routing::STATUS_HISTORICAL]);
+
+        RoutingApproval::create([
+            'tenant_id'  => $routing->tenant_id,
+            'routing_id' => $routing->id,
+            'user_id'    => $userId,
+            'action'     => RoutingApproval::ACTION_RETIRED,
+            'comments'   => "Retired (end date {$end} passed).",
+        ]);
+
+        $this->handleBomsOnRoutingEnded($routing, 'expired', $userId, "end date {$end} passed");
     }
 
     /**
@@ -290,11 +340,8 @@ class RoutingLifecycleService
             ->get();
 
         foreach ($pendingBoms as $bom) {
-            $bom->update([
-                'status'         => ProductionBom::STATUS_DRAFT,
-                'has_warning'    => true,
-                'warning_reason' => "Automatically returned to draft because linked routing ({$routing->routing_number}) was rejected.{$reasonText}",
-            ]);
+            // RT-IMPL-05: routing reasons go to the audit entry, not the BOM warning field (component warnings only)
+            $bom->update(['status' => ProductionBom::STATUS_DRAFT]);
 
             ProductionBomApproval::create([
                 'tenant_id' => $bom->tenant_id,

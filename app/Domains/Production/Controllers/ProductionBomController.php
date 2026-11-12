@@ -269,6 +269,22 @@ class ProductionBomController extends Controller
             })
             ->get();
 
+        // RT-IMPL-09: operations removed from the routing that still carry this BOM's materials are shown as a
+        // "Deleted" card (never dropped silently) — the BOM can't be saved until their materials are moved / removed
+        $removedOpIds = \App\Domains\Production\Models\RoutingOperationMaterial::where('bom_id', $bom->id)->pluck('routing_operation_id')->unique();
+        $removedOps = \App\Domains\Production\Models\RoutingOperation::onlyTrashed()->whereIn('id', $removedOpIds)->with(['workCenter', 'section'])->get();
+        foreach ($removedOps->groupBy('routing_id') as $routingId => $ops) {
+            $routingModel = $routings->firstWhere('id', $routingId);
+            if (!$routingModel) {
+                continue;
+            }
+            $ops->each(function ($op) {
+                $op->setAttribute('is_deleted', true);
+                $op->setAttribute('sequence', 99000 + $op->id); // shown after the live operations
+            });
+            $routingModel->setRelation('operations', $routingModel->operations->concat($ops)->values());
+        }
+
         return view('modules.production.bom.edit', compact('bom', 'products', 'materials', 'uoms', 'routings'));
     }
 

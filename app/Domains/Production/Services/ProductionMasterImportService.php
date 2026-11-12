@@ -403,9 +403,12 @@ class ProductionMasterImportService
                     $replacesOpNum = trim($opData['replaces_operation_number'] ?? '');
                     $priority = !empty($opData['priority']) ? (int) $opData['priority'] : 1;
                     $setupTime = trim($opData['setup_time_minutes'] ?? '0');
+                    $setupPerPiece = trim((string) ($opData['setup_time_per_piece_minutes'] ?? '')); // RT-IMPL-13
                     $procTime = trim($opData['processing_time_minutes'] ?? '0');
                     $yield = trim($opData['yield_percentage'] ?? '100');
                     $isExt = strtolower(trim($opData['is_external'] ?? 'no'));
+                    $vendorCode = trim((string) ($opData['vendor_code'] ?? ''));               // RT-IMPL-16: external operations
+                    $subcontractCost = trim((string) ($opData['subcontract_cost_per_unit'] ?? ''));
 
                     $matCode = trim($opData['material_code'] ?? '');
                     $matQty = trim($opData['material_quantity'] ?? '');
@@ -428,9 +431,12 @@ class ProductionMasterImportService
                             'replaces_operation_number' => $replacesOpNum,
                             'priority' => $priority,
                             'setup_time_minutes' => $setupTime,
+                            'setup_time_per_piece_minutes' => $setupPerPiece === '' ? null : $setupPerPiece,
                             'processing_time_minutes' => $procTime,
                             'expected_yield_percentage' => $yield,
                             'is_external' => in_array($isExt, ['yes', '1', 'true', 'external']),
+                            'vendor_code' => $vendorCode,
+                            'subcontract_cost_per_unit' => $subcontractCost === '' ? 0 : $subcontractCost,
                             'materials' => []
                         ];
                     }
@@ -496,7 +502,9 @@ class ProductionMasterImportService
                             $wcId = $workCenters[$op['work_center_code']];
                         }
 
-                        if (!empty($op['section_code'])) {
+                        if (empty($op['section_code'])) {
+                            $opErrors[] = "Section Code is required for internal operation '{$opNumber}'."; // RT-IMPL-16 (RT-06)
+                        } else {
                             $sec = $sections->firstWhere('code', $op['section_code']);
                             if (!$sec) {
                                 $opErrors[] = "Section '{$op['section_code']}' does not exist.";
@@ -511,7 +519,9 @@ class ProductionMasterImportService
                         $hasMachine = !empty($op['machine_code']);
                         $hasBatch = !empty($op['manual_batch_name']);
 
-                        if ($hasMachine && $hasBatch) {
+                        if (!$hasMachine && !$hasBatch) {
+                            $opErrors[] = "Operation '{$opNumber}' must specify a Machine or a Manual Batch."; // RT-IMPL-16 (RT-07)
+                        } elseif ($hasMachine && $hasBatch) {
                             $opErrors[] = "Operation '{$opNumber}' cannot specify both a Machine and a Manual Batch.";
                         } elseif ($hasMachine) {
                             $mach = $machines->firstWhere('code', $op['machine_code']);
@@ -529,6 +539,18 @@ class ProductionMasterImportService
                                 $opErrors[] = "Manual Batch '{$op['manual_batch_name']}' does not exist in Section '{$op['section_code']}'.";
                             } else {
                                 $batchId = $batch->id;
+                            }
+                        }
+                    }
+
+                    $vendorId = null;
+                    if ($isExternal) {
+                        if ($op['vendor_code'] === '') {
+                            $opErrors[] = "Vendor Code is required for outsourced operation '{$opNumber}'.";
+                        } else {
+                            $vendorId = \App\Domains\Inventory\Models\Vendor::where('tenant_id', $tenantId)->where('code', $op['vendor_code'])->value('id');
+                            if (!$vendorId) {
+                                $opErrors[] = "Vendor '{$op['vendor_code']}' does not exist.";
                             }
                         }
                     }
@@ -562,12 +584,31 @@ class ProductionMasterImportService
                         $op['section_id'] = $secId;
                         $op['machine_id'] = $mchId;
                         $op['section_manual_production_id'] = $batchId;
+                        $op['vendor_id'] = $vendorId;
                         $operations[] = $op;
                     }
                 }
 
                 if (empty($operations)) {
                     $rowErrors[] = "Routing must contain at least one valid operation.";
+                }
+
+                // RT-IMPL-16 (RT-27 rule 8): an existing routing is updated by import only while it is a draft
+                $existingRouting = Routing::where('tenant_id', $tenantId)->where('routing_number', $routingCode)->first();
+                if ($existingRouting && !$existingRouting->isDraft()) {
+                    $rowErrors[] = "Routing '{$routingCode}' is {$existingRouting->status}. Only draft routings can be updated by import.";
+                }
+
+                // RT-IMPL-16 (RT-27 rule 6–7): figures worked out by the backend from the latest section snapshot
+                // (same calculator as the form), then the SAME operation checks as the web form / API
+                if (empty($rowErrors) && !empty($operations)) {
+                    $payloadOps = $this->routingImportPayload($operations, $rowErrors);
+                    if (empty($rowErrors)) {
+                        $rowErrors = app(RoutingImportValidator::class)->validate($payloadOps);
+                    }
+                    if (empty($rowErrors)) {
+                        $operations = $payloadOps;
+                    }
                 }
 
                 $previewRows[] = [
@@ -772,120 +813,39 @@ class ProductionMasterImportService
                     }
                 }
             } elseif ($type === 'routings') {
+                // RT-IMPL-16: create / update through RoutingService — same save as the form (figures saved as checked,
+                // operations updated IN PLACE by operation number, removed ones soft-deleted, BOM allocations never deleted)
+                $routingService = app(RoutingService::class);
                 foreach ($validRows as $row) {
                     $data = $row['data'];
                     $routing = Routing::where('tenant_id', $tenantId)->where('routing_number', $data['routing_number'])->first();
+                    $payload = [
+                        'routing_number' => $data['routing_number'],
+                        'name'           => $data['name'],
+                        'version'        => $data['version'],
+                        'operations'     => $data['operations'],
+                    ];
 
                     if ($routing) {
-                        if ($strategy === 'update') {
-                            $routing->update([
-                                'name' => $data['name'],
-                                'version' => $data['version']
-                            ]);
-
-                            $opIds = $routing->operations()->withTrashed()->pluck('id');
-                            RoutingOperationMaterial::whereIn('routing_operation_id', $opIds)->delete();
-                            $routing->operations()->withTrashed()->forceDelete();
-
-                            foreach ($data['operations'] as $op) {
-                                $newOp = RoutingOperation::create([
-                                    'tenant_id' => $tenantId,
-                                    'routing_id' => $routing->id,
-                                    'sequence' => $op['sequence'],
-                                    'operation_number' => $op['operation_number'],
-                                    'name' => $op['name'],
-                                    'operation_type' => $op['operation_type'],
-                                    'work_center_id' => $op['work_center_id'],
-                                    'machine_id' => $op['machine_id'],
-                                    'setup_time_minutes' => $op['setup_time_minutes'],
-                                    'processing_time_minutes' => $op['processing_time_minutes'],
-                                    'expected_yield_percentage' => $op['expected_yield_percentage'],
-                                    'is_external' => $op['is_external']
-                                ]);
-
-                                // [INVERSION-DECOUPLE-TRACK-11] Routing import no longer populates RoutingOperationMaterial; populated from BOM side
-                                /*
-                                foreach ($op['materials'] as $index => $mat) {
-                                    RoutingOperationMaterial::create([
-                                        'tenant_id' => $tenantId,
-                                        'routing_operation_id' => $newOp->id,
-                                        'material_id' => $mat['material_id'],
-                                        'quantity' => $mat['quantity'],
-                                        'uom_id' => $mat['uom_id'],
-                                        'sequence' => ($index + 1) * 10
-                                    ]);
-                                }
-                                */
-                            }
+                        if ($strategy === 'update' && $routing->isDraft()) {
+                            $start = $routing->effective_from && $routing->effective_from->toDateString() >= now()->toDateString()
+                                ? $routing->effective_from->toDateString() : now()->toDateString();
+                            $routingService->update($routing->id, \App\Domains\Production\DTO\RoutingDTO::fromArray(array_merge($payload, [
+                                'effective_from' => $start,
+                                'effective_to'   => $routing->effective_to?->toDateString(),
+                                'description'    => $routing->description,
+                                'is_default'     => $routing->is_default,
+                            ])));
                             $successCount++;
                         } else {
                             $failedCount++;
                         }
                     } else {
-                        $routing = Routing::create([
-                            'tenant_id' => $tenantId,
-                            'routing_number' => $data['routing_number'],
-                            'name' => $data['name'],
-                            'version' => $data['version'],
-                            'status' => 'draft',
-                            'created_by' => $userId
-                        ]);
-
-                        RoutingOperation::withTrashed()->where('routing_id', $routing->id)->forceDelete();
-
-                        $createdOpsMap = [];
-                        foreach ($data['operations'] as $op) {
-                            $newOp = RoutingOperation::create([
-                                'tenant_id' => $tenantId,
-                                'routing_id' => $routing->id,
-                                'sequence' => $op['sequence'],
-                                'operation_number' => $op['operation_number'],
-                                'name' => $op['name'],
-                                'operation_type' => $op['operation_type'],
-                                'work_center_id' => $op['work_center_id'],
-                                'section_id' => $op['section_id'] ?? null,
-                                'machine_id' => $op['machine_id'] ?? null,
-                                'section_manual_production_id' => $op['section_manual_production_id'] ?? null,
-                                'is_alternative' => $op['is_alternative'] ?? false,
-                                'priority' => !empty($op['is_alternative']) ? ($op['priority'] ?? 1) : null,
-                                'setup_time_minutes' => $op['setup_time_minutes'],
-                                'processing_time_minutes' => $op['processing_time_minutes'],
-                                'expected_yield_percentage' => $op['expected_yield_percentage'],
-                                'is_external' => $op['is_external']
-                            ]);
-                            $createdOpsMap[$op['operation_number']] = $newOp;
-                        }
-
-                        // Pass 2: Link alternative replaces_operation_id
-                        foreach ($data['operations'] as $op) {
-                            if (!empty($op['is_alternative']) && !empty($op['replaces_operation_number'])) {
-                                if (isset($createdOpsMap[$op['replaces_operation_number']]) && isset($createdOpsMap[$op['operation_number']])) {
-                                    $createdOpsMap[$op['operation_number']]->update([
-                                        'replaces_operation_id' => $createdOpsMap[$op['replaces_operation_number']]->id
-                                    ]);
-                                }
-                            }
-                        }
-
-                            // [INVERSION-DECOUPLE-TRACK-11] Routing import no longer populates RoutingOperationMaterial; populated from BOM side
-                            /*
-                            foreach ($op['materials'] as $index => $mat) {
-                                RoutingOperationMaterial::create([
-                                    'tenant_id' => $tenantId,
-                                    'routing_operation_id' => $newOp->id,
-                                    'material_id' => $mat['material_id'],
-                                    'quantity' => $mat['quantity'],
-                                    'uom_id' => $mat['uom_id'],
-                                    'sequence' => ($index + 1) * 10
-                                ]);
-                            }
-                            */
-                        }
+                        $routingService->create(\App\Domains\Production\DTO\RoutingDTO::fromArray($payload), $tenantId, $userId);
                         $successCount++;
                     }
                 }
             }
-
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -896,6 +856,77 @@ class ProductionMasterImportService
             'success_count' => $successCount,
             'failed_count' => $failedCount,
         ];
+    }
+
+    /**
+     * RT-IMPL-16: import rows → the create payload the form / API send, with every figure worked out from the latest
+     * section snapshot by the one calculator (RT-IMPL-14). Setup times and yield come from the file; run time comes
+     * from the machine / batch capacity (the file's processing time is not used). Alternatives link by sequence.
+     *
+     * @param  array<int, array>  $operations  parsed import operations
+     * @param  array<int, string> $errors      filled with "section not calculated" / "resource not in snapshot" errors
+     */
+    private function routingImportPayload(array $operations, array &$errors): array
+    {
+        $calculator = app(RoutingOperationCostCalculator::class);
+        $sectionService = app(SectionCalculationService::class);
+        $seqByNumber = collect($operations)->pluck('sequence', 'operation_number');
+        $snapshots = [];
+        $payload = [];
+
+        foreach ($operations as $op) {
+            $row = [
+                'sequence'                     => (int) $op['sequence'],
+                'operation_number'             => $op['operation_number'],
+                'name'                         => $op['name'],
+                'operation_type'               => $op['operation_type'],
+                'work_center_id'               => $op['work_center_id'],
+                'section_id'                   => $op['section_id'],
+                'machine_id'                   => $op['machine_id'],
+                'section_manual_production_id' => $op['section_manual_production_id'],
+                'is_alternative'               => (bool) $op['is_alternative'],
+                'replaces_sequence'            => $op['is_alternative'] ? ($seqByNumber[$op['replaces_operation_number']] ?? null) : null,
+                'priority'                     => (int) ($op['priority'] ?? 1),
+                'setup_time_minutes'           => (float) $op['setup_time_minutes'],
+                'setup_time_per_piece_minutes' => $op['setup_time_per_piece_minutes'] !== null ? (float) $op['setup_time_per_piece_minutes'] : null,
+                'expected_yield_percentage'    => (float) $op['expected_yield_percentage'],
+                'is_external'                  => (bool) $op['is_external'],
+                'vendor_id'                    => $op['vendor_id'] ?? null,
+                'subcontract_cost_per_unit'    => (float) ($op['subcontract_cost_per_unit'] ?? 0),
+            ];
+
+            $resources = null;
+            if (!$row['is_external'] && $row['section_id']) {
+                if (!array_key_exists($row['section_id'], $snapshots)) {
+                    $section = WorkCenterSection::find($row['section_id']);
+                    $snapshots[$row['section_id']] = $section ? $sectionService->getSnapshotResourceCosts($section) : null;
+                }
+                $resources = $snapshots[$row['section_id']];
+                if (!$resources || !empty($resources['not_calculated'])) {
+                    $code = WorkCenterSection::find($row['section_id'])?->code ?? $row['section_id'];
+                    $errors[] = "Section {$code} has not been calculated yet. Recalculate the Work Center first.";
+                    continue;
+                }
+            }
+
+            $calc = $calculator->calculate($row, $resources);
+            if ($calc['error'] !== null) {
+                $errors[] = "Operation {$row['operation_number']}: the machine / batch is not in the latest section calculation (inactive or added after the last recalculation).";
+                continue;
+            }
+            foreach ($calc['figures'] as $k => $v) {
+                $row[$k] = round((float) $v, 4);
+            }
+            if ($resources) {
+                $row['section_calculation_id'] = $resources['section_calculation_id'] ?? null;
+                $row['section_snapshot_number'] = $resources['snapshot_number'] ?? null;
+            }
+            $payload[] = $row;
+        }
+
+        $errors = array_values(array_unique($errors));
+
+        return $payload;
     }
 
     /**

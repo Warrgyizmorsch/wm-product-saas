@@ -60,6 +60,13 @@ class RoutingPolicy
             && $user->hasProductionPermission('production.routing.cancel', $routing->tenant_id);
     }
 
+    /** RT-IMPL-02: retire (active / scheduled → historical) needs the approve permission. */
+    public function retire(User $user, Routing $routing): bool
+    {
+        return $routing->canBeRetired()
+            && $user->hasProductionPermission('production.routing.approve', $routing->tenant_id);
+    }
+
     public function duplicate(User $user, Routing $routing): bool
     {
         return $user->hasProductionPermission('production.routing.create', $routing->tenant_id);

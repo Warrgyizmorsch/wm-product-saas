@@ -178,7 +178,8 @@ class RoutingService
     }
 
     /**
-     * Approve a pending routing. Makes it active and archives old active version.
+     * Approve a pending routing. Makes it active (or scheduled). Older versions are NOT retired automatically —
+     * they are retired manually with the Retire action (RT-02).
      */
     public function approve(int $id, int $approverUserId): Routing
     {
@@ -214,8 +215,7 @@ class RoutingService
         */
 
         return DB::transaction(function () use ($routing, $approverUserId) {
-            // Centralized routing approval lifecycle transition: archives previous active versions
-            // and sets their effective_to date to the new version's effective_from date
+            // Centralized routing approval lifecycle transition — no auto-retire of older versions (RT-02)
             $this->routingLifecycleService->transitionOnApproval($routing, $approverUserId);
 
             event(new \App\Domains\Production\Events\RoutingApproved($routing->fresh()));
@@ -280,9 +280,52 @@ class RoutingService
     }
 
     /**
-     * Duplicate a routing as a new draft version.
+     * RT-IMPL-02 (RT-02 rule 3): retire an active / scheduled routing → historical. effective_to = today, audit entry,
+     * then the linked BOMs are handled (approved BOMs → inactive, drafts get a warning).
      */
-    public function duplicateVersion(int $id, string $newVersion, ?int $creatorUserId = null): Routing
+    public function retire(int $id, int $userId, ?string $comments = null): Routing
+    {
+        $routing = $this->routingRepository->find($id);
+
+        if (!$routing) {
+            throw new InvalidArgumentException('Routing not found.');
+        }
+
+        if (!$routing->canBeRetired()) {
+            throw new InvalidArgumentException('Only active or scheduled routings can be retired.');
+        }
+
+        return DB::transaction(function () use ($routing, $userId, $comments) {
+            $today = Carbon::today()->toDateString();
+
+            $routing->update([
+                'status'       => Routing::STATUS_HISTORICAL,
+                'effective_to' => $today,
+            ]);
+
+            RoutingApproval::create([
+                'tenant_id'  => $routing->tenant_id,
+                'routing_id' => $routing->id,
+                'user_id'    => $userId,
+                'action'     => RoutingApproval::ACTION_RETIRED,
+                'comments'   => $comments ?: "Routing retired on {$today}.",
+            ]);
+
+            // RT-IMPL-06: approved BOMs → inactive, pending BOMs → draft, drafts → live advisory
+            $this->routingLifecycleService->handleBomsOnRoutingEnded($routing, 'retired', $userId, $comments);
+
+            return $routing->fresh();
+        });
+    }
+
+    /**
+     * RT-IMPL-20: Duplicate Version saves nothing. Returns the copy of a routing as a create payload (same shape the
+     * create form / store endpoint take): header with the new version, every operation, alternatives and
+     * predecessors linked by sequence, and the cost figures worked out from the latest section snapshots
+     * (RT-IMPL-14). Problems (section not calculated, resource no longer in the snapshot) come back as warnings;
+     * the save then refuses until they are fixed.
+     */
+    public function buildCopyPayload(int $id, string $newVersion): array
     {
         $original = $this->routingRepository->getRoutingWithOperations($id);
 
@@ -290,95 +333,122 @@ class RoutingService
             throw new InvalidArgumentException('Source routing not found.');
         }
 
-        $tenantId = $original->tenant_id;
-        $this->checkRoutingConflicts($original->name, $newVersion, $tenantId);
-        $this->routingLifecycleService->validateEffectiveDates(
-            Carbon::now()->toDateString(),
-            null,
-            0,
-            null,
-            $tenantId
-        );
+        $this->checkRoutingConflicts($original->name, $newVersion, $original->tenant_id);
 
-        return DB::transaction(function () use ($original, $newVersion, $creatorUserId, $tenantId) {
-            // [INVERSION-DECOUPLE-TRACK-03] Decoupled: Routing no longer tracks BOM or material_quantity_mode
-            /*
-            $bomId = $original->bom_id;
-            $currentBom = $original->bom_id ? \App\Domains\Production\Models\ProductionBom::where('tenant_id', $tenantId)->find($original->bom_id) : null;
-            if (!$currentBom || in_array($currentBom->status, ['cancelled', 'inactive'])) {
-                // If old routing had a cancelled/inactive BOM, automatically select an active/approved BOM
-                $activeBom = \App\Domains\Production\Models\ProductionBom::where('tenant_id', $tenantId)
-                    ->where('product_id', $original->product_id)
-                    ->whereIn('status', ['approved', 'active'])
-                    ->orderByDesc('id')
-                    ->first();
-                if ($activeBom) {
-                    $bomId = $activeBom->id;
-                } else {
-                    $draftBom = \App\Domains\Production\Models\ProductionBom::where('tenant_id', $tenantId)
-                        ->where('product_id', $original->product_id)
-                        ->where('status', 'draft')
-                        ->orderByDesc('id')
-                        ->first();
-                    $bomId = $draftBom ? $draftBom->id : null;
+        $calculator = app(RoutingOperationCostCalculator::class);
+        $sectionService = app(SectionCalculationService::class);
+        $ops = $original->operations->sortBy('sequence')->values();
+        $seqById = $ops->pluck('sequence', 'id');
+        $snapshots = [];
+        $warnings = [];
+        $rows = [];
+
+        foreach ($ops as $op) {
+            $row = [
+                'sequence'                       => $op->sequence,
+                'operation_number'               => $op->operation_number,
+                'name'                           => $op->name,
+                'operation_type'                 => $op->operation_type,
+                'description'                    => $op->description,
+                'instructions'                   => $op->instructions,
+                'is_alternative'                 => (bool) $op->is_alternative,
+                'replaces_sequence'              => $op->is_alternative ? ($seqById[$op->replaces_operation_id] ?? null) : null,
+                'priority'                       => (int) ($op->priority ?? 1),
+                'work_center_id'                 => $op->work_center_id,
+                'section_id'                     => $op->section_id,
+                'machine_id'                     => $op->machine_id,
+                'section_manual_production_id'   => $op->section_manual_production_id,
+                'setup_time_minutes'             => (float) $op->setup_time_minutes,
+                'setup_time_per_piece_minutes'   => $op->setup_time_per_piece_minutes !== null ? (float) $op->setup_time_per_piece_minutes : null,
+                'processing_time_minutes'        => (float) $op->processing_time_minutes,
+                'wait_time_minutes'              => (float) ($op->wait_time_minutes ?? 0),
+                'expected_yield_percentage'      => (float) $op->expected_yield_percentage,
+                'quality_required'               => (bool) $op->quality_required,
+                'is_external'                    => (bool) $op->is_external,
+                'vendor_id'                      => $op->vendor_id,
+                'material_supply_type'           => $op->material_supply_type,
+                'subcontract_input_type'         => $op->subcontract_input_type,
+                'subcontract_lead_time_days'     => $op->subcontract_lead_time_days,
+                'subcontract_cost_per_unit'      => $op->subcontract_cost_per_unit !== null ? (float) $op->subcontract_cost_per_unit : null,
+                'subcontract_service_product_id' => $op->subcontract_service_product_id,
+                'dispatch_buffer_days'           => $op->dispatch_buffer_days,
+                'return_buffer_days'             => $op->return_buffer_days,
+                'queue_threshold_enabled'        => (bool) ($op->queue_threshold_enabled ?? $op->overlap_enabled),
+                'transfer_batch_quantity'        => $op->transfer_batch_quantity,
+                'transfer_lag_minutes'           => $op->transfer_lag_minutes,
+                'is_parallel'                    => (bool) $op->is_parallel,
+                'parallel_group'                 => $op->parallel_group,
+                'predecessor_sequence'           => $op->previous_operation_id ? ($seqById[$op->previous_operation_id] ?? null) : null,
+            ];
+
+            $resources = null;
+            if (!$op->is_external && $op->section_id) {
+                if (!array_key_exists($op->section_id, $snapshots)) {
+                    $section = WorkCenterSection::find($op->section_id);
+                    $snapshots[$op->section_id] = $section ? $sectionService->getSnapshotResourceCosts($section) : null;
                 }
-            }
-            */
-
-            $newRouting = $this->routingRepository->create([
-                'tenant_id'      => $tenantId,
-                'routing_number' => $this->numberService->generateNextNumber($tenantId),
-                'name'           => $original->name,
-                // [DECOUPLE-PRODUCT-INDEPENDENT] 'product_id' => $original->product_id,
-                // [INVERSION-DECOUPLE-TRACK-03]
-                // 'bom_id'                 => $bomId,
-                // 'material_quantity_mode' => $original->material_quantity_mode ?? 'per_unit',
-                'version'        => $newVersion,
-                'revision'       => $original->revision + 1,
-                'is_default'     => $original->is_default,
-                'effective_from' => Carbon::now()->toDateString(),
-                'effective_to'   => null,
-                'status'         => Routing::STATUS_DRAFT,
-                'description'    => "Duplicated from version {$original->version}. " . $original->description,
-                'created_by'     => $creatorUserId,
-            ]);
-
-            // Copy all operations and their materials
-            foreach ($original->operations as $op) {
-                $newOp = RoutingOperation::create(array_merge($op->toArray(), [
-                    'id'         => null,
-                    'tenant_id'  => $tenantId,
-                    'routing_id' => $newRouting->id,
-                    'created_at' => null,
-                    'updated_at' => null,
-                    'deleted_at' => null,
-                ]));
-
-                foreach ($op->materials as $mat) {
-                    RoutingOperationMaterial::create([
-                        'tenant_id'            => $tenantId,
-                        'routing_operation_id' => $newOp->id,
-                        'material_id'          => $mat->material_id,
-                        'quantity'             => $mat->quantity,
-                        'uom_id'               => $mat->uom_id,
-                        'consumption_type'     => $mat->consumption_type,
-                        'sequence'             => $mat->sequence,
-                    ]);
+                $resources = $snapshots[$op->section_id];
+                if (!$resources || !empty($resources['not_calculated'])) {
+                    $warnings[] = "Operation {$op->name}: " . ($resources['message'] ?? 'section not found.');
+                    $rows[] = $row;
+                    continue;
                 }
             }
 
-            RoutingApproval::create([
-                'tenant_id'  => $tenantId,
-                'routing_id' => $newRouting->id,
-                'user_id'    => $creatorUserId,
-                'action'     => RoutingApproval::ACTION_REVISION_CREATED,
-                'comments'   => "Version {$newVersion} duplicated from version {$original->version}.",
-            ]);
+            $calc = $calculator->calculate($row, $resources);
+            if ($calc['error'] !== null) {
+                $warnings[] = "Operation {$op->name}: the selected machine / batch is not in the latest section calculation — choose another resource.";
+            } else {
+                foreach ($calc['figures'] as $k => $v) {
+                    $row[$k] = round((float) $v, 4);
+                }
+                if ($resources) {
+                    $row['section_calculation_id'] = $resources['section_calculation_id'] ?? null;
+                    $row['section_snapshot_number'] = $resources['snapshot_number'] ?? null;
+                }
+            }
+            $rows[] = $row;
+        }
 
-            event(new \App\Domains\Production\Events\RoutingRevisionCreated($newRouting));
+        return [
+            'source_routing_id' => $original->id,
+            'source_version'    => $original->version,
+            'routing_number'    => 'AUTO',
+            'name'              => $original->name,
+            'version'           => $newVersion,
+            'effective_from'    => Carbon::today()->toDateString(),
+            'effective_to'      => null,
+            'is_default'        => (bool) $original->is_default,
+            'description'       => $original->description,
+            'operations'        => $rows,
+            'warnings'          => $warnings,
+        ];
+    }
 
-            return $newRouting;
-        });
+    /**
+     * RT-IMPL-20: a routing saved from a Duplicate Version copy records where it came from — revision = source + 1,
+     * "Revision Created" audit entry, revision event. Called after the normal create.
+     */
+    public function recordRevisionSource(Routing $routing, int $sourceRoutingId, ?int $userId = null): Routing
+    {
+        $source = Routing::where('tenant_id', $routing->tenant_id)->find($sourceRoutingId);
+        if (!$source) {
+            return $routing;
+        }
+
+        $routing->update(['revision' => (int) $source->revision + 1]);
+
+        RoutingApproval::create([
+            'tenant_id'  => $routing->tenant_id,
+            'routing_id' => $routing->id,
+            'user_id'    => $userId,
+            'action'     => RoutingApproval::ACTION_REVISION_CREATED,
+            'comments'   => "Version {$routing->version} created from {$source->routing_number} version {$source->version}.",
+        ]);
+
+        event(new \App\Domains\Production\Events\RoutingRevisionCreated($routing->fresh()));
+
+        return $routing->fresh();
     }
 
     /**
@@ -389,8 +459,7 @@ class RoutingService
         $query = Routing::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('name', $name)
-            ->where('version', $version)
-            ->whereNotIn('status', [Routing::STATUS_CANCELLED]);
+            ->where('version', $version); // RT-IMPL-03: cancelled routings keep their name + version (DB unique key) — clear message instead of a database error
 
         if ($ignoreId !== null) {
             $query->where('id', '!=', $ignoreId);
@@ -404,15 +473,64 @@ class RoutingService
     }
 
     /**
-     * Sync routing operations — delete all then recreate (dynamic grid pattern).
+     * RT-IMPL-09 (RT-10 rules 4–7): save operations IN PLACE — submitted rows are matched to the routing's existing
+     * operations (by operation id from the form; by operation number when the payload carries no ids — API / import),
+     * matched rows are updated (ids stay stable, so BOM allocations keep pointing at them), new rows are created and
+     * only the operations the user removed are SOFT-deleted (their BOM allocations are kept; the BOM shows them).
+     * Sequences of existing rows are moved out of the way first (sequence = −id) so the unique [routing_id, sequence]
+     * key never clashes — soft-deleted rows keep their negative sequence.
      *
-     * @param RoutingOperation[] $operationDTOs
+     * @return array<int, string> warnings for removed operations that BOMs still use
      */
-    private function syncOperations(Routing $routing, array $operationDTOs, int $tenantId): void
+    private function syncOperations(Routing $routing, array $operationDTOs, int $tenantId): array
     {
-        // Hard delete (forceDelete) operations since sequence unique constraint
-        // would conflict with soft-deleted rows if sequences are reused
-        $routing->operations()->forceDelete();
+        $existing = $routing->operations()->get()->keyBy('id');
+        $matchById = collect($operationDTOs)->contains(fn($d) => !empty($d->operation_id));
+        $byNumber = $existing->keyBy('operation_number');
+
+        $matched = [];
+        $used = [];
+        foreach ($operationDTOs as $index => $opDto) {
+            $model = null;
+            if ($matchById) {
+                if ($opDto->operation_id && isset($existing[$opDto->operation_id])) {
+                    $model = $existing[$opDto->operation_id];
+                }
+            } elseif ($opDto->operation_number && isset($byNumber[$opDto->operation_number])) {
+                $model = $byNumber[$opDto->operation_number];
+            }
+            if ($model && !isset($used[$model->id])) {
+                $matched[$index] = $model;
+                $used[$model->id] = true;
+            }
+        }
+
+        // Free every sequence of this routing (kept, removed and older soft-deleted rows) before writing new ones
+        RoutingOperation::withTrashed()->where('routing_id', $routing->id)->where('sequence', '>', 0)
+            ->update(['sequence' => DB::raw('0 - id')]);
+
+        // Removed operations: warn about BOM allocations, soft-delete, audit
+        $warnings = [];
+        foreach ($existing as $op) {
+            if (isset($used[$op->id])) {
+                continue;
+            }
+            $allocations = RoutingOperationMaterial::where('routing_operation_id', $op->id)->get();
+            if ($allocations->isNotEmpty()) {
+                $bomNumbers = ProductionBom::withoutGlobalScopes()->whereIn('id', $allocations->pluck('bom_id')->filter()->unique())
+                    ->pluck('bom_number')->implode(', ');
+                $warnings[] = "Operation {$op->operation_number} ({$op->name}) is used by BOM {$bomNumbers} ({$allocations->count()} material(s)). "
+                    . 'It was removed from this routing; those BOMs must move or remove its materials.';
+            }
+            $op->delete();
+            RoutingApproval::create([
+                'tenant_id'  => $routing->tenant_id,
+                'routing_id' => $routing->id,
+                'user_id'    => auth()->id(),
+                'action'     => 'Operation Removed',
+                'comments'   => "Operation {$op->operation_number} ({$op->name}) removed.",
+            ]);
+        }
 
         $createdOps = [];
         $opsBySeq = [];
@@ -426,69 +544,42 @@ class RoutingService
                 'sequence'         => $seq,
                 'operation_number' => $opDto->operation_number ?: 'OP-' . str_pad((string) $seq, 3, '0', STR_PAD_LEFT),
             ]);
-            unset($data['previous_operation_id']);
-            // Unset replaces_operation_id for Pass 1 to prevent FK violations
-            unset($data['replaces_operation_id']);
+            unset($data['previous_operation_id'], $data['replaces_operation_id'], $data['materials']);
 
-            // Calculate cost_per_unit if not explicitly provided
-            if (!isset($data['cost_per_unit']) || $data['cost_per_unit'] === null || (float) $data['cost_per_unit'] <= 0.0) {
-                $activeMinutes = (float) $opDto->setup_time_minutes + (float) $opDto->processing_time_minutes;
-                $yieldFactor = $opDto->expected_yield_percentage > 0 ? (100 / $opDto->expected_yield_percentage) : 1.0;
-                if ($opDto->is_external) {
-                    $data['cost_per_unit'] = round(((float) $opDto->subcontract_cost_per_unit) * $yieldFactor, 4);
-                } else {
-                    $laborRate = (float) $opDto->labor_cost_rate;
-                    $machineRate = (float) $opDto->machine_cost_rate;
-                    if ($opDto->section_manual_production_id && $opDto->section_id && $laborRate <= 0.0) {
-                        $section = \App\Domains\Production\Models\WorkCenterSection::find($opDto->section_id);
-                        if ($section) {
-                            $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($section);
-                            foreach ($sectionCosts['manual_batches'] as $mb) {
-                                if ((int) $mb['id'] === (int) $opDto->section_manual_production_id) {
-                                    $laborRate = ($mb['labor_cost_per_hour'] ?? 0.0) / 60.0;
-                                    break;
-                                }
-                            }
-                        }
-                    } elseif ($opDto->machine_id) {
-                        if ($machineRate <= 0.0) {
-                            $machine = \App\Domains\Production\Models\Machine::find($opDto->machine_id);
-                            if ($machine) {
-                                $machineRate = ((float) $machine->operating_cost_per_hour) / 60.0;
-                            }
-                        }
-                        if ($opDto->section_id && $laborRate <= 0.0) {
-                            $section = \App\Domains\Production\Models\WorkCenterSection::find($opDto->section_id);
-                            if ($section) {
-                                $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($section);
-                                $laborRate = ($sectionCosts['operator_labor_cost_per_machine_per_hour'] ?? 0.0) / 60.0;
-                            }
-                        }
-                    } elseif ($opDto->work_center_id && $laborRate <= 0.0) {
-                        $wc = \App\Domains\Production\Models\WorkCenter::find($opDto->work_center_id);
-                        if ($wc) {
-                            $laborRate = ((float) $wc->cost_per_hour) / 60.0;
-                        }
-                    }
-                    $data['cost_per_unit'] = round(($activeMinutes * ($laborRate + $machineRate)) * $yieldFactor, 4);
+            // RT-IMPL-14 (RT-19 rule 2): figures are calculated ONCE (form / API), checked by the request
+            // (ValidatesRoutingOperations), then saved exactly as sent — no recalculation here.
+            $data['costs_calculated_at'] = now();
+            if (!$opDto->is_external && $opDto->section_id && empty($data['section_calculation_id'])) {
+                // API callers may omit the reference: record the snapshot whose figures the check used
+                $section = \App\Domains\Production\Models\WorkCenterSection::find($opDto->section_id);
+                if ($section) {
+                    $meta = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSnapshotResourceCosts($section);
+                    $data['section_calculation_id']     = $meta['section_calculation_id'] ?? null;
+                    $data['section_snapshot_number']    = $meta['snapshot_number'] ?? null;
+                    $data['work_center_calculation_id'] = $meta['work_center_calculation_id'] ?? null;
                 }
             }
 
-            $createdOp = RoutingOperation::create($data);
-            $createdOps[] = ['model' => $createdOp, 'dto' => $opDto];
-            $opsBySeq[$seq] = $createdOp->id;
-
-            if (!empty($opDto->row_uid)) {
-                $uidToOpMap[$opDto->row_uid] = $createdOp;
-                $uidToOpMap['uid:' . $opDto->row_uid] = $createdOp;
+            if (isset($matched[$index])) {
+                $model = $matched[$index];
+                // the row was moved to sequence = −id above; tell the model so an unchanged sequence is still written
+                $model->setRawAttributes(array_merge($model->getAttributes(), ['sequence' => -$model->id]), true);
+                $model->fill($data);
+                $model->save();
+            } else {
+                $model = RoutingOperation::create($data);
             }
-            $uidToOpMap['seq:' . $seq] = $createdOp;
-            if (!empty($data['operation_number'])) {
-                $uidToOpMap[$data['operation_number']] = $createdOp;
+
+            $createdOps[] = ['model' => $model, 'dto' => $opDto];
+            $opsBySeq[$seq] = $model->id;
+            if (!empty($opDto->row_uid)) {
+                $uidToOpMap[$opDto->row_uid] = $model;
             }
         }
 
-        // Pass 2: Bind alternative replacements (replaces_operation_id)
+        $idsOfThisRouting = collect($createdOps)->map(fn($c) => $c['model']->id)->all();
+
+        // Pass 2 (RT-IMPL-08): bind alternatives unambiguously, only to operations of THIS routing
         foreach ($createdOps as $item) {
             $model = $item['model'];
             $dto = $item['dto'];
@@ -500,15 +591,8 @@ class RoutingService
                     $resolvedReplacesId = $opsBySeq[$dto->replaces_sequence];
                 } elseif (!empty($dto->replaces_row_uid) && isset($uidToOpMap[$dto->replaces_row_uid])) {
                     $resolvedReplacesId = $uidToOpMap[$dto->replaces_row_uid]->id;
-                } elseif (!empty($dto->replaces_operation_id)) {
-                    $target = (string) $dto->replaces_operation_id;
-                    if (isset($opsBySeq[(int) $target])) {
-                        $resolvedReplacesId = $opsBySeq[(int) $target];
-                    } elseif (isset($uidToOpMap[$target])) {
-                        $resolvedReplacesId = $uidToOpMap[$target]->id;
-                    } elseif (RoutingOperation::where('tenant_id', $tenantId)->where('id', $dto->replaces_operation_id)->exists()) {
-                        $resolvedReplacesId = $dto->replaces_operation_id;
-                    }
+                } elseif (!empty($dto->replaces_operation_id) && in_array((int) $dto->replaces_operation_id, $idsOfThisRouting, true)) {
+                    $resolvedReplacesId = (int) $dto->replaces_operation_id;
                 }
 
                 // Guard: an operation can NEVER replace itself
@@ -530,10 +614,8 @@ class RoutingService
             $dto = $item['dto'];
 
             if ($dto->is_parallel) {
-                // Parallel operations are independent of previous operations
                 $model->previous_operation_id = null;
             } elseif ($dto->is_alternative) {
-                // Rule: Alternative operation follows the EXACT same predecessor as the main op it replaces
                 if ($model->replaces_operation_id) {
                     $primaryOp = collect($createdOps)->first(fn($c) => $c['model']->id === $model->replaces_operation_id);
                     $model->previous_operation_id = $primaryOp ? $primaryOp['model']->previous_operation_id : null;
@@ -542,11 +624,9 @@ class RoutingService
                 }
             } elseif ($dto->predecessor_sequence !== null) {
                 if ($dto->predecessor_sequence <= 0) {
-                    // Explicitly marked independent / none
                     $model->previous_operation_id = null;
                 } else {
                     $targetPredId = $opsBySeq[$dto->predecessor_sequence] ?? null;
-                    // Guard: if chosen predecessor was an alternative, redirect to its primary replacement
                     $targetPredItem = collect($createdOps)->first(fn($c) => $c['model']->id === $targetPredId);
                     if ($targetPredItem && $targetPredItem['dto']->is_alternative) {
                         $model->previous_operation_id = $targetPredItem['model']->replaces_operation_id ?? null;
@@ -555,7 +635,6 @@ class RoutingService
                     }
                 }
             } elseif ($index > 0) {
-                // Default sequential fallback: find immediate preceding NON-ALTERNATIVE operation
                 $prevModel = null;
                 for ($p = $index - 1; $p >= 0; $p--) {
                     if (!$createdOps[$p]['dto']->is_alternative) {
@@ -570,27 +649,17 @@ class RoutingService
 
             $model->save();
         }
+
+        if ($warnings !== []) {
+            session()->flash('warning', implode(' ', $warnings));
+        }
+
+        return $warnings;
     }
 
-    /**
-     * Validate that a machine belongs to the specified work center.
-     * Used by form requests and UI validation.
-     */
-    public function validateMachineBelongsToWorkCenter(int $machineId, int $workCenterId): bool
-    {
-        $machine = Machine::with('section')->find($machineId);
-        return (bool) ($machine && $machine->section?->work_center_id === $workCenterId);
-    }
+    // RT-IMPL-07 / RT-30: unused validateMachineBelongsToWorkCenter() / validateSectionBelongsToWorkCenter() removed —
+    // the checks live in Requests\Concerns\ValidatesRoutingOperations (shared by web + API).
 
-    /**
-     * Validate that a section belongs to the specified work center.
-     */
-    public function validateSectionBelongsToWorkCenter(int $sectionId, int $workCenterId): bool
-    {
-        return WorkCenterSection::where('id', $sectionId)
-            ->where('work_center_id', $workCenterId)
-            ->exists();
-    }
 
     /**
      * Validate that a machine belongs to the specified section.

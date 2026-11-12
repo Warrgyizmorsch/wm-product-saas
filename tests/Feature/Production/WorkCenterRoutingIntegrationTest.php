@@ -20,6 +20,7 @@ use Tests\TestCase;
 class WorkCenterRoutingIntegrationTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\FillsRoutingFigures; // RT-IMPL-14: fill figures like the form does
 
     private Tenant $tenant;
     private User $user;
@@ -153,7 +154,7 @@ class WorkCenterRoutingIntegrationTest extends TestCase
         ];
 
         $response = $this->authRequest()
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertRedirect();
         $response->assertSessionHasNoErrors();
@@ -199,7 +200,7 @@ class WorkCenterRoutingIntegrationTest extends TestCase
         ];
 
         $response = $this->authRequest()
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertRedirect();
         $response->assertSessionHasNoErrors();
@@ -236,7 +237,7 @@ class WorkCenterRoutingIntegrationTest extends TestCase
         ];
 
         $response = $this->authRequest()
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertSessionHasErrors(['operations.0.machine_id']);
         $this->assertDatabaseMissing('routings', ['name' => 'Conflict Routing']);
@@ -265,7 +266,7 @@ class WorkCenterRoutingIntegrationTest extends TestCase
         ];
 
         $response = $this->authRequest()
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertSessionHasErrors(['operations.0.machine_id']);
         $this->assertDatabaseMissing('routings', ['name' => 'Missing Resource Routing']);
@@ -294,7 +295,7 @@ class WorkCenterRoutingIntegrationTest extends TestCase
         ];
 
         $response = $this->authRequest()
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertSessionHasErrors(['operations.0.section_id']);
     }
@@ -322,7 +323,7 @@ class WorkCenterRoutingIntegrationTest extends TestCase
         ];
 
         $response = $this->authRequest()
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertSessionHasErrors(['operations.0.machine_id']);
     }
@@ -368,7 +369,7 @@ class WorkCenterRoutingIntegrationTest extends TestCase
         ];
 
         $response = $this->authRequest()
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertRedirect();
         $response->assertSessionHasNoErrors();
@@ -429,7 +430,7 @@ class WorkCenterRoutingIntegrationTest extends TestCase
         ];
 
         $response = $this->authRequest()
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertSessionHasErrors(['operations.1.priority']);
     }
@@ -460,6 +461,10 @@ class WorkCenterRoutingIntegrationTest extends TestCase
             'labor_cost_rate' => 1.00, // $10 labor
             'machine_cost_rate' => 0.50, // $5 machine -> Total = $15
             'expected_yield_percentage' => 100,
+            // RT-IMPL-14: readers use the figures saved on the operation
+            'labor_cost_per_unit' => 10.00,
+            'machine_cost_per_unit' => 5.00,
+            'cost_per_unit' => 15.00,
         ]);
 
         $altOp = RoutingOperation::create([
@@ -480,6 +485,9 @@ class WorkCenterRoutingIntegrationTest extends TestCase
             'labor_cost_rate' => 2.00, // $40
             'machine_cost_rate' => 0.00,
             'expected_yield_percentage' => 100,
+            'labor_cost_per_unit' => 40.00,
+            'machine_cost_per_unit' => 0.00,
+            'cost_per_unit' => 40.00,
         ]);
 
         $costService = app(RoutingCostService::class);
@@ -497,6 +505,11 @@ class WorkCenterRoutingIntegrationTest extends TestCase
 
     public function test_section_resources_endpoint_returns_machines_batches_and_labor_cost(): void
     {
+        // RT-IMPL-14: the endpoint reads the latest section snapshot — calculate the Work Center first
+        app(\App\Domains\Production\Services\CountdownCalculationEngine::class)->recalculateNow(
+            $this->workCenterA->fresh(), 'manual', \App\Domains\Production\Services\CountdownCalculationEngine::SCOPE_ALL
+        );
+
         $response = $this->authRequest()
             ->getJson(route('production.sections.resources', $this->sectionA->id));
 
@@ -560,7 +573,7 @@ class WorkCenterRoutingIntegrationTest extends TestCase
         ];
 
         $response = $this->authRequest()
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertRedirect();
         $response->assertSessionHasNoErrors();

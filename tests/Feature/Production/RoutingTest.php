@@ -17,6 +17,7 @@ use Tests\TestCase;
 class RoutingTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\FillsRoutingFigures; // RT-IMPL-14: fill figures like the form does
 
     private Tenant $tenantA;
     private User $adminA;
@@ -139,7 +140,7 @@ class RoutingTest extends TestCase
 
         $response = $this->actingAs($this->engineerA)
             ->withHeader('X-Tenant', 'tenant-a')
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertSessionHasNoErrors();
         $response->assertRedirect();
@@ -182,7 +183,7 @@ class RoutingTest extends TestCase
 
         $response = $this->actingAs($this->engineerA)
             ->withHeader('X-Tenant', 'tenant-a')
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertSessionHasErrors(['operations.1.sequence']);
     }
@@ -278,7 +279,7 @@ class RoutingTest extends TestCase
             'sequence' => 1,
         ]);
 
-        // Duplicate via manager
+        // RT-IMPL-20: Duplicate Version saves nothing — it checks the version and opens the pre-filled create form
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.routing.duplicate', $routing->id), [
@@ -286,46 +287,50 @@ class RoutingTest extends TestCase
             ]);
 
         $response->assertSessionHasNoErrors();
-        $response->assertRedirect();
-        
+        $response->assertRedirect(route('production.routing.create', ['source_routing_id' => $routing->id, 'version' => '1.1.0']));
+        $this->assertNull(Routing::where('version', '1.1.0')->first(), 'nothing is saved by the Duplicate button');
+
+        $this->actingAs($this->adminA)->withHeader('X-Tenant', 'tenant-a')
+            ->get(route('production.routing.create', ['source_routing_id' => $routing->id, 'version' => '1.1.0']))
+            ->assertOk()
+            ->assertSee('1.1.0')
+            ->assertSee('Operation 1')
+            ->assertSee('name="source_routing_id"', false);
+
+        // Saving the copy creates the new draft version (revision = source + 1, "Revision Created" audit)
+        $store = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.routing.store'), $this->withRoutingFigures([
+                'routing_number' => 'AUTO',
+                'name' => 'Dupl Base Routing',
+                'version' => '1.1.0',
+                'effective_from' => now()->toDateString(),
+                'source_routing_id' => $routing->id,
+                'operations' => [[
+                    'sequence' => 10,
+                    'name' => 'Operation 1',
+                    'operation_type' => 'manufacturing',
+                    'work_center_id' => $this->workCenterA->id,
+                    'section_id' => $this->sectionA->id,
+                    'machine_id' => $this->machineA->id,
+                    'setup_time_minutes' => 10,
+                    'expected_yield_percentage' => 100,
+                ]],
+            ]));
+        $store->assertSessionHasNoErrors();
+        $store->assertRedirect();
+
         $newRouting = Routing::where('version', '1.1.0')->first();
         $this->assertNotNull($newRouting);
-        $this->assertNotNull($newRouting->routing_number);
         $this->assertNotEmpty($newRouting->routing_number);
+        $this->assertNotEquals($routing->routing_number, $newRouting->routing_number);
         $this->assertEquals(Routing::STATUS_DRAFT, $newRouting->status);
         $this->assertEquals(1, $newRouting->revision);
         $this->assertCount(1, $newRouting->operations);
         $this->assertEquals('Operation 1', $newRouting->operations[0]->name);
-        $this->assertCount(1, $newRouting->operations[0]->materials);
-        $this->assertEquals($rawMaterial->id, $newRouting->operations[0]->materials[0]->material_id);
-        $this->assertEquals(2.5, (float) $newRouting->operations[0]->materials[0]->quantity);
-
-        // Verify update on cloned routing maintains routing_number
-        $updateResponse = $this->actingAs($this->adminA)
-            ->withHeader('X-Tenant', 'tenant-a')
-            ->put(route('production.routing.update', $newRouting->id), [
-                'routing_number' => $newRouting->routing_number,
-                'name' => 'Updated Duplicated Routing',
-                'product_id' => $this->finishedProductA->id,
-                'version' => '1.1.0',
-                'effective_from' => now()->toDateString(),
-                'operations' => [
-                    [
-                        'sequence' => 10,
-                        'name' => 'Operation 1 Modified',
-                        'operation_type' => 'manufacturing',
-                        'work_center_id' => $this->workCenterA->id,
-                        'section_id' => $this->sectionA->id,
-                        'machine_id' => $this->machineA->id,
-                    ]
-                ]
-            ]);
-
-        $updateResponse->assertRedirect();
-        $newRouting->refresh();
-        $this->assertNotNull($newRouting->routing_number);
-        $this->assertNotEmpty($newRouting->routing_number);
-        $this->assertEquals('Updated Duplicated Routing', $newRouting->name);
+        $this->assertDatabaseHas('production_routing_approvals', ['routing_id' => $newRouting->id, 'action' => 'Revision Created']);
+        // the source routing is untouched (approval never retires older versions — RT-02)
+        $this->assertEquals(Routing::STATUS_ACTIVE, $routing->fresh()->status);
     }
 
     public function test_bulk_action_routing_processing(): void

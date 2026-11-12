@@ -258,6 +258,9 @@
                                                 Op <span x-text="op.sequence"></span>
                                             </span>
                                             <span class="fw-bold text-dark fs-13" x-text="op.name"></span>
+                                            <template x-if="op.is_deleted">
+                                                <span class="badge bg-danger text-white fs-10" :title="'Operation ' + (op.operation_number || '') + ' was removed from the routing. Move or remove its materials before saving.'">{{ __('production.operation_deleted') }}</span>
+                                            </template>
 
                                             <!-- Work Center / Section Badge -->
                                             <template x-if="op.work_center && op.work_center.name">

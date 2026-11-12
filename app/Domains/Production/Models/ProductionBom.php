@@ -88,6 +88,57 @@ class ProductionBom extends BaseModel
         return $this->belongsTo(Routing::class, 'routing_id');
     }
 
+    /**
+     * RT-IMPL-05 (RT-04 rules 2–3): routing advisory worked out live from the linked routing's current status —
+     * never stored. null when the routing is active (or the BOM is cancelled / inactive / has no routing).
+     */
+    public function getRoutingAdvisoryAttribute(): ?string
+    {
+        if (!$this->routing_id || in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_INACTIVE], true)) {
+            return null;
+        }
+        $routing = $this->routing;
+        if (!$routing) {
+            return "The linked routing no longer exists. This BOM can't be approved until an active routing is linked.";
+        }
+        if ($routing->status === Routing::STATUS_ACTIVE) {
+            return null;
+        }
+        $status = str_replace('_', ' ', $routing->status);
+
+        return "Linked routing {$routing->routing_number} is {$status}. This BOM can't be approved until the routing is active.";
+    }
+
+    /**
+     * RT-IMPL-09 (RT-10 rule 7): allocations of this BOM that point to an operation removed (soft-deleted) from the
+     * routing — worked out live. One message per removed operation.
+     *
+     * @return array<int, string>
+     */
+    public function getDeletedOperationAdvisoriesAttribute(): array
+    {
+        if (!$this->exists || in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_INACTIVE], true)) {
+            return [];
+        }
+
+        return self::deletedOperationMessages($this->id);
+    }
+
+    /** @return array<int, string> one message per removed operation that still carries this BOM's materials */
+    public static function deletedOperationMessages(int $bomId): array
+    {
+        $opIds = RoutingOperationMaterial::where('bom_id', $bomId)->pluck('routing_operation_id')->unique()->filter();
+        if ($opIds->isEmpty()) {
+            return [];
+        }
+
+        return RoutingOperation::onlyTrashed()->whereIn('id', $opIds)->with(['routing' => fn($q) => $q->withTrashed()])->get()
+            ->map(fn($op) => "Routing changed: operation {$op->operation_number} ({$op->name}) was removed from routing "
+                . ($op->routing?->routing_number ?? '#' . $op->routing_id) . '. Move or remove its materials before saving.')
+            ->values()
+            ->all();
+    }
+
     public function getActiveRoutingAttribute(): ?Routing
     {
         return $this->routing;

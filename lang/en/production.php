@@ -788,6 +788,7 @@ return array (
   'material_cost' => 'Material Cost',
   'overhead_cost' => 'Overhead Cost',
   'overhead_cost_help' => 'Enter the overhead per day. If you know the monthly amount, divide it by 30.',
+  'routing_one_unit_notice' => 'Values shown below are calculated for 1 unit only. Excludes facility overhead.',
   'production_orders' => 'Production Orders',
   'production_order_execution' => 'Production Orders (Manufacturing Execution)',
   'create_direct_order' => 'Create Production Order',
@@ -2326,6 +2327,20 @@ return array (
   'calculation_countdown_minutes' => 'Debounce Countdown (Minutes)',
   'calculation_countdown_hint' => 'Wait time in minutes before recalculating after changes (minimum 1 minute, cannot be zero).',
   'capacity_placeholder' => 'e.g. 50.00 units/hr',
+  // RT-IMPL-02 / RT-IMPL-20
+  'retire_routing' => 'Retire Routing',
+  'retire_routing_body' => 'The routing becomes historical (end date = today). It stays visible as history and can no longer be chosen for new BOMs. Approved BOMs using it become inactive; draft BOMs get a warning.',
+  'retire_reason_placeholder' => 'e.g. Replaced by version 2.0.0',
+  'routing_copy_title' => 'New version of :number (from v:version)',
+  'routing_copy_notice' => 'Copy of the routing — nothing is saved until you click Save. Costs are worked out from the latest section calculations.',
+  // RT-IMPL-05 / 06 / 09 / 18
+  'routing_advisory' => 'Routing',
+  'routing_not_active' => 'Routing not active',
+  'bom_impact_title' => 'BOMs using this routing',
+  'bom_impact_none' => 'No BOMs use this routing.',
+  'bom_impact_effect' => 'What happens',
+  'operation_deleted' => 'Deleted',
+  'inactive_resources' => 'Inactive resources',
 );
 
 

@@ -21,6 +21,11 @@ Schedule::command('billing:reconcile-subscriptions')
     ->hourly()
     ->withoutOverlapping();
 
+// RT-IMPL-04: routing status by dates — scheduled → active on start date, expired → historical (with BOM handling).
+Schedule::command('production:process-routing-dates')
+    ->dailyAt('00:05')
+    ->withoutOverlapping();
+
 // Process expired Work Center calculation debounce countdowns.
 Schedule::command('production:process-calculation-countdowns')
     ->everyMinute()

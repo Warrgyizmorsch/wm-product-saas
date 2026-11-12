@@ -1805,6 +1805,7 @@ return [
   'overhead_cost' => 'ओवरहेड लागत',
   'overhead_cost_help' => 'प्रति दिन का ओवरहेड दर्ज करें। यदि आपको मासिक राशि पता है, तो उसे 30 से भाग दें।',
   'operational_overview' => 'परिचालन पूर्वावलोकन',
+  'routing_one_unit_notice' => 'नीचे दिखाए गए मान केवल 1 इकाई के लिए गणना किए गए हैं। सुविधा ओवरहेड शामिल नहीं है।',
   'horizon' => 'अवधि:',
   'this_week' => 'इस सप्ताह',
   'this_month' => 'इस महीने',
@@ -2411,4 +2412,18 @@ return [
     'delete_bom' => 'BOM हटाएं',
     'select_bom' => 'BOM चुनें',
     'cost' => 'लागत',
+  // RT-IMPL-02 / RT-IMPL-20
+  'retire_routing' => 'रूटिंग सेवानिवृत्त करें',
+  'retire_routing_body' => 'रूटिंग ऐतिहासिक हो जाएगी (समाप्ति तिथि = आज)। यह इतिहास के रूप में दिखेगी और नए BOM के लिए नहीं चुनी जा सकेगी। इसका उपयोग करने वाले स्वीकृत BOM निष्क्रिय होंगे; ड्राफ्ट BOM को चेतावनी मिलेगी।',
+  'retire_reason_placeholder' => 'जैसे संस्करण 2.0.0 से बदला गया',
+  'routing_copy_title' => ':number का नया संस्करण (v:version से)',
+  'routing_copy_notice' => 'रूटिंग की प्रति — Save दबाने तक कुछ भी सहेजा नहीं जाता। लागत नवीनतम सेक्शन गणना से निकाली जाती है।',
+  // RT-IMPL-05 / 06 / 09 / 18
+  'routing_advisory' => 'रूटिंग',
+  'routing_not_active' => 'रूटिंग सक्रिय नहीं',
+  'bom_impact_title' => 'इस रूटिंग का उपयोग करने वाले BOM',
+  'bom_impact_none' => 'कोई BOM इस रूटिंग का उपयोग नहीं करता।',
+  'bom_impact_effect' => 'क्या होगा',
+  'operation_deleted' => 'हटाया गया',
+  'inactive_resources' => 'निष्क्रिय संसाधन',
 ];

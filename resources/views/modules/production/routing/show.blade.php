@@ -102,6 +102,12 @@
                     @endcan
                 @endif
 
+                @can('retire', $routing)
+                    <x-ui.button type="button" variant="outline-secondary" icon="feather-archive" class="px-3" data-bs-toggle="modal" data-bs-target="#retireModal">
+                        {{ __('production.retire_routing') }}
+                    </x-ui.button>
+                @endcan
+
                 @if ($routing->isActive() || $routing->isScheduled())
                     @can('cancel', $routing)
                         <x-ui.button type="button" variant="outline-danger" icon="feather-slash" class="px-3" data-bs-toggle="modal" data-bs-target="#cancelModal">
@@ -179,7 +185,7 @@
                             $primarySetupMin = (float) $routing->operations->where('is_alternative', false)->sum('setup_time_minutes');
                         @endphp
                         <span class="fs-22 fw-bold text-dark font-monospace">{{ format_duration($primarySetupMin) }}</span>
-                        <small class="text-muted d-block fs-11 mt-0.5 font-monospace">({{ number_format($primarySetupMin, 1) }}m)</small>
+                        <small class="text-muted d-block fs-11 mt-0.5 font-monospace">({{ format_decimal($primarySetupMin) }}m) setup per run</small>
                     </div>
                     <div>
                         <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.total_cycle_running_time') }}</span>
@@ -187,7 +193,7 @@
                             $primaryCycleMin = (float) $routing->totalCycleTimeMinutes();
                         @endphp
                         <span class="fs-22 fw-bold text-success font-monospace">{{ format_duration($primaryCycleMin) }}</span>
-                        <small class="text-muted d-block fs-11 mt-0.5 font-monospace">({{ number_format($primaryCycleMin, 1) }}m)</small>
+                        <small class="text-muted d-block fs-11 mt-0.5 font-monospace">({{ format_decimal($primaryCycleMin) }}m)</small>
                         <small class="text-muted d-block mt-1">{{ __('production.cycle_time_desc') }}</small>
                     </div>
                 </div>
@@ -207,7 +213,7 @@
                     <div class="d-flex flex-column gap-3 py-2 px-2">
                         <div>
                             <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.routing_cost_per_unit') }}</span>
-                            <span class="fs-24 fw-bold text-primary">{{ format_currency($costSummary['total_cost']) }}</span>
+                            <span class="fs-24 fw-bold text-primary">{{ format_currency($costSummary['total_cost'], 4) }}</span>
                             <div class="mt-1 d-flex flex-column gap-0.5">
                                 <span class="text-muted fs-11">
                                     <i class="feather-info text-primary me-0.5"></i>Primary route baseline (excludes alternative operations).
@@ -224,18 +230,23 @@
                             <h6 class="fw-bold text-dark mb-2">{{ __('production.cost_contribution_details') }}</h6>
                             <div class="d-flex justify-content-between align-items-center mb-1 fs-12">
                                 <span class="text-muted">{{ __('production.labor_cost') }}:</span>
-                                <span class="fw-semibold text-dark">{{ format_currency($costSummary['labor_cost']) }}</span>
+                                <span class="fw-semibold text-dark">{{ format_currency($costSummary['labor_cost'], 4) }}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center fs-12">
                                 <span class="text-muted">{{ __('production.machine_cost') }}:</span>
-                                <span class="fw-semibold text-dark">{{ format_currency($costSummary['machine_cost']) }}</span>
+                                <span class="fw-semibold text-dark">{{ format_currency($costSummary['machine_cost'], 4) }}</span>
                             </div>
                             @if (!empty($costSummary['subcontract_cost']) && (float) $costSummary['subcontract_cost'] > 0.0)
                                 <div class="d-flex justify-content-between align-items-center fs-12 mt-1">
                                     <span class="text-muted">Subcontract Cost:</span>
-                                    <span class="fw-semibold text-dark">{{ format_currency($costSummary['subcontract_cost']) }}</span>
+                                    <span class="fw-semibold text-dark">{{ format_currency($costSummary['subcontract_cost'], 4) }}</span>
                                 </div>
                             @endif
+                            {{-- RT-IMPL-13: setup per operation is a per-RUN cost, not part of Cost / Unit --}}
+                            <div class="d-flex justify-content-between align-items-center fs-12 mt-1 pt-1 border-top routing-setup-cost-per-run" title="Σ (setup per operation × (labor + machine rate)) of primary operations — paid once per production run">
+                                <span class="text-muted">Setup Cost per Run:</span>
+                                <span class="fw-semibold text-dark">{{ format_currency($costSummary['setup_cost_per_run'] ?? 0, 4) }}</span>
+                            </div>
                         </div>
                     </div>
                 @else
@@ -246,6 +257,33 @@
                 @endif
             </div>
         </div>
+
+        {{-- RT-IMPL-18 (RT-29 rule 2): inactive / deleted resources --}}
+        @if (!empty($costStatus['inactive']))
+            <div class="alert alert-soft-danger border border-danger-subtle d-flex align-items-start gap-2.5 mb-3 py-2.5 px-3 fs-12 rounded-3 routing-inactive-resources-banner">
+                <i class="feather-slash text-danger fs-16 flex-shrink-0 mt-0.5"></i>
+                <div class="flex-grow-1">
+                    <strong class="text-dark d-block mb-1">{{ $costStatus['inactive_header'] }}</strong>
+                    @foreach ($costStatus['inactive'] as $row)
+                        <div class="mb-0.5">{{ $row['message'] }}</div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        {{-- RT-IMPL-14 (RT-19 rule 7): outdated / not-calculated costs --}}
+        @if (!empty($costStatus) && ($costStatus['outdated'] || $costStatus['not_calculated']))
+            <div class="alert {{ $costStatus['outdated'] ? 'alert-soft-warning border-warning-subtle' : 'alert-soft-secondary border-secondary-subtle' }} border d-flex align-items-start gap-2.5 mb-4 py-2.5 px-3 fs-12 rounded-3 routing-cost-status-banner">
+                <i class="feather-alert-triangle text-warning fs-16 flex-shrink-0 mt-0.5"></i>
+                <div class="flex-grow-1">
+                    <strong class="text-dark d-block mb-1">{{ $costStatus['outdated'] ? 'Costs outdated' : 'Costs not calculated' }}</strong>
+                    @foreach ($costStatus['operations'] as $opStatus)
+                        <div class="mb-0.5"><span class="font-monospace fw-semibold text-dark">{{ $opStatus['operation_number'] }}:</span> {{ implode(' ', $opStatus['messages']) }}</div>
+                    @endforeach
+                    <div class="mt-1 text-muted">{{ $costStatus['action'] }}</div>
+                </div>
+            </div>
+        @endif
 
         <!-- Description Info -->
         @if ($routing->description)
@@ -258,6 +296,8 @@
         <!-- Operations Sequence Details -->
         <div class="mb-4 pb-4 border-bottom">
             <h5 class="fw-bold text-dark mb-3">{{ __('production.sequence_operations_timeline') }}</h5>
+            {{-- RT-IMPL-10 (RT-12 / RT-17) --}}
+            <div class="alert alert-soft-info border border-info-subtle py-1.5 px-3 fs-12 mb-2 d-flex align-items-center gap-2 routing-one-unit-notice"><i class="feather-info text-info fs-13"></i><span>{{ __('production.routing_one_unit_notice') }}</span></div>
             <div class="table-responsive">
                 <table class="erp-thin-table" style="min-width: 1300px;">
                     <thead>
@@ -267,11 +307,12 @@
                             <th style="width: 14%; min-width: 160px;">{{ __('production.work_center') }}</th>
                             <th style="width: 14%; min-width: 160px;">Section</th>
                             <th style="width: 22%; min-width: 240px;">Resource</th>
-                            <th class="text-end" style="width: 5%; min-width: 60px;">{{ __('production.setup') }}</th>
+                            <th class="text-end" style="width: 5%; min-width: 60px;" title="Setup per operation — once per production run">{{ __('production.setup') }} / run</th>
+                            <th class="text-end" style="width: 5%; min-width: 60px;" title="Setup per piece — every unit">{{ __('production.setup') }} / piece</th>
                             <th class="text-end" style="width: 5%; min-width: 60px;">{{ __('production.run') }}</th>
                             <th class="text-end" style="width: 4%; min-width: 50px;">Wait</th>
                             <th class="text-end" style="width: 8%; min-width: 90px;">
-                                Cost / Unit <i class="feather-info text-primary ms-0.5 fs-11" data-bs-toggle="tooltip" data-bs-placement="top" title="Total Cost Per Unit: includes setup time + cycle run time, machine power/maintenance, and allocated operator labor."></i>
+                                Cost / Unit <i class="feather-info text-primary ms-0.5 fs-11" data-bs-toggle="tooltip" data-bs-placement="top" title="Cost / Unit = (setup per piece + run time) × (labor + machine rate) × (100 ÷ yield). Setup per run is shown separately as setup cost per run."></i>
                             </th>
                             <th class="text-end" style="width: 4%; min-width: 50px;">{{ __('production.yield') }}</th>
                             <th class="text-center" style="width: 4%; min-width: 50px;">{{ __('production.qc_gate') }}</th>
@@ -340,26 +381,13 @@
                                         @endif
                                     @elseif ($op->machine)
                                         @php
+                                            // RT-IMPL-14: saved figures only (no live calculation); capacity / speed from the saved snapshot
                                             $snap = $op->resource_snapshot ?? [];
-                                            $cap = $snap['capacity'] ?? ($op->machine->capacity ?? null);
-                                            $speedMin = $snap['speed_minutes_per_unit'] ?? ($cap > 0 ? (60.0 / $cap) : null);
-                                            $mCost = $snap['machine_cost_per_unit'] ?? null;
-                                            $lCost = $snap['labor_cost_per_unit'] ?? null;
-                                            $opCost = $snap['cost_per_unit'] ?? ($snap['operation_cost_per_unit'] ?? null);
-
-                                            if (($mCost === null || $lCost === null || $opCost === null) && $op->section) {
-                                                $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($op->section);
-                                                foreach ($sectionCosts['machines'] as $secM) {
-                                                    if ((int) $secM['id'] === (int) $op->machine_id) {
-                                                        $cap = $cap ?? ($secM['capacity'] ?? null);
-                                                        $speedMin = $speedMin ?? ($secM['speed_minutes_per_unit'] ?? null);
-                                                        $mCost = $mCost ?? ($secM['machine_cost_per_unit'] ?? null);
-                                                        $lCost = $lCost ?? ($secM['labor_cost_per_unit'] ?? null);
-                                                        $opCost = $opCost ?? ($secM['cost_per_unit'] ?? null);
-                                                        break;
-                                                    }
-                                                }
-                                            }
+                                            $cap = $snap['capacity'] ?? null;
+                                            $speedMin = $snap['speed_minutes_per_unit'] ?? ($op->processing_time_minutes > 0 ? (float) $op->processing_time_minutes : null);
+                                            $mCost = $op->costsNotCalculated() ? null : (float) ($op->machine_cost_per_unit ?? 0);
+                                            $lCost = $op->costsNotCalculated() ? null : (float) ($op->labor_cost_per_unit ?? 0);
+                                            $opCost = $op->costsNotCalculated() ? null : (float) $op->cost_per_unit;
                                         @endphp
                                         <span class="badge bg-soft-primary text-primary"><i class="feather-cpu me-1"></i>Machine</span>
                                         <span class="fw-semibold text-dark d-block fs-11 mt-0.5">{{ $op->machine->name }}</span>
@@ -376,48 +404,46 @@
                                                         <span class="text-muted"><i class="feather-clock me-1"></i>Run Speed:</span>
                                                         <span class="fw-bold text-dark font-monospace">
                                                             {{ format_duration($speedMin) }}
-                                                            <span class="text-muted fw-normal fs-9">({{ number_format($speedMin, 2) }} m/u)</span>
+                                                            <span class="text-muted fw-normal fs-9">({{ format_decimal($speedMin) }} m/u)</span>
                                                         </span>
                                                     </div>
                                                 @endif
                                                 @if ($mCost !== null)
                                                     <div class="d-flex justify-content-between align-items-center mb-0.5">
                                                         <span class="text-muted"><i class="feather-cpu me-1"></i>Machine Cost:</span>
-                                                        <span class="font-monospace text-dark">{{ format_currency($mCost) }}</span>
+                                                        <span class="font-monospace text-dark">{{ format_currency($mCost, 4) }}</span>
                                                     </div>
                                                 @endif
                                                 @if ($lCost !== null)
                                                     <div class="d-flex justify-content-between align-items-center mb-0.5">
                                                         <span class="text-muted"><i class="feather-user me-1"></i>Operator Cost:</span>
-                                                        <span class="font-monospace text-dark">{{ format_currency($lCost) }}</span>
+                                                        <span class="font-monospace text-dark">{{ format_currency($lCost, 4) }}</span>
                                                     </div>
+                                                    @if (isset($snap['non_batch_daily_labor_cost'], $snap['section_operating_hours'], $snap['active_machines_count']) && (float) $snap['section_operating_hours'] > 0 && (int) $snap['active_machines_count'] > 0)
+                                                        {{-- RT-IMPL-12: how the operator labor rate was derived --}}
+                                                        <div class="text-muted fs-9 mb-0.5 operator-labor-basis">
+                                                            Non-batch labor {{ format_currency((float) $snap['non_batch_daily_labor_cost'], 4) }}/day
+                                                            ÷ {{ format_hours((float) $snap['section_operating_hours']) }}
+                                                            ÷ {{ (int) $snap['active_machines_count'] }} {{ \Illuminate\Support\Str::plural('machine', (int) $snap['active_machines_count']) }}
+                                                            = {{ format_currency((float) ($snap['operator_labor_cost_per_machine_per_hour'] ?? 0), 4) }}/hr
+                                                        </div>
+                                                    @endif
                                                 @endif
                                                 @if ($opCost !== null)
                                                     <div class="d-flex justify-content-between align-items-center pt-0.5 border-top border-light-subtle">
                                                         <span class="fw-semibold text-dark"><i class="feather-dollar-sign me-0.5 text-muted"></i>Operation Cost:</span>
-                                                        <span class="fw-bold text-primary font-monospace">{{ format_currency($opCost) }}</span>
+                                                        <span class="fw-bold text-primary font-monospace">{{ format_currency($opCost, 4) }}</span>
                                                     </div>
                                                 @endif
                                             </div>
                                         @endif
                                     @elseif ($op->manualProduction)
                                         @php
+                                            // RT-IMPL-14: saved figures only (no live calculation)
                                             $snap = $op->resource_snapshot ?? [];
                                             $cap = $snap['capacity'] ?? null;
-                                            $speedMin = $snap['speed_minutes_per_unit'] ?? null;
-                                            $lCost = $snap['labor_cost_per_unit'] ?? ($snap['cost_per_unit'] ?? null);
-
-                                            if (($cap === null || $lCost === null) && $op->section) {
-                                                $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($op->section);
-                                                foreach ($sectionCosts['manual_batches'] as $secB) {
-                                                    if ((int) $secB['id'] === (int) $op->section_manual_production_id) {
-                                                        $cap = $cap ?? ($secB['capacity_per_hour'] ?? null);
-                                                        $speedMin = $speedMin ?? ($secB['speed_minutes_per_unit'] ?? null);
-                                                        $lCost = $lCost ?? ($secB['labor_cost_per_unit'] ?? ($secB['cost_per_unit'] ?? null));
-                                                        break;
-                                                    }
-                                                }
-                                            }
+                                            $speedMin = $snap['speed_minutes_per_unit'] ?? ($op->processing_time_minutes > 0 ? (float) $op->processing_time_minutes : null);
+                                            $lCost = $op->costsNotCalculated() ? null : (float) ($op->labor_cost_per_unit ?? $op->cost_per_unit);
                                         @endphp
                                         <span class="badge bg-soft-success text-success"><i class="feather-users me-1"></i>Manual Batch</span>
                                         <span class="fw-semibold text-dark d-block fs-11 mt-0.5">{{ $op->manualProduction->batch_name }}</span>
@@ -438,14 +464,14 @@
                                                         <span class="text-muted"><i class="feather-clock me-1"></i>Run Speed:</span>
                                                         <span class="fw-bold text-dark font-monospace">
                                                             {{ format_duration($speedMin) }}
-                                                            <span class="text-muted fw-normal fs-9">({{ number_format($speedMin, 2) }} m/u)</span>
+                                                            <span class="text-muted fw-normal fs-9">({{ format_decimal($speedMin) }} m/u)</span>
                                                         </span>
                                                     </div>
                                                 @endif
                                                 @if ($lCost !== null)
                                                     <div class="d-flex justify-content-between align-items-center pt-0.5 border-top border-light-subtle">
                                                         <span class="fw-semibold text-dark"><i class="feather-dollar-sign me-0.5 text-muted"></i>Labor Cost:</span>
-                                                        <span class="fw-bold text-success font-monospace">{{ format_currency($lCost) }}</span>
+                                                        <span class="fw-bold text-success font-monospace">{{ format_currency($lCost, 4) }}</span>
                                                     </div>
                                                 @endif
                                             </div>
@@ -457,33 +483,50 @@
                                 <td class="text-end align-middle font-monospace">
                                     <span class="fw-semibold text-dark">{{ format_duration($op->setup_time_minutes) }}</span>
                                     @if ((float) $op->setup_time_minutes > 0)
-                                        <small class="text-muted d-block fs-9">{{ number_format($op->setup_time_minutes, 1) }}m</small>
+                                        <small class="text-muted d-block fs-9">{{ format_decimal($op->setup_time_minutes) }} min</small>
+                                    @endif
+                                </td>
+                                <td class="text-end align-middle font-monospace">
+                                    @if ((float) ($op->setup_time_per_piece_minutes ?? 0) > 0)
+                                        <span class="fw-semibold text-dark">{{ format_duration($op->setup_time_per_piece_minutes) }}</span>
+                                        <small class="text-muted d-block fs-9">{{ format_decimal($op->setup_time_per_piece_minutes) }} min</small>
+                                    @else
+                                        <span class="text-muted">—</span>
                                     @endif
                                 </td>
                                 <td class="text-end align-middle font-monospace">
                                     <span class="fw-semibold text-dark">{{ format_duration($op->processing_time_minutes) }}</span>
                                     @if ((float) $op->processing_time_minutes > 0)
-                                        <small class="text-muted d-block fs-9">{{ number_format($op->processing_time_minutes, 1) }}m</small>
+                                        <small class="text-muted d-block fs-9">{{ format_decimal($op->processing_time_minutes) }} min</small>
                                     @endif
                                 </td>
                                 <td class="text-end align-middle font-monospace">
                                     @if ((float)($op->wait_time_minutes ?? 0) > 0)
                                         <span class="fw-semibold text-dark">{{ format_duration($op->wait_time_minutes) }}</span>
-                                        <small class="text-muted d-block fs-9">{{ number_format($op->wait_time_minutes, 1) }}m</small>
+                                        <small class="text-muted d-block fs-9">{{ format_decimal($op->wait_time_minutes) }} min</small>
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif
                                 </td>
                                 <td class="text-end align-middle font-monospace">
                                     @php
-                                        $setupMin = (float) $op->setup_time_minutes;
+                                        $setupMin = (float) ($op->setup_time_per_piece_minutes ?? 0); // RT-IMPL-13: per piece
                                         $runMin = (float) $op->processing_time_minutes;
                                         $activeMin = $setupMin + $runMin;
+                                        $setupRunCost = $op->setupCostPerRun();
                                         $costVal = $op->cost_per_unit !== null && (float) $op->cost_per_unit > 0.0 ? (float) $op->cost_per_unit : $op->estimatedCostPerUnit();
                                     @endphp
-                                    <span class="fw-bold text-primary fs-12" data-bs-toggle="tooltip" data-bs-placement="top" title="Setup: {{ format_duration($setupMin) }} + Run: {{ format_duration($runMin) }} = {{ format_duration($activeMin) }} active time">
-                                        {{ format_currency($costVal) }}
+                                    <span class="fw-bold text-primary fs-12" data-bs-toggle="tooltip" data-bs-placement="top" title="Setup / piece: {{ format_duration($setupMin) }} + Run: {{ format_duration($runMin) }} = {{ format_duration($activeMin) }} per piece">
+                                        {{ format_currency($costVal, 4) }}
                                     </span>
+                                    @if ($setupRunCost > 0)
+                                        <small class="text-muted d-block fs-9" title="Setup per operation × (labor + machine rate) — once per run">+ {{ format_currency($setupRunCost, 4) }} / run</small>
+                                    @endif
+                                    @if ($op->costsNotCalculated())
+                                        <small class="text-warning d-block fs-9 routing-costs-not-calculated">Costs not calculated — open and save the routing</small>
+                                    @elseif (!$op->is_external && $op->section_snapshot_number)
+                                        <small class="text-muted d-block fs-9 font-monospace" title="Figures from section calculation snapshot #{{ $op->section_snapshot_number }}{{ $op->costs_calculated_at ? ' (' . $op->costs_calculated_at->format('Y-m-d H:i') . ')' : '' }}">Snapshot #{{ $op->section_snapshot_number }}</small>
+                                    @endif
                                     @if ($op->is_alternative)
                                         <span class="badge bg-soft-warning text-warning fs-9 d-block mt-0.5" style="font-weight: 500;" title="Alternative operation — replaces a primary operation and is not added into the standard primary total.">
                                             <i class="feather-git-branch me-0.5"></i>Alt Branch
@@ -531,7 +574,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="13" class="text-center py-4 text-muted">
+                                <td colspan="14" class="text-center py-4 text-muted">
                                     <i class="feather-info me-2"></i>{{ __('production.no_operations_defined') }}
                                 </td>
                             </tr>
@@ -540,16 +583,16 @@
                     @if ($routing->operations->count() > 0)
                         <tfoot>
                             <tr class="bg-light-subtle border-top">
-                                <td colspan="8" class="text-end fw-bold text-dark py-2.5 fs-12">
+                                <td colspan="9" class="text-end fw-bold text-dark py-2.5 fs-12">
                                     Primary Route Baseline ({{ $routing->operations->where('is_alternative', false)->count() }} {{ __('production.stages') }}):
                                 </td>
                                 <td class="text-end fw-bold text-primary py-2.5 fs-13 font-monospace">
-                                    {{ format_currency($costSummary['total_cost'] ?? 0) }}
+                                    {{ format_currency($costSummary['total_cost'] ?? 0, 4) }}
                                 </td>
                                 <td colspan="4" class="py-2.5 fs-11 text-muted">
                                     @if ($routing->operations->where('is_alternative', true)->count() > 0)
                                         <span class="badge bg-soft-warning text-warning font-monospace" title="Alternative operation branch cost (excluded from baseline unit cost)">
-                                            +{{ $routing->operations->where('is_alternative', true)->count() }} Alt Op(s) ({{ format_currency($routing->operations->where('is_alternative', true)->sum(fn($o) => $o->cost_per_unit > 0 ? $o->cost_per_unit : $o->estimatedCostPerUnit())) }})
+                                            +{{ $routing->operations->where('is_alternative', true)->count() }} Alt Op(s) ({{ format_currency($routing->operations->where('is_alternative', true)->sum(fn($o) => $o->cost_per_unit > 0 ? $o->cost_per_unit : $o->estimatedCostPerUnit()), 4) }})
                                         </span>
                                     @endif
                                 </td>
@@ -715,8 +758,27 @@
         :closeText="__('production.cancel')"
         :static="true"
     >
+        @include('modules.production.routing.partials.bom-impact', ['routing' => $routing, 'impact' => $bomImpact ?? null])
         <x-ui.odoo-form-ui type="textarea" :label="__('production.notes_reasons')" name="comments" placeholder="{{ __('production.cancel_reason_placeholder') }}" :required="true" rows="4"></x-ui.odoo-form-ui>
     </x-ui.modal>
+
+    <!-- RT-IMPL-02: Retire Modal -->
+    @can('retire', $routing)
+    @php $retireTitle = '<i class="feather-archive me-2 text-dark"></i>' . __('production.retire_routing'); @endphp
+    <x-ui.modal
+        id="retireModal"
+        :title="$retireTitle"
+        formAction="{{ route('production.routing.retire', $routing->id) }}"
+        formMethod="POST"
+        :submitText="__('production.retire_routing')"
+        :closeText="__('production.cancel')"
+        :static="true"
+    >
+        <p class="fs-13 text-muted">{{ __('production.retire_routing_body') }}</p>
+        @include('modules.production.routing.partials.bom-impact', ['routing' => $routing, 'impact' => $bomImpact ?? null])
+        <x-ui.odoo-form-ui type="textarea" :label="__('production.notes_reasons')" name="comments" placeholder="{{ __('production.retire_reason_placeholder') }}" rows="3"></x-ui.odoo-form-ui>
+    </x-ui.modal>
+    @endcan
 
     <!-- Duplicate / Create New Version Modal -->
     <x-ui.modal
@@ -775,13 +837,14 @@
                     'section' => $op->section?->name ?? '-',
                     'resource_type' => $resType,
                     'resource' => $resName,
-                    'setup_minutes' => (float) $op->setup_time_minutes,
+                    'setup_minutes' => (float) ($op->setup_time_per_piece_minutes ?? 0), // RT-IMPL-13: per piece (setup per run is separate)
+                    'setup_per_run_minutes' => (float) $op->setup_time_minutes,
                     'processing_minutes' => (float) $op->processing_time_minutes,
-                    'total_minutes' => (float) $op->setup_time_minutes + (float) $op->processing_time_minutes,
-                    'cost_per_unit' => round((float) $cVal, 2),
-                    'labor_cost' => round((float) ($opCostDetails['labor_cost'] ?? 0), 2),
-                    'machine_cost' => round((float) ($opCostDetails['machine_cost'] ?? 0), 2),
-                    'subcontract_cost' => round((float) ($opCostDetails['subcontract_cost'] ?? 0), 2),
+                    'total_minutes' => $op->cycleTimePerPieceMinutes(),
+                    'cost_per_unit' => round((float) $cVal, 4),
+                    'labor_cost' => round((float) ($opCostDetails['labor_cost'] ?? 0), 4),
+                    'machine_cost' => round((float) ($opCostDetails['machine_cost'] ?? 0), 4),
+                    'subcontract_cost' => round((float) ($opCostDetails['subcontract_cost'] ?? 0), 4),
                     'yield_percentage' => (float) ($op->expected_yield_percentage > 0 ? $op->expected_yield_percentage : 100),
                 ];
             }
@@ -818,7 +881,8 @@
             }
 
             $primaryBaselineCost = (float) ($costSummary['total_cost'] ?? 0);
-            $primaryBaselineCycle = (float) $routing->totalCycleTimeMinutes();
+            // RT-IMPL-13: simulator compares cycle time per piece (setup per piece + run) — same basis as its own totals
+            $primaryBaselineCycle = (float) $routing->operations->where('is_alternative', false)->sum(fn($o) => $o->cycleTimePerPieceMinutes());
             $currencySym = active_currency_symbol();
         @endphp
 
@@ -892,7 +956,7 @@
                                                     </small>
                                                 </div>
                                                 <div class="text-end font-monospace">
-                                                    <div class="fw-bold text-dark fs-12" x-text="currencySym + ' ' + Number(ops[stage.primary_id].cost_per_unit).toFixed(2)"></div>
+                                                    <div class="fw-bold text-dark fs-12" x-text="currencySym + ' ' + fmt4(ops[stage.primary_id].cost_per_unit)"></div>
                                                     <small class="text-muted fs-11" x-text="formatDuration(ops[stage.primary_id].total_minutes) + ' (' + formatDuration(ops[stage.primary_id].setup_minutes) + ' setup + ' + formatDuration(ops[stage.primary_id].processing_minutes) + ' run)'"></small>
                                                 </div>
                                             </div>
@@ -934,7 +998,7 @@
                                                             </div>
                                                         </div>
                                                         <div class="text-end font-monospace">
-                                                            <div class="fw-bold fs-12" :class="selected['stage_' + stage.primary_id] == opId ? 'text-primary' : 'text-dark'" x-text="currencySym + ' ' + Number(ops[opId].cost_per_unit).toFixed(2)"></div>
+                                                            <div class="fw-bold fs-12" :class="selected['stage_' + stage.primary_id] == opId ? 'text-primary' : 'text-dark'" x-text="currencySym + ' ' + fmt4(ops[opId].cost_per_unit)"></div>
                                                             <small class="text-muted fs-10" x-text="formatDuration(ops[opId].total_minutes) + ' (' + formatDuration(ops[opId].setup_minutes) + ' setup + ' + formatDuration(ops[opId].processing_minutes) + ' run)'"></small>
                                                         </div>
                                                     </label>
@@ -979,26 +1043,26 @@
                                     <div class="col-sm-3 col-6">
                                         <div class="p-2.5 bg-light rounded border">
                                             <span class="text-muted fs-10 text-uppercase d-block mb-1">Simulated Cost / Unit</span>
-                                            <span class="fs-18 fw-bold text-primary font-monospace" x-text="currencySym + ' ' + Number(results.totalCost).toFixed(2)"></span>
+                                            <span class="fs-18 fw-bold text-primary font-monospace" x-text="currencySym + ' ' + fmt4(results.totalCost)"></span>
                                         </div>
                                     </div>
                                     <div class="col-sm-3 col-6">
                                         <div class="p-2.5 bg-light rounded border">
                                             <span class="text-muted fs-10 text-uppercase d-block mb-1">Labor Cost</span>
-                                            <span class="fs-16 fw-semibold text-dark font-monospace" x-text="currencySym + ' ' + Number(results.laborCost).toFixed(2)"></span>
+                                            <span class="fs-16 fw-semibold text-dark font-monospace" x-text="currencySym + ' ' + fmt4(results.laborCost)"></span>
                                         </div>
                                     </div>
                                     <div class="col-sm-3 col-6">
                                         <div class="p-2.5 bg-light rounded border">
                                             <span class="text-muted fs-10 text-uppercase d-block mb-1">Machine Cost</span>
-                                            <span class="fs-16 fw-semibold text-dark font-monospace" x-text="currencySym + ' ' + Number(results.machineCost).toFixed(2)"></span>
+                                            <span class="fs-16 fw-semibold text-dark font-monospace" x-text="currencySym + ' ' + fmt4(results.machineCost)"></span>
                                         </div>
                                     </div>
                                     <div class="col-sm-3 col-6">
                                         <div class="p-2.5 bg-light rounded border">
                                             <span class="text-muted fs-10 text-uppercase d-block mb-1">Total Cycle Time</span>
                                             <span class="fs-16 fw-bold text-success font-monospace" x-text="formatDuration(results.cycleMinutes)"></span>
-                                            <small class="text-muted d-block fs-10 font-monospace" x-text="'(' + Number(results.cycleMinutes).toFixed(1) + 'm)'"></small>
+                                            <small class="text-muted d-block fs-10 font-monospace" x-text="'(' + fmt4(results.cycleMinutes) + 'm)'"></small>
                                         </div>
                                     </div>
                                 </div>
@@ -1013,12 +1077,12 @@
                                         </template>
                                         <template x-if="results.costDelta < 0">
                                             <span class="badge bg-soft-success text-success font-monospace fw-bold">
-                                                <i class="feather-trending-down me-0.5"></i> -<span x-text="currencySym"></span> <span x-text="Math.abs(results.costDelta).toFixed(2)"></span> (<span x-text="Math.abs(results.costDeltaPct).toFixed(1)"></span>% Savings)
+                                                <i class="feather-trending-down me-0.5"></i> -<span x-text="currencySym"></span> <span x-text="fmt4(Math.abs(results.costDelta))"></span> (<span x-text="Math.abs(results.costDeltaPct).toFixed(1)"></span>% Savings)
                                             </span>
                                         </template>
                                         <template x-if="results.costDelta > 0">
                                             <span class="badge bg-soft-danger text-danger font-monospace fw-bold">
-                                                <i class="feather-trending-up me-0.5"></i> +<span x-text="currencySym"></span> <span x-text="Number(results.costDelta).toFixed(2)"></span> (+<span x-text="Number(results.costDeltaPct).toFixed(1)"></span>%)
+                                                <i class="feather-trending-up me-0.5"></i> +<span x-text="currencySym"></span> <span x-text="fmt4(results.costDelta)"></span> (+<span x-text="Number(results.costDeltaPct).toFixed(1)"></span>%)
                                             </span>
                                         </template>
                                     </div>
@@ -1053,6 +1117,7 @@
 
     @push('scripts')
         <script>
+            window.fmt4 = function (v) { const n = Math.round((parseFloat(v) || 0) * 10000) / 10000; return Number.isInteger(n) ? String(n) : n.toFixed(4); }; // 4 decimals only when there are decimals
             function deleteDraftRouting() {
                 var message = '{{ addslashes(__('production.confirm_delete_routing') ?: 'Are you sure you want to delete this draft routing?') }}';
                 var options = {
@@ -1113,8 +1178,8 @@
 
                     formatDuration(minutes) {
                         if (!minutes || parseFloat(minutes) <= 0) return '0s';
+                        if (parseFloat(minutes) * 60 < 1) return '< 1s'; // anything under 1 second
                         const totalSecs = Math.round(parseFloat(minutes) * 60);
-                        if (totalSecs <= 0) return '0s';
                         const h = Math.floor(totalSecs / 3600);
                         const m = Math.floor((totalSecs % 3600) / 60);
                         const s = totalSecs % 60;

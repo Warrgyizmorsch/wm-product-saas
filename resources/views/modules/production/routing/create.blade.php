@@ -114,6 +114,8 @@
 @endpush
 
 @push('scripts')
+    <script>window.fmt4 = function (v) { const n = Math.round((parseFloat(v) || 0) * 10000) / 10000; return Number.isInteger(n) ? String(n) : n.toFixed(4); }; // 4 decimals only when there are decimals
+    </script>
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <!-- Load Alpine.js for dynamic operations grid management -->
@@ -193,6 +195,8 @@
                         </div>
                     </template>
                     
+                    {{-- RT-IMPL-10 (RT-12 / RT-17) --}}
+                    <div class="alert alert-soft-info border border-info-subtle py-1.5 px-3 fs-12 mb-2 d-flex align-items-center gap-2 routing-one-unit-notice"><i class="feather-info text-info fs-13"></i><span>{{ __('production.routing_one_unit_notice') }}</span></div>
                     <div class="table-responsive mb-3">
                         <x-ui.odoo-form-ui type="table" style="min-width: 1560px;">
                             <thead>
@@ -203,7 +207,8 @@
                                     <th style="width: 175px; min-width: 175px;">Section</th>
                                     <th style="width: 185px; min-width: 185px;">{{ __('production.machine') }}</th>
                                     <th style="width: 185px; min-width: 185px;">Manual Batch</th>
-                                    <th style="width: 85px; min-width: 85px;" class="text-end">{{ __('production.setup') }} (m)</th>
+                                    <th style="width: 85px; min-width: 85px;" class="text-end" title="Setup per operation: once per production run (machine changeover, tool setting). Not part of Cost / Unit — shown as setup cost per run.">{{ __('production.setup') }} / run (m)</th>
+                                    <th style="width: 85px; min-width: 85px;" class="text-end" title="Setup per piece: repeated for every unit (loading, clamping, positioning). Added to the run time in Cost / Unit.">{{ __('production.setup') }} / piece (m)</th>
                                     <th style="width: 85px; min-width: 85px;" class="text-end">{{ __('production.run') }} (m)</th>
                                     <th style="width: 85px; min-width: 85px;" class="text-end" title="Buffer / wait / cure / cool-down time (minutes)">Wait (m)</th>
                                     <th style="width: 105px; min-width: 105px;" class="text-end" title="Total Cost Per Unit: includes setup time + cycle run time, machine power/maintenance, and allocated operator labor.">
@@ -227,9 +232,16 @@
                                             <input type="hidden" x-bind:name="'operations['+index+'][replaces_operation_id]'" :value="operation.is_alternative ? (operation.replaces_operation_id || '') : ''" />
                                             <input type="hidden" x-bind:name="'operations['+index+'][replaces_sequence]'" :value="operation.is_alternative ? (operation.replaces_sequence || '') : ''" />
                                             <input type="hidden" x-bind:name="'operations['+index+'][priority]'" :value="operation.is_alternative ? (operation.priority || 1) : ''" />
-                                            <input type="hidden" x-bind:name="'operations['+index+'][labor_cost_rate]'" :value="operation.labor_cost_rate" />
-                                            <input type="hidden" x-bind:name="'operations['+index+'][machine_cost_rate]'" :value="operation.machine_cost_rate" />
+                                            {{-- RT-IMPL-14: all figures come from computeFigures() (one calculator); the backend re-checks and saves them as sent --}}
+                                            <input type="hidden" x-bind:name="'operations['+index+'][labor_cost_rate]'" :value="computeFigures(operation).labor_cost_rate.toFixed(4)" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][machine_cost_rate]'" :value="computeFigures(operation).machine_cost_rate.toFixed(4)" />
                                             <input type="hidden" x-bind:name="'operations['+index+'][cost_per_unit]'" :value="calculateUnitCost(operation)" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][labor_cost_per_unit]'" :value="computeFigures(operation).labor_cost_per_unit.toFixed(4)" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][machine_cost_per_unit]'" :value="computeFigures(operation).machine_cost_per_unit.toFixed(4)" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][setup_cost_per_run]'" :value="calculateSetupCostPerRun(operation)" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][section_calculation_id]'" :value="operation.is_external ? '' : ((sectionMeta(operation) || {}).section_calculation_id || '')" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][section_snapshot_number]'" :value="operation.is_external ? '' : ((sectionMeta(operation) || {}).snapshot_number || '')" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][work_center_calculation_id]'" :value="operation.is_external ? '' : ((sectionMeta(operation) || {}).work_center_calculation_id || '')" />
                                             <input type="hidden" x-bind:name="'operations['+index+'][resource_snapshot]'" :value="JSON.stringify(getResourceSnapshot(operation))" />
                                         </td>
                                         
@@ -351,6 +363,16 @@
                                                     <i class="feather-arrow-left me-1 text-secondary"></i>Select Work Center first
                                                 </div>
                                             </template>
+                                            {{-- RT-IMPL-14 (RT-19 rule 7): figures come from the section's latest calculation snapshot --}}
+                                            <template x-if="!operation.is_external && sectionMeta(operation) && sectionMeta(operation).not_calculated">
+                                                <div class="mt-1.5 text-danger fs-10 routing-section-not-calculated"><i class="feather-alert-triangle me-1"></i><span x-text="sectionMeta(operation).message"></span></div>
+                                            </template>
+                                            <template x-if="!operation.is_external && sectionMeta(operation) && !sectionMeta(operation).not_calculated">
+                                                <div class="mt-1 text-muted fs-10 font-monospace" :title="'Figures from section calculation snapshot #' + sectionMeta(operation).snapshot_number">Snapshot #<span x-text="sectionMeta(operation).snapshot_number"></span></div>
+                                            </template>
+                                            <template x-if="!operation.is_external && sectionMeta(operation) && !sectionMeta(operation).not_calculated && sectionMeta(operation).has_pending_changes">
+                                                <div class="mt-1 text-warning fs-10"><i class="feather-clock me-1"></i>Section has pending changes — recalculate the Work Center for the latest figures.</div>
+                                            </template>
                                             <template x-if="operation.work_center_id && (!operation.availableSections || operation.availableSections.length === 0) && !operation.is_external">
                                                 <div class="mt-1.5 d-flex align-items-center text-warning fs-10 fst-italic">
                                                     <i class="feather-alert-circle me-1"></i>No sections in this WC
@@ -421,19 +443,19 @@
                                                     </div>
                                                     <div class="d-flex justify-content-between align-items-center fs-10 text-secondary mb-1">
                                                         <span><i class="feather-clock me-1 text-muted"></i>Run Speed:</span>
-                                                        <span class="fw-bold text-dark font-monospace" x-text="formatDuration(getSelectedMachine(operation).speed_minutes_per_unit) + ' (' + parseFloat(getSelectedMachine(operation).speed_minutes_per_unit || 0).toFixed(2) + ' m/u)'"></span>
+                                                        <span class="fw-bold text-dark font-monospace" x-text="formatDuration(getSelectedMachine(operation).speed_minutes_per_unit) + ' (' + fmt4(getSelectedMachine(operation).speed_minutes_per_unit) + ' m/u)'"></span>
                                                     </div>
                                                     <div class="d-flex justify-content-between align-items-center fs-10 text-secondary mb-1">
                                                         <span><i class="feather-cpu me-1 text-muted"></i>Machine Cost:</span>
-                                                        <span class="fw-semibold text-dark font-monospace" x-text="'{{ active_currency_symbol() }}' + parseFloat(getSelectedMachine(operation).machine_cost_per_unit || 0).toFixed(2)"></span>
+                                                        <span class="fw-semibold text-dark font-monospace" x-text="'{{ active_currency_symbol() }}' + fmt4(getSelectedMachine(operation).machine_cost_per_unit)"></span>
                                                     </div>
                                                     <div class="d-flex justify-content-between align-items-center fs-10 text-secondary mb-1">
                                                         <span><i class="feather-user me-1 text-muted"></i>Operator Cost:</span>
-                                                        <span class="fw-semibold text-dark font-monospace" x-text="'{{ active_currency_symbol() }}' + parseFloat(getSelectedMachine(operation).labor_cost_per_unit || 0).toFixed(2)"></span>
+                                                        <span class="fw-semibold text-dark font-monospace" x-text="'{{ active_currency_symbol() }}' + fmt4(getSelectedMachine(operation).labor_cost_per_unit)"></span>
                                                     </div>
                                                     <div class="d-flex justify-content-between align-items-center fs-10 text-secondary pt-1 border-top border-light-subtle">
                                                         <span class="fw-semibold text-dark"><i class="feather-dollar-sign me-0.5 text-muted"></i>Operation Cost:</span>
-                                                        <span class="fw-bold text-primary font-monospace fs-11" x-text="'{{ active_currency_symbol() }}' + parseFloat(getSelectedMachine(operation).cost_per_unit || 0).toFixed(2)"></span>
+                                                        <span class="fw-bold text-primary font-monospace fs-11" x-text="'{{ active_currency_symbol() }}' + fmt4(getSelectedMachine(operation).cost_per_unit)"></span>
                                                     </div>
                                                 </div>
                                             </template>
@@ -502,11 +524,11 @@
                                                     </div>
                                                     <div class="d-flex justify-content-between align-items-center fs-10 text-secondary mb-1">
                                                         <span><i class="feather-clock me-1 text-muted"></i>Run Speed:</span>
-                                                        <span class="fw-bold text-dark font-monospace" x-text="formatDuration(getSelectedBatch(operation).speed_minutes_per_unit) + ' (' + parseFloat(getSelectedBatch(operation).speed_minutes_per_unit || 0).toFixed(2) + ' m/u)'"></span>
+                                                        <span class="fw-bold text-dark font-monospace" x-text="formatDuration(getSelectedBatch(operation).speed_minutes_per_unit) + ' (' + fmt4(getSelectedBatch(operation).speed_minutes_per_unit) + ' m/u)'"></span>
                                                     </div>
                                                     <div class="d-flex justify-content-between align-items-center fs-10 text-secondary pt-1 border-top border-light-subtle">
                                                         <span><i class="feather-dollar-sign me-0.5 text-muted"></i>Labor Cost:</span>
-                                                        <span class="fw-bold text-info font-monospace fs-11" x-text="'{{ active_currency_symbol() }}' + parseFloat(getSelectedBatch(operation).cost_per_unit || 0).toFixed(2)"></span>
+                                                        <span class="fw-bold text-info font-monospace fs-11" x-text="'{{ active_currency_symbol() }}' + fmt4(getSelectedBatch(operation).cost_per_unit)"></span>
                                                     </div>
                                                 </div>
                                             </template>
@@ -514,17 +536,25 @@
                                         
                                         <!-- Setup Time -->
                                         <td class="align-middle text-end" style="width: 85px; min-width: 85px;">
-                                            <input type="number" step="any" x-bind:name="'operations['+index+'][setup_time_minutes]'" class="odoo-table-input text-end px-1" :class="operation.is_external ? 'bg-light text-muted' : ''" style="width: 100%;" :style="operation.is_external ? 'cursor: not-allowed;' : ''" x-model="operation.setup_time_minutes" :readonly="operation.is_external" min="0" required />
+                                            <input type="number" step="any" x-bind:name="'operations['+index+'][setup_time_minutes]'" class="odoo-table-input text-end px-1" :class="operation.is_external ? 'bg-light text-muted' : ''" style="width: 100%;" :style="operation.is_external ? 'cursor: not-allowed;' : ''" x-model="operation.setup_time_minutes" :readonly="operation.is_external" min="0" placeholder="0" title="Setup per operation (once per run)" />
                                             <div class="mt-1" x-show="parseFloat(operation.setup_time_minutes || 0) > 0">
                                                 <span class="badge bg-soft-secondary text-secondary fs-10 font-monospace py-0.5 px-1" x-text="formatDuration(operation.setup_time_minutes)"></span>
+                                            </div>
+                                        </td>
+
+                                        <!-- Setup per Piece (RT-IMPL-13) -->
+                                        <td class="align-middle text-end" style="width: 85px; min-width: 85px;">
+                                            <input type="number" step="any" x-bind:name="'operations['+index+'][setup_time_per_piece_minutes]'" class="odoo-table-input text-end px-1" :class="operation.is_external ? 'bg-light text-muted' : ''" style="width: 100%;" :style="operation.is_external ? 'cursor: not-allowed;' : ''" x-model="operation.setup_time_per_piece_minutes" :readonly="operation.is_external" min="0" placeholder="0" title="Setup per piece (every unit)" />
+                                            <div class="mt-1" x-show="parseFloat(operation.setup_time_per_piece_minutes || 0) > 0">
+                                                <span class="badge bg-soft-secondary text-secondary fs-10 font-monospace py-0.5 px-1" x-text="formatDuration(operation.setup_time_per_piece_minutes)"></span>
                                             </div>
                                         </td>
                                         
                                         <!-- Process Time (Run) - Derived from resource capacity, non-editable -->
                                         <td class="align-middle text-end" style="width: 85px; min-width: 85px;">
-                                            <input type="number" step="any" x-bind:name="'operations['+index+'][processing_time_minutes]'" class="odoo-table-input text-end px-1 fw-semibold bg-light text-muted" style="width: 100%; cursor: not-allowed;" x-model="operation.processing_time_minutes" readonly tabindex="-1" min="0" required title="Run speed is automatically derived from Machine / Manual Batch capacity" />
-                                            <div class="mt-1" x-show="parseFloat(operation.processing_time_minutes || 0) > 0">
-                                                <span class="badge bg-soft-primary text-primary fs-10 font-monospace py-0.5 px-1" x-text="formatDuration(operation.processing_time_minutes)"></span>
+                                            <input type="number" step="any" x-bind:name="'operations['+index+'][processing_time_minutes]'" class="odoo-table-input text-end px-1 fw-semibold bg-light text-muted" style="width: 100%; cursor: not-allowed;" :value="fmt4(computeFigures(operation).processing_time_minutes)" readonly tabindex="-1" min="0" required title="Run speed is automatically derived from Machine / Manual Batch capacity" />
+                                            <div class="mt-1" x-show="computeFigures(operation).processing_time_minutes > 0">
+                                                <span class="badge bg-soft-primary text-primary fs-10 font-monospace py-0.5 px-1" x-text="formatDuration(computeFigures(operation).processing_time_minutes)"></span>
                                             </div>
                                         </td>
 
@@ -538,7 +568,10 @@
                                         
                                         <!-- Cost / Unit -->
                                         <td class="align-middle text-end font-monospace fw-semibold" style="width: 105px; min-width: 105px;">
-                                            <span class="fs-12 text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Total unit cost: (setup time + cycle run time) × rates × yield" x-text="'{{ active_currency_symbol() }}' + calculateUnitCost(operation)"></span>
+                                            <span class="fs-12 text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Cost / Unit = (setup per piece + run time) × (labor + machine rate) × (100 ÷ yield)" x-text="'{{ active_currency_symbol() }}' + fmt4(calculateUnitCost(operation))"></span>
+                                            <div class="text-muted fs-10 fw-normal mt-0.5" x-show="parseFloat(calculateSetupCostPerRun(operation)) > 0" title="Setup cost per run = setup per operation × (labor + machine rate) — once per production run, no yield">
+                                                + <span x-text="'{{ active_currency_symbol() }}' + fmt4(calculateSetupCostPerRun(operation))"></span> / run
+                                            </div>
                                         </td>
                                         
                                         <!-- Quality Required -->
@@ -599,7 +632,7 @@
 
                                      <!-- Subcontract Details Expanded Panel -->
                                      <tr x-show="operation.is_external" class="bg-light-subtle">
-                                         <td colspan="13" class="p-2 border-top-0">
+                                         <td colspan="14" class="p-2 border-top-0">
                                              <div class="row g-2 align-items-center fs-12 px-2 py-2 bg-white rounded border">
                                                  <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="select" label="Vendor *" x-bind:name="'operations['+index+'][vendor_id]'" class="form-select form-select-sm fs-11" x-model="operation.vendor_id" x-bind:required="operation.is_external" x-bind:disabled="!operation.is_external">
@@ -726,6 +759,7 @@
                                 machine_id: op.machine_id || '',
                                 section_manual_production_id: op.section_manual_production_id || '',
                                 setup_time_minutes: op.setup_time_minutes !== undefined ? op.setup_time_minutes : '0.00',
+                                setup_time_per_piece_minutes: op.setup_time_per_piece_minutes !== undefined ? op.setup_time_per_piece_minutes : '',
                                 processing_time_minutes: op.processing_time_minutes !== undefined ? op.processing_time_minutes : '0.00',
                                 wait_time_minutes: op.wait_time_minutes !== undefined ? op.wait_time_minutes : '0.00',
                                 labor_cost_rate: op.labor_cost_rate !== undefined ? op.labor_cost_rate : '0.0000',
@@ -807,6 +841,7 @@
                         machine_id: '',
                         section_manual_production_id: '',
                         setup_time_minutes: '0.00',
+                        setup_time_per_piece_minutes: '',
                         processing_time_minutes: '0.00',
                         wait_time_minutes: '0.00',
                         labor_cost_rate: '0.0000',
@@ -1000,6 +1035,7 @@
                 formatDuration(minutes) {
                     const mFloat = parseFloat(minutes || 0);
                     if (isNaN(mFloat) || mFloat <= 0) return '0s';
+                    if (mFloat * 60 < 1) return '< 1s'; // anything under 1 second
                     const totalSeconds = Math.round(mFloat * 60);
                     const hours = Math.floor(totalSeconds / 3600);
                     const remainingSecs = totalSeconds % 3600;
@@ -1345,6 +1381,22 @@
                     });
                 },
 
+                // RT-IMPL-14: which section / Work Center snapshot the figures came from
+                snapshotSource(operation) {
+                    const meta = this.sectionMeta(operation) || {};
+                    return {
+                        work_center_id: meta.work_center_id || operation.work_center_id || null,
+                        work_center_code: meta.work_center_code || null,
+                        section_id: meta.section_id || operation.section_id || null,
+                        section_code: meta.section_code || null,
+                        section_calculation_id: meta.section_calculation_id || null,
+                        section_snapshot_number: meta.snapshot_number || null,
+                        work_center_calculation_id: meta.work_center_calculation_id || null,
+                        work_center_snapshot_number: meta.work_center_snapshot_number || null,
+                        calculated_at: meta.calculated_at || null
+                    };
+                },
+
                 getResourceSnapshot(operation) {
                     if (operation.is_external) {
                         return {
@@ -1364,9 +1416,15 @@
                             speed_minutes_per_unit: parseFloat(machine.speed_minutes_per_unit || 0),
                             operating_cost_per_hour: parseFloat(machine.operating_cost_per_hour || 0),
                             operator_labor_cost_per_machine_per_hour: parseFloat(operation.operator_labor_cost_per_machine_per_hour || machine.operator_labor_cost_per_hour || 0),
-                            machine_cost_per_unit: parseFloat(machine.machine_cost_per_unit || 0),
-                            labor_cost_per_unit: parseFloat(machine.labor_cost_per_unit || 0),
-                            cost_per_unit: parseFloat(machine.cost_per_unit || 0)
+                            non_batch_daily_labor_cost: parseFloat(machine.non_batch_daily_labor_cost || 0),
+                            section_operating_hours: parseFloat(machine.section_operating_hours || 0),
+                            active_machines_count: parseInt(machine.active_machines_count || 0, 10),
+                            // run-only per-unit figures of the resource (not the operation's Cost / Unit — RT-IMPL-14)
+                            run_machine_cost_per_unit: parseFloat(machine.machine_cost_per_unit || 0),
+                            run_labor_cost_per_unit: parseFloat(machine.labor_cost_per_unit || 0),
+                            run_cost_per_unit: parseFloat(machine.cost_per_unit || 0),
+                            rate_source: 'operator labor = non-batch daily labor ÷ section operating hours ÷ active machines',
+                            ...this.snapshotSource(operation)
                         };
                     }
                     const batch = this.getSelectedBatch(operation);
@@ -1379,8 +1437,10 @@
                             capacity: parseFloat(batch.capacity_per_hour || 0),
                             speed_minutes_per_unit: parseFloat(batch.speed_minutes_per_unit || 0),
                             labor_cost_per_hour: parseFloat(batch.labor_cost_per_hour || 0),
-                            labor_cost_per_unit: parseFloat(batch.labor_cost_per_unit || 0),
-                            cost_per_unit: parseFloat(batch.cost_per_unit || 0)
+                            run_labor_cost_per_unit: parseFloat(batch.labor_cost_per_unit || 0),
+                            run_cost_per_unit: parseFloat(batch.cost_per_unit || 0),
+                            rate_source: 'batch labor per hour (batch workers)',
+                            ...this.snapshotSource(operation)
                         };
                     }
                     return null;
@@ -1399,8 +1459,7 @@
                         operation.operator_labor_cost_per_machine_per_hour = 0;
                         operation.labor_cost_rate = '0.0000';
                         operation.machine_cost_rate = '0.0000';
-                        operation.setup_time_minutes = '0.00';
-                        operation.processing_time_minutes = '0.00';
+                        this.clearResourceDerivedTimes(operation); // RT-IMPL-15
                         operation.wait_time_minutes = '0.00';
 
                         if ($row.length) {
@@ -1435,8 +1494,7 @@
                     operation.operator_labor_cost_per_machine_per_hour = 0;
                     operation.labor_cost_rate = '0.0000';
                     operation.machine_cost_rate = '0.0000';
-                    operation.processing_time_minutes = '0.00';
-
+                    this.clearResourceDerivedTimes(operation); // RT-IMPL-15
                     if (operation.work_center_id) {
                         operation.availableSections = this.workCenterSectionsMap[operation.work_center_id] || [];
                     } else {
@@ -1459,8 +1517,7 @@
                     operation.operator_labor_cost_per_machine_per_hour = 0;
                     operation.labor_cost_rate = '0.0000';
                     operation.machine_cost_rate = '0.0000';
-                    operation.processing_time_minutes = '0.00';
-
+                    this.clearResourceDerivedTimes(operation); // RT-IMPL-15
                     if (!$row || !$row.length) {
                         $row = $('tr[data-row-uid="' + operation.uid + '"]');
                     }
@@ -1491,15 +1548,15 @@
                         const m = (operation.availableMachines || []).find(item => String(item.id) === String(operation.machine_id));
                         if (m) {
                             if (m.speed_minutes_per_unit > 0) {
-                                operation.processing_time_minutes = parseFloat(m.speed_minutes_per_unit).toFixed(2);
+                                operation.processing_time_minutes = parseFloat(m.speed_minutes_per_unit).toFixed(4);
                             } else {
-                                operation.processing_time_minutes = '0.00';
+                                this.clearResourceDerivedTimes(operation); // RT-IMPL-15
                             }
                             operation.machine_cost_rate = (parseFloat(m.operating_cost_per_hour || 0) / 60.0).toFixed(4);
                             operation.labor_cost_rate = (parseFloat(operation.operator_labor_cost_per_machine_per_hour || 0) / 60.0).toFixed(4);
                         }
                     } else {
-                        operation.processing_time_minutes = '0.00';
+                        this.clearResourceDerivedTimes(operation); // RT-IMPL-15
                         operation.machine_cost_rate = '0.0000';
                         operation.labor_cost_rate = '0.0000';
                     }
@@ -1516,15 +1573,15 @@
                         const b = (operation.availableBatches || []).find(item => String(item.id) === String(operation.section_manual_production_id));
                         if (b) {
                             if (b.speed_minutes_per_unit > 0) {
-                                operation.processing_time_minutes = parseFloat(b.speed_minutes_per_unit).toFixed(2);
+                                operation.processing_time_minutes = parseFloat(b.speed_minutes_per_unit).toFixed(4);
                             } else {
-                                operation.processing_time_minutes = '0.00';
+                                this.clearResourceDerivedTimes(operation); // RT-IMPL-15
                             }
                             operation.machine_cost_rate = '0.0000';
                             operation.labor_cost_rate = (parseFloat(b.labor_cost_per_hour || 0) / 60.0).toFixed(4);
                         }
                     } else {
-                        operation.processing_time_minutes = '0.00';
+                        this.clearResourceDerivedTimes(operation); // RT-IMPL-15
                         operation.machine_cost_rate = '0.0000';
                         operation.labor_cost_rate = '0.0000';
                     }
@@ -1545,21 +1602,80 @@
                         .catch(err => console.error('Failed to load section resources:', err));
                 },
 
-                calculateUnitCost(operation) {
-                    if (operation.is_external) {
-                        const unitSub = parseFloat(operation.subcontract_cost_per_unit || 0);
-                        const yieldPct = parseFloat(operation.expected_yield_percentage || 100);
-                        const yieldFactor = yieldPct > 0 ? (100 / yieldPct) : 1.0;
-                        return (unitSub * yieldFactor).toFixed(2);
-                    }
-                    const activeMinutes = parseFloat(operation.setup_time_minutes || 0) + parseFloat(operation.processing_time_minutes || 0);
-                    const laborRate = parseFloat(operation.labor_cost_rate || 0);
-                    const machineRate = parseFloat(operation.machine_cost_rate || 0);
-                    const yieldPct = parseFloat(operation.expected_yield_percentage || 100);
-                    const yieldFactor = yieldPct > 0 ? (100 / yieldPct) : 1.0;
+                // RT-IMPL-14 (RT-19 rule 1): ONE calculator for every figure of an operation. Rates and run time come from
+                // the selected machine / batch of the section's latest calculation snapshot; rounding = backend check
+                // (RoutingOperationCostCalculator). Formulas: RT-IMPL-10 / 11 / 12 / 13.
+                round4(v) {
+                    const n = parseFloat(v || 0);
+                    return isNaN(n) ? 0 : Math.round(n * 10000) / 10000;
+                },
 
-                    const unitCost = activeMinutes * (laborRate + machineRate) * yieldFactor;
-                    return (unitCost || 0).toFixed(2);
+                sectionMeta(operation) {
+                    if (!operation || !operation.section_id) return null;
+                    return this.sectionResourcesCache[operation.section_id] || null;
+                },
+
+                computeFigures(operation) {
+                    const r4 = (v) => this.round4(v);
+                    const yieldPct = parseFloat(operation.expected_yield_percentage || 100);
+                    const yf = yieldPct > 0 ? (100 / yieldPct) : 1.0;
+
+                    if (operation.is_external) {
+                        return {
+                            processing_time_minutes: r4(operation.processing_time_minutes), labor_cost_rate: 0, machine_cost_rate: 0,
+                            labor_cost_per_unit: 0, machine_cost_per_unit: 0,
+                            cost_per_unit: r4(parseFloat(operation.subcontract_cost_per_unit || 0) * yf),
+                            setup_cost_per_run: 0, cycle_time_per_piece: 0, found: true
+                        };
+                    }
+
+                    const meta = this.sectionMeta(operation) || {};
+                    const m = this.getSelectedMachine(operation);
+                    const b = m ? null : this.getSelectedBatch(operation);
+                    let speed = 0, laborRate = 0, machineRate = 0;
+                    if (m) {
+                        speed = parseFloat(m.speed_minutes_per_unit || 0);
+                        machineRate = r4(parseFloat(m.operating_cost_per_hour || 0) / 60);
+                        const opLabor = (m.operator_labor_cost_per_hour !== undefined && m.operator_labor_cost_per_hour !== null)
+                            ? m.operator_labor_cost_per_hour : (meta.operator_labor_cost_per_machine_per_hour || 0);
+                        laborRate = r4(parseFloat(opLabor || 0) / 60);
+                    } else if (b) {
+                        speed = parseFloat(b.speed_minutes_per_unit || 0);
+                        laborRate = r4(parseFloat(b.labor_cost_per_hour || 0) / 60);
+                    }
+
+                    const run = r4(speed);
+                    const cycle = parseFloat(operation.setup_time_per_piece_minutes || 0) + run;
+                    const laborPerUnit = r4(cycle * laborRate * yf);
+                    const machinePerUnit = r4(cycle * machineRate * yf);
+
+                    return {
+                        processing_time_minutes: run,
+                        labor_cost_rate: laborRate,
+                        machine_cost_rate: machineRate,
+                        labor_cost_per_unit: laborPerUnit,
+                        machine_cost_per_unit: machinePerUnit,
+                        cost_per_unit: r4(laborPerUnit + machinePerUnit),
+                        setup_cost_per_run: r4(parseFloat(operation.setup_time_minutes || 0) * (laborRate + machineRate)),
+                        cycle_time_per_piece: r4(cycle),
+                        found: !!(m || b)
+                    };
+                },
+
+                calculateUnitCost(operation) {
+                    return this.computeFigures(operation).cost_per_unit.toFixed(4);
+                },
+
+                // RT-IMPL-13: setup per operation × (labor + machine rate) — once per run, no yield
+                calculateSetupCostPerRun(operation) {
+                    return this.computeFigures(operation).setup_cost_per_run.toFixed(4);
+                },
+
+                // RT-IMPL-15: whenever the run time is cleared, both setup times are cleared too
+                clearResourceDerivedTimes(operation) {
+                    operation.processing_time_minutes = '0.00';
+                    operation.setup_time_minutes = '0.00';
+                    operation.setup_time_per_piece_minutes = '';
                 },
 
                 removeOperation(index) {

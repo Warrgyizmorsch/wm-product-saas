@@ -298,6 +298,32 @@ if (! function_exists('format_indian_number')) {
     }
 }
 
+if (! function_exists('decimal_is_whole')) {
+    /** True when the value has no digits after the decimal point at the given precision (e.g. 15.00001 at 4 → true). */
+    function decimal_is_whole($value, int $decimals = 4): bool
+    {
+        $r = round((float) $value, $decimals);
+
+        return $r == floor($r);
+    }
+}
+
+if (! function_exists('format_decimal')) {
+    /**
+     * Display rule for precise figures (times, rates, quantities): 4 decimals when there are decimal digits,
+     * none when the value is whole — 11.5 → "11.5000", 0.0167 → "0.0167", 15 → "15", 0 → "0".
+     */
+    function format_decimal($value, int $decimals = 4, string $thousandsSep = ''): string
+    {
+        $v = (float) ($value ?? 0);
+        if (decimal_is_whole($v, $decimals)) {
+            $decimals = 0;
+        }
+
+        return number_format($v, $decimals, '.', $thousandsSep);
+    }
+}
+
 if (! function_exists('format_currency')) {
     function format_currency($amountInBase, int $decimals = 2, bool $includeSymbol = true): string
     {
@@ -309,6 +335,11 @@ if (! function_exists('format_currency')) {
 
         $code = active_currency();
         $isNegative = $val < 0;
+
+        // Precise figures (4+ decimals, no-rounding rule): a whole number is shown without decimals (₹15, not ₹15.0000)
+        if ($decimals >= 4 && decimal_is_whole($val, $decimals)) {
+            $decimals = 0;
+        }
 
         if ($code === 'INR') {
             $formatted = format_indian_number($val, $decimals);
@@ -476,10 +507,10 @@ if (! function_exists('format_duration')) {
         }
 
         $mFloat = (float) $minutes;
-        $totalSeconds = (int) round($mFloat * 60);
-        if ($totalSeconds <= 0) {
-            return '0s';
+        if ($mFloat * 60 < 1) {
+            return '< 1s'; // anything under 1 second (0.6s too — never rounded up to "1s")
         }
+        $totalSeconds = (int) round($mFloat * 60);
 
         $hours = intdiv($totalSeconds, 3600);
         $remainingSecs = $totalSeconds % 3600;

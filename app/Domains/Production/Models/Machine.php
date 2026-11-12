@@ -198,4 +198,61 @@ class Machine extends BaseModel
     {
         return (float) ($this->consumption_per_hour ?? 0);
     }
+
+    // ─── Operating cost (WC-08 / RT-IMPL-11) ──────────────────────────────────
+
+    /**
+     * The one rule for a machine's operating cost per hour, shared by the section calculation and routing:
+     * entered operating cost if > 0, else consumption × energy rate if > 0, else 0.
+     * Also returns the breakdown (base energy cost, additional cost, deductibles) and the explanation type.
+     *
+     * @return array{base_energy_cost: float, entered_cost: float, additional_cost: float, deductibles: float,
+     *               final_cost_per_hour: float, explanation_type: string}
+     */
+    public function operatingCostBreakdown(): array
+    {
+        $consumption = (float) ($this->consumption_per_hour ?? 0.0);
+        $rate        = (float) ($this->energy_rate_per_unit ?? 0.0);
+        $base        = round($consumption * $rate, 4);
+        $entered     = (float) ($this->operating_cost_per_hour ?? 0.0);
+
+        $additional = 0.0;
+        $deductibles = 0.0;
+        if ($entered > 0.0 && $base > 0.0) {
+            if ($entered > $base) {
+                $additional = round($entered - $base, 4);
+                $type = 'additional';
+            } elseif ($entered < $base) {
+                $deductibles = round($base - $entered, 4);
+                $type = 'deductible';
+            } else {
+                $type = 'matches';
+            }
+            $final = $entered;
+        } elseif ($entered > 0.0) {
+            $final = $entered;
+            $type = 'flat';
+        } elseif ($base > 0.0) {
+            $final = $base;
+            $type = 'energy';
+        } else {
+            $final = 0.0;
+            $type = 'none';
+        }
+
+        return [
+            'base_energy_cost'    => $base,
+            'entered_cost'        => $entered,
+            'additional_cost'     => $additional,
+            'deductibles'         => $deductibles,
+            'final_cost_per_hour' => (float) $final,
+            'explanation_type'    => $type,
+        ];
+    }
+
+    /** Final operating cost per hour (base currency) — see operatingCostBreakdown(). */
+    public function finalOperatingCostPerHour(): float
+    {
+        return $this->operatingCostBreakdown()['final_cost_per_hour'];
+    }
 }

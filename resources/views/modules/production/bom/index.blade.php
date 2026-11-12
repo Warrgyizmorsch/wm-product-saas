@@ -308,6 +308,13 @@
                                     <span class="erp-badge-draft text-uppercase">{{ __('production.' . $bom->status) }}</span>
                                 @endif
 
+                                @if($bom->routing_advisory)
+                                    <div class="mt-1">
+                                        <span class="badge bg-soft-info text-info border border-info-subtle fs-10 px-1.5 py-0.5 rounded-pill d-inline-flex align-items-center gap-1" title="{{ $bom->routing_advisory }}">
+                                            <i class="feather-git-branch fs-10"></i> {{ __('production.routing_not_active') }}
+                                        </span>
+                                    </div>
+                                @endif
                                 @if(!in_array($bom->status, ['cancelled', 'inactive']) && ($bom->has_warning || $bom->hasComponentWarning()))
                                     <div class="mt-1">
                                         <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1.5 py-0.5 rounded-pill d-inline-flex align-items-center gap-1"

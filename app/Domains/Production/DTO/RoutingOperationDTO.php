@@ -18,7 +18,8 @@ class RoutingOperationDTO
         public readonly int     $priority = 1,
         public readonly ?string $row_uid = null,
         public readonly ?string $replaces_row_uid = null,
-        public readonly float   $setup_time_minutes = 0.0,
+        public readonly float   $setup_time_minutes = 0.0,           // RT-IMPL-13: setup per operation (once per run)
+        public readonly ?float  $setup_time_per_piece_minutes = null, // RT-IMPL-13: setup per piece
         public readonly float   $processing_time_minutes = 0.0,
         public readonly float   $wait_time_minutes = 0.0,
         public readonly float   $expected_yield_percentage = 100.0,
@@ -49,6 +50,15 @@ class RoutingOperationDTO
         public readonly ?array  $resource_snapshot = null,
         public readonly ?int    $replaces_sequence = null,
         public readonly array   $materials = [],
+        // RT-IMPL-14: saved figures + the section / Work Center snapshot they came from
+        public readonly ?float  $labor_cost_per_unit = null,
+        public readonly ?float  $machine_cost_per_unit = null,
+        public readonly ?float  $setup_cost_per_run = null,
+        public readonly ?int    $section_calculation_id = null,
+        public readonly ?int    $section_snapshot_number = null,
+        public readonly ?int    $work_center_calculation_id = null,
+        // RT-IMPL-09: id of the existing operation this row updates (matching only — not a column write)
+        public readonly ?int    $operation_id = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -99,7 +109,8 @@ class RoutingOperationDTO
             priority:                       isset($data['priority']) ? (int) $data['priority'] : 1,
             row_uid:                        !empty($data['row_uid']) ? (string) $data['row_uid'] : null,
             replaces_row_uid:               !empty($data['replaces_row_uid']) ? (string) $data['replaces_row_uid'] : null,
-            setup_time_minutes:             !$isExternal && isset($data['setup_time_minutes']) ? (float) $data['setup_time_minutes'] : 0.0,
+            setup_time_minutes:             !$isExternal && isset($data['setup_time_minutes']) && $data['setup_time_minutes'] !== '' ? (float) $data['setup_time_minutes'] : 0.0,
+            setup_time_per_piece_minutes:   !$isExternal && isset($data['setup_time_per_piece_minutes']) && $data['setup_time_per_piece_minutes'] !== '' ? (float) $data['setup_time_per_piece_minutes'] : null,
             processing_time_minutes:        !$isExternal ? $processingMinutes : 0.0,
             wait_time_minutes:              !$isExternal && isset($data['wait_time_minutes']) ? (float) $data['wait_time_minutes'] : 0.0,
             expected_yield_percentage:      isset($data['expected_yield_percentage']) ? (float) $data['expected_yield_percentage'] : 100.0,
@@ -130,6 +141,13 @@ class RoutingOperationDTO
             resource_snapshot:             !empty($data['resource_snapshot']) ? (is_array($data['resource_snapshot']) ? $data['resource_snapshot'] : json_decode((string) $data['resource_snapshot'], true)) : null,
             replaces_sequence:             isset($data['replaces_sequence']) && $data['replaces_sequence'] !== '' ? (int) $data['replaces_sequence'] : null,
             materials:                     $materials,
+            labor_cost_per_unit:           isset($data['labor_cost_per_unit']) && $data['labor_cost_per_unit'] !== '' ? (float) $data['labor_cost_per_unit'] : null,
+            machine_cost_per_unit:         isset($data['machine_cost_per_unit']) && $data['machine_cost_per_unit'] !== '' ? (float) $data['machine_cost_per_unit'] : null,
+            setup_cost_per_run:            isset($data['setup_cost_per_run']) && $data['setup_cost_per_run'] !== '' ? (float) $data['setup_cost_per_run'] : null,
+            section_calculation_id:        !$isExternal && !empty($data['section_calculation_id']) ? (int) $data['section_calculation_id'] : null,
+            section_snapshot_number:       !$isExternal && !empty($data['section_snapshot_number']) ? (int) $data['section_snapshot_number'] : null,
+            work_center_calculation_id:    !$isExternal && !empty($data['work_center_calculation_id']) ? (int) $data['work_center_calculation_id'] : null,
+            operation_id:                  !empty($data['id']) ? (int) $data['id'] : null,
         );
     }
 
@@ -148,8 +166,15 @@ class RoutingOperationDTO
             'replaces_operation_id'          => $this->replaces_operation_id,
             'priority'                       => $this->priority,
             'cost_per_unit'                  => $this->cost_per_unit,
+            'labor_cost_per_unit'            => $this->labor_cost_per_unit,
+            'machine_cost_per_unit'          => $this->machine_cost_per_unit,
+            'setup_cost_per_run'             => $this->setup_cost_per_run,
+            'section_calculation_id'         => $this->section_calculation_id,
+            'section_snapshot_number'        => $this->section_snapshot_number,
+            'work_center_calculation_id'     => $this->work_center_calculation_id,
             'resource_snapshot'              => $this->resource_snapshot,
             'setup_time_minutes'             => $this->setup_time_minutes,
+            'setup_time_per_piece_minutes'   => $this->setup_time_per_piece_minutes,
             'processing_time_minutes'        => $this->processing_time_minutes,
             'wait_time_minutes'              => $this->wait_time_minutes,
             'expected_yield_percentage'      => $this->expected_yield_percentage,

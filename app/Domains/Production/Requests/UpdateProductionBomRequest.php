@@ -122,7 +122,11 @@ class UpdateProductionBomRequest extends FormRequest
 
                 // [TRACK-05] Operation ownership check: Operation must belong to the selected Routing
                 if ($routing && $opId > 0 && !in_array($opId, $validOpIds, true)) {
-                    $validator->errors()->add("items.{$index}.routing_operation_id", "The selected operation does not belong to the chosen routing.");
+                    // RT-IMPL-09: an operation removed from the routing (soft-deleted) gets its own message
+                    $removedOp = \App\Domains\Production\Models\RoutingOperation::onlyTrashed()->where('routing_id', $routing->id)->find($opId);
+                    $validator->errors()->add("items.{$index}.routing_operation_id", $removedOp
+                        ? "Operation {$removedOp->operation_number} was removed from the routing. Move or remove its materials before saving."
+                        : "The selected operation does not belong to the chosen routing.");
                 }
 
                 if ($materialId > 0) {

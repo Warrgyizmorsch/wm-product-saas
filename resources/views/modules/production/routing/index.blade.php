@@ -334,6 +334,16 @@
                                 @else
                                     <span class="badge bg-soft-secondary text-secondary rounded-pill px-2 py-1">{{ ucfirst($routing->status) }}</span>
                                 @endif
+                                @php $rowCostStatus = app(\App\Domains\Production\Services\RoutingCostStatusService::class)->check($routing); @endphp
+                                @if ($rowCostStatus['outdated'])
+                                    <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1 ms-1 routing-costs-outdated-badge" title="{{ collect($rowCostStatus['operations'])->map(fn($o) => $o['operation_number'] . ': ' . implode(' ', $o['messages']))->implode(' | ') }} — {{ $rowCostStatus['action'] }}"><i class="feather-alert-triangle me-0.5"></i>Costs outdated</span>
+                                @elseif ($rowCostStatus['not_calculated'])
+                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-2 py-1 ms-1" title="{{ $rowCostStatus['action'] }}">Costs not calculated</span>
+                                @endif
+                                @if (!empty($rowCostStatus['inactive']))
+                                    {{-- RT-IMPL-18 --}}
+                                    <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1 ms-1 routing-inactive-badge" title="{{ collect($rowCostStatus['inactive'])->pluck('message')->implode(' ') }} {{ $rowCostStatus['inactive_header'] }}"><i class="feather-slash me-0.5"></i>{{ __('production.inactive_resources') }}</span>
+                                @endif
                             </td>
                             <td class="text-end">
                                 <x-ui.action-dropdown :viewUrl="route('production.routing.show', $routing->id)">
@@ -391,6 +401,13 @@
                                     @endif
 
                                     {{-- Duplicate --}}
+                                    @can('retire', $routing)
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#retireModal{{ $routing->id }}">
+                                                <i class="feather-archive me-2 text-muted fs-12"></i>{{ __('production.retire_routing') }}
+                                            </button>
+                                        </li>
+                                    @endcan
                                     @can('duplicate', $routing)
                                         <li>
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#duplicateModal{{ $routing->id }}">
@@ -453,10 +470,26 @@
                                 </x-ui.modal>
 
                                 <!-- Cancel Modal -->
+                                @can('retire', $routing)
+                                <x-ui.modal id="retireModal{{ $routing->id }}" title="{{ __('production.retire_routing') }}" class="text-start">
+                                    <form method="POST" action="{{ route('production.routing.retire', $routing->id) }}" id="retireForm{{ $routing->id }}">
+                                        @csrf
+                                        <p class="fs-13 text-muted">{{ __('production.retire_routing_body') }}</p>
+                                        @include('modules.production.routing.partials.bom-impact', ['routing' => $routing])
+                                        <x-ui.input :label="__('production.notes_reasons')" name="comments" placeholder="{{ __('production.retire_reason_placeholder') }}" />
+                                    </form>
+                                    <x-slot name="footer">
+                                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+                                        <x-ui.button type="submit" variant="dark" onclick="document.getElementById('retireForm{{ $routing->id }}').submit();">{{ __('production.retire_routing') }}</x-ui.button>
+                                    </x-slot>
+                                </x-ui.modal>
+                                @endcan
+
                                 <x-ui.modal id="cancelModal{{ $routing->id }}" title="{{ __('production.cancel_routing_version') }}" submit-text="{{ __('production.cancel_version') }}" class="text-start">
                                     <form method="POST" action="{{ route('production.routing.cancel', $routing->id) }}" id="cancelForm{{ $routing->id }}">
                                         @csrf
                                         <p class="fs-13 text-muted">{{ __('production.cancel_routing_modal_body') }}</p>
+                                        @include('modules.production.routing.partials.bom-impact', ['routing' => $routing])
                                         <x-ui.input :label="__('production.cancellation_reason')" name="comments" placeholder="e.g. Process design obsolete" required />
                                     </form>
                                     <x-slot name="footer">

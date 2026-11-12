@@ -179,6 +179,26 @@
             </div>
         </div>
 
+        @foreach($bom->deleted_operation_advisories as $msg)
+            {{-- RT-IMPL-09: allocation on an operation removed from the routing --}}
+            <div class="alert alert-danger border-danger bg-soft-danger p-3 mb-3 rounded shadow-sm d-flex align-items-start fs-12" role="alert">
+                <i class="feather-alert-octagon me-2 mt-1 text-danger"></i><div class="text-dark">{{ $msg }}</div>
+            </div>
+        @endforeach
+
+        @if($bom->routing_advisory)
+            {{-- RT-IMPL-05: routing advisory, worked out live from the routing status (not stored) --}}
+            <div class="alert alert-info border-info bg-soft-info p-3 mb-3 rounded shadow-sm d-flex align-items-start" role="alert">
+                <i class="feather-git-branch me-2 mt-1 text-info"></i>
+                <div class="fs-12 text-dark">
+                    <strong>{{ __('production.routing_advisory') }}:</strong> {{ $bom->routing_advisory }}
+                    @if($bom->routing)
+                        <a href="{{ route('production.routing.show', $bom->routing_id) }}" class="ms-1">{{ $bom->routing->routing_number }}</a>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         @if(!$isCancelledOrInactive && !empty($bomComponentWarnings))
             <div class="alert alert-warning border-warning bg-soft-warning p-3 mb-4 rounded shadow-sm" role="alert">
                 <div class="d-flex align-items-start">

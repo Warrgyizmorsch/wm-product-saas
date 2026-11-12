@@ -173,6 +173,9 @@ Route::middleware([
         Route::post('/{routing}/cancel', [RoutingApiController::class, 'cancel'])
             ->middleware('throttle:production-api-write')
             ->name('api.v1.production.routings.cancel');
+        Route::post('/{routing}/retire', [RoutingApiController::class, 'retire'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.routings.retire'); // RT-IMPL-02
         Route::post('/{routing}/duplicate', [RoutingApiController::class, 'duplicate'])
             ->middleware('throttle:production-api-write')
             ->name('api.v1.production.routings.duplicate');

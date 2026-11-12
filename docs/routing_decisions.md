@@ -48,6 +48,8 @@
 | RT-32 | Downstream: production orders, plans, MRP, scheduling, MES (combined 11-item list) | ⏸️ Deferred |
 | RT-33 | ECO (engineering change orders) — 4 notes recorded | ⏸️ Deferred |
 | RT-34 | Remove commented-out decoupling code in one final pass | ✅ Agreed (→ RT-IMPL-19, do last) |
+| RT-35 | Duplicate Version = pre-filled create form, nothing saved until Save (routing version of BM-03) | ✅ Agreed 2026-11-12 (→ RT-IMPL-20) |
+| RT-36 | Older routings saved before calculate-once (RT-19) have no saved figures — one-time fill from the latest section snapshots? | 🟡 Proposed (→ RT-IMPL-21) |
 
 **Routing review completed 2026-11-11:** 34 / 34 reviewed — **28 agreed**, **1 provisional** (RT-08), **5 deferred / on hold** (RT-09, RT-17, RT-31, RT-32, RT-33), plus carried-over WC-RTG-01 / WC-RTG-02 decided (RT-14, RT-29).
 Open items in [`routing_implementation_tasks.md`](routing_implementation_tasks.md): RT-ISSUE-01 (external cost / vendor), RT-IMPL-03 (proposed), RT-DEF-01 (deferred to RT-32). Several tasks have a BOM part to do with the BOM file (RT-IMPL-05, 09, 13, 14).
@@ -175,6 +177,8 @@ Deferred to a dedicated QA / QC review (quality plans, inspection workflow, test
 1. When a Routing is made the order quantity is unknown, so **all times and costs on the routing form and show page are for 1 unit**. A notice above the operations table says so: *"Values shown below are calculated for 1 unit only."*
 2. Every operation shows **Cost / Unit** (labor + machine cost per unit, or subcontract cost for external), saved with the operation (`production_routing_operations.cost_per_unit`).
 3. **No rounding — show the truth.** Times and costs are stored and displayed with their real precision (at least 4 decimals), not rounded to 2. E.g. a screw costing ₹0.0042 per unit shows **₹0.0042**, not ₹0.00; a machine at 3,600 u/h shows **0.0167 min** (1s), not 0.02 min.
+4. **Display rule (clarified by user 2026-11-12):** show **4 decimals only when there are decimal digits**; a whole number is shown **without decimals** to keep the UI clean — ₹15 not ₹15.0000, 0 not 0.0000; 11.5 → 11.5000, 0.0167 → 0.0167 (the 4-decimal precision rule is unchanged). Applies to money, times, rates and quantities shown at precision. *(Data fields — hidden form values, saved columns — keep 4 decimals.)*
+5. **Time under 1 second** is shown as **"< 1s"** — anything under a second (0.6 s too), never rounded up to "1s" and never "0s" (0 itself stays "0s").
 → Task **RT-IMPL-10**.
 * *Code reference:* `routing/create.blade.php` 209–210 (column ✔), 232 (saved ✔), 1548–1563 (`calculateUnitCost()` → `.toFixed(2)` ✘), 1494, 1519 (processing time `.toFixed(2)` ✘); `RoutingService.php` 433 (backend fallback); columns `setup_time_minutes` / `processing_time_minutes` **decimal(10,2)** (migration `2026_06_30_000004`, 43, 45 ✘), `cost_per_unit` decimal(15,4) ✔; `format_currency()` default 2 decimals (`app/helpers.php` 302); no "1 unit" notice anywhere ✘.
 * *Origin:* `work_center_routing_linking_tracker.md` WC-TRACK-03 Point 3.1; confirmed 2026-11-10.
@@ -421,3 +425,19 @@ ECO is not linked to the new BOM / Routing design yet; it may stay broken / disc
 → Task **RT-IMPL-19** (do last).
 * *Today:* 40 markers in 13 files (2026-11-11) — see RT-IMPL-19.
 * *Origin:* `bom_routing_feature_exchange_tracker.md` TRACK-03 (comment-out policy); confirmed 2026-11-11.
+
+### RT-35: Duplicate Version — Pre-filled Create Form, Nothing Saved Until Save
+*(Routing version of BM-03; agreed 2026-11-12.)*
+1. **The Duplicate Version button saves nothing.** It checks the new version (name + version must be free — clear message otherwise) and opens the routing **create form pre-filled** from the source routing. The new routing, its operations and the "Revision Created" audit entry are written **only when the user clicks Save**. Cancel leaves nothing behind.
+2. **Faithful copy:** every operation with all its fields — section, machine / batch, setup times, yield, external / subcontract fields, queue threshold, parallel group; alternatives and predecessors are linked **by sequence** (never by the source routing's operation ids). New routing number (AUTO), version as typed, start date today, no end date.
+3. **Costs come from the current section snapshots** (RT-19 calculate-once): on open the form works out every figure from the latest section calculation; a section with no calculation or a resource no longer in it shows the usual message and the save is refused until fixed.
+4. On save: **revision = source revision + 1**, audit *"Version X created from RTG-… version Y"*, revision event. The source routing is untouched (no auto-retire — RT-02).
+5. **API:** the duplicate endpoint returns the copy data (with figures and warnings) **without saving**; the client sends it to the normal create endpoint with `source_routing_id`.
+6. Materials are not copied — materials belong to the BOM (RT-27 / BM decisions).
+→ Task **RT-IMPL-20**.
+* *Origin:* user review 2026-11-12 ("routing is still first saving the DB and then the edit screen opens").
+
+### RT-36: Older Routings Without Saved Figures — 🟡 PROPOSED
+Routings saved before RT-IMPL-14 have no saved Cost / Unit, labor / machine per unit or setup cost per run, so they show *"Costs not calculated"* and ₹0. A draft is fixed by opening and saving it; an **active / scheduled** routing is read-only and today can only get figures through a new version (Duplicate Version → save → approve).
+**Proposal:** a one-time command (`production:fill-routing-figures`) fills the missing figures for routings that have none, from the latest section snapshots, using the same calculator the backend check uses (RT-19), and records the snapshot number. Routings that already have figures are never touched. *Conflict to decide:* this changes an approved routing outside a new version (RT-03 rule 2).
+→ Task **RT-IMPL-21** (not started — waiting for the user's decision).

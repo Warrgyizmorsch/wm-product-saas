@@ -124,7 +124,6 @@ class BomRoutingInversionTest extends TestCase
     {
         $dto = new RoutingDTO(
             name: $name,
-            product_id: $this->finishedProduct->id,
             version: $version,
             effective_from: now()->toDateString(),
             operations: [

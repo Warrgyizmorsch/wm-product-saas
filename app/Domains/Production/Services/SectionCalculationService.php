@@ -511,42 +511,15 @@ class SectionCalculationService
             $consumption = (float) ($machine->consumption_per_hour ?? 0.0);
             $rate = (float) ($machine->energy_rate_per_unit ?? 0.0);
 
-            // 1. Calculate Base Energy Cost
-            $baseEnergyCost = round($consumption * $rate, 4);
-
-            // 2. Entered Operating Cost
-            $enteredCost = (float) ($machine->operating_cost_per_hour ?? 0.0);
-
-            // 3. Reconcile Discrepancy
-            $additionalCost = 0.0;
-            $deductibles    = 0.0;
-            // WC-IMPL-04: store a message type + numbers; the sentence is built at display (CalculationText)
-            $explanationType = 'none';
-            $finalOpCostHr  = 0.0;
-
-            if ($enteredCost > 0.0 && $baseEnergyCost > 0.0) {
-                if ($enteredCost > $baseEnergyCost) {
-                    $additionalCost = round($enteredCost - $baseEnergyCost, 4);
-                    $finalOpCostHr  = $enteredCost;
-                    $explanationType = 'additional';
-                } elseif ($enteredCost < $baseEnergyCost) {
-                    $deductibles   = round($baseEnergyCost - $enteredCost, 4);
-                    $finalOpCostHr = $enteredCost;
-                    $explanationType = 'deductible';
-                } else {
-                    $finalOpCostHr = $enteredCost;
-                    $explanationType = 'matches';
-                }
-            } elseif ($enteredCost > 0.0) {
-                $finalOpCostHr = $enteredCost;
-                $explanationType = 'flat';
-            } elseif ($baseEnergyCost > 0.0) {
-                $finalOpCostHr = $baseEnergyCost;
-                $explanationType = 'energy';
-            } else {
-                $finalOpCostHr = 0.0;
-                $explanationType = 'none';
-            }
+            // WC-08 / RT-IMPL-11: one shared rule for the final operating cost (Machine::operatingCostBreakdown()).
+            // WC-IMPL-04: a message type + numbers are stored; the sentence is built at display (CalculationText).
+            $costBreakdown   = $machine->operatingCostBreakdown();
+            $baseEnergyCost  = $costBreakdown['base_energy_cost'];
+            $enteredCost     = $costBreakdown['entered_cost'];
+            $additionalCost  = $costBreakdown['additional_cost'];
+            $deductibles     = $costBreakdown['deductibles'];
+            $finalOpCostHr   = $costBreakdown['final_cost_per_hour'];
+            $explanationType = $costBreakdown['explanation_type'];
 
             $dailyCap  = round($capHr * $uniqueOperatingHours, 4);
             $dailyCost = round($finalOpCostHr * $uniqueOperatingHours, 4);
@@ -1295,6 +1268,10 @@ class SectionCalculationService
         $calc = $this->calculate($section);
         $batchId = $batchId ?: (string) Str::uuid();
 
+        // RT-IMPL-14 (RT-19 rule 7): the snapshot also stores the figures routing uses (per active machine / batch,
+        // operator labor per machine), so routing reads them from this snapshot instead of calculating live.
+        $calc['calculation_details']['routing_resources'] = $this->getSectionResourceCosts($section);
+
         // Assign sequential snapshot_number scoped per Section
         $nextSnapshotNumber = ((int) WorkCenterSectionCalculation::where('section_id', $section->id)->max('snapshot_number')) + 1;
 
@@ -1329,6 +1306,52 @@ class SectionCalculationService
         app(WorkCenterActivityLogger::class)->logSectionCalculationCompleted($record);
 
         return $record;
+    }
+
+    /**
+     * RT-IMPL-14 (RT-19 rule 7): routing resource figures FROM THE LATEST SECTION SNAPSHOT (no live calculation),
+     * plus which snapshot they came from. Used by the routing form endpoint and the backend cost check.
+     *
+     * `not_calculated = true` when the section has no snapshot with routing figures yet.
+     * `has_pending_changes = true` when the section is queued in its Work Center's countdown.
+     */
+    public function getSnapshotResourceCosts(WorkCenterSection $section): array
+    {
+        $snapshot = WorkCenterSectionCalculation::where('section_id', $section->id)->latest('id')->first();
+        $routing = $snapshot?->calculation_details['routing_resources'] ?? null;
+
+        $workCenter = $section->workCenter;
+        $pending = is_array($workCenter?->pending_calculation_section_ids) ? $workCenter->pending_calculation_section_ids : [];
+        $wcCalc = $snapshot?->work_center_calculation_id
+            ? \App\Domains\Production\Models\WorkCenterCalculation::find($snapshot->work_center_calculation_id)
+            : null;
+
+        $meta = [
+            'section_id'                 => $section->id,
+            'section_name'               => $section->name,
+            'section_code'               => $section->code,
+            'work_center_id'             => $section->work_center_id,
+            'work_center_code'           => $workCenter?->code,
+            'section_calculation_id'     => $snapshot?->id,
+            'snapshot_number'            => $snapshot?->snapshot_number,
+            'work_center_calculation_id' => $wcCalc?->id,
+            'work_center_snapshot_number'=> $wcCalc?->snapshot_number,
+            'calculated_at'              => $snapshot?->created_at?->toIso8601String(),
+            'has_pending_changes'        => in_array((int) $section->id, array_map('intval', $pending), true),
+        ];
+
+        if (!$snapshot || !is_array($routing)) {
+            return $meta + [
+                'not_calculated'                           => true,
+                'message'                                  => "Section {$section->code} has not been calculated yet. Recalculate the Work Center first.",
+                'active_machines_count'                    => 0,
+                'operator_labor_cost_per_machine_per_hour' => 0.0,
+                'machines'                                 => [],
+                'manual_batches'                           => [],
+            ];
+        }
+
+        return array_merge($routing, $meta, ['not_calculated' => false]);
     }
 
     /**
@@ -1400,7 +1423,9 @@ class SectionCalculationService
             ->with('employee')
             ->get();
 
-        $unassignedInternalLaborHourlyCost = 0.0;
+        // RT-IMPL-12 (RT-14): sum DAILY cost of the non-batch workers, then average over the section operating hours.
+        // (Summing hourly rates treated every worker as on the floor at the same time.)
+        $unassignedInternalLaborDailyCost = 0.0;
         foreach ($internalAssignments as $assignment) {
             if (in_array($assignment->id, $assignedEmployeeAssignmentIds, true)) {
                 continue; // Belongs to a manual batch
@@ -1409,15 +1434,7 @@ class SectionCalculationService
             if (!$emp || !$emp->status) {
                 continue;
             }
-            $shiftId = $emp->shift_id ?: (!empty($operatingHours['shifts']) ? $operatingHours['shifts'][0]['id'] : null);
-            $shiftClockHours = (float) ($shiftMap[$shiftId]['duration_hours'] ?? 8.0);
-            if ($shiftClockHours <= 0) {
-                $shiftClockHours = 8.0;
-            }
-            $monthlySalary = $emp->monthlyCtc(); // HRMS payroll monthly CTC (current_salary is annual) — WC-17
-            $dailySalary = round($monthlySalary / 30, 4);
-            $hourlyRate = round($dailySalary / $shiftClockHours, 4);
-            $unassignedInternalLaborHourlyCost += $hourlyRate;
+            $unassignedInternalLaborDailyCost += $emp->monthlyCtc() / 30; // HRMS monthly CTC ÷ 30 (WC-IMPL-07)
         }
 
         // 4. Unassigned External Contractor Labor (assigned to Section but manual_production_id IS NULL)
@@ -1428,21 +1445,26 @@ class SectionCalculationService
             ->with('payGrade')
             ->get();
 
-        $unassignedExternalLaborHourlyCost = 0.0;
+        $unassignedExternalLaborDailyCost = 0.0;
         foreach ($externalAllocations as $alloc) {
             $headcount = (int) ($alloc->number_of_external_workers ?? 1);
             $ratePerHour = (float) ($alloc->payGrade?->hourly_rate ?? 0.0);
-            $unassignedExternalLaborHourlyCost += round($headcount * $ratePerHour, 4);
+            // contractors are paid for the full shift clock hours of their allocation (WC-19); 8 h fallback = WC-ISSUE-03
+            $allocShiftHours = (float) ($shiftMap[$alloc->shift_id]['duration_hours'] ?? 8.0);
+            $unassignedExternalLaborDailyCost += $headcount * $ratePerHour * $allocShiftHours;
         }
 
-        $totalUnassignedLaborCostPerHour = round($unassignedInternalLaborHourlyCost + $unassignedExternalLaborHourlyCost, 4);
-        $operatorLaborCostPerMachinePerHour = $activeMachinesCount > 0
+        $nonBatchDailyLaborCost = round($unassignedInternalLaborDailyCost + $unassignedExternalLaborDailyCost, 4);
+        $totalUnassignedLaborCostPerHour = $uniqueOperatingHours > 0
+            ? round($nonBatchDailyLaborCost / $uniqueOperatingHours, 4)
+            : 0.0;
+        $operatorLaborCostPerMachinePerHour = ($activeMachinesCount > 0 && $uniqueOperatingHours > 0)
             ? round($totalUnassignedLaborCostPerHour / $activeMachinesCount, 4)
             : 0.0;
 
-        $formattedMachines = $machines->map(function ($m) use ($operatorLaborCostPerMachinePerHour) {
+        $formattedMachines = $machines->map(function ($m) use ($operatorLaborCostPerMachinePerHour, $nonBatchDailyLaborCost, $uniqueOperatingHours, $activeMachinesCount) {
             $capacity = (float) ($m->capacity ?? 0.0);
-            $operatingCost = (float) ($m->operating_cost_per_hour ?? 0.0);
+            $operatingCost = $m->finalOperatingCostPerHour(); // RT-IMPL-11: entered cost, else consumption × rate
             $speedMinutes = $capacity > 0 ? round(60.0 / $capacity, 4) : 0.0;
             $unitLaborCost = $capacity > 0 ? round($operatorLaborCostPerMachinePerHour / $capacity, 4) : 0.0;
             $unitMachineCost = $capacity > 0 ? round($operatingCost / $capacity, 4) : 0.0;
@@ -1456,6 +1478,10 @@ class SectionCalculationService
                 'operating_cost_per_hour'         => $operatingCost,
                 'speed_minutes_per_unit'          => $speedMinutes,
                 'operator_labor_cost_per_hour'    => $operatorLaborCostPerMachinePerHour,
+                // RT-IMPL-12: basis of the operator labor rate (non-batch daily labor ÷ section hours ÷ active machines)
+                'non_batch_daily_labor_cost'      => $nonBatchDailyLaborCost,
+                'section_operating_hours'         => $uniqueOperatingHours,
+                'active_machines_count'           => $activeMachinesCount,
                 'labor_cost_per_unit'             => $unitLaborCost,
                 'machine_cost_per_unit'           => $unitMachineCost,
                 'cost_per_unit'                   => $totalCostPerUnit,
@@ -1487,6 +1513,8 @@ class SectionCalculationService
             'section_name'                             => $section->name,
             'section_code'                             => $section->code,
             'active_machines_count'                    => $activeMachinesCount,
+            'non_batch_daily_labor_cost'               => $nonBatchDailyLaborCost,
+            'section_operating_hours'                  => $uniqueOperatingHours,
             'total_unassigned_labor_cost_per_hour'     => $totalUnassignedLaborCostPerHour,
             'unassigned_labor_hourly_total'            => $totalUnassignedLaborCostPerHour,
             'operator_labor_cost_per_machine_per_hour' => $operatorLaborCostPerMachinePerHour,

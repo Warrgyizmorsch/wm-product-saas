@@ -46,8 +46,17 @@ class RoutingOperation extends BaseModel
         'replaces_operation_id',
         'priority',
         'cost_per_unit',
+        // RT-IMPL-14: saved figures + source snapshot
+        'labor_cost_per_unit',
+        'machine_cost_per_unit',
+        'setup_cost_per_run',
+        'costs_calculated_at',
+        'section_calculation_id',
+        'section_snapshot_number',
+        'work_center_calculation_id',
         'resource_snapshot',
-        'setup_time_minutes',
+        'setup_time_minutes',          // RT-IMPL-13: setup per operation (once per run)
+        'setup_time_per_piece_minutes', // RT-IMPL-13: setup per piece
         'processing_time_minutes',
         'wait_time_minutes',
         'expected_yield_percentage', // A2: production loss tracking
@@ -81,8 +90,16 @@ class RoutingOperation extends BaseModel
         'replaces_operation_id'     => 'integer',
         'priority'                  => 'integer',
         'cost_per_unit'             => 'float',
+        'labor_cost_per_unit'       => 'float',
+        'machine_cost_per_unit'     => 'float',
+        'setup_cost_per_run'        => 'float',
+        'costs_calculated_at'       => 'datetime',
+        'section_calculation_id'    => 'integer',
+        'section_snapshot_number'   => 'integer',
+        'work_center_calculation_id'=> 'integer',
         'resource_snapshot'         => 'array',
         'setup_time_minutes'        => 'float',
+        'setup_time_per_piece_minutes' => 'float',
         'processing_time_minutes'   => 'float',
         'wait_time_minutes'         => 'float',
         'expected_yield_percentage' => 'float',
@@ -206,11 +223,35 @@ class RoutingOperation extends BaseModel
     // ─── Computed Helpers ─────────────────────────────────────────────────────
 
     /**
-     * Total operation cycle time in minutes.
+     * Cycle time per piece in minutes (RT-IMPL-13): setup per piece + run time.
+     * Setup per operation (once per run) and wait time are separate.
+     */
+    public function cycleTimePerPieceMinutes(): float
+    {
+        return (float) ($this->setup_time_per_piece_minutes ?? 0) + (float) $this->processing_time_minutes;
+    }
+
+    /**
+     * Setup cost per run (RT-IMPL-13): setup per operation × (labor + machine rate per minute) — no yield.
+     */
+    public function setupCostPerRun(): float
+    {
+        if ($this->is_external) {
+            return 0.0;
+        }
+        if ($this->setup_cost_per_run !== null) {
+            return round((float) $this->setup_cost_per_run, 4); // RT-IMPL-14: saved value
+        }
+        return round((float) $this->setup_time_minutes * ((float) $this->labor_cost_rate + (float) $this->machine_cost_rate), 4);
+    }
+
+    /**
+     * Total operation time in minutes for one piece incl. setup per run and wait (scheduling view).
      */
     public function totalCycleTimeMinutes(): float
     {
         return $this->setup_time_minutes
+            + (float) ($this->setup_time_per_piece_minutes ?? 0)
             + $this->processing_time_minutes
             + $this->wait_time_minutes;
     }
@@ -226,67 +267,17 @@ class RoutingOperation extends BaseModel
     }
 
     /**
-     * Estimated operation cost per unit (1-unit baseline).
-     * Reconciles setup time, cycle run time, machine power/maintenance, and operator labor.
+     * Operation cost per unit — RT-IMPL-14: the SAVED value (calculated once in the form / API and checked by the
+     * backend). No live lookup; an operation saved before costs were stored returns 0 (see costsNotCalculated()).
      */
     public function estimatedCostPerUnit(): float
     {
-        if ($this->cost_per_unit !== null && (float) $this->cost_per_unit > 0.0) {
-            return (float) $this->cost_per_unit;
-        }
+        return round((float) ($this->cost_per_unit ?? 0), 4);
+    }
 
-        $yieldFactor = $this->expected_yield_percentage > 0 ? (100 / $this->expected_yield_percentage) : 1.0;
-
-        if ($this->is_external) {
-            return round(((float) $this->subcontract_cost_per_unit) * $yieldFactor, 4);
-        }
-
-        $activeMinutes = (float) $this->setup_time_minutes + (float) $this->processing_time_minutes;
-        $laborRate = 0.0;
-        $machineRate = 0.0;
-        $snap = is_array($this->resource_snapshot) ? $this->resource_snapshot : null;
-
-        if ($this->section_manual_production_id) {
-            $machineRate = 0.0;
-            if ($snap && isset($snap['labor_cost_per_hour'])) {
-                $laborRate = ((float) $snap['labor_cost_per_hour']) / 60.0;
-            } elseif ($this->section) {
-                $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($this->section);
-                foreach ($sectionCosts['manual_batches'] as $mb) {
-                    if ((int) $mb['id'] === (int) $this->section_manual_production_id) {
-                        $laborRate = ((float) ($mb['labor_cost_per_hour'] ?? 0.0)) / 60.0;
-                        break;
-                    }
-                }
-            }
-            if ($laborRate <= 0.0) {
-                $laborRate = (float) $this->labor_cost_rate;
-            }
-        } elseif ($this->machine_id) {
-            if ($snap && (isset($snap['operating_cost_per_hour']) || isset($snap['machine_cost_per_hour']))) {
-                $machineRate = ((float) ($snap['operating_cost_per_hour'] ?? $snap['machine_cost_per_hour'])) / 60.0;
-            } elseif ($this->machine) {
-                $machineRate = ((float) $this->machine->operating_cost_per_hour) / 60.0;
-            }
-            if ($machineRate <= 0.0) {
-                $machineRate = (float) $this->machine_cost_rate;
-            }
-
-            if ($snap && isset($snap['operator_labor_cost_per_machine_per_hour'])) {
-                $laborRate = ((float) $snap['operator_labor_cost_per_machine_per_hour']) / 60.0;
-            } elseif ($this->section) {
-                $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($this->section);
-                $laborRate = ((float) ($sectionCosts['operator_labor_cost_per_machine_per_hour'] ?? 0.0)) / 60.0;
-            }
-            if ($laborRate <= 0.0) {
-                $laborRate = (float) $this->labor_cost_rate;
-            }
-        } elseif ($this->work_center_id) {
-            $wc = $this->workCenter;
-            $wcLaborRate = $wc ? ((float) $wc->cost_per_hour / 60.0) : 0.0;
-            $laborRate = $wcLaborRate > 0.0 ? $wcLaborRate : (float) $this->labor_cost_rate;
-        }
-
-        return round(($activeMinutes * ($laborRate + $machineRate)) * $yieldFactor, 4);
+    /** True for operations saved before figures were stored ("Costs not calculated — open and save the routing"). */
+    public function costsNotCalculated(): bool
+    {
+        return $this->cost_per_unit === null;
     }
 }
