@@ -525,6 +525,20 @@
                 'hrms.kra_kpi.submitted',
                 'hrms.kra_kpi.approved',
                 'hrms.goal.approved',
+                // Projects Events
+                'project.task.assigned',
+                'project.task.completed',
+                'project.issue.assigned',
+                'project.issue.logged',
+                'project.issue.resolved',
+                'project.milestone.completed',
+                'project.timesheet.submitted',
+                'project.timesheet.approved',
+                'project.timesheet.rejected',
+                'project.review.requested',
+                'project.review.signed_off',
+                'project.change_request.created',
+                'project.closed',
                 // Visitor Events
                 ...visitorEvents
             ];

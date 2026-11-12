@@ -265,17 +265,29 @@
                             <td class="text-end">
                                 <div class="d-flex justify-content-end align-items-center gap-1">
                                     @if ($cr->isPending() && auth()->user()->can('approve', $cr))
-                                        <form method="POST" action="{{ route('projects.change-requests.approve', [$project, $cr]) }}" 
-                                            onsubmit="return confirm('{{ __('projects.confirm_approve_cr') }}')" class="d-inline">
-                                            @csrf
-                                            <button type="submit" class="btn btn-sm btn-outline-success" title="{{ __('projects.approve') }}">
-                                                <i class="feather-check"></i> {{ __('projects.approve') }}
+                                        @php
+                                            $isSelfApprovalBlocked = (int) $cr->requested_by === (int) auth()->id()
+                                                && (int) $project->manager_id !== (int) auth()->id()
+                                                && (int) $project->owner_id !== (int) auth()->id()
+                                                && ! auth()->user()->hasRole('admin', 'super_admin', 'tenant_owner');
+                                        @endphp
+                                        @if ($isSelfApprovalBlocked)
+                                            <span class="badge bg-secondary-subtle text-muted border fs-11" title="{{ __('projects.cannot_approve_own_cr') }}">
+                                                <i class="feather-lock me-1"></i>{{ __('projects.cannot_approve_own_cr') }}
+                                            </span>
+                                        @else
+                                            <form method="POST" action="{{ route('projects.change-requests.approve', [$project, $cr]) }}" 
+                                                onsubmit="return confirm('{{ __('projects.confirm_approve_cr') }}')" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-success" title="{{ __('projects.approve') }}">
+                                                    <i class="feather-check"></i> {{ __('projects.approve') }}
+                                                </button>
+                                            </form>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                onclick="openRejectCrModal({{ $cr->id }})" title="{{ __('projects.reject') }}">
+                                                <i class="feather-x"></i>
                                             </button>
-                                        </form>
-                                        <button type="button" class="btn btn-sm btn-outline-danger" 
-                                            onclick="openRejectCrModal({{ $cr->id }})" title="{{ __('projects.reject') }}">
-                                            <i class="feather-x"></i>
-                                        </button>
+                                        @endif
                                     @elseif ($cr->isApproved() && (auth()->user()->can('markImplemented', $cr) || auth()->user()->can('implement', $cr)))
                                         <form method="POST" action="{{ route('projects.change-requests.implement', [$project, $cr]) }}" 
                                             onsubmit="return confirm('{{ __('projects.confirm_implement_cr') }}')" class="d-inline">
@@ -308,6 +320,7 @@
 <x-ui.modal id="initiateReviewModal" :title="__('projects.initiate_uat_review')" size="md" :showFooter="false">
     <form method="POST" action="{{ route('projects.reviews.store', $project) }}" enctype="multipart/form-data">
         @csrf
+        <input type="hidden" name="_review_form" value="initiate">
         <input type="hidden" name="_modal" value="initiateReviewModal">
 
         <div class="row g-3">
@@ -340,7 +353,7 @@
 
             <div class="col-12">
                 <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.evidence') }} ({{ __('projects.optional') }})</label>
-                <input type="file" name="evidence_file" class="form-control form-control-sm">
+                <input type="file" name="evidence_file" class="form-control form-control-sm" accept=".pdf,.docx,.xlsx,.csv,.png,.jpg,.jpeg,.zip,.txt">
                 <div class="form-text fs-11 text-muted">{{ __('projects.max_file_size_hint') }}</div>
             </div>
         </div>
@@ -358,7 +371,9 @@
 <x-ui.modal id="signOffReviewModal" :title="__('projects.sign_off_review')" size="md" :showFooter="false">
     <form id="signOffReviewForm" method="POST" action="" enctype="multipart/form-data">
         @csrf
+        <input type="hidden" name="_review_form" value="signoff">
         <input type="hidden" name="_modal" value="signOffReviewModal">
+        <input type="hidden" name="review_id" id="signOffReviewId" value="{{ old('review_id') }}">
 
         <div class="row g-3">
             <div class="col-12">
@@ -385,7 +400,7 @@
 
             <div class="col-12">
                 <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.evidence') }} ({{ __('projects.optional') }})</label>
-                <input type="file" name="evidence_file" class="form-control form-control-sm">
+                <input type="file" name="evidence_file" class="form-control form-control-sm" accept=".pdf,.docx,.xlsx,.csv,.png,.jpg,.jpeg,.zip,.txt">
                 <div class="form-text fs-11 text-muted">{{ __('projects.max_file_size_hint') }}</div>
             </div>
         </div>
@@ -403,6 +418,7 @@
 <x-ui.modal id="createCrModal" :title="__('projects.create_change_request')" size="lg" :showFooter="false">
     <form method="POST" action="{{ route('projects.change-requests.store', $project) }}">
         @csrf
+        <input type="hidden" name="_cr_form" value="create">
         <input type="hidden" name="_modal" value="createCrModal">
 
         <div class="row g-3">
@@ -420,7 +436,7 @@
 
             <div class="col-12">
                 <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.cr_title') }} <span class="text-danger">*</span></label>
-                <x-ui.odoo-form-ui type="input" name="title" :placeholder="__('projects.cr_title')" :value="old('title')" required />
+                <x-ui.odoo-form-ui type="input" name="title" maxlength="255" :placeholder="__('projects.cr_title')" :value="old('title')" required />
             </div>
 
             <div class="col-12">
@@ -441,17 +457,17 @@
 
             <div class="col-12 col-md-6">
                 <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.impact_schedule_days') }}</label>
-                <x-ui.odoo-form-ui type="input" inputType="number" name="impact_schedule_days" min="0" :value="old('impact_schedule_days', 0)" />
+                <x-ui.odoo-form-ui type="input" inputType="number" name="impact_schedule_days" min="0" step="1" inputmode="numeric" :value="old('impact_schedule_days', 0)" />
             </div>
 
             <div class="col-12 col-md-6">
                 <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.impact_budget_amount') }} ({{ active_currency_symbol() }})</label>
-                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" name="impact_budget_amount" :value="old('impact_budget_amount', '0.00')" />
+                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" inputmode="decimal" name="impact_budget_amount" :value="old('impact_budget_amount', '0.00')" />
             </div>
 
             <div class="col-12 col-md-6">
                 <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.impact_budget_hours') }}</label>
-                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" name="impact_budget_hours" :value="old('impact_budget_hours', '0.00')" />
+                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" inputmode="decimal" name="impact_budget_hours" :value="old('impact_budget_hours', '0.00')" />
             </div>
         </div>
 
@@ -468,7 +484,9 @@
 <x-ui.modal id="rejectCrModal" :title="__('projects.reject_change_request')" size="md" :showFooter="false">
     <form id="rejectCrForm" method="POST" action="">
         @csrf
+        <input type="hidden" name="_cr_form" value="reject">
         <input type="hidden" name="_modal" value="rejectCrModal">
+        <input type="hidden" name="cr_id" id="rejectCrId" value="{{ old('cr_id') }}">
 
         <div class="row g-3">
             <div class="col-12">
@@ -490,10 +508,10 @@
 <x-ui.modal id="uploadReviewEvidenceModal" :title="__('projects.upload_review_evidence')" size="md" :showFooter="false">
     <form id="uploadReviewEvidenceForm" method="POST" action="{{ route('projects.documents.store', $project) }}" enctype="multipart/form-data">
         @csrf
-        <input type="hidden" name="_document_form" value="upload">
+        <input type="hidden" name="_review_form" value="upload_evidence">
         <input type="hidden" name="_modal" value="uploadReviewEvidenceModal">
         <input type="hidden" name="attachable_type" value="review">
-        <input type="hidden" name="attachable_id" id="uploadEvidenceReviewId" value="">
+        <input type="hidden" name="attachable_id" id="uploadEvidenceReviewId" value="{{ old('attachable_id') }}">
         <input type="hidden" name="category" value="{{ \App\Domains\Projects\Models\ProjectDocument::CATEGORY_TEST_CASE }}">
 
         <div class="row g-3">
@@ -529,8 +547,12 @@
         var modalEl = document.getElementById('signOffReviewModal');
         if (!modalEl) return;
         var form = document.getElementById('signOffReviewForm');
+        var reviewIdInput = document.getElementById('signOffReviewId');
+        if (reviewIdInput) {
+            reviewIdInput.value = reviewId;
+        }
         if (form) {
-            form.action = "{{ route('projects.reviews.signoff', [$project, ':id']) }}".replace(':id', reviewId);
+            form.action = "{{ route('projects.reviews.signoff', [$project, ':id']) }}".replace(/:id|%3Aid/g, reviewId);
         }
         if (window.bootstrap) {
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -541,8 +563,12 @@
         var modalEl = document.getElementById('rejectCrModal');
         if (!modalEl) return;
         var form = document.getElementById('rejectCrForm');
+        var crIdInput = document.getElementById('rejectCrId');
+        if (crIdInput) {
+            crIdInput.value = crId;
+        }
         if (form) {
-            form.action = "{{ route('projects.change-requests.reject', [$project, ':id']) }}".replace(':id', crId);
+            form.action = "{{ route('projects.change-requests.reject', [$project, ':id']) }}".replace(/:id|%3Aid/g, crId);
         }
         if (window.bootstrap) {
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -560,5 +586,23 @@
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
         }
     }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var signOffReviewIdEl = document.getElementById('signOffReviewId');
+        if (signOffReviewIdEl && signOffReviewIdEl.value) {
+            var signOffForm = document.getElementById('signOffReviewForm');
+            if (signOffForm) {
+                signOffForm.action = "{{ route('projects.reviews.signoff', [$project, ':id']) }}".replace(/:id|%3Aid/g, signOffReviewIdEl.value);
+            }
+        }
+
+        var rejectCrIdEl = document.getElementById('rejectCrId');
+        if (rejectCrIdEl && rejectCrIdEl.value) {
+            var rejectForm = document.getElementById('rejectCrForm');
+            if (rejectForm) {
+                rejectForm.action = "{{ route('projects.change-requests.reject', [$project, ':id']) }}".replace(/:id|%3Aid/g, rejectCrIdEl.value);
+            }
+        }
+    });
 </script>
 @endpush

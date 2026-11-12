@@ -281,11 +281,11 @@ class ProjectController extends Controller
             : collect();
 
         $reviews = $canViewReviews
-            ? $project->reviews()->with(['reviewer', 'creator', 'documents'])->latest('review_date')->latest('id')->get()
+            ? $project->reviews()->with(['reviewer', 'creator', 'documents', 'project'])->latest('review_date')->latest('id')->get()
             : collect();
 
         $changeRequests = $canViewCRs
-            ? $project->changeRequests()->with(['requester', 'approver', 'creator', 'review'])->latest('id')->get()
+            ? $project->changeRequests()->with(['requester', 'approver', 'creator', 'review', 'project'])->latest('id')->get()
             : collect();
 
         $billingService = app(\App\Domains\Projects\Services\ProjectBillingService::class);
@@ -295,7 +295,9 @@ class ProjectController extends Controller
         $serviceProducts = ($canViewBilling && $canGenerateInvoice)
             ? \App\Domains\Inventory\Models\Product::where('tenant_id', $project->tenant_id)
                 ->where('item_type', 'Service')
-                ->where('status', 'active')
+                ->where(function ($q) {
+                    $q->whereNull('status')->orWhereIn('status', ['active', 'Active']);
+                })
                 ->orderBy('name')
                 ->get()
             : collect();
@@ -361,9 +363,9 @@ class ProjectController extends Controller
         $timesheetCost = (float) $project->timeLogs()->sum(DB::raw('hours * COALESCE(hourly_rate, 0)'));
         $totalCostConsumed = $timesheetCost + $mfgCost;
 
-        $baseBudgetAmount = (float) ($project->budget_amount ?? 0);
-        $approvedCrBudget = (float) $changeRequests->where('status', 'Approved')->sum('impact_budget');
-        $revisedBudget = $baseBudgetAmount + $approvedCrBudget;
+        $revisedBudget = (float) ($project->budget_amount ?? 0);
+        $approvedCrBudget = (float) $changeRequests->where('status', 'Approved')->sum('impact_budget_amount');
+        $baseBudgetAmount = max(0.0, $revisedBudget - $approvedCrBudget);
 
         $costPercent = $revisedBudget > 0 ? round(($totalCostConsumed / $revisedBudget) * 100, 1) : null;
         $isOverBudget = $revisedBudget > 0 && $totalCostConsumed > $revisedBudget;
@@ -372,6 +374,8 @@ class ProjectController extends Controller
             'total_consumed' => $totalCostConsumed,
             'mfg_cost' => $mfgCost,
             'timesheet_cost' => $timesheetCost,
+            'base_budget' => $baseBudgetAmount,
+            'cr_budget' => $approvedCrBudget,
             'revised_budget' => $revisedBudget,
             'percent' => $costPercent,
             'is_over_budget' => $isOverBudget,
@@ -451,17 +455,13 @@ class ProjectController extends Controller
 
     public function bulkAction(Request $request): RedirectResponse
     {
-        $action = $request->input('action');
-        $ids = $request->input('ids');
+        $validated = $request->validate([
+            'action' => ['required', 'string', 'in:delete'],
+            'ids'    => ['required', 'array', 'min:1'],
+            'ids.*'  => ['required', 'integer'],
+        ]);
 
-        if (empty($ids) || !is_array($ids)) {
-            return redirect()->route('projects.index')->with('error', 'No projects selected.');
-        }
-
-        if ($action !== 'delete') {
-            return redirect()->route('projects.index')->with('error', 'Invalid action.');
-        }
-
+        $ids = $validated['ids'];
         $tenantId = require_tenant_id();
         $projects = Project::whereIn('id', $ids)->where('tenant_id', $tenantId)->get();
 

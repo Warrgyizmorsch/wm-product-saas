@@ -115,8 +115,14 @@
         </tbody>
     </x-ui.odoo-form-ui>
 
-    <div class="mt-4">
-        {{ $milestones->links() }}
+    <div class="mt-3">
+        <x-ui.pagination
+            :paginator="$milestones"
+            :currentPage="$milestones->currentPage()"
+            :totalPages="$milestones->lastPage()"
+            :totalResults="$milestones->total()"
+            :perPage="$milestones->perPage()"
+        />
     </div>
 </div>
 @endsection

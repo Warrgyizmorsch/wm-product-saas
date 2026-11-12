@@ -1,8 +1,7 @@
 @php
-    $overviewOpenTasks = max($totalTasks - $completedTasks, 0);
-    $overviewOverdueCount = $attentionTasks->where('attention_reason', 'overdue')->count();
-    $overviewBlockedCount = $attentionTasks->where('attention_reason', 'blocked')->count();
-    $overviewDueSoonCount = $attentionTasks->where('attention_reason', 'due_soon')->count();
+    $overviewOpenTasks = $openTasksCount ?? max($totalTasks - $completedTasks, 0);
+    $overviewOverdueCount = $overdueTasksCount ?? $attentionTasks->where('attention_reason', 'overdue')->count();
+    $overviewProgress = $milestoneProgress ?? (int) ($milestone->completion_percentage ?? 0);
 
     $attentionReasonMeta = [
         'overdue' => ['label' => __('projects.attention_overdue'), 'variant' => 'danger', 'icon' => 'feather-alert-triangle'],
@@ -33,7 +32,7 @@
     </div>
     <div class="col-6 col-md-3">
         <div class="border rounded-3 p-3 text-center h-100 project-stat-card">
-            <div class="fs-20 fw-bold text-dark">{{ $milestone->completion_percentage }}%</div>
+            <div class="fs-20 fw-bold text-dark">{{ $overviewProgress }}%</div>
             <div class="fs-11 text-uppercase text-muted fw-semibold">{{ __('projects.completion_percentage') }}</div>
         </div>
     </div>

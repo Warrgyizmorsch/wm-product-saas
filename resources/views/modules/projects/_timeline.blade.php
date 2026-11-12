@@ -1,6 +1,6 @@
 @php
     $canUpdateAnyTask = auth()->user()->can('update', $project);
-    $activeMilestones = isset($milestones) ? $milestones : $project->milestones()->orderBy('milestone_order')->get();
+    $activeMilestones = isset($milestones) ? $milestones : $project->milestones()->orderBy('start_date')->orderBy('id')->get();
 @endphp
 
 <div x-data="ganttTimeline({
@@ -435,6 +435,15 @@ document.addEventListener('alpine:init', () => {
                         this.onMilestoneFilterChange();
                     });
                 }
+
+                // If user switches to this tab from another tab, ensure layout and connectors re-align
+                const tabBtn = document.querySelector('[data-bs-target="#tab-timeline"], [href="#tab-timeline"], #tab-timeline-tab');
+                if (tabBtn) {
+                    tabBtn.addEventListener('shown.bs.tab', () => {
+                        this.computeTimeColumns();
+                        this.$nextTick(() => this.recomputeConnectors());
+                    });
+                }
             });
         },
 
@@ -609,19 +618,20 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        computeBarWidth(durationDays) {
+            if (this.scale === 'day') {
+                return Math.max(this.columnWidth, durationDays * this.columnWidth);
+            } else if (this.scale === 'week') {
+                return Math.max(28, (durationDays / 7) * this.columnWidth);
+            } else {
+                return Math.max(20, (durationDays / 30.416) * this.columnWidth);
+            }
+        },
+
         getTaskBarStyle(task, rIdx) {
             let leftPx = this.dateToPixels(task.start_date);
-            let rightPx = this.dateToPixels(task.due_date);
             let durationDays = Math.max(1, this.getDaysDiff(task.start_date, task.due_date) + 1);
-
-            let widthPx;
-            if (this.scale === 'day') {
-                widthPx = Math.max(this.columnWidth, durationDays * this.columnWidth);
-            } else if (this.scale === 'week') {
-                widthPx = Math.max(28, (durationDays / 7) * this.columnWidth);
-            } else {
-                widthPx = Math.max(20, (durationDays / 30.416) * this.columnWidth);
-            }
+            let widthPx = this.computeBarWidth(durationDays);
 
             return `left: ${Math.max(4, leftPx)}px; width: ${widthPx}px; top: 6px; height: 32px;`;
         },
@@ -637,7 +647,8 @@ document.addEventListener('alpine:init', () => {
         },
 
         getTaskTooltip(task) {
-            return `${task.task_code} - ${task.title}\nDates: ${task.start_date} to ${task.due_date} (${task.duration} days)\nES: ${task.early_start} | EF: ${task.early_finish}\nLS: ${task.late_start} | LF: ${task.late_finish}\nTotal Float: ${task.total_float}d | Free Float: ${task.free_float}d${task.is_critical ? ' (CRITICAL PATH)' : ''}`;
+            let floatInfo = `Total Float: ${task.total_float}d` + (task.free_float !== undefined ? ` | Free Float: ${task.free_float}d` : '');
+            return `${task.task_code} - ${task.title}\nDates: ${task.start_date} to ${task.due_date} (${task.duration} days)\nES: ${task.early_start} | EF: ${task.early_finish}\nLS: ${task.late_start} | LF: ${task.late_finish}\n${floatInfo}${task.is_critical ? ' (CRITICAL PATH)' : ''}`;
         },
 
         showToast(type, message) {
@@ -800,14 +811,14 @@ document.addEventListener('alpine:init', () => {
                 let pY = headerHeight + (p.rowIndex * rowHeight) + (rowHeight / 2);
                 let sY = headerHeight + (s.rowIndex * rowHeight) + (rowHeight / 2);
 
-                let pStartPx = this.dateToPixels(p.task.start_date);
+                let pStartPx = Math.max(4, this.dateToPixels(p.task.start_date));
                 let pDur = Math.max(1, this.getDaysDiff(p.task.start_date, p.task.due_date) + 1);
-                let pWidthPx = (this.scale === 'day') ? (pDur * this.columnWidth) : (pDur / 7 * this.columnWidth);
+                let pWidthPx = this.computeBarWidth(pDur);
                 let pEndPx = pStartPx + pWidthPx;
 
-                let sStartPx = this.dateToPixels(s.task.start_date);
+                let sStartPx = Math.max(4, this.dateToPixels(s.task.start_date));
                 let sDur = Math.max(1, this.getDaysDiff(s.task.start_date, s.task.due_date) + 1);
-                let sWidthPx = (this.scale === 'day') ? (sDur * this.columnWidth) : (sDur / 7 * this.columnWidth);
+                let sWidthPx = this.computeBarWidth(sDur);
                 let sEndPx = sStartPx + sWidthPx;
 
                 let type = link.type ?? link.dependency_type ?? 'Finish-to-Start';
@@ -1045,7 +1056,11 @@ document.addEventListener('alpine:init', () => {
             if (durText) durText.textContent = `${task.duration} ${task.duration === 1 ? '{{ __('projects.day') }}' : '{{ __('projects.days') }}'}`;
 
             const floatText = document.getElementById('rescheduleFloatText');
-            if (floatText) floatText.textContent = `${task.total_float}d (Free: ${task.free_float}d)`;
+            if (floatText) {
+                floatText.textContent = (task.free_float !== undefined && task.free_float !== null)
+                    ? `${task.total_float}d (Free: ${task.free_float}d)`
+                    : `${task.total_float}d`;
+            }
 
             const critBadge = document.getElementById('rescheduleCriticalBadge');
             if (critBadge) {

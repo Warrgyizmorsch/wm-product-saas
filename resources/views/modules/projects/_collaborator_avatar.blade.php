@@ -10,6 +10,7 @@
      tabindex="0"
      data-member-id="{{ $memberId ?? '' }}"
      data-collaborator-name="{{ $name }}"
-     data-collaborator-role="{{ $role ?? '' }}">
+     data-collaborator-role="{{ $role ?? '' }}"
+     data-collaborator-rate="{{ $rate ?? '' }}">
     {{ $initials ?: '?' }}
 </div>

@@ -1,6 +1,8 @@
 <x-ui.modal id="modalGenerateInvoice" size="lg" :title="__('projects.generate_invoice')" :showFooter="false">
     <form action="{{ route('projects.billing.store', $project) }}" method="POST" id="formGenerateInvoice">
         @csrf
+        <input type="hidden" name="_billing_form" value="generate_invoice">
+        <input type="hidden" name="_modal" value="modalGenerateInvoice">
 
         {{-- Invoice Header Metadata --}}
         <div class="row g-3 mb-4 pb-3 border-bottom">
@@ -28,6 +30,7 @@
                     name="payment_terms"
                     :label="__('projects.payment_terms')"
                     :value="old('payment_terms', 'Net 30')"
+                    maxlength="255"
                     placeholder="e.g. Net 30"
                 />
             </div>

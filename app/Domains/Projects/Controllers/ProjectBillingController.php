@@ -10,6 +10,7 @@ use App\Domains\Projects\Services\ProjectBillingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ProjectBillingController extends Controller
@@ -35,12 +36,28 @@ class ProjectBillingController extends Controller
     {
         $this->authorize('generateInvoice', $project);
 
+        $tenantId = require_tenant_id();
+
         $payload = $request->validate([
             'time_log_ids'       => ['nullable', 'array'],
-            'time_log_ids.*'     => ['integer'],
+            'time_log_ids.*'     => [
+                'integer',
+                Rule::exists('project_time_logs', 'id')
+                    ->where('tenant_id', $tenantId)
+                    ->where('project_id', $project->id),
+            ],
             'milestone_ids'      => ['nullable', 'array'],
-            'milestone_ids.*'    => ['integer'],
-            'service_product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'milestone_ids.*'    => [
+                'integer',
+                Rule::exists('project_milestones', 'id')
+                    ->where('tenant_id', $tenantId)
+                    ->where('project_id', $project->id),
+            ],
+            'service_product_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('products', 'id')->where('tenant_id', $tenantId),
+            ],
         ]);
 
         $preview = $this->billingService->previewInvoice($project, $payload);

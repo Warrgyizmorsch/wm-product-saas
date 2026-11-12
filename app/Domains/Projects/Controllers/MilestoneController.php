@@ -46,6 +46,11 @@ class MilestoneController extends Controller
 
         $filters = $request->only(['search', 'status', 'project_id']);
 
+        $perPage = (int) $request->input('per_page', 10);
+        if ($perPage <= 0 || $perPage > 100) {
+            $perPage = 10;
+        }
+
         $statuses = Milestone::query()
             ->whereNotNull('status')
             ->where('status', '!=', '')
@@ -58,7 +63,7 @@ class MilestoneController extends Controller
             ->get(['id', 'name', 'project_code']);
 
         return view('modules.projects.milestones.index', [
-            'milestones'  => $this->milestones->paginateAll($filters),
+            'milestones'  => $this->milestones->paginateAll($filters, $perPage),
             'filters'     => $filters,
             'statuses'    => $statuses,
             'projects'    => $projects,
@@ -180,6 +185,14 @@ class MilestoneController extends Controller
         $activityTotal = $allActivities->count();
         $pagedActivities = $allActivities->forPage($activityPage, $activityPerPage)->values();
 
+        $totalTasksCount = $milestoneTasks->count();
+        $completedTasksCount = $milestoneTasks->where('status', Task::STATUS_COMPLETED)->count();
+        $openTasksCount = $openTasks->count();
+        $overdueTasksCount = $openTasks->filter(fn (Task $task) => $task->due_date !== null && $today->gt($task->due_date))->count();
+        $milestoneProgress = $totalTasksCount > 0
+            ? (int) round(($completedTasksCount / $totalTasksCount) * 100)
+            : (int) ($milestone->completion_percentage ?? 0);
+
         return view('modules.projects.milestones.workspace', [
             'project' => $project,
             'milestone' => $milestone,
@@ -198,8 +211,11 @@ class MilestoneController extends Controller
             'milestones' => Milestone::query()->where('project_id', $project->id)->orderBy('name')->get(['id', 'name']),
             'activeMemberOptions' => $activeMembers->pluck('user'),
             'dashboard' => ['task_lists' => $taskListProgress],
-            'totalTasks' => $milestoneTasks->count(),
-            'completedTasks' => $milestoneTasks->where('status', Task::STATUS_COMPLETED)->count(),
+            'totalTasks' => $totalTasksCount,
+            'completedTasks' => $completedTasksCount,
+            'openTasksCount' => $openTasksCount,
+            'overdueTasksCount' => $overdueTasksCount,
+            'milestoneProgress' => $milestoneProgress,
             'upcomingTasks' => $upcomingTasks,
             'attentionTasks' => $attentionTasks,
             'recentActivities' => $allActivities->take(5)->values(),

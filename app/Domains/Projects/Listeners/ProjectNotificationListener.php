@@ -3,9 +3,11 @@
 namespace App\Domains\Projects\Listeners;
 
 use App\Domains\Projects\Events\ChangeRequestCreated;
+use App\Domains\Projects\Events\IssueAssigned;
 use App\Domains\Projects\Events\IssueLogged;
 use App\Domains\Projects\Events\IssueResolved;
 use App\Domains\Projects\Events\IssueRetested;
+use App\Domains\Projects\Events\MilestoneCompleted;
 use App\Domains\Projects\Events\ProjectClosed;
 use App\Domains\Projects\Events\ProjectReviewRequested;
 use App\Domains\Projects\Events\ProjectReviewSignedOff;
@@ -28,9 +30,11 @@ class ProjectNotificationListener
         match ($event::class) {
             TaskAssigned::class           => $this->notifications->handleTaskAssigned($event),
             TaskCompleted::class          => $this->notifications->handleTaskCompleted($event),
+            IssueAssigned::class          => $this->notifications->handleIssueAssigned($event),
             IssueLogged::class            => $this->notifications->handleIssueLogged($event),
             IssueResolved::class          => $this->notifications->handleIssueResolved($event),
             IssueRetested::class          => $this->notifications->handleIssueRetested($event),
+            MilestoneCompleted::class     => $this->notifications->handleMilestoneCompleted($event),
             TimesheetSubmitted::class     => $this->notifications->handleTimesheetSubmitted($event),
             TimesheetApproved::class      => $this->notifications->handleTimesheetApproved($event),
             TimesheetRejected::class      => $this->notifications->handleTimesheetRejected($event),

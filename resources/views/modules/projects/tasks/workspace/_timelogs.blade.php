@@ -30,7 +30,8 @@
                         <th>{{ __('projects.user', ['default' => 'User']) }}</th>
                         <th>{{ __('projects.date', ['default' => 'Date']) }}</th>
                         <th>{{ __('projects.hours', ['default' => 'Hours']) }}</th>
-                        <th>{{ __('projects.billable', ['default' => 'Billable']) }}</th>
+                        <th>{{ __('projects.rate', ['default' => 'Rate']) }}</th>
+                        <th>{{ __('projects.amount', ['default' => 'Amount']) }}</th>
                         <th>{{ __('projects.status', ['default' => 'Status']) }}</th>
                         <th>{{ __('projects.description', ['default' => 'Description']) }}</th>
                         <th class="text-end">{{ __('projects.actions', ['default' => 'Actions']) }}</th>
@@ -45,10 +46,17 @@
                             <td>{{ $log->log_date?->format('d/m/Y') }}</td>
                             <td><span class="fw-bold text-dark font-monospace">{{ number_format((float) $log->hours, 2) }}</span> hrs</td>
                             <td>
-                                @if ($log->is_billable)
-                                    <x-ui.badge variant="success" soft>{{ __('projects.billable', ['default' => 'Billable']) }}</x-ui.badge>
+                                @if ($log->hourly_rate !== null && (float) $log->hourly_rate > 0)
+                                    <span class="font-monospace text-dark">{{ active_currency_symbol() }}{{ number_format((float) $log->hourly_rate, 2) }}</span>/hr
                                 @else
-                                    <x-ui.badge variant="secondary" soft>{{ __('projects.non_billable', ['default' => 'Non-Billable']) }}</x-ui.badge>
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if ($log->hourly_rate !== null && (float) $log->hourly_rate > 0 && (float) $log->hours > 0)
+                                    <span class="fw-bold font-monospace text-primary">{{ active_currency_symbol() }}{{ number_format((float) $log->hourly_rate * (float) $log->hours, 2) }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
                                 @endif
                             </td>
                             <td>
@@ -71,7 +79,25 @@
                                     {{ $log->description ?: '—' }}
                                 </span>
                             </td>
-                            <td class="text-end">
+                            <td class="text-end text-nowrap">
+                                @if ($log->approval_status === 'Pending' && (auth()->user()?->can('approve', $log) || auth()->id() === (int)$project->owner_id || auth()->id() === (int)$project->manager_id || auth()->user()?->hasAnyRole('owner', 'tenant_owner', 'admin', 'super_admin')))
+                                    <form method="POST" action="{{ route('projects.timesheets.approve', $log) }}" class="d-inline" onsubmit="return confirm('{{ __('projects.confirm_approve_timelog', ['default' => 'Approve this time entry?']) }}');">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button type="submit" class="btn btn-sm btn-icon btn-light text-success me-1" title="{{ __('projects.approve', ['default' => 'Approve']) }}">
+                                            <i class="feather-check"></i>
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{{ route('projects.timesheets.reject', $log) }}" class="d-inline" onsubmit="return promptRejectRemarks(event, this);">
+                                        @csrf
+                                        @method('PATCH')
+                                        <input type="hidden" name="rejection_remarks" value="">
+                                        <button type="submit" class="btn btn-sm btn-icon btn-light text-warning me-1" title="{{ __('projects.reject', ['default' => 'Reject']) }}">
+                                            <i class="feather-x"></i>
+                                        </button>
+                                    </form>
+                                @endif
+
                                 @if ($log->approval_status !== 'Approved' && auth()->user()?->can('delete', $log))
                                     <form method="POST" action="{{ route('projects.tasks.timelogs.destroy', [$project, $task, $log]) }}" class="d-inline" onsubmit="return confirm('{{ __('projects.confirm_delete_timelog', ['default' => 'Delete this time entry?']) }}');">
                                         @csrf
@@ -101,31 +127,131 @@
         :closeText="__('projects.cancel', ['default' => 'Cancel'])">
 
         <div class="row g-3">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <x-ui.odoo-form-ui type="input" inputType="date" name="log_date" :label="__('projects.date', ['default' => 'Date'])" :value="date('Y-m-d')" :required="true" />
             </div>
-            <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" inputType="number" name="hours" :label="__('projects.hours', ['default' => 'Hours'])" step="0.25" min="0.01" max="24" placeholder="e.g. 2.50" :required="true" />
+            <div class="col-md-4">
+                <x-ui.odoo-form-ui type="input" inputType="time" name="start_time" id="timeLogStartTime" :label="__('projects.start_time', ['default' => 'Start Time'])" />
             </div>
-            <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" inputType="time" name="start_time" :label="__('projects.start_time', ['default' => 'Start Time'])" />
+            <div class="col-md-4">
+                <x-ui.odoo-form-ui type="input" inputType="time" name="end_time" id="timeLogEndTime" :label="__('projects.end_time', ['default' => 'End Time'])" />
             </div>
-            <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" inputType="time" name="end_time" :label="__('projects.end_time', ['default' => 'End Time'])" />
-            </div>
-            <div class="col-md-6 d-flex align-items-center">
-                <x-ui.odoo-form-ui type="checkbox" name="is_billable" value="1" id="isBillableSwitch" checked :label="__('projects.billable_time', ['default' => 'Billable to Client'])" />
-            </div>
-            <div class="col-md-6" id="hourlyRateGroup">
-                @php
-                    $currentMember = $project->members?->firstWhere('user_id', auth()->id());
-                    $defaultMemberRate = $currentMember?->rate_per_hour;
-                @endphp
-                <x-ui.odoo-form-ui type="input" inputType="number" name="hourly_rate" :label="__('projects.rate_per_hour', ['default' => 'Rate / Hour']) . ' (' . active_currency_symbol() . ')'" step="0.01" min="0" placeholder="e.g. 500.00" :value="$defaultMemberRate" />
+            <div class="col-12">
+                <x-ui.odoo-form-ui type="input" inputType="number" name="hours" id="timeLogHoursInput" :label="__('projects.hours', ['default' => 'Hours'])" step="0.01" min="0.01" max="24" inputmode="decimal" placeholder="e.g. 2.50" :required="true" />
+                <div id="logTimeHoursHint" class="fs-11 text-muted mt-1" data-default-hint="{{ __('projects.hours_hint') }}">
+                    {{ __('projects.hours_hint') }}
+                </div>
             </div>
             <div class="col-12">
                 <x-ui.odoo-form-ui type="textarea" name="description" :label="__('projects.description', ['default' => 'Work Summary / Description'])" :rows="3" placeholder="{{ __('projects.describe_work_done', ['default' => 'Describe work performed...']) }}" />
             </div>
         </div>
     </x-ui.modal>
+
+    @push('scripts')
+        <script>
+            (function ($) {
+                function syncTimeLogHours() {
+                    var modal = $('#logTimeModal');
+                    if (!modal.length) return;
+
+                    var startInput = modal.find('input[name="start_time"]');
+                    var endInput = modal.find('input[name="end_time"]');
+                    var hoursInput = modal.find('input[name="hours"]');
+                    var hintEl = modal.find('#logTimeHoursHint');
+
+                    var startVal = (startInput.val() || '').trim();
+                    var endVal = (endInput.val() || '').trim();
+
+                    if (startVal && endVal) {
+                        var sParts = startVal.split(':');
+                        var eParts = endVal.split(':');
+
+                        if (sParts.length >= 2 && eParts.length >= 2) {
+                            var sMin = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
+                            var eMin = parseInt(eParts[0], 10) * 60 + parseInt(eParts[1], 10);
+
+                            if (eMin > sMin) {
+                                var diffHours = ((eMin - sMin) / 60).toFixed(2);
+                                hoursInput.val(diffHours);
+                                hoursInput.prop('readonly', true);
+                                hoursInput.addClass('bg-light').removeClass('is-invalid');
+                                endInput.removeClass('is-invalid');
+                                if (hintEl.length) {
+                                    hintEl.html('<span class="text-success fw-semibold"><i class="feather-lock me-1"></i>Locked to calculated interval: ' + diffHours + ' hrs</span>');
+                                }
+                            } else {
+                                endInput.addClass('is-invalid');
+                                hoursInput.prop('readonly', false).removeClass('bg-light');
+                                if (hintEl.length) {
+                                    hintEl.html('<span class="text-danger fw-semibold"><i class="feather-alert-circle me-1"></i>End time must be after start time</span>');
+                                }
+                            }
+                        }
+                    } else {
+                        hoursInput.prop('readonly', false);
+                        hoursInput.removeClass('bg-light is-invalid');
+                        endInput.removeClass('is-invalid');
+                        if (hintEl.length) {
+                            var defHint = hintEl.data('default-hint') || 'Auto-calculated from Start/End time, or enter directly.';
+                            hintEl.html('<span class="text-muted">' + defHint + '</span>');
+                        }
+                    }
+                }
+
+                // Global event delegation on document so it works anywhere
+                $(document).on('input change keyup blur', '#logTimeModal input[name="start_time"], #logTimeModal input[name="end_time"]', function () {
+                    syncTimeLogHours();
+                });
+
+                $(document).on('show.bs.modal shown.bs.modal', '#logTimeModal', function () {
+                    syncTimeLogHours();
+                });
+
+                $(document).on('submit', '#logTimeModal form', function (e) {
+                    var modal = $('#logTimeModal');
+                    var startInput = modal.find('input[name="start_time"]');
+                    var endInput = modal.find('input[name="end_time"]');
+                    var hoursInput = modal.find('input[name="hours"]');
+
+                    var startVal = (startInput.val() || '').trim();
+                    var endVal = (endInput.val() || '').trim();
+
+                    if (startVal && endVal) {
+                        var sParts = startVal.split(':');
+                        var eParts = endVal.split(':');
+                        var sMin = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
+                        var eMin = parseInt(eParts[0], 10) * 60 + parseInt(eParts[1], 10);
+
+                        if (eMin <= sMin) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            endInput.addClass('is-invalid');
+                            if (window.showAppToast) {
+                                window.showAppToast('error', 'End time must be after start time.');
+                            }
+                            return false;
+                        }
+
+                        // Always enforce calculated hours
+                        var diffHours = ((eMin - sMin) / 60).toFixed(2);
+                        hoursInput.val(diffHours);
+                    }
+                });
+
+                window.promptRejectRemarks = function (event, form) {
+                    event.preventDefault();
+                    var remarks = window.prompt("Enter rejection reason (optional):", "");
+                    if (remarks === null) return false;
+                    form.querySelector('input[name="rejection_remarks"]').value = remarks.trim();
+                    form.submit();
+                    return true;
+                };
+
+                $(document).ready(function () {
+                    syncTimeLogHours();
+                });
+            })(jQuery);
+        </script>
+    @endpush
 @endif

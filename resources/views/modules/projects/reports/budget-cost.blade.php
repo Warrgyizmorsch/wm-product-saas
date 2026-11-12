@@ -123,8 +123,14 @@
         </tbody>
     </x-ui.odoo-form-ui>
 
-    <div class="mt-4">
-        {{ $rows->links() }}
+    <div class="mt-3">
+        <x-ui.pagination
+            :paginator="$rows"
+            :currentPage="$rows->currentPage()"
+            :totalPages="$rows->lastPage()"
+            :totalResults="$rows->total()"
+            :perPage="$rows->perPage()"
+        />
     </div>
 </div>
 @endsection

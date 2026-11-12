@@ -655,9 +655,11 @@ class AppServiceProvider extends ServiceProvider
         foreach ([
             \App\Domains\Projects\Events\TaskAssigned::class,
             \App\Domains\Projects\Events\TaskCompleted::class,
+            \App\Domains\Projects\Events\IssueAssigned::class,
             \App\Domains\Projects\Events\IssueLogged::class,
             \App\Domains\Projects\Events\IssueResolved::class,
             \App\Domains\Projects\Events\IssueRetested::class,
+            \App\Domains\Projects\Events\MilestoneCompleted::class,
             \App\Domains\Projects\Events\TimesheetSubmitted::class,
             \App\Domains\Projects\Events\TimesheetApproved::class,
             \App\Domains\Projects\Events\TimesheetRejected::class,

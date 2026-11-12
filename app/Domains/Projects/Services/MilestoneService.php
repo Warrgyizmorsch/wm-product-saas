@@ -2,10 +2,12 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Projects\Events\MilestoneCompleted;
 use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Repositories\MilestoneRepositoryInterface;
 use App\Domains\Projects\Repositories\TaskDependencyRepositoryInterface;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -38,7 +40,7 @@ class MilestoneService
         return $this->milestones->getForProject($project->id);
     }
 
-    public function paginateAll(array $filters, int $perPage = 15): LengthAwarePaginator
+    public function paginateAll(array $filters, int $perPage = 10): LengthAwarePaginator
     {
         return $this->milestones->paginateAll($filters, $perPage);
     }
@@ -96,6 +98,11 @@ class MilestoneService
                     $milestone,
                     ['old_status' => $oldStatus, 'new_status' => $newStatus],
                 );
+
+                $actor = auth()->user() ?? $project?->manager ?? $project?->owner ?? User::first();
+                if ($actor) {
+                    event(new MilestoneCompleted($milestone, $actor));
+                }
             } else {
                 $this->activity->record(
                     $project,
@@ -117,7 +124,9 @@ class MilestoneService
      */
     public function updateField(Milestone $milestone, string $field, mixed $value): mixed
     {
-        return DB::transaction(function () use ($milestone, $field, $value) {
+        $oldStatus = $milestone->status;
+
+        return DB::transaction(function () use ($milestone, $field, $value, $oldStatus) {
             $project = $milestone->project;
             $milestone = $this->milestones->update($milestone->id, [$field => $value]);
 
@@ -125,13 +134,29 @@ class MilestoneService
                 $this->members->ensureCollaborator($project, $milestone->owner_id);
             }
 
-            $this->activity->record(
-                $project,
-                'milestone.updated',
-                "Milestone '{$milestone->name}' updated",
-                null,
-                $milestone,
-            );
+            if ($field === 'status' && $value === Milestone::STATUS_COMPLETED && $oldStatus !== Milestone::STATUS_COMPLETED) {
+                $this->activity->record(
+                    $project,
+                    'milestone.completed',
+                    "Milestone '{$milestone->name}' completed",
+                    null,
+                    $milestone,
+                    ['old_status' => $oldStatus, 'new_status' => $value],
+                );
+
+                $actor = auth()->user() ?? $project?->manager ?? $project?->owner ?? User::first();
+                if ($actor) {
+                    event(new MilestoneCompleted($milestone, $actor));
+                }
+            } else {
+                $this->activity->record(
+                    $project,
+                    'milestone.updated',
+                    "Milestone '{$milestone->name}' updated",
+                    null,
+                    $milestone,
+                );
+            }
 
             return $milestone->{$field};
         });
@@ -147,11 +172,13 @@ class MilestoneService
                 foreach ($milestone->tasks as $task) {
                     $taskService->delete($task);
                 }
+                foreach ($milestone->taskLists as $taskList) {
+                    $taskList->delete();
+                }
             } else {
                 $milestone->tasks()->update(['milestone_id' => null]);
+                $milestone->taskLists()->update(['milestone_id' => null]);
             }
-
-            $milestone->taskLists()->update(['milestone_id' => null]);
 
             $this->activity->record(
                 $project,
@@ -294,7 +321,20 @@ class MilestoneService
 
         $percentage = $totalEligible > 0 ? (int) round(($completedCount / $totalEligible) * 100) : 0;
 
-        if ($model->completion_percentage !== $percentage) {
+        if ($percentage === 100 && $totalEligible > 0 && $model->status !== Milestone::STATUS_COMPLETED) {
+            $this->milestones->update($model->id, [
+                'completion_percentage' => 100,
+                'status'                => Milestone::STATUS_COMPLETED,
+            ]);
+            $model->completion_percentage = 100;
+            $model->status = Milestone::STATUS_COMPLETED;
+
+            $project = $model->project ?? Project::find($model->project_id);
+            $actor = auth()->user() ?? $project?->manager ?? $project?->owner ?? User::first();
+            if ($actor) {
+                event(new MilestoneCompleted($model, $actor));
+            }
+        } elseif ($model->completion_percentage !== $percentage) {
             $this->milestones->update($model->id, [
                 'completion_percentage' => $percentage,
             ]);

@@ -10,7 +10,7 @@ interface MilestoneRepositoryInterface
 {
     public function getForProject(int $projectId): Collection;
 
-    public function paginateAll(array $filters, int $perPage = 15): LengthAwarePaginator;
+    public function paginateAll(array $filters, int $perPage = 10): LengthAwarePaginator;
 
     public function find(int $id): ?Milestone;
 

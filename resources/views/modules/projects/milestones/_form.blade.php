@@ -1,7 +1,7 @@
 <input type="hidden" name="_milestone_form" id="milestone_form_mode" value="{{ old('_milestone_form') }}">
 <input type="hidden" name="_milestone_id" id="milestone_form_id" value="{{ old('_milestone_id') }}">
 
-<x-ui.odoo-form-ui type="input" id="milestone_name" label="{{ __('projects.milestone_name') }}" name="name" :required="true"
+<x-ui.odoo-form-ui type="input" id="milestone_name" label="{{ __('projects.milestone_name') }}" name="name" maxlength="255" :required="true"
     :value="old('name')"
     :errorText="$errors->first('name')" />
 <x-ui.odoo-form-ui type="textarea" id="milestone_description" label="{{ __('projects.description') }}" name="description"
@@ -39,6 +39,6 @@
     @endforeach
 </x-ui.odoo-form-ui>
 <x-ui.odoo-form-ui type="input" id="milestone_completion_percentage" inputType="number" label="{{ __('projects.completion_percentage') }}" name="completion_percentage"
-    min="0" max="100"
+    min="0" max="100" step="1" inputmode="numeric"
     :value="old('completion_percentage', 0)"
     :errorText="$errors->first('completion_percentage')" />
