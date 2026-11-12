@@ -59,9 +59,9 @@ class ProjectReportService
         return $query->orderBy('created_at', 'desc');
     }
 
-    public function getProjectSummaryReport(ReportFilterDTO $filters, int $perPage = 15): LengthAwarePaginator
+    public function getProjectSummaryReport(ReportFilterDTO $filters, int $perPage = 10): LengthAwarePaginator
     {
-        return $this->getProjectSummaryQuery($filters)->paginate($perPage);
+        return $this->getProjectSummaryQuery($filters)->paginate($perPage)->withQueryString();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -106,16 +106,16 @@ class ProjectReportService
             $search = $filters->search;
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('task_number', 'like', "%{$search}%");
+                  ->orWhere('task_code', 'like', "%{$search}%");
             });
         }
 
         return $query->orderBy('due_date', 'asc')->orderBy('id', 'desc');
     }
 
-    public function getTaskStatusReport(ReportFilterDTO $filters, int $perPage = 15): LengthAwarePaginator
+    public function getTaskStatusReport(ReportFilterDTO $filters, int $perPage = 10): LengthAwarePaginator
     {
-        return $this->getTaskStatusQuery($filters)->paginate($perPage);
+        return $this->getTaskStatusQuery($filters)->paginate($perPage)->withQueryString();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -205,7 +205,7 @@ class ProjectReportService
         return $rows->sortByDesc('total_hours')->values();
     }
 
-    public function getResourceUtilizationReport(ReportFilterDTO $filters, int $perPage = 15): LengthAwarePaginator
+    public function getResourceUtilizationReport(ReportFilterDTO $filters, int $perPage = 10): LengthAwarePaginator
     {
         $all = $this->getResourceUtilizationData($filters);
         $page = (int) request()->query('page', 1);
@@ -261,9 +261,9 @@ class ProjectReportService
         return $query->orderBy('log_date', 'desc')->orderBy('id', 'desc');
     }
 
-    public function getTimesheetBillabilityReport(ReportFilterDTO $filters, int $perPage = 15): LengthAwarePaginator
+    public function getTimesheetBillabilityReport(ReportFilterDTO $filters, int $perPage = 10): LengthAwarePaginator
     {
-        return $this->getTimesheetBillabilityQuery($filters)->paginate($perPage);
+        return $this->getTimesheetBillabilityQuery($filters)->paginate($perPage)->withQueryString();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -311,9 +311,9 @@ class ProjectReportService
         return $query->orderBy('created_at', 'desc')->orderBy('id', 'desc');
     }
 
-    public function getIssueDefectDensityReport(ReportFilterDTO $filters, int $perPage = 15): LengthAwarePaginator
+    public function getIssueDefectDensityReport(ReportFilterDTO $filters, int $perPage = 10): LengthAwarePaginator
     {
-        return $this->getIssueDefectDensityQuery($filters)->paginate($perPage);
+        return $this->getIssueDefectDensityQuery($filters)->paginate($perPage)->withQueryString();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -359,9 +359,9 @@ class ProjectReportService
         return $query->orderBy('due_date', 'asc')->orderBy('id', 'desc');
     }
 
-    public function getMilestoneVarianceReport(ReportFilterDTO $filters, int $perPage = 15): LengthAwarePaginator
+    public function getMilestoneVarianceReport(ReportFilterDTO $filters, int $perPage = 10): LengthAwarePaginator
     {
-        return $this->getMilestoneVarianceQuery($filters)->paginate($perPage);
+        return $this->getMilestoneVarianceQuery($filters)->paginate($perPage)->withQueryString();
     }
 
     /**
@@ -454,15 +454,15 @@ class ProjectReportService
         $rows = collect();
 
         foreach ($projects as $project) {
-            $baseBudgetAmount = (float) ($project->budget_amount ?? 0);
-            $baseBudgetHours  = (float) ($project->budget_hours ?? 0);
-
             $approvedCrs = $project->changeRequests->where('status', 'Approved');
-            $crBudgetAmount = (float) $approvedCrs->sum('impact_budget');
+            $crBudgetAmount = (float) $approvedCrs->sum('impact_budget_amount');
             $crBudgetHours  = (float) $approvedCrs->sum('impact_budget_hours');
 
-            $revisedBudgetAmount = $baseBudgetAmount + $crBudgetAmount;
-            $revisedBudgetHours  = $baseBudgetHours + $crBudgetHours;
+            $revisedBudgetAmount = (float) ($project->budget_amount ?? 0);
+            $revisedBudgetHours  = (float) ($project->budget_hours ?? 0);
+
+            $baseBudgetAmount = max(0.0, $revisedBudgetAmount - $crBudgetAmount);
+            $baseBudgetHours  = max(0.0, $revisedBudgetHours - $crBudgetHours);
 
             $timeLogs = $project->timeLogs;
             $actualHours = (float) $timeLogs->sum('hours');
@@ -517,7 +517,7 @@ class ProjectReportService
         return $rows;
     }
 
-    public function getBudgetCostReport(ReportFilterDTO $filters, int $perPage = 15): LengthAwarePaginator
+    public function getBudgetCostReport(ReportFilterDTO $filters, int $perPage = 10): LengthAwarePaginator
     {
         $all = $this->getBudgetCostReportData($filters);
         $page = (int) request()->query('page', 1);

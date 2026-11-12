@@ -158,7 +158,7 @@
                                         @if ($invoice->status === 'Draft' && auth()->user()->can('update', $invoice))
                                             <li>
                                                 <form action="{{ route('sales.invoices.post', $invoice->id) }}" method="POST"
-                                                      onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_post_invoice')));">
+                                                      onsubmit="return confirm(@js(__('projects.confirm_post_invoice')));">
                                                     @csrf
                                                     <button type="submit" class="dropdown-item text-success">
                                                         <i class="feather-check-circle me-2"></i>{{ __('projects.post_invoice') }}

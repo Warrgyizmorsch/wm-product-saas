@@ -1,17 +1,17 @@
 <input type="hidden" name="_tasklist_form" id="tasklist_form_mode" value="{{ old('_tasklist_form') }}">
 <input type="hidden" name="_tasklist_id" id="tasklist_form_id" value="{{ old('_tasklist_id') }}">
 
-<x-ui.odoo-form-ui type="input" id="tasklist_name" label="{{ __('projects.tasklist_name') }}" name="name" :required="true"
+<x-ui.odoo-form-ui type="input" id="tasklist_name" label="{{ __('projects.tasklist_name') }}" name="name" maxlength="255" :required="true"
     :value="old('name')"
     :errorText="$errors->first('name')" />
 <x-ui.odoo-form-ui type="textarea" id="tasklist_description" label="{{ __('projects.description') }}" name="description"
     :value="old('description')"
     :errorText="$errors->first('description')" />
-<x-ui.odoo-form-ui type="select" id="tasklist_milestone_id" label="{{ __('projects.milestone') }}" name="milestone_id"
+<x-ui.odoo-form-ui type="select" id="tasklist_milestone_id" label="{{ __('projects.milestone') }}" name="milestone_id" :required="true"
     :errorText="$errors->first('milestone_id')">
-    <option value="">{{ __('projects.none_option') }}</option>
+    <option value="">{{ __('projects.select_option') }}</option>
     @foreach ($milestones as $milestoneOption)
-        <option value="{{ $milestoneOption->id }}" @selected((int) old('milestone_id') === $milestoneOption->id)>
+        <option value="{{ $milestoneOption->id }}" @selected((int) old('milestone_id', $milestone->id ?? null) === $milestoneOption->id)>
             {{ $milestoneOption->name }}
         </option>
     @endforeach

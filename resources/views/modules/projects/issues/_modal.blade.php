@@ -7,7 +7,7 @@
         <div class="row g-3">
             <div class="col-12">
                 <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.issue_title') }} <span class="text-danger">*</span></label>
-                <x-ui.odoo-form-ui type="input" name="title" :placeholder="__('projects.issue_title')" :value="old('title')" required />
+                <x-ui.odoo-form-ui type="input" name="title" maxlength="255" :placeholder="__('projects.issue_title')" :value="old('title')" required />
             </div>
 
             <div class="col-md-6">

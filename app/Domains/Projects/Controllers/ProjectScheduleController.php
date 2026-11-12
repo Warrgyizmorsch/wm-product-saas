@@ -31,7 +31,7 @@ class ProjectScheduleController extends Controller
             return response()->json($schedule);
         }
 
-        $milestones = $project->milestones()->orderBy('milestone_order')->get();
+        $milestones = $project->milestones()->orderBy('start_date')->orderBy('id')->get();
 
         return view('modules.projects.timeline', [
             'project'    => $project,

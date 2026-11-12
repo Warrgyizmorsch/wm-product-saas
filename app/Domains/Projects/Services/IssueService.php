@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Projects\Events\IssueAssigned;
 use App\Domains\Projects\Events\IssueLogged;
 use App\Domains\Projects\Events\IssueResolved;
 use App\Domains\Projects\Events\IssueRetested;
@@ -68,6 +69,10 @@ class IssueService
 
             event(new IssueLogged($issue, $reporter));
 
+            if (!empty($issue->assignee_id)) {
+                event(new IssueAssigned($issue, $reporter));
+            }
+
             return $issue;
         });
     }
@@ -94,6 +99,13 @@ class IssueService
 
         return DB::transaction(function () use ($issue, $data, $project, $actor) {
             $originalStatus = $issue->status;
+            $previousAssigneeId = $issue->assignee_id;
+
+            // Auto-update status to Assigned if assigning an Open issue
+            if (array_key_exists('assignee_id', $data) && !empty($data['assignee_id']) && $issue->status === Issue::STATUS_OPEN && !array_key_exists('status', $data)) {
+                $data['status'] = Issue::STATUS_ASSIGNED;
+            }
+
             $updated = $this->issues->update($issue->id, $data);
 
             if ($originalStatus !== $updated->status) {
@@ -131,6 +143,28 @@ class IssueService
                         ]
                     );
                 }
+            }
+
+            if (array_key_exists('assignee_id', $data) && !empty($data['assignee_id']) && (int) $data['assignee_id'] !== (int) $previousAssigneeId) {
+                $updated->loadMissing('assignee');
+                $this->activityLogs->record(
+                    $project,
+                    'project.issue_assigned',
+                    __('projects.issue_assigned_title', [
+                        'number'   => $updated->issue_number,
+                        'user'     => $actor->name,
+                        'assignee' => $updated->assignee?->name ?? 'User',
+                        'default'  => ":user assigned issue :number to :assignee",
+                    ]),
+                    null,
+                    $updated,
+                    [
+                        'previous_assignee_id' => $previousAssigneeId,
+                        'new_assignee_id'      => $updated->assignee_id,
+                    ]
+                );
+
+                event(new IssueAssigned($updated, $actor, $previousAssigneeId));
             }
 
             return $updated;
@@ -268,9 +302,11 @@ class IssueService
         return $deleted;
     }
 
-    public function updateField(Issue $issue, string $field, mixed $value, User $actor): Issue
+    public function updateField(Issue $issue, string $field, mixed $value, User $actor): mixed
     {
-        return $this->update($issue, [$field => $value], $actor);
+        $updated = $this->update($issue, [$field => $value], $actor);
+
+        return $updated->{$field};
     }
 
     private function validateAssigneeIsCollaborator(Project $project, int $userId): void

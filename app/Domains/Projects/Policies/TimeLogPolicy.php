@@ -73,6 +73,13 @@ class TimeLogPolicy
             return false;
         }
 
+        if ($user->id === (int) $project?->owner_id || 
+            $user->id === (int) $project?->manager_id ||
+            $user->hasAnyRole('owner', 'tenant_owner', 'admin', 'super_admin', 'project_manager') ||
+            ($user->tenant_id === $project?->tenant_id && ($user->is_owner ?? false))) {
+            return true;
+        }
+
         return $this->access->allows($user, 'projects.timetracking.approve', [
             'tenant_id' => $timeLog->tenant_id,
             'owner_id'  => $project?->owner_id,
@@ -84,6 +91,11 @@ class TimeLogPolicy
 
     public function approveAny(User $user): bool
     {
+        if ($user->hasAnyRole('owner', 'tenant_owner', 'admin', 'super_admin', 'project_manager') ||
+            ($user->is_owner ?? false)) {
+            return true;
+        }
+
         return $this->access->allows($user, 'projects.timetracking.approve', [
             'tenant_id' => require_tenant_id(),
         ]) || $this->access->allows($user, 'projects.projects.update', [

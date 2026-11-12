@@ -82,6 +82,10 @@ class ProjectPolicy
 
     public function generateInvoice(User $user, Project $project): bool
     {
+        if ($project->isClosed()) {
+            return false;
+        }
+
         $hasProjectScope = $this->access->allows($user, 'projects.billing.generate_invoice', [
             'tenant_id' => $project->tenant_id,
             'owner_id'  => $project->owner_id,

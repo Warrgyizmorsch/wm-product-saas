@@ -98,14 +98,14 @@
         <p class="fs-12 text-muted mb-0">Project events will appear here as members, milestones, and other changes occur.</p>
     </div>
 @else
-    <div class="px-3 pb-3 mb-3 border-bottom d-flex align-items-center justify-content-between">
+    <div class="px-3 py-3 mb-3 border-bottom d-flex align-items-center justify-content-between bg-white">
         <span class="text-muted fs-12 fw-semibold">{{ $activities->count() }} Events</span>
     </div>
 
     <div class="activity-timeline-container px-3">
         @foreach ($groupedActivities as $dateGroup => $activitiesInGroup)
             <div class="timeline-date-group mb-4">
-                <div class="timeline-date-header py-1 mb-3 position-sticky bg-white text-uppercase fs-11 fw-bold text-muted" 
+                <div class="timeline-date-header py-2 mb-3 position-sticky bg-white text-uppercase fs-11 fw-bold text-muted border-bottom" 
                      style="top: 0; z-index: 10; letter-spacing: 0.05em;">
                     {{ $dateGroup }}
                 </div>
@@ -176,6 +176,9 @@
 @endif
 
 <style>
+    #activityLogDrawer .offcanvas-body {
+        padding-top: 0 !important;
+    }
     .activity-timeline-container {
         position: relative;
     }
@@ -183,7 +186,16 @@
         position: relative;
     }
     .timeline-date-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
         letter-spacing: 0.05em;
+        margin-left: -1rem;
+        margin-right: -1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        background-color: #ffffff !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
     }
     .timeline-items {
         position: relative;

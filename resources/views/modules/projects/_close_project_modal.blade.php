@@ -53,6 +53,7 @@
                     id="closureDateField"
                     :label="__('projects.closure_date')"
                     :value="old('closure_date', now()->toDateString())"
+                    @if($project->start_date) min="{{ $project->start_date->format('Y-m-d') }}" @endif
                     required
                 />
             </div>

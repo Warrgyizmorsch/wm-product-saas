@@ -1,5 +1,6 @@
 @php
     $collaborators = $members->where('is_active', true)->sortBy(fn ($member) => mb_strtolower($member->user?->name ?: ''))->values();
+    $currencySymbol = active_currency_symbol();
 @endphp
 
 <div class="d-flex align-items-center justify-content-between mb-2">
@@ -21,7 +22,9 @@
          data-remove-label="{{ __('projects.remove_collaborator') }}"
          data-confirm-remove-template="{{ __('projects.confirm_remove_collaborator', ['name' => '__NAME__']) }}"
          data-remove-success-text="{{ __('projects.member_removed') }}"
-         data-remove-error-text="{{ __('projects.something_went_wrong') }}">
+         data-remove-error-text="{{ __('projects.something_went_wrong') }}"
+         data-billing-method="{{ $project->billing_method }}"
+         data-currency-symbol="{{ $currencySymbol }}">
         <div class="d-flex align-items-center flex-wrap" id="projectCollaboratorAvatars">
             @foreach ($collaborators as $index => $collaborator)
                 @php
@@ -36,6 +39,7 @@
                     'index' => $index,
                     'memberId' => $collaborator->id,
                     'role' => $collaboratorRole,
+                    'rate' => $collaborator->rate_per_hour,
                 ])
             @endforeach
 
@@ -62,4 +66,49 @@
             {{ __('projects.collaborators_active_count', ['count' => $collaborators->count()]) }}
         </div>
     </div>
+
+    @if ($canManageMembers)
+        <div class="modal fade" id="modalAddCollaboratorRate" tabindex="-1" aria-labelledby="modalAddCollaboratorRateLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content shadow-sm border">
+                    <div class="modal-header py-2 px-3 border-bottom">
+                        <h6 class="modal-title fs-13 fw-bold" id="modalAddCollaboratorRateLabel">
+                            <i class="feather-user-plus me-1 text-primary"></i>{{ __('projects.add_collaborator') }}
+                        </h6>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body py-3 px-3">
+                        <div class="mb-3">
+                            <label class="form-label fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.collaborator') ?? 'Collaborator' }}</label>
+                            <div class="fs-13 fw-semibold text-dark" id="modalCollaboratorUserName">—</div>
+                        </div>
+                        <div class="mb-2">
+                            <label for="modalCollaboratorRateInput" class="form-label fs-12 fw-semibold mb-1">
+                                {{ __('projects.rate_per_hour') ?? 'Rate / Hour' }} ({{ $currencySymbol }}) <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">{{ $currencySymbol }}</span>
+                                <input type="number" step="0.01" min="0" max="99999999.99"
+                                       class="form-control form-control-sm"
+                                       id="modalCollaboratorRateInput"
+                                       placeholder="0.00" required>
+                            </div>
+                            <div class="text-danger fs-11 mt-1 d-none" id="modalCollaboratorRateError">
+                                {{ __('projects.rate_required_for_user_billing') }}
+                            </div>
+                            <div class="form-text fs-11 text-muted mt-1">
+                                {{ __('projects.user_billing_rate_help') }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2 px-3 bg-light border-top">
+                        <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('projects.cancel') }}</button>
+                        <button type="button" class="btn btn-sm btn-primary" id="modalCollaboratorSubmitBtn">
+                            <i class="feather-check me-1"></i>{{ __('projects.add') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 @endif

@@ -116,10 +116,19 @@
 
                 var name = avatar.dataset.collaboratorName || '';
                 var role = avatar.dataset.collaboratorRole || '';
+                var rate = avatar.dataset.collaboratorRate;
                 var memberId = avatar.dataset.memberId;
+                var currencySymbol = container.dataset.currencySymbol || '₹';
 
                 var content = '<div class="fw-semibold fs-13">' + escapeHtml(name) + '</div>'
-                    + '<div class="text-muted fs-12 mb-2">' + escapeHtml(role) + '</div>';
+                    + '<div class="text-muted fs-12 mb-1">' + escapeHtml(role) + '</div>';
+
+                if (rate && !isNaN(parseFloat(rate)) && parseFloat(rate) > 0) {
+                    content += '<div class="text-primary fw-semibold fs-11 mb-2">'
+                        + escapeHtml(currencySymbol) + ' ' + parseFloat(rate).toFixed(2) + ' / hr</div>';
+                } else {
+                    content += '<div class="mb-2"></div>';
+                }
 
                 if (canManage) {
                     content += '<button type="button" class="btn btn-sm btn-outline-danger w-100 collaborator-remove-btn" '
@@ -251,6 +260,89 @@
                 });
         }
 
+        var rateModalEl = document.getElementById('modalAddCollaboratorRate');
+        var rateModal = (rateModalEl && typeof bootstrap !== 'undefined') ? new bootstrap.Modal(rateModalEl) : null;
+        var modalUserNameEl = document.getElementById('modalCollaboratorUserName');
+        var modalRateInput = document.getElementById('modalCollaboratorRateInput');
+        var modalRateError = document.getElementById('modalCollaboratorRateError');
+        var modalSubmitBtn = document.getElementById('modalCollaboratorSubmitBtn');
+        var pendingCollaborator = null;
+
+        function getBillingMethod() {
+            var billingField = document.querySelector('[data-field="billing_method"]');
+            if (billingField) {
+                var select = billingField.querySelector('select');
+                if (select && select.value) return select.value;
+                var textEl = billingField.querySelector('.inline-edit__text');
+                if (textEl) {
+                    var txt = textEl.textContent.trim();
+                    if (txt.toLowerCase().includes('user')) return 'User Based';
+                    if (txt && txt !== '—' && !txt.includes('None')) return txt;
+                }
+            }
+            return container.dataset.billingMethod || '';
+        }
+
+        if (modalSubmitBtn) {
+            modalSubmitBtn.addEventListener('click', function () {
+                submitRateModal();
+            });
+        }
+
+        if (modalRateInput) {
+            modalRateInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitRateModal();
+                }
+            });
+        }
+
+        function submitRateModal() {
+            if (!pendingCollaborator) return;
+            var val = modalRateInput ? modalRateInput.value.trim() : '';
+            var num = parseFloat(val);
+            if (val === '' || isNaN(num) || num < 0) {
+                if (modalRateInput) modalRateInput.classList.add('is-invalid');
+                if (modalRateError) modalRateError.classList.remove('d-none');
+                return;
+            }
+
+            if (modalRateInput) modalRateInput.classList.remove('is-invalid');
+            if (modalRateError) modalRateError.classList.add('d-none');
+
+            var target = pendingCollaborator;
+            pendingCollaborator = null;
+            if (rateModal) {
+                rateModal.hide();
+            }
+
+            addCollaborator(target.id, num);
+        }
+
+        function promptRateAndAdd(userId, userName) {
+            hideResults();
+            pendingCollaborator = { id: userId, name: userName };
+
+            if (rateModal && rateModalEl) {
+                if (modalUserNameEl) modalUserNameEl.textContent = userName;
+                if (modalRateInput) {
+                    modalRateInput.value = '';
+                    modalRateInput.classList.remove('is-invalid');
+                }
+                if (modalRateError) modalRateError.classList.add('d-none');
+                rateModal.show();
+                setTimeout(function () {
+                    if (modalRateInput) modalRateInput.focus();
+                }, 300);
+            } else {
+                var entered = window.prompt('Enter Rate / Hour (' + (container.dataset.currencySymbol || '₹') + ') for ' + userName + ':');
+                if (entered !== null && entered.trim() !== '' && !isNaN(entered)) {
+                    addCollaborator(userId, parseFloat(entered));
+                }
+            }
+        }
+
         function renderResults(results) {
             resultsList.innerHTML = '';
 
@@ -269,7 +361,11 @@
                 item.style.cursor = 'pointer';
                 item.textContent = result.text;
                 item.addEventListener('click', function () {
-                    addCollaborator(result.id);
+                    if (getBillingMethod() === 'User Based') {
+                        promptRateAndAdd(result.id, result.text);
+                    } else {
+                        addCollaborator(result.id, null);
+                    }
                 });
                 resultsList.appendChild(item);
             });
@@ -277,12 +373,17 @@
             resultsList.classList.remove('d-none');
         }
 
-        function addCollaborator(userId) {
+        function addCollaborator(userId, ratePerHour) {
             if (isAdding) return;
             isAdding = true;
 
             var csrfToken = document.querySelector('meta[name="csrf-token"]');
             csrfToken = csrfToken ? csrfToken.content : '';
+
+            var payload = { user_id: userId };
+            if (ratePerHour !== null && typeof ratePerHour !== 'undefined') {
+                payload.rate_per_hour = ratePerHour;
+            }
 
             fetch(storeUrl, {
                 method: 'POST',
@@ -292,7 +393,7 @@
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-TOKEN': csrfToken,
                 },
-                body: JSON.stringify({ user_id: userId }),
+                body: JSON.stringify(payload),
             })
                 .then(function (response) {
                     return response.json().catch(function () { return {}; }).then(function (data) {

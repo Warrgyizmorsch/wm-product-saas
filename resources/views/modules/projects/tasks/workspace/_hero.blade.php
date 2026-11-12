@@ -41,7 +41,7 @@
                 </li>
                 <li>
                     <a class="dropdown-item text-danger" href="javascript:void(0);"
-                       onclick="confirmAction(@js(__('projects.confirm_remove_task')), function () { document.getElementById('taskWorkspaceDeleteForm').submit(); })">
+                       onclick="if (confirm(@js(__('projects.confirm_remove_task')))) { document.getElementById('taskWorkspaceDeleteForm').submit(); }">
                         <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
                     </a>
                 </li>

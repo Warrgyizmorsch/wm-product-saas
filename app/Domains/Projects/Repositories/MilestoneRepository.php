@@ -28,7 +28,7 @@ class MilestoneRepository implements MilestoneRepositoryInterface
             ->get();
     }
 
-    public function paginateAll(array $filters, int $perPage = 15): LengthAwarePaginator
+    public function paginateAll(array $filters, int $perPage = 10): LengthAwarePaginator
     {
         $query = Milestone::query()
             ->with(['project', 'owner'])

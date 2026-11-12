@@ -72,7 +72,12 @@ class TaskController extends Controller
             $query->where('assignee_id', $filters['assignee_id']);
         }
 
-        $tasks = $query->latest('id')->paginate(15)->withQueryString();
+        $perPage = (int) $request->input('per_page', 10);
+        if ($perPage <= 0 || $perPage > 100) {
+            $perPage = 10;
+        }
+
+        $tasks = $query->latest('id')->paginate($perPage)->withQueryString();
         $statuses = Task::STATUSES;
         $priorities = Task::PRIORITIES;
         $projects = Project::query()->where('tenant_id', require_tenant_id())->orderBy('name')->get();
@@ -291,10 +296,20 @@ class TaskController extends Controller
     {
         $this->authorize('delete', $task);
 
+        $targetUrl = $task->milestone_id
+            ? route('projects.milestones.show', [$project, $task->milestone_id]) . '?tab=tasklists'
+            : route('projects.show', $project) . '?tab=tasklists';
+
         $this->tasks->delete($task);
 
+        $previous = url()->previous();
+        $taskShowUrl = route('projects.tasks.show', [$project, $task]);
+        if ($previous && str_starts_with($previous, $taskShowUrl)) {
+            return redirect()->to($targetUrl)->with('success', __('projects.task_removed'));
+        }
+
         return redirect()
-            ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'tasklists']))
+            ->to($this->backUrlWithQuery($targetUrl, ['tab' => 'tasklists']))
             ->with('success', __('projects.task_removed'));
     }
 

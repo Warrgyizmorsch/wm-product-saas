@@ -107,6 +107,11 @@ class Task extends BaseModel
         $this->attributes['assignee_id'] = $value;
     }
 
+    public function getTaskNumberAttribute(): ?string
+    {
+        return $this->task_code;
+    }
+
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewer_id');

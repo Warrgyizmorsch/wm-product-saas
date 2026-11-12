@@ -81,7 +81,7 @@ class TaskService
             $data['tenant_id'] = $project->tenant_id;
             $data['company_id'] = $data['company_id'] ?? $project->company_id;
             $data['branch_id'] = $data['branch_id'] ?? $project->branch_id;
-            $data['milestone_id'] = $data['milestone_id'] ?? $taskList->milestone_id;
+            $data['milestone_id'] = $taskList->milestone_id ?? $data['milestone_id'] ?? null;
             $data['task_code'] = $this->getNextTaskCode($project);
             $data['position'] = $this->nextPosition($taskList);
             $data['status'] = $data['status'] ?? Task::STATUS_OPEN;

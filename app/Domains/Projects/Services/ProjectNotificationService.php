@@ -4,9 +4,11 @@ namespace App\Domains\Projects\Services;
 
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\Projects\Events\ChangeRequestCreated;
+use App\Domains\Projects\Events\IssueAssigned;
 use App\Domains\Projects\Events\IssueLogged;
 use App\Domains\Projects\Events\IssueResolved;
 use App\Domains\Projects\Events\IssueRetested;
+use App\Domains\Projects\Events\MilestoneCompleted;
 use App\Domains\Projects\Events\ProjectClosed;
 use App\Domains\Projects\Events\ProjectReviewRequested;
 use App\Domains\Projects\Events\ProjectReviewSignedOff;
@@ -20,6 +22,8 @@ use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\TimeLog;
 use App\Models\Notification;
 use App\Models\User;
+use App\Services\Notification\NotificationService;
+use App\Services\Pusher\PusherBroadcastService;
 use Illuminate\Support\Facades\Log;
 
 class ProjectNotificationService
@@ -99,6 +103,47 @@ class ProjectNotificationService
                 } catch (\Throwable $e) {
                     Log::warning("Project notification in-app create failed: " . $e->getMessage());
                 }
+            }
+
+            // Real-time Pusher WebSockets & FCM Broadcast (Deferred execution so HTTP response is instant)
+            if ($notification) {
+                NotificationService::runDeferred(function () use ($recipient, $title, $message, $actionUrl, $type, $iconClass, $data, $notification) {
+                    try {
+                        PusherBroadcastService::broadcast(
+                            channels: ["user-{$recipient->id}"],
+                            eventName: 'notification',
+                            data: [
+                                'id'         => $notification->id,
+                                'title'      => $title,
+                                'message'    => $message,
+                                'action_url' => $actionUrl,
+                                'module'     => 'projects',
+                                'type'       => (string) $type,
+                                'icon_class' => $iconClass,
+                            ]
+                        );
+                    } catch (\Throwable $pusherEx) {
+                        Log::info("Projects Pusher broadcast skipped: " . $pusherEx->getMessage());
+                    }
+
+                    if (config('firebase.auto_push_notifications', true)) {
+                        try {
+                            \App\Services\Firebase\FcmService::sendToUser(
+                                user: $recipient,
+                                title: $title,
+                                body: $message,
+                                actionUrl: $actionUrl,
+                                extraData: array_merge($data ?? [], [
+                                    'notification_id' => (string) ($notification->id ?? ''),
+                                    'module'          => 'projects',
+                                    'type'            => (string) $type,
+                                ])
+                            );
+                        } catch (\Throwable $fcmEx) {
+                            Log::info("Projects FCM push skipped: " . $fcmEx->getMessage());
+                        }
+                    }
+                });
             }
         }
 
@@ -256,6 +301,46 @@ class ProjectNotificationService
         }
     }
 
+    public function handleIssueAssigned(IssueAssigned $event): void
+    {
+        $issue = $event->issue;
+        $actor = $event->actor;
+        $project = $issue->project ?? Project::find($issue->project_id);
+        $assigneeId = $issue->assignee_id;
+
+        if (!$project || !$assigneeId) {
+            return;
+        }
+
+        $assignee = $issue->assignee ?? User::find($assigneeId);
+        if (!$assignee) {
+            return;
+        }
+
+        $actionUrl = $this->safeRoute('projects.issues.show', [$project, $issue])
+            ?? $this->safeRoute('projects.show', [$project, 'tab' => 'issues']);
+
+        $this->notifyUser(
+            recipient: $assignee,
+            actor: $actor,
+            project: $project,
+            type: 'issue.assigned',
+            title: __('projects.notification_issue_assigned_title', ['number' => $issue->issue_number]),
+            message: __('projects.notification_issue_assigned_body', [
+                'title'   => $issue->title,
+                'project' => $project->name,
+                'actor'   => $actor->name,
+            ]),
+            actionUrl: $actionUrl,
+            iconClass: 'feather-alert-triangle',
+            data: [
+                'project_id'   => $project->id,
+                'entity_id'    => $issue->id,
+                'issue_number' => $issue->issue_number,
+            ]
+        );
+    }
+
     public function handleIssueLogged(IssueLogged $event): void
     {
         $issue = $event->issue;
@@ -399,6 +484,66 @@ class ProjectNotificationService
                     'entity_id'    => $issue->id,
                     'issue_number' => $issue->issue_number,
                     'passed'       => $event->passed,
+                ]
+            );
+        }
+    }
+
+    public function handleMilestoneCompleted(MilestoneCompleted $event): void
+    {
+        $milestone = $event->milestone;
+        $actor = $event->actor;
+        $project = $milestone->project ?? Project::find($milestone->project_id);
+
+        if (!$project) {
+            return;
+        }
+
+        $recipients = collect();
+
+        // 1. Notify Milestone Owner if assigned
+        if ($milestone->owner_id) {
+            $owner = $milestone->owner ?? User::find($milestone->owner_id);
+            if ($owner) {
+                $recipients->push($owner);
+            }
+        }
+
+        // 2. Notify Project Leadership (Manager, Owner)
+        foreach ($this->resolveProjectLeadership($project) as $leader) {
+            $recipients->push($leader);
+        }
+
+        // 3. Notify active project collaborators
+        if ($project->relationLoaded('members') || method_exists($project, 'members')) {
+            $memberUsers = $project->members()->where('is_active', true)->with('user')->get()->pluck('user')->filter();
+            foreach ($memberUsers as $user) {
+                $recipients->push($user);
+            }
+        }
+
+        $recipients = $recipients->unique('id');
+        $actionUrl = $this->safeRoute('projects.milestones.show', [$project, $milestone])
+            ?? $this->safeRoute('projects.show', [$project, 'tab' => 'milestones']);
+
+        foreach ($recipients as $recipient) {
+            $this->notifyUser(
+                recipient: $recipient,
+                actor: $actor,
+                project: $project,
+                type: 'milestone.completed',
+                title: __('projects.notification_milestone_completed_title', ['name' => $milestone->name]),
+                message: __('projects.notification_milestone_completed_body', [
+                    'name'    => $milestone->name,
+                    'project' => $project->name,
+                    'actor'   => $actor->name,
+                ]),
+                actionUrl: $actionUrl,
+                iconClass: 'feather-flag',
+                data: [
+                    'project_id'   => $project->id,
+                    'entity_id'    => $milestone->id,
+                    'milestone_id' => $milestone->id,
                 ]
             );
         }
@@ -774,11 +919,17 @@ class ProjectNotificationService
     {
         $leaders = collect();
 
-        if ($project->manager_id && $project->manager) {
-            $leaders->push($project->manager);
+        if ($project->manager_id) {
+            $manager = $project->manager ?? User::find($project->manager_id);
+            if ($manager) {
+                $leaders->push($manager);
+            }
         }
-        if ($project->owner_id && $project->owner) {
-            $leaders->push($project->owner);
+        if ($project->owner_id) {
+            $owner = $project->owner ?? User::find($project->owner_id);
+            if ($owner) {
+                $leaders->push($owner);
+            }
         }
 
         return $leaders->unique('id');

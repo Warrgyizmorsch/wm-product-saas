@@ -22,6 +22,9 @@
             align-items: center;
             padding: 0 14px;
         }
+        #activityLogDrawer .offcanvas-body {
+            padding-top: 0 !important;
+        }
     </style>
 @endpush
 
@@ -389,7 +392,9 @@
                         ? 'issues'
                         : (old('_document_form')
                             ? 'documents'
-                            : (old('_review_form') || old('_cr_form') ? 'reviews' : 'summary'))));
+                            : (old('_review_form') || old('_cr_form')
+                                ? 'reviews'
+                                : (old('_billing_form') ? 'billing' : 'summary')))));
 
             $projectDetailTabs = [
                 ['id' => 'tab-summary', 'label' => __('projects.summary'), 'icon' => 'feather-grid', 'active' => $activeProjectTab === 'summary'],
