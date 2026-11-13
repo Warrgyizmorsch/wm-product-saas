@@ -88,6 +88,7 @@ class DispatchOrderRepository
             'salesOrder.customer',
             'items.product',
             'items.warehouse',
+            'items.serialNumbers',
         ])
         ->whereHas('salesOrder', function ($q) {
             $q->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered']);
@@ -408,7 +409,7 @@ class DispatchOrderRepository
                     'warehouse_id' => $item['warehouse_id'],
                     'quantity_ordered' => $item['quantity'],
                     'quantity_dispatched' => $item['quantity'],
-                    'serial_numbers' => $item['serial_numbers'] ?? null,
+                    'serial_numbers' => is_array($item['serial_numbers'] ?? null) ? implode(', ', array_filter(array_map('trim', $item['serial_numbers']))) : (isset($item['serial_numbers']) ? trim((string)$item['serial_numbers']) : null),
                     'batch_number' => $item['batch_number'] ?? null,
                 ]);
             }

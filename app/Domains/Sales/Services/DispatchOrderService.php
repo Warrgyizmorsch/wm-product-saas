@@ -36,6 +36,9 @@ class DispatchOrderService
                 $relQty = $item->quantity_released !== null ? (float) $item->quantity_released : (float) $item->quantity;
                 $remainingQty = max(0.0, $relQty - $alreadyDispatched);
                 $unreservedAvail = StockService::getAvailableStock((int) $item->product_id, (int) $item->warehouse_id);
+                $trackSerial = (bool) ($item->product?->track_serial_number);
+                $trackBatch = (bool) ($item->product?->track_batch);
+                $reservedSerials = $item->serialNumbers ? $item->serialNumbers->pluck('serial_number')->values()->all() : [];
 
                 return [
                     'id' => $item->id,
@@ -54,6 +57,9 @@ class DispatchOrderService
                     'remaining_qty' => $remainingQty,
                     'dispatch_qty' => $remainingQty,
                     'fully_dispatched' => $remainingQty <= 0,
+                    'track_serial_number' => $trackSerial,
+                    'track_batch' => $trackBatch,
+                    'reserved_serials' => $reservedSerials,
                 ];
             })->filter(fn ($i) => $i['remaining_qty'] > 0)->values();
 
@@ -82,7 +88,7 @@ class DispatchOrderService
             ->whereIn('status', ['Posted', 'Partially Paid', 'Paid'])
             ->get();
 
-        $mr = MaterialRequirement::with('items.warehouse')
+        $mr = MaterialRequirement::with(['items.warehouse', 'items.serialNumbers'])
             ->where('sales_order_id', $salesOrderId)
             ->first();
 
@@ -108,6 +114,9 @@ class DispatchOrderService
                 $warehouseName = $item->warehouse?->name ?: ($matchingMrItem?->warehouse?->name ?: 'Main Warehouse');
                 $quantityReserved = (float) ($matchingMrItem?->quantity_reserved ?? 0);
                 $unreservedAvail = StockService::getAvailableStock((int) $item->product_id, (int) $warehouseId);
+                $trackSerial = (bool) ($item->product?->track_serial_number);
+                $trackBatch = (bool) ($item->product?->track_batch);
+                $reservedSerials = ($matchingMrItem && $matchingMrItem->serialNumbers) ? $matchingMrItem->serialNumbers->pluck('serial_number')->values()->all() : [];
 
                 return [
                     'id' => $item->id,
@@ -128,6 +137,9 @@ class DispatchOrderService
                     'remaining_qty' => $remainingQty,
                     'dispatch_qty' => $remainingQty,
                     'fully_dispatched' => $remainingQty <= 0,
+                    'track_serial_number' => $trackSerial,
+                    'track_batch' => $trackBatch,
+                    'reserved_serials' => $reservedSerials,
                 ];
             })->filter(fn ($i) => $i['remaining_qty'] > 0)->values();
 
