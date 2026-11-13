@@ -48,7 +48,18 @@ class SerialNumberController extends Controller
             });
         }
 
-        $serials = $query->latest()->paginate(25)->withQueryString();
+        // Sorting
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = strtolower($request->input('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        if (in_array($sortBy, ['created_at', 'serial_number', 'status', 'purchase_rate'])) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->latest();
+        }
+
+        $perPage = (int) $request->input('per_page', 10);
+        $serials = $query->paginate($perPage)->withQueryString();
 
         $products = Product::where('tenant_id', $tenantId)
             ->where('track_serial_number', true)

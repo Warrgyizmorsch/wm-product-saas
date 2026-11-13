@@ -65,7 +65,8 @@ class BatchController extends Controller
             $query->orderBy('expiry_date', 'asc');
         }
 
-        $batches = $query->paginate(10)->withQueryString();
+        $perPage = (int) $request->input('per_page', 10);
+        $batches = $query->paginate($perPage)->withQueryString();
 
         $products = Product::where('tenant_id', $tenantId)
             ->where('track_batch', true)

@@ -54,6 +54,8 @@
                 <!-- Custom Filter Component -->
                 <form method="GET" action="{{ route('inventory.serial-numbers.index') }}" class="d-inline">
                     @if(request('search')) <input type="hidden" name="search" value="{{ request('search') }}"> @endif
+                    @if(request('sort_by')) <input type="hidden" name="sort_by" value="{{ request('sort_by') }}"> @endif
+                    @if(request('sort_order')) <input type="hidden" name="sort_order" value="{{ request('sort_order') }}"> @endif
                     
                     <x-ui.filter :label="__('inventory.filter')" offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('inventory.filter_options') }}</h6>
@@ -87,6 +89,16 @@
                                 @foreach($warehouses as $wh)
                                     <option value="{{ $wh->id }}" @selected(request('warehouse_id') == $wh->id)>{{ $wh->name }}</option>
                                 @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.per_page') ?? 'Items Per Page' }}</label>
+                            <x-ui.odoo-form-ui type="select" name="per_page">
+                                <option value="10" @selected(request('per_page', 10) == 10)>10 {{ __('inventory.per_page') ?? 'per page' }}</option>
+                                <option value="25" @selected(request('per_page') == 25)>25 {{ __('inventory.per_page') ?? 'per page' }}</option>
+                                <option value="50" @selected(request('per_page') == 50)>50 {{ __('inventory.per_page') ?? 'per page' }}</option>
+                                <option value="100" @selected(request('per_page') == 100)>100 {{ __('inventory.per_page') ?? 'per page' }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
@@ -193,6 +205,7 @@
         <!-- Pagination Component -->
         <div class="pt-3">
             <x-ui.pagination 
+                :paginator="$serials"
                 :currentPage="$serials->currentPage()" 
                 :totalPages="$serials->lastPage()" 
                 :totalResults="$serials->total()" 

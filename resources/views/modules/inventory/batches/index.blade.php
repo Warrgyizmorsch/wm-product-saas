@@ -116,6 +116,16 @@
                             </x-ui.odoo-form-ui>
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.per_page') ?? 'Items Per Page' }}</label>
+                            <x-ui.odoo-form-ui type="select" name="per_page">
+                                <option value="10" @selected(request('per_page', 10) == 10)>10 {{ __('inventory.per_page') ?? 'per page' }}</option>
+                                <option value="25" @selected(request('per_page') == 25)>25 {{ __('inventory.per_page') ?? 'per page' }}</option>
+                                <option value="50" @selected(request('per_page') == 50)>50 {{ __('inventory.per_page') ?? 'per page' }}</option>
+                                <option value="100" @selected(request('per_page') == 100)>100 {{ __('inventory.per_page') ?? 'per page' }}</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
                         <div class="d-flex gap-2 justify-content-end mt-4">
                             <a href="{{ route('inventory.batches.index') }}" class="btn btn-sm btn-light border">{{ __('inventory.reset') }}</a>
                             <button type="submit" class="btn btn-sm btn-primary">{{ __('inventory.apply_filters') }}</button>
@@ -213,6 +223,7 @@
         <!-- Pagination Component -->
         <div class="pt-3">
             <x-ui.pagination 
+                :paginator="$batches"
                 :currentPage="$batches->currentPage()" 
                 :totalPages="$batches->lastPage()" 
                 :totalResults="$batches->total()" 
