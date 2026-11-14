@@ -1,0 +1,1112 @@
+# Work Center & Section Calculation Engine Rework Plan
+
+## 1. Executive Summary & Core Principles
+* **Immutable Snapshot History:** Calculations are completely decoupled from operational tables (`production_work_centers`, `production_work_center_sections`). Every calculation run produces a new immutable record in history tables.
+* **Smart Debounce / Countdown Engine:** Micro-actions (assigning personnel, adjusting shift workers, machine mapping) trigger a configurable countdown (e.g., 5–10 mins) instead of immediately firing heavy queries.
+* **Targeted Section & Rollup Scope:** Only changed/impacted sections in a countdown window are recalculated. Work Center calculations aggregate the latest state of all sections plus WC-level resources.
+* **Shift-Anchored Manual Production:** Manual production is no longer a static number on a section. It is tied to dedicated teams/batches anchored to specific shifts, whether composed of internal employees or external worker allocations.
+* **Clean Relational Schema:** Queryable high-level metrics are stored as database columns; detailed cost breakdowns, worker lists, and shift metadata live inside structured `calculation_details` JSON.
+
+---
+
+## 2. Countdown & Debounce Engine Workflow
+
+```mermaid
+flowchart TD
+    subgraph Trigger_Events["User Actions / Triggers"]
+        A1["Section Micro-Action\n(Assign Employee / External Worker / Machine)"]
+        A2["Section Edit Form Submitted"]
+        A3["Work Center Edit Form Submitted"]
+        A4["WC-Level Direct Change\n(Overhead / WC Unassigned Employee)"]
+    end
+
+    subgraph Debounce_Gate["Countdown & Debounce Check"]
+        B{"Is a Countdown\nAlready Active?"}
+        C["Start Countdown Timer\n(e.g., 5-10 min from WC config)\nDisplay Warning Banner in UI"]
+        D["Add Section ID to\npending_calculation_section_ids"]
+        E["Lock Countdown Duration Modal"]
+    end
+
+    subgraph Expiry_Or_Instant["Execution Determination"]
+        F["Countdown Ticks Down..."]
+        G["Countdown Reaches 0 / Expires"]
+        H["Direct Instant Execution"]
+    end
+
+    subgraph Calculation_Runner["Calculation Processing"]
+        I["1. Recalculate ONLY sections in pending_calculation_section_ids\n(Save rows in production_work_center_section_calculations)"]
+        J["2. Recalculate Work Center Roll-up\n(Save row in production_work_center_calculations)"]
+        K["3. Reset pending_calculation_section_ids & End Timestamp"]
+        L["Recalculate Work Center ONLY\n(Sections not impacted)"]
+    end
+
+    A1 --> B
+    B -- "No Active Countdown" --> C
+    C --> D
+    C --> E
+    B -- "Countdown Already Active" --> D
+    D --> F
+    F --> G
+    G --> I
+
+    A2 --> B
+    B -- "If Countdown Active" --> D
+    B -- "If NO Countdown Active" --> H
+    H --> I
+    I --> J --> K
+
+    A3 --> B
+    B -- "If Countdown Active" --> D
+    B -- "If NO Countdown Active" --> J
+
+    A4 --> L
+```
+
+### Countdown Configuration Rules
+1. **Per-Work Center Timer:** `calculation_countdown_minutes` is a **required field** in the Work Center create and edit form. Every Work Center independently configures its own countdown duration. There is no system-wide default — it must be set by the user on creation.
+2. **Change Duration Modal:** When **no countdown is currently active**, a dedicated **"Change Countdown Duration"** button is visible on the Work Center page. Clicking it opens a modal allowing the authorized user to update the duration. This button is hidden / disabled while a countdown is actively ticking.
+3. **Countdown Cannot Be Cancelled:** Once a countdown is triggered (by a micro-action or a form save), it **cannot be stopped or cancelled**. A configuration change has already been committed to the database and will impact calculated rates — the recalculation MUST run. The only path to accelerate it is the **"Recalculate Now"** manual bypass button, which fires the calculation immediately before the timer expires. This is an acceleration, not a cancellation — the pending changes are still fully calculated.
+
+---
+
+## 3. Entity-Relationship (ER) Diagram
+
+```mermaid
+erDiagram
+    production_work_centers ||--o{ production_work_center_sections : "contains"
+    production_work_centers ||--o{ production_work_center_employees : "assigns"
+    production_work_centers ||--o{ production_work_center_calculations : "audit snapshots"
+
+    production_work_center_sections ||--o{ production_machines : "houses"
+    production_work_center_sections ||--o{ production_external_worker_allocations : "allocates"
+    production_work_center_sections ||--o{ production_section_manual_productions : "defines teams"
+    production_work_center_sections ||--o{ production_work_center_section_calculations : "audit snapshots"
+
+    production_shifts ||--o{ production_section_manual_productions : "anchors"
+    production_shifts ||--o{ production_external_worker_allocations : "schedules"
+
+    production_section_manual_productions ||--o{ production_section_manual_production_employees : "groups"
+    production_work_center_employees ||--o{ production_section_manual_production_employees : "assigned to"
+
+    production_section_manual_productions ||--o{ production_external_worker_allocations : "groups allocation"
+
+    production_work_center_calculations ||--o{ production_work_center_section_calculations : "roll-up link"
+
+    production_work_centers ||--o{ production_work_center_activity_logs : "activity log"
+    production_work_center_sections ||--o{ production_work_center_activity_logs : "section events"
+
+    production_work_centers {
+        bigint id PK
+        string name
+        decimal overhead_cost "Flat daily amount entered by user"
+        int calculation_countdown_minutes "Required — user-configured per WC"
+        timestamp calculation_countdown_end_at
+        json pending_calculation_section_ids
+        boolean is_calculation_running
+    }
+
+    production_work_center_sections {
+        bigint id PK
+        bigint work_center_id FK
+        string name
+        string code
+        json assigned_shifts
+    }
+
+    production_section_manual_productions {
+        bigint id PK
+        bigint section_id FK
+        bigint shift_id FK
+        string batch_name
+        decimal capacity_per_hour
+        boolean active
+    }
+
+    production_section_manual_production_employees {
+        bigint id PK
+        bigint manual_production_id FK
+        bigint work_center_employee_id FK
+    }
+
+    production_external_worker_allocations {
+        bigint id PK
+        bigint section_id FK
+        bigint shift_id FK
+        bigint pay_grade_id FK
+        bigint manual_production_id FK "Nullable FK to manual batch"
+        int number_of_external_workers
+        boolean active
+    }
+
+    production_work_center_section_calculations {
+        bigint id PK
+        bigint section_id FK
+        bigint work_center_id FK
+        bigint work_center_calculation_id FK "Nullable link"
+        uuid batch_id
+        string trigger_type
+        decimal capacity_per_hour "Approx Average"
+        decimal daily_capacity "Exact Shift-Aware"
+        decimal labor_cost_per_hour
+        decimal total_daily_labor_cost
+        decimal machine_cost_per_hour
+        decimal total_daily_machine_cost
+        decimal total_daily_operating_cost
+        decimal total_operating_cost_per_hour
+        decimal unique_operating_hours
+        json calculation_details "Costs, workers, shifts breakdown"
+    }
+
+    production_work_center_calculations {
+        bigint id PK
+        bigint work_center_id FK
+        uuid batch_id
+        string trigger_type
+        json impacted_section_ids
+        decimal capacity_per_hour
+        decimal daily_capacity
+        decimal labor_cost_per_hour
+        decimal machine_cost_per_hour
+        decimal total_daily_machine_cost
+        decimal overhead_cost "Flat daily amount snapshot"
+        decimal total_daily_cost
+        decimal total_cost_per_hour
+        decimal unique_operating_hours
+        json calculation_details
+    }
+
+    production_work_center_activity_logs {
+        bigint id PK
+        bigint work_center_id FK
+        bigint section_id FK "Nullable"
+        bigint user_id FK "Nullable (null = system timer)"
+        string event_type
+        string entity_type
+        bigint entity_id "Nullable"
+        string description
+        json properties "Before/after diffs"
+    }
+```
+
+---
+
+## 4. Visual Resource Relationship & Shift-Anchoring
+
+This diagram illustrates how resources belong to a section and how only manual batches/external workers are anchored to shifts:
+
+```mermaid
+graph TD
+    subgraph Section_A["Section A: Assembly & Packaging"]
+        direction TB
+
+        subgraph Section_Machines["Section-Wide Machinery (Runs Across All Section Operating Hours)"]
+            M1["Machine #1 (Cap: 40 units/hr)"]
+            M2["Machine #2 (Cap: 50 units/hr)"]
+            M3["Machine #3 (Cap: 40 units/hr)"]
+        end
+
+        subgraph Shift_1["Shift 1 (Morning: 08:00 - 16:30 | 7.5 Effective Hrs)"]
+            subgraph MP_Team_1["Manual Batch #1: Core Assembly Team"]
+                direction LR
+                E1["Emp: Alice"]
+                E2["Emp: Bob"]
+                E3["Emp: Charlie"]
+                Rate1["Batch Capacity: 30 units/hr"]
+            end
+        end
+
+        subgraph Shift_2["Shift 2 (Evening: 16:30 - 01:00 | 7.5 Effective Hrs)"]
+            subgraph MP_Ext_Alloc["Manual Batch #2: Evening Packing Team"]
+                direction LR
+                ExtA["Ext Alloc #101: 4 Workers (Grade A)"]
+                ExtB["Ext Alloc #102: 2 Workers (Grade B)"]
+                Rate2["Batch Capacity: 25 units/hr"]
+            end
+        end
+    end
+
+    Section_A --> Output["Daily Capacity & Cost Calculation Engine"]
+```
+
+> **Key Architecture Rule:** Machines are **never assigned to a specific shift**. They belong directly to the section and operate continuously during the section's active clock hours. Only **Manual Production Batches** and **External Worker Allocations** are anchored to specific shifts.
+
+
+---
+
+## 5. Concrete End-to-End Numerical Example
+
+Let's walk through an actual production scenario to demonstrate the exact math.
+
+### Scenario Context
+* **Work Center:** *Electronics Manufacturing Center* (Overhead = **$1,200.00/day** flat daily amount)
+* **Section:** *Circuit Assembly & Soldering*
+* **Shifts Configured (consecutive, no overlap):**
+  * **Shift 1 (Day Shift):** 8.0 elapsed hours, **7.5 effective operating hours** (e.g., `08:00 – 15:30`, break excluded).
+  * **Shift 2 (Evening Shift):** 8.0 elapsed hours, **7.5 effective operating hours** (e.g., `15:30 – 23:00`, break excluded).
+* **Section Unique Operating Hours:** $7.5 + 7.5 = \mathbf{15.0}$ clock hours (no shift overlap).
+* **Key Rule: Machines are NOT assigned to specific shifts.** They are section-wide resources that run during ALL active operating hours of the section.
+
+---
+
+### Step 1: Resource Setup & Capacities
+
+#### A. Machines in Section (Section-Wide — Run Full 15.0 Operating Hours)
+* **Machine A (SMT Line 1):** Capacity = **60 units/hr**. Runs during all section operating hours.
+* **Machine B (Wave Solder):** Capacity = **40 units/hr**. Runs during all section operating hours.
+
+$$\text{Daily Machine A Capacity} = 60 \times 15.0 = \mathbf{900\ units}$$
+$$\text{Daily Machine B Capacity} = 40 \times 15.0 = \mathbf{600\ units}$$
+$$\mathbf{Total\ Daily\ Machine\ Capacity} = 900 + 600 = \mathbf{1,500\ units}$$
+
+---
+
+#### B. Shift-Anchored Manual Production Batches
+
+##### 1. Batch #1: "Manual Insertion Team" (Shift 1)
+* **Shift:** Shift 1 (7.5 effective hours)
+* **Team Members:** 4 Internal Employees (Alice, Bob, David, Eva)
+* **Team Capacity Rate:** **35 units/hr**
+$$\text{Daily Batch 1 Capacity} = 35 \text{ units/hr} \times 7.5 \text{ hrs} = \mathbf{262.5\ units}$$
+
+##### 2. Batch #2: "Final Inspection & Cable Harness" (Shift 2)
+* **Shift:** Shift 2 (7.5 effective hours)
+* **Allocated Workers:**
+  * Allocation #21: 3 External Workers (Grade A)
+  * Allocation #22: 2 External Workers (Grade B)
+* **Combined Allocation Capacity Rate:** **20 units/hr**
+$$\text{Daily Batch 2 Capacity} = 20 \text{ units/hr} \times 7.5 \text{ hrs} = \mathbf{150.0\ units}$$
+
+$$\mathbf{Total\ Daily\ Manual\ Capacity} = 262.5 + 150.0 = \mathbf{412.5\ units}$$
+
+---
+
+### Step 2: Section Calculation Output
+
+* **Exact Daily Capacity:**
+  $$\text{Daily Capacity} = \text{Daily Machine} + \text{Daily Manual} = 1,500 + 412.5 = \mathbf{1,912.5\ units}$$
+
+* **Approximate Hourly Capacity (Displayed Average):**
+  $$\text{Machine Cap/hr} = 60 + 40 = 100 \text{ units/hr}$$
+  $$\text{Manual Cap/hr} = 35 + 20 = 55 \text{ units/hr}$$
+  $$\text{Hourly Average} = 100 + 55 = \mathbf{155\ units/hr}$$
+  *(With UI badge: "⚠️ Average across operations; actual output varies by shift")*
+
+* **Stored in `production_work_center_section_calculations`:**
+  * `capacity_per_hour` = `155.0000`
+  * `daily_capacity` = `1912.5000`
+  * `calculation_details` = JSON containing:
+    ```json
+    {
+      "machines": [
+        {"id": 1, "name": "Machine A (SMT Line 1)", "cap_hr": 60, "section_operating_hrs": 15.0, "daily_cap": 900},
+        {"id": 2, "name": "Machine B (Wave Solder)", "cap_hr": 40, "section_operating_hrs": 15.0, "daily_cap": 600}
+      ],
+      "manual_batches": [
+        {
+          "batch_name": "Manual Insertion Team",
+          "shift_id": 1,
+          "internal_employees": [12, 15, 18, 19],
+          "cap_hr": 35,
+          "eff_hrs": 7.5,
+          "daily_cap": 262.5
+        },
+        {
+          "batch_name": "Final Inspection & Cable Harness",
+          "shift_id": 2,
+          "external_allocations": [21, 22],
+          "cap_hr": 20,
+          "eff_hrs": 7.5,
+          "daily_cap": 150.0
+        }
+      ],
+      "totals": {
+        "section_unique_operating_hours": 15.0,
+        "daily_machine_capacity": 1500.0,
+        "daily_manual_capacity": 412.5,
+        "total_daily_capacity": 1912.5,
+        "hourly_average_capacity": 155.0
+      }
+    }
+    ```
+
+---
+
+### Step 3: Work Center Roll-up & Overhead Application
+*(Assuming this is the only section in the Work Center for this example.)*
+
+* **WC Daily Capacity** = Section Daily Capacity = **1,912.5 units**
+* **WC Hourly Capacity** = Section Hourly Capacity = **155 units/hr**
+* **WC Unique Operating Hours** = 15.0 hrs
+* **WC Daily Overhead Cost** (flat, entered in WC form) = **$1,200.00/day**
+* **WC Overhead Cost Per Hour** (computed reference) = $\$1,200.00 / 15.0 = \mathbf{\$80.00/\text{hr}}$
+* **WC Total Daily Operating Cost** = Labor Daily + Machine Daily + Overhead:
+  $$\text{WC Total Daily Cost} = \text{WC Daily Labor} + \text{WC Daily Machine Expense} + \$1,200.00$$
+  *(Full labor and machine cost details are demonstrated in the overlapping shift walkthrough in Section 8.)*
+
+> **Note on Overhead:** Overhead is always stored and entered as a **flat daily amount**. The `overhead_cost_per_hour` displayed in the UI is derived by dividing the flat daily amount by `WC Unique Operating Hours` — it is a computed display value only, not stored separately.
+
+---
+
+### Step 4: Countdown Simulation in Action
+
+1. **10:00 AM:** Manager assigns 1 new internal employee to Section A.
+   * `is_countdown_active` = `false` $\rightarrow$ System sets `calculation_countdown_end_at = 10:10 AM` (10 min — WC-configured duration).
+   * `pending_calculation_section_ids` = `[Section_A_ID]`.
+   * Banner appears in UI: *"Calculations will run in 10:00 minutes. Make any further changes now."*
+   * **"Change Countdown Duration"** button is now hidden/disabled. Countdown cannot be cancelled.
+2. **10:04 AM:** Manager updates external worker quantity in Section B.
+   * `is_countdown_active` = `true` $\rightarrow$ Section B is added to queue.
+   * `pending_calculation_section_ids` = `[Section_A_ID, Section_B_ID]`.
+   * Countdown continues ticking (6 minutes left).
+3. **10:06 AM:** Manager opens Section A Edit Form and clicks Save.
+   * Since countdown is **active**, it does **NOT** run instantly. Changes are saved, and Section A remains in the pending batch.
+4. **10:10 AM:** Countdown hits zero!
+   * Calculation engine wakes up.
+   * Calculates Section A $\rightarrow$ inserts new row into `production_work_center_section_calculations`.
+   * Calculates Section B $\rightarrow$ inserts new row into `production_work_center_section_calculations`.
+   * Rolls up all sections + WC resources $\rightarrow$ inserts new row into `production_work_center_calculations`.
+   * Resets `pending_calculation_section_ids` to `[]` and `calculation_countdown_end_at` to `null`.
+   * **"Change Countdown Duration"** button is re-enabled. UI banner disappears; updated metrics display on screen.
+
+---
+
+## 6. Section Operating Hours & The Timeline Interval Engine
+
+### A. Machine Operating Hours: Confirmed Decision (Union of Unique Clock Hours)
+* **Core Rule:** Machines belong to the **section**, not to any individual shift. A machine assigned to a section is considered active during **all** operating hours of that section, regardless of which shifts run.
+* **No Shift Pinning for Machines:** There is no mechanism to assign a machine to a specific shift. If you need production that only runs during specific shifts, that is modeled via **Shift-Anchored Manual Production Batches**, not machines.
+* **Calculation:** The section's unique operating clock-hours are computed as the union (de-duplicated) of all shift time windows.
+  * Example: If Shift 1 runs `06:00 – 12:00` and Shift 2 runs `08:00 – 14:00` (overlap `08:00 – 12:00` counted once):
+    $$\text{Section Unique Operating Hours} = \text{Union}(\text{Shift 1}, \text{Shift 2}) = \mathbf{8.0\text{ clock hours}}\quad (06:00 \text{ to } 14:00)$$
+  * Example: If Shift 1 runs `08:00 – 15:30` and Shift 2 runs `15:30 – 23:00` (consecutive, no overlap):
+    $$\text{Section Unique Operating Hours} = 7.5 + 7.5 = \mathbf{15.0\text{ clock hours}}$$
+* Machine daily capacity and daily operating expense are always calculated using `Section Unique Operating Hours`.
+
+---
+
+### B. The Timeline Interval Engine (Overlapping Shift Labor Slicing)
+When shifts overlap, **workers from both shifts are actively working on the floor simultaneously**. Therefore, labor burn rates vary across the day. The calculation engine slices the section's operating day into discrete, non-overlapping **timeline intervals**:
+
+```mermaid
+gantt
+    title Section Shift Overlap & Timeline Interval Slicing
+    dateFormat  HH:mm
+    axisFormat %H:%M
+    
+    section Shift Schedules
+    Shift 1 (06:00 - 12:00) :a1, 06:00, 6h
+    Shift 2 (08:00 - 14:00) :a2, 08:00, 6h
+    
+    section Timeline Intervals
+    Interval 1: Shift 1 Only (2h)         :crit, 06:00, 2h
+    Interval 2: PEAK OVERLAP (4h)         :active, 08:00, 4h
+    Interval 3: Shift 2 Only (2h)         :crit, 12:00, 2h
+```
+
+#### The Interval Mathematical Formulation:
+For any discrete slice $[t_i, t_{i+1}]$:
+1. **Active Worker Set:** Identifies all internal employees and external worker allocations whose shift covers $[t_i, t_{i+1}]$.
+2. **Interval Hourly Labor Burn Rate ($\$/\text{hr}$):**
+   $$\text{Interval Hourly Rate} = \sum_{\text{active internal}} \text{Employee Hourly Rate} + \sum_{\text{active external}} (\text{Workers} \times \text{Pay Grade Hourly Rate})$$
+3. **Interval Total Cost ($\$$):**
+   $$\text{Interval Cost} = \text{Interval Hourly Rate} \times \text{Interval Duration (hours)}$$
+4. **Total Daily Section Labor Cost ($\$$):**
+   $$\text{Total Daily Labor Cost} = \sum_{\text{all intervals}} \text{Interval Cost}$$
+5. **Section Average Labor Cost per Operating Hour ($\$/\text{hr}$):**
+   $$\text{Average Hourly Labor Cost} = \frac{\text{Total Daily Labor Cost}}{\text{Section Unique Operating Hours}}$$
+6. **Peak Hourly Labor Cost ($\$/\text{hr}$):**
+   $$\text{Peak Hourly Labor Cost} = \max_{\text{intervals}}(\text{Interval Hourly Rate})$$
+
+---
+
+### C. Inactive Resources Exclusion Rule
+Any resource flagged as inactive is **strictly excluded** from all calculation metrics:
+1. **Machines (`production_machines`):** Machines with `status != 'active'` contribute `0.0` units/hr to capacity and `$0.00` to machine operating expenses.
+2. **Internal Employees (`production_work_center_employees`):** Internal employees with `status != 'active'` contribute `$0.00` to labor costs and are excluded from all timeline intervals and active rosters.
+3. **External Worker Allocations (`production_external_worker_allocations`):** Allocations with `active = false` contribute `0` worker headcount, `$0.00` to labor costs, and `0.0` capacity to manual batches.
+4. **Manual Production Batches (`production_section_manual_productions`):** Batches with `active = false` contribute `0.0` to section daily and hourly capacity.
+5. **Countdown Trigger on Status Change:** Toggling any resource between active and inactive constitutes an impactful operational change and immediately arms/queues the Work Center countdown calculation timer.
+
+---
+
+## 7. Complete Labor Costing Engine
+
+### A. Internal Employee Labor Costing (HRMS Grounded)
+Internal employees have individual personalized salaries fetched from the HRMS module:
+1. **Source:** Look up employee's **Net Monthly Salary** (net monthly payables) from HRMS pay structure.
+2. **Daily Rate (Standard 30 Days):**
+   $$\text{Daily Salary} = \frac{\text{Net Monthly Salary}}{30}$$
+3. **Individual Hourly Rate:**
+   $$\text{Employee Hourly Rate} = \frac{\text{Daily Salary}}{\text{Assigned Shift Effective Hours}} = \frac{\text{Net Monthly Salary}}{30 \times \text{Shift Effective Hours}}$$
+4. **Daily Cost in Section:**
+   $$\text{Employee Daily Cost} = \text{Employee Hourly Rate} \times \text{Shift Effective Hours} = \text{Daily Salary}$$
+
+> **Intentional Design Decision (Fixed CTC / Salary Model):**
+> It is completely intentional that an employee's derived hourly rate depends on the effective duration of the shift they are assigned to. Because employees are compensated on a fixed monthly CTC/salary, their daily liability to the company is fixed ($\text{Salary} \div 30$). If they work a 6-hour shift, their effective hourly burn rate is higher than if they work an 8-hour shift, but their total daily cost impact to the section remains identical.
+
+### B. External Worker Labor Costing (Pay Grade Headcount)
+1. **Source:** Hourly rate from `production_external_worker_pay_grades` $\times$ number of workers.
+2. **Allocation Hourly Rate:**
+   $$\text{Allocation Hourly Rate} = \text{number\_of\_workers} \times \text{pay\_grade\_hourly\_rate}$$
+3. **Allocation Daily Cost:**
+   $$\text{Allocation Daily Cost} = \text{Allocation Hourly Rate} \times \text{Shift Effective Hours}$$
+
+### C. HRMS Integration & Fallback Handling
+When querying an employee's Net Monthly Salary from the HRMS module:
+1. **Configured Salary Found:** Proceed with standard salary-to-daily derivation ($\text{Salary} \div 30$).
+2. **Missing Salary in HRMS:** The calculation engine does NOT crash or abort. It records a labor cost of `$0.00` for that employee, marks the record with a `⚠️ Missing HRMS Salary` warning flag in the `calculation_details` JSON payload, and surfaces an alert on the Work Center roster.
+3. **HRMS Module Unavailable:** The engine falls back to the most recent cached salary snapshot on the employee record. If no historical snapshot exists, it defaults to `$0.00` with an outage warning flag logged in `production_work_center_activity_logs`.
+
+---
+
+## 8. Concrete End-to-End Overlapping Shift Numerical Walkthrough
+
+Let's execute the exact scenario described in the user's audio:
+
+### Scenario Context
+* **Section:** *Precision Fabrication Section*
+* **Shift 1:** `06:00 – 12:00` (6.0 effective operating hours)
+* **Shift 2:** `08:00 – 14:00` (6.0 effective operating hours)
+* **Section Unique Operating Window:** `06:00 – 14:00` = **8.0 clock hours**
+
+---
+
+### Step 1: Workforce Configuration & Rates
+
+#### Shift 1 Roster (`06:00 – 12:00` | 6 hrs)
+* **Internal Employee Alice:**
+  * HRMS Net Monthly Salary: **$3,600.00/mo**
+  * Daily Salary: $\$3,600 / 30 = \mathbf{\$120.00/\text{day}}$
+  * Hourly Rate: $\$120.00 / 6\text{ hrs} = \mathbf{\$20.00/\text{hr}}$
+* **Internal Employee Bob:**
+  * HRMS Net Monthly Salary: **$2,700.00/mo**
+  * Daily Salary: $\$2,700 / 30 = \mathbf{\$90.00/\text{day}}$
+  * Hourly Rate: $\$90.00 / 6\text{ hrs} = \mathbf{\$15.00/\text{hr}}$
+* **External Allocation #1:**
+  * 10 Workers @ Pay Grade Rate **$100.00/hr**
+  * Hourly Burn: $10 \times \$100.00 = \mathbf{\$1,000.00/\text{hr}}$
+* **Shift 1 Total Hourly Burn Rate:** $\$20 + \$15 + \$1,000 = \mathbf{\$1,035.00/\text{hr}}$
+
+#### Shift 2 Roster (`08:00 – 14:00` | 6 hrs)
+* **Internal Employee Charlie:**
+  * HRMS Net Monthly Salary: **$4,500.00/mo**
+  * Daily Salary: $\$4,500 / 30 = \mathbf{\$150.00/\text{day}}$
+  * Hourly Rate: $\$150.00 / 6\text{ hrs} = \mathbf{\$25.00/\text{hr}}$
+* **External Allocation #2:**
+  * 10 Workers @ Pay Grade Rate **$150.00/hr**
+  * Hourly Burn: $10 \times \$150.00 = \mathbf{\$1,500.00/\text{hr}}$
+* **Shift 2 Total Hourly Burn Rate:** $\$25 + \$1,500 = \mathbf{\$1,525.00/\text{hr}}$
+
+---
+
+### Step 2: Timeline Interval Slicing & Cost Execution
+
+| Interval | Time Window | Duration | Active Shifts & Workers | Hourly Burn Rate | Interval Cost |
+|---|---|---|---|---|---|
+| **Interval 1** | `06:00 – 08:00` | 2.0 hrs | **Shift 1 Only** (Alice, Bob, Ext #1) | $\$1,035.00/\text{hr}$ | $\$1,035.00 \times 2 = \mathbf{\$2,070.00}$ |
+| **Interval 2** | `08:00 – 12:00` | 4.0 hrs | **Shift 1 + Shift 2 (OVERLAP)**<br>Alice, Bob, Charlie, Ext #1, Ext #2 | $\$1,035.00 + \$1,525.00 = \mathbf{\$2,560.00/\text{hr}}$ | $\$2,560.00 \times 4 = \mathbf{\$10,240.00}$ |
+| **Interval 3** | `12:00 – 14:00` | 2.0 hrs | **Shift 2 Only** (Charlie, Ext #2) | $\$1,525.00/\text{hr}$ | $\$1,525.00 \times 2 = \mathbf{\$3,050.00}$ |
+| **DAILY TOTAL** | `06:00 – 14:00` | **8.0 hrs** | **All Resources Accounted** | — | $\mathbf{\$15,360.00/\text{day}}$ |
+
+---
+
+### Step 3: Resulting Metrics for the Section
+
+* **Total Daily Labor Cost:** $\mathbf{\$15,360.00/\text{day}}$
+  * *Internal Labor Portion:* $(\$120 + \$90) + \$150 = \$360.00/\text{day}$
+  * *External Labor Portion:* $(\$1,000 \times 6) + (\$1,500 \times 6) = \$6,000 + \$9,000 = \$15,000.00/\text{day}$
+* **Average Hourly Labor Cost:** 
+  $$\text{Average Hourly Rate} = \frac{\$15,360.00}{8.0\text{ Unique Operating Hours}} = \mathbf{\$1,920.00/\text{hr}}$$
+* **Peak Hourly Labor Cost (Overlap Window):** $\mathbf{\$2,560.00/\text{hr}}$ (Between `08:00` and `12:00`)
+
+---
+
+### Step 4: JSON Audit Structure (`calculation_details`)
+
+```json
+{
+  "operating_hours": {
+    "unique_clock_hours": 8.0,
+    "operational_window": "06:00 - 14:00",
+    "overlap_hours": 4.0
+  },
+  "timeline_intervals": [
+    {
+      "window": "06:00 - 08:00",
+      "duration_hours": 2.0,
+      "active_shift_ids": [1],
+      "active_internal_employee_ids": [101, 102],
+      "active_external_allocation_ids": [201],
+      "hourly_burn_rate": 1035.00,
+      "interval_total_cost": 2070.00
+    },
+    {
+      "window": "08:00 - 12:00",
+      "duration_hours": 4.0,
+      "is_peak_overlap": true,
+      "active_shift_ids": [1, 2],
+      "active_internal_employee_ids": [101, 102, 103],
+      "active_external_allocation_ids": [201, 202],
+      "hourly_burn_rate": 2560.00,
+      "interval_total_cost": 10240.00
+    },
+    {
+      "window": "12:00 - 14:00",
+      "duration_hours": 2.0,
+      "active_shift_ids": [2],
+      "active_internal_employee_ids": [103],
+      "active_external_allocation_ids": [202],
+      "hourly_burn_rate": 1525.00,
+      "interval_total_cost": 3050.00
+    }
+  ],
+  "internal_employees": [
+    {
+      "id": 101,
+      "name": "Alice",
+      "shift_id": 1,
+      "hrms_net_monthly_salary": 3600.00,
+      "daily_rate_formula": "3600.00 / 30",
+      "daily_salary": 120.00,
+      "shift_hours": 6.0,
+      "hourly_rate_formula": "120.00 / 6.0",
+      "hourly_rate": 20.00
+    },
+    {
+      "id": 102,
+      "name": "Bob",
+      "shift_id": 1,
+      "hrms_net_monthly_salary": 2700.00,
+      "daily_rate_formula": "2700.00 / 30",
+      "daily_salary": 90.00,
+      "shift_hours": 6.0,
+      "hourly_rate_formula": "90.00 / 6.0",
+      "hourly_rate": 15.00
+    },
+    {
+      "id": 103,
+      "name": "Charlie",
+      "shift_id": 2,
+      "hrms_net_monthly_salary": 4500.00,
+      "daily_rate_formula": "4500.00 / 30",
+      "daily_salary": 150.00,
+      "shift_hours": 6.0,
+      "hourly_rate_formula": "150.00 / 6.0",
+      "hourly_rate": 25.00
+    }
+  ],
+  "external_allocations": [
+    {
+      "id": 201,
+      "shift_id": 1,
+      "headcount": 10,
+      "pay_grade_rate": 100.00,
+      "hourly_burn_rate": 1000.00,
+      "shift_hours": 6.0,
+      "daily_cost": 6000.00
+    },
+    {
+      "id": 202,
+      "shift_id": 2,
+      "headcount": 10,
+      "pay_grade_rate": 150.00,
+      "hourly_burn_rate": 1500.00,
+      "shift_hours": 6.0,
+      "daily_cost": 9000.00
+    }
+  ],
+  "totals": {
+    "total_daily_internal_cost": 360.00,
+    "total_daily_external_cost": 15000.00,
+    "total_daily_labor_cost": 15360.00,
+    "average_hourly_labor_cost": 1920.00,
+    "peak_hourly_labor_cost": 2560.00
+  }
+}
+```
+
+---
+
+## 9. Database Column vs. JSON Strategy (The Golden Rule)
+
+To keep database queries lightning fast while preserving full audit depth:
+1. **Dedicated Database Columns:**
+   * Strictly reserved for high-frequency search/filter keys and **primary metrics prominently displayed in the main tables/cards** (e.g. `capacity_per_hour`, `daily_capacity`).
+2. **`calculation_details` JSON:**
+   * Houses all granular, multi-dimensional data:
+     * Full audit trail of source numbers and mathematical formulas
+     * Timeline interval slicing with peak and average burn rates
+     * Complete worker and allocation rosters with shift affiliations
+   * Displayed when the user opens the **dedicated detailed inspection modal/pop-up**.
+3. **Future Column Promotion:**
+   * When frontend views are finalized, any metric constantly needed on the main table will be promoted from JSON to a dedicated column without breaking the schema.
+
+---
+
+## 10. Internal Employee Assignment: Shift Gaps vs. Break Matching & Partial Mismatch Flow
+
+### A. The Challenge: Non-Continuous / Split Section Shifts
+Sections may operate on split shifts with inactive gaps in between (for example: `08:00 – 10:00`, then inactive gap, then `12:00 – 14:00`, then inactive gap, then `17:00 – 22:00`). During these gaps, the section and its machines are completely shut down.
+
+When assigning an internal employee to such a section, the system performs a compatibility check between:
+1. **The Inactive Gap Window(s)** between the section's active shifts.
+2. **The Employee's Scheduled Break(s)** defined in their HRMS shift profile.
+
+```mermaid
+flowchart TD
+    Assign["User selects Internal Employee for Section"] --> Check["Compare Section Inactive Gaps with Employee Shift Breaks"]
+    
+    Check -->|Gaps match Employee Breaks exactly| Smooth["Proceed Smoothly: Assign Employee (No Warning)"]
+    
+    Check -->|Section Inactive Gap > Employee Break| Mismatch["Flag as Partial Mismatch: Employee has Idle Window"]
+    
+    Mismatch --> Modal["Display Partial Mismatch Warning Dialog with Suggestions"]
+    
+    Modal --> Choice1["Suggestion 1: Assign Anyway (Override & Accept Idle Time)"]
+    Modal --> Choice2["Suggestion 2: Adjust Section Shifts or Breaks"]
+    Modal --> Choice3["Suggestion 3: Choose Another Employee"]
+```
+
+---
+
+### B. Compatibility Rules & Scenarios
+
+#### Scenario 1: Exact / Compatible Match
+* **Section Schedule:** `08:00 – 12:00` and `13:00 – 17:00` (Inactive gap: `12:00 – 13:00` = **1.0 hr**).
+* **Employee Shift:** `08:00 – 17:00` with an official scheduled Lunch Break `12:00 – 13:00` (**1.0 hr**).
+* **Engine Decision:** **Valid Match.** The section shutdown coincides with the employee's designated break. Employee is assigned with zero friction.
+
+#### Scenario 2: Partial Mismatch (Idle Hours Conflict: Section Gap > Employee Break)
+* **Section Schedule:** `08:00 – 10:00` and `12:00 – 14:00` (Inactive gap: `10:00 – 12:00` = **2.0 hrs**).
+* **Employee Shift:** `08:00 – 14:00` with only a 30-minute break (`10:00 – 10:30`).
+* **Conflict:** From `10:30 to 12:00` (**1.5 hours**), the employee is on the clock and being paid, but the section is closed. The employee sits idle.
+
+#### Scenario 3: Reverse Mismatch (Employee Break > Section Gap / Break Overlaps Production)
+* **Section Schedule:** `08:00 – 16:00` (Continuous section operation, 0m gap, or only a 30m gap `12:00 – 12:30`).
+* **Employee Shift:** `08:00 – 16:30` with an official 60-minute break (`12:00 – 13:00`).
+* **Conflict:** The employee is on scheduled break for 30 minutes while the section is actively running.
+* **Engine Decision:** Displays an operational notice warning in the assignment modal informing the manager that the employee is unavailable during active run time, but does NOT block assignment.
+
+---
+
+### C. Frontend Warning & Suggestions Dialog (Non-Blocking)
+
+Rather than hard-blocking the assignment, the system surfaces a non-blocking confirmation dialog that informs the user and provides actionable recommendations:
+
+> ⚠️ **Warning: Partial Shift & Break Schedule Mismatch Detected**
+> 
+> * Employee **John Doe**'s shift schedule does not fully align with the section's operating window.
+> * **Details:** Section inactive gap is 2.0 hrs, while employee break is only 30 mins (1.5 hrs idle on clock).
+> 
+> **Suggestions:**
+> 1. **Assign Anyway (Override):** Proceed and confirm the assignment.
+> 2. **Adjust Section Shifts:** Update the section's shift timings or break windows to align with workforce schedules.
+> 3. **Choose Another Employee:** Pick an employee whose shift and break schedule fits this section's operating hours.
+
+---
+
+### D. Calculation Engine Treatment: Breaks Do NOT Impact Calculation Numbers
+
+> **Fundamental Principle: Breaks are Paid Workday Hours**
+> Breaks do **not** reduce an employee's salary or alter calculation engine figures. Because breaks are paid, the business pays the employee their contracted daily CTC regardless of whether they are working, on lunch, or idle during a section gap.
+> 
+> 1. **Zero Impact on Total Daily Cost:** The employee's daily labor cost charged to the section remains $\text{Net Monthly Salary} \div 30$.
+> 2. **Does Not Reduce Work Center Rate:** Break durations do NOT alter or subtract from the Work Center's capacity or labor cost calculations (neither forward idle gaps nor reverse production overlaps reduce the financial calculations).
+> 3. **Audit Visibility Only:** When the user chooses **"Assign Anyway"**, the unutilized idle window is purely cataloged in the `calculation_details` JSON for managerial visibility:
+>    ```json
+>    "unutilized_idle_hours": [
+>      {
+>        "employee_id": 101,
+>        "employee_name": "John Doe",
+>        "window": "10:30 - 12:00",
+>        "duration_hours": 1.5,
+>        "idle_cost": 30.00
+>      }
+>    ]
+>    ```
+
+---
+
+---
+
+## 11. Work Center Level Roll-up Engine
+
+### A. Capacity Roll-up
+1. **Daily Capacity:**
+   Work Center Daily Capacity is the direct arithmetic sum of all its active Sections' daily capacities:
+   $$\text{WC Daily Capacity} = \sum_{s \in \text{Sections}} \text{Section Daily Capacity}_s$$
+2. **Hourly Capacity:**
+   Work Center Hourly Capacity is the direct arithmetic sum of all its active Sections' hourly rated capacities:
+   $$\text{WC Hourly Capacity} = \sum_{s \in \text{Sections}} \text{Section Hourly Capacity}_s$$
+3. **Efficiency Percentage Note:**
+   The `efficiency_percentage` calculation is explicitly **postponed** for a future dedicated phase. For the current engine, theoretical capacity equals scheduled capacity.
+
+---
+
+### B. Labor Cost Roll-up & Work Center Level Personnel
+A Work Center's total labor cost aggregates all sections plus any internal employees assigned directly to the Work Center (`section_id = null`, e.g., Work Center managers, supervisors, floating maintenance staff):
+
+1. **Section Labor Contribution:**
+   Sum of all sections' calculated `total_daily_labor_cost`.
+2. **Work Center Level Direct Employees:**
+   For each employee where `work_center_id = WC_ID` and `section_id IS NULL`:
+   * Retrieve Net Monthly Salary from HRMS.
+   * Daily Salary = $\text{Net Monthly Salary} \div 30$.
+   * Add directly to the Work Center's daily labor pool.
+3. **Total Work Center Daily Labor Cost:**
+   $$\text{WC Daily Labor Cost} = \sum_{s \in \text{Sections}} \text{Section Daily Labor Cost}_s + \sum_{e \in \text{WC Staff}} \text{Daily Salary}_e$$
+4. **Work Center Average Labor Cost Per Hour:**
+   $$\text{WC Labor Cost Per Hour} = \frac{\text{WC Daily Labor Cost}}{\text{WC Unique Operating Hours}}$$
+   *(Where `WC Unique Operating Hours` is the union of all operating clock hours across all sections in the Work Center).*
+
+---
+
+### C. Machine Operating Expense Roll-up
+A Work Center aggregates all machine operating expenses across all sections:
+
+1. **Total Work Center Daily Machine Expense:**
+   $$\text{WC Daily Machine Expense} = \sum_{s \in \text{Sections}} \text{Section Daily Machine Expense}_s$$
+2. **Work Center Machine Cost Per Hour:**
+   $$\text{WC Machine Cost Per Hour} = \frac{\text{WC Daily Machine Expense}}{\text{WC Unique Operating Hours}}$$
+
+---
+
+### D. Overhead & Total Work Center Operating Cost
+1. **Overhead Cost:**
+   Direct flat operating expense entered by the user in the Work Center form (`overhead_cost` column on `production_work_centers`).
+2. **Total Daily Operating Cost:**
+   $$\text{WC Total Daily Cost} = \text{WC Daily Labor Cost} + \text{WC Daily Machine Expense} + \text{WC Overhead Cost}$$
+3. **Total Hourly Operating Cost:**
+   $$\text{WC Total Cost Per Hour} = \frac{\text{WC Total Daily Cost}}{\text{WC Unique Operating Hours}}$$
+
+---
+
+### E. Frontend Average Hourly Warning Badge
+Because hourly metrics (`capacity_per_hour`, `labor_cost_per_hour`, `total_cost_per_hour`) are mathematical averages derived across operating hours, the UI must explicitly inform users of the underlying interval fluctuations:
+* **Mandatory UI Warning Badge / Tooltip:** Beside every hourly rate or capacity figure on Work Center and Section cards/tables, render a warning badge:
+  > ⚠️ **Notice: Weighted Average Metric**
+  > Hourly rates and capacities represent the mathematical average across the unique operating hours of active shifts. Actual floor burn rates and output fluctuate between shifts and peak overlap intervals. Click **"Inspect Calculation Details"** to view the interval breakdown.
+
+---
+
+## 12. Machine Operating Expense Architecture
+
+### A. Machine Resource Configuration (Form & Database)
+To capture real-world operational costs of machinery, the machine creation and edit forms introduce an **Operating Expense** configuration section with dynamic fields:
+
+```mermaid
+flowchart TD
+    EnergySelect["Energy / Resource Requirement Dropdown"] -->|Electricity| ElecFields["Unit Consumption (kWh/hr) + Rate per Unit ($/kWh)"]
+    EnergySelect -->|Petrol| PetrolFields["Consumption (Liters/hr) + Rate per Liter ($/L)"]
+    EnergySelect -->|Diesel| DieselFields["Consumption (Liters/hr) + Rate per Liter ($/L)"]
+    EnergySelect -->|Others| OtherFields["Direct Per-Hour Rate ($/hr) + Optional Custom Metric"]
+
+    ElecFields --> Calc["Computed Operating Cost Per Hour = Consumption × Rate"]
+    PetrolFields --> Calc
+    DieselFields --> Calc
+    OtherFields --> Direct["Operating Cost Per Hour = User Entered Rate"]
+
+    Calc --> Store["Save to production_machines (operating_cost_per_hour)"]
+    Direct --> Store
+```
+
+### B. Field Specifications on `production_machines`
+1. **`energy_source` (Dropdown / Enum):**
+   * `electricity` — Powered by electric grid / generator.
+   * `petrol` — Fuel powered (gasoline/petrol).
+   * `diesel` — Fuel powered (diesel).
+   * `others` — Any alternate power/operating method (pneumatic, steam, LPG, gas, solar, flat rate, battery charging, etc.).
+2. **`consumption_per_hour` (Decimal 10,4, nullable):**
+   * For **Electricity**: Units (kWh) consumed per 1 hour of active operation.
+   * For **Petrol**: Liters consumed per 1 hour of active operation.
+   * For **Diesel**: Liters consumed per 1 hour of active operation.
+   * For **Others**: Optional / custom metric.
+3. **`energy_rate_per_unit` (Decimal 10,4, nullable):**
+   * For **Electricity**: Current cost per electricity unit (e.g. `$0.18/kWh`).
+   * For **Petrol**: Current cost per liter (e.g. `$1.25/L`).
+   * For **Diesel**: Current cost per liter (e.g. `$1.15/L`).
+   * For **Others**: Optional / N/A.
+4. **`operating_cost_per_hour` (Decimal 12,4):**
+   * For `electricity`, `petrol`, `diesel`: Automatically computed:
+     $$\text{operating\_cost\_per\_hour} = \text{consumption\_per\_hour} \times \text{energy\_rate\_per\_unit}$$
+     *(The form auto-calculates this on-the-fly via JavaScript while allowing review).*
+   * For `others`: The user enters the flat **Per-Hour Operating Cost** directly (units/liters are not compulsory).
+
+### C. Calculation Engine Integration (Section & Machine Level)
+1. **Individual Machine Daily Operating Cost:**
+   $$\text{Machine Daily Operating Cost} = \text{operating\_cost\_per\_hour} \times \text{Section Unique Operating Hours}$$
+   *(Since machines run during the section's active operating hours).*
+2. **Section Total Machine Operating Cost:**
+   * **Section Daily Machine Cost:** $\sum_{m \in \text{Section Machines}} \text{Machine Daily Operating Cost}_m$
+   * **Section Hourly Machine Cost:** $\sum_{m \in \text{Section Machines}} \text{Machine Operating Cost Per Hour}_m$
+3. **Section Total Operating Cost:**
+   * $\text{Section Daily Operating Cost} = \text{Section Daily Labor Cost} + \text{Section Daily Machine Cost}$
+   * $\text{Section Hourly Operating Cost} = \frac{\text{Section Daily Operating Cost}}{\text{Section Unique Operating Hours}}$
+
+### D. Portable / Auxiliary Tools Handling
+In current factory operations, smaller tools and powered equipment (battery-operated screwdrivers, cordless drills, soldering stations, pneumatic tools) are **not** segregated into a separate database table:
+* They are configured directly as equipment entries in `production_machines`.
+* For battery-powered tools requiring recharging, the charging station or tool's effective consumption is modeled under `energy_source = 'electricity'` or `energy_source = 'others'` with a flat hourly operating rate.
+* This avoids adding redundant schema tables while fully capturing tool operating costs.
+
+---
+
+## 13. Work Center Activity & Audit Logging Engine
+
+### A. Purpose & Scope
+Every Work Center maintains an immutable **Activity & Audit Log** recording all administrative, structural, and resource changes across the Work Center and all its nested Sections. This provides complete governance, chronological tracking, and forensic traceability.
+
+### B. Tracked Events
+The audit engine listens to all lifecycle and operational actions:
+1. **Work Center Events:**
+   * Work Center created, updated, or status toggled.
+   * Work Center overhead cost modified.
+   * Direct Work Center employee assigned (`section_id = null`), status toggled, or removed.
+2. **Section Events:**
+   * Section created, updated, or deleted.
+   * Section shift configuration modified (shifts added, removed, or timings changed).
+3. **Resource Assignment Events:**
+   * Machine assigned to section, removed, or machine operating specs updated.
+   * Internal employee assigned to section, status toggled, or removed.
+   * External worker allocation created, worker quantity updated, activated, deactivated, or removed.
+   * Manual production batch created, updated, employee roster modified, or deleted.
+4. **Calculation Events:**
+   * Calculation triggered (countdown auto-fired or manual bypass).
+   * Calculation snapshot completed with resulting daily capacity and operating cost summary.
+
+### C. Log Table Schema: `production_work_center_activity_logs`
+```sql
+CREATE TABLE `production_work_center_activity_logs` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `tenant_id` BIGINT UNSIGNED NOT NULL,
+  `work_center_id` BIGINT UNSIGNED NOT NULL,
+  `section_id` BIGINT UNSIGNED NULL COMMENT 'Target section if action occurred within a section',
+  `user_id` BIGINT UNSIGNED NULL COMMENT 'User who performed the action (null if system/countdown)',
+  `event_type` VARCHAR(60) NOT NULL COMMENT 'e.g. section_created, machine_assigned, employee_assigned, shift_updated, calculation_completed',
+  `entity_type` VARCHAR(100) NOT NULL COMMENT 'e.g. WorkCenter, Section, Machine, WorkCenterEmployee, ExternalWorkerAllocation',
+  `entity_id` BIGINT UNSIGNED NULL,
+  `description` VARCHAR(255) NOT NULL COMMENT 'Human-readable summary of the change',
+  `properties` JSON NULL COMMENT 'Structured payload: before/after diffs, worker counts, cost snapshots',
+  `created_at` TIMESTAMP NULL,
+  `updated_at` TIMESTAMP NULL,
+  INDEX `pwcal_wc_idx` (`tenant_id`, `work_center_id`),
+  INDEX `pwcal_sec_idx` (`tenant_id`, `section_id`),
+  INDEX `pwcal_event_idx` (`event_type`),
+  INDEX `pwcal_created_idx` (`created_at`)
+);
+```
+
+### D. UI Placement & Experience
+* A dedicated **"Activity & Audit Logs"** card/tab embedded directly in the Work Center show/detail page.
+* Displays:
+  * **Timestamp:** Localized human time (e.g. `24 Oct 2026, 12:30 PM` and relative `10 minutes ago`).
+  * **User:** Avatar + user name (or `System / Timer` badge).
+  * **Event Badge:** Color-coded badges (`Section`, `Personnel`, `Machine`, `Calculation`, `Shift`).
+  * **Description:** Clean concise summary (e.g., *"Added 4 External Workers to Packing Section"*, *"Assigned Machine SMT-Line-1 with Electricity rate $0.18/kWh"*).
+  * **Details Popover / Modal:** Clickable to inspect exact JSON properties / changes diff.
+
+### E. Retention & Archiving Policy
+* Factory floors produce continuous operational events. To preserve query speed and avoid table bloat:
+  * **Hot Storage Window:** Logs are maintained in live MySQL for **180 days (6 months)**.
+  * **Automated Cleanup Command:** A scheduled artisan command (`php artisan production:prune-activity-logs`) runs on the 1st of every month to archive logs older than 180 days to compressed JSON / S3 cold storage or purge them based on tenant data retention settings.
+
+---
+
+## 14. Cost & Capacity Matrix: What is Calculated Hourly vs. Daily
+
+| Entity | Metric | Hourly Calculated? | Daily Calculated? | Formula / Source |
+| :--- | :--- | :---: | :---: | :--- |
+| **Machine** | **Capacity** | ✅ Yes | ✅ Yes | Hourly = Rated Cap/hr; Daily = $\text{Cap/hr} \times \text{Section Unique Operating Hours}$. |
+| **Machine** | **Operating Cost** | ✅ Yes | ✅ Yes | **Hourly:** Consumption $\times$ Rate (or flat hourly for 'Others').<br>**Daily:** $\text{Hourly Operating Cost} \times \text{Section Unique Operating Hours}$. |
+| **Manual Batch** | **Capacity** | ✅ Yes | ✅ Yes | Hourly = Batch Rate/hr; Daily = $\text{Batch Rate} \times \text{Shift Effective Hours}$. |
+| **Section** | **Capacity** | ✅ Yes | ✅ Yes | **Hourly:** $\sum \text{Machines Cap/hr} + \sum \text{Manual Batches Cap/hr}$<br>**Daily:** $\sum \text{Machine Daily Cap} + \sum \text{Manual Batch Daily Cap}$ |
+| **Section** | **Labor Cost** | ✅ Yes | ✅ Yes | **Daily:** Sum across timeline interval slices (exact cost).<br>**Hourly:** $\text{Average Hourly} = \frac{\text{Total Daily Labor Cost}}{\text{Section Operating Hours}}$<br>*(Peak hourly rate during overlap is captured in JSON).* |
+| **Section** | **Machine Cost**| ✅ Yes | ✅ Yes | **Hourly:** $\sum \text{Machine Hourly Operating Costs}$<br>**Daily:** $\sum \text{Machine Daily Operating Costs}$ |
+| **Section** | **Total Operating Cost**| ✅ Yes | ✅ Yes | **Daily:** $\text{Labor Daily Cost} + \text{Machine Daily Cost}$<br>**Hourly:** $\frac{\text{Total Section Daily Cost}}{\text{Section Operating Hours}}$ |
+| **Work Center** | **Capacity** | ✅ Yes | ✅ Yes | **Hourly:** $\sum \text{All Sections' Hourly Capacities}$<br>**Daily:** $\sum \text{All Sections' Daily Capacities}$<br>*(Efficiency % is excluded for now).* |
+| **Work Center** | **Labor Cost** | ✅ Yes | ✅ Yes | **Daily:** $\sum \text{Section Daily Labor Costs} + \sum \text{WC Unassigned Staff Daily Costs}$<br>**Hourly:** $\frac{\text{WC Total Daily Labor Cost}}{\text{WC Unique Operating Hours}}$ |
+| **Work Center** | **Machine Cost**| ✅ Yes | ✅ Yes | **Daily:** $\sum \text{Section Daily Machine Costs}$<br>**Hourly:** $\frac{\text{WC Total Daily Machine Cost}}{\text{WC Unique Operating Hours}}$ |
+| **Work Center** | **Overhead** | ❌ No | ✅ Yes | Direct flat amount entered in the Work Center form. |
+| **Work Center** | **Total Operating Cost**| ✅ Yes | ✅ Yes | **Daily:** $\text{WC Labor Daily} + \text{WC Machine Daily} + \text{Overhead Cost}$<br>**Hourly:** $\frac{\text{WC Total Daily Operating Cost}}{\text{WC Unique Operating Hours}}$ |
+
+---
+
+## 15. Definitive Schema: Calculation & Audit Tables
+
+### Table 1: Updates to `production_machines`
+```sql
+ALTER TABLE `production_machines`
+  ADD COLUMN `energy_source` ENUM('electricity', 'petrol', 'diesel', 'others') NOT NULL DEFAULT 'electricity' AFTER `capacity_per_hour`,
+  ADD COLUMN `consumption_per_hour` DECIMAL(10,4) NULL DEFAULT 0.0000 AFTER `energy_source`,
+  ADD COLUMN `energy_rate_per_unit` DECIMAL(10,4) NULL DEFAULT 0.0000 AFTER `consumption_per_hour`,
+  ADD COLUMN `operating_cost_per_hour` DECIMAL(12,4) NOT NULL DEFAULT 0.0000 AFTER `energy_rate_per_unit`;
+```
+
+### Table 2: `production_work_center_section_calculations`
+Immutable history table storing Section-level calculation snapshots.
+
+```sql
+CREATE TABLE `production_work_center_section_calculations` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `tenant_id` BIGINT UNSIGNED NOT NULL,
+  `work_center_id` BIGINT UNSIGNED NOT NULL,
+  `section_id` BIGINT UNSIGNED NOT NULL,
+  `work_center_calculation_id` BIGINT UNSIGNED NULL COMMENT 'FK to parent WC calculation snapshot if part of a rollup',
+  `batch_id` CHAR(36) NOT NULL COMMENT 'UUID grouping sections calculated in the same run',
+  `trigger_type` VARCHAR(50) NOT NULL DEFAULT 'manual' COMMENT 'manual | countdown_timer | micro_action',
+  `capacity_per_hour` DECIMAL(12,4) NOT NULL DEFAULT 0.0000 COMMENT 'Rated hourly capacity',
+  `daily_capacity` DECIMAL(14,4) NOT NULL DEFAULT 0.0000 COMMENT 'Shift-aware daily capacity',
+  `labor_cost_per_hour` DECIMAL(12,4) NOT NULL DEFAULT 0.0000 COMMENT 'Average hourly labor burn rate',
+  `total_daily_labor_cost` DECIMAL(14,4) NOT NULL DEFAULT 0.0000 COMMENT 'Exact daily labor cost',
+  `machine_cost_per_hour` DECIMAL(12,4) NOT NULL DEFAULT 0.0000 COMMENT 'Sum of machines hourly operating expenses',
+  `total_daily_machine_cost` DECIMAL(14,4) NOT NULL DEFAULT 0.0000 COMMENT 'Total daily machine operating expenses',
+  `total_daily_operating_cost` DECIMAL(14,4) NOT NULL DEFAULT 0.0000 COMMENT 'Labor Daily + Machine Daily',
+  `total_operating_cost_per_hour` DECIMAL(12,4) NOT NULL DEFAULT 0.0000 COMMENT 'Total Daily Cost / Operating Hours',
+  `unique_operating_hours` DECIMAL(8,4) NOT NULL DEFAULT 0.0000 COMMENT 'Unique active clock hours across shifts',
+  `calculation_details` LONGTEXT NULL COMMENT 'Full JSON audit: timeline intervals, peak burn rate, rosters, machine expenses, manual batches, idle warnings',
+  `created_at` TIMESTAMP NULL,
+  `updated_at` TIMESTAMP NULL,
+  INDEX `pwcsc_tenant_sec_idx` (`tenant_id`, `section_id`),
+  INDEX `pwcsc_batch_idx` (`batch_id`),
+  INDEX `pwcsc_wc_calc_idx` (`work_center_calculation_id`)
+);
+```
+
+### Table 3: `production_work_center_calculations`
+Immutable history table storing Work Center rollup calculation snapshots.
+
+```sql
+CREATE TABLE `production_work_center_calculations` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `tenant_id` BIGINT UNSIGNED NOT NULL,
+  `work_center_id` BIGINT UNSIGNED NOT NULL,
+  `batch_id` CHAR(36) NOT NULL COMMENT 'UUID for this calculation batch run',
+  `trigger_type` VARCHAR(50) NOT NULL DEFAULT 'manual' COMMENT 'manual | countdown_timer | direct_edit',
+  `impacted_section_ids` JSON NULL COMMENT 'Array of section IDs recalculated in this run',
+  `capacity_per_hour` DECIMAL(12,4) NOT NULL DEFAULT 0.0000 COMMENT 'Sum of all sections hourly capacity',
+  `daily_capacity` DECIMAL(14,4) NOT NULL DEFAULT 0.0000 COMMENT 'Sum of all sections daily capacity',
+  `labor_cost_per_hour` DECIMAL(12,4) NOT NULL DEFAULT 0.0000 COMMENT 'Average hourly labor burn rate',
+  `total_daily_labor_cost` DECIMAL(14,4) NOT NULL DEFAULT 0.0000 COMMENT 'Sum of sections labor + WC level staff',
+  `machine_cost_per_hour` DECIMAL(12,4) NOT NULL DEFAULT 0.0000 COMMENT 'Sum of all sections machine hourly expense',
+  `total_daily_machine_cost` DECIMAL(14,4) NOT NULL DEFAULT 0.0000 COMMENT 'Sum of all sections machine daily expense',
+  `overhead_cost` DECIMAL(14,4) NOT NULL DEFAULT 0.0000 COMMENT 'Direct flat overhead entered in WC form',
+  `total_daily_cost` DECIMAL(14,4) NOT NULL DEFAULT 0.0000 COMMENT 'Labor Daily + Machine Daily + Overhead Cost',
+  `total_cost_per_hour` DECIMAL(12,4) NOT NULL DEFAULT 0.0000 COMMENT 'Total Daily Cost / WC Operating Hours',
+  `unique_operating_hours` DECIMAL(8,4) NOT NULL DEFAULT 0.0000 COMMENT 'Union of clock hours across all sections',
+  `calculation_details` LONGTEXT NULL COMMENT 'Full JSON audit: section contributions, machine expenses, WC staff itemization, overhead notes',
+  `created_at` TIMESTAMP NULL,
+  `updated_at` TIMESTAMP NULL,
+  INDEX `pwcc_tenant_wc_idx` (`tenant_id`, `work_center_id`),
+  INDEX `pwcc_batch_idx` (`batch_id`)
+);
+```
+
+### Table 4: `production_work_center_activity_logs`
+(As defined in Section 13.C above).
+
+### Table 5: `production_external_worker_pay_grades`
+Configurable hourly wage rates for external/contract workforce categories.
+
+```sql
+CREATE TABLE `production_external_worker_pay_grades` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `tenant_id` BIGINT UNSIGNED NOT NULL,
+  `grade_code` VARCHAR(50) NOT NULL COMMENT 'e.g. GRADE_A, PACKER_LVL1',
+  `grade_name` VARCHAR(100) NOT NULL COMMENT 'e.g. Senior Assembler, General Labor',
+  `hourly_rate` DECIMAL(12,4) NOT NULL DEFAULT 0.0000 COMMENT 'Contracted billing rate per hour',
+  `currency` VARCHAR(10) NOT NULL DEFAULT 'USD',
+  `is_active` BOOLEAN NOT NULL DEFAULT 1,
+  `created_at` TIMESTAMP NULL,
+  `updated_at` TIMESTAMP NULL,
+  INDEX `pewpg_tenant_idx` (`tenant_id`),
+  UNIQUE INDEX `pewpg_code_tenant_unique` (`tenant_id`, `grade_code`)
+);
+```
+
+### Table 6: Updates to `production_work_centers`
+Columns added to support per-Work Center countdown configuration, debounce tracking, and execution state.
+
+```sql
+ALTER TABLE `production_work_centers`
+  ADD COLUMN `overhead_cost` DECIMAL(14,4) NOT NULL DEFAULT 0.0000 COMMENT 'Flat daily overhead entered by user' AFTER `description`,
+  ADD COLUMN `calculation_countdown_minutes` INT UNSIGNED NOT NULL DEFAULT 10 COMMENT 'Required on create — per WC countdown duration' AFTER `overhead_cost`,
+  ADD COLUMN `calculation_countdown_end_at` TIMESTAMP NULL COMMENT 'Target expiry timestamp when countdown is active' AFTER `calculation_countdown_minutes`,
+  ADD COLUMN `pending_calculation_section_ids` JSON NULL COMMENT 'Array of section IDs queued for recalculation' AFTER `calculation_countdown_end_at`,
+  ADD COLUMN `is_calculation_running` BOOLEAN NOT NULL DEFAULT 0 COMMENT 'Concurrency mutex lock during calculation execution' AFTER `pending_calculation_section_ids`;
+```
+
+### Table 7: `production_section_manual_productions` & Pivot Table
+Shift-anchored manual teams for labor-driven output.
+
+```sql
+CREATE TABLE `production_section_manual_productions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `tenant_id` BIGINT UNSIGNED NOT NULL,
+  `section_id` BIGINT UNSIGNED NOT NULL,
+  `shift_id` BIGINT UNSIGNED NOT NULL,
+  `batch_name` VARCHAR(100) NOT NULL,
+  `capacity_per_hour` DECIMAL(12,4) NOT NULL DEFAULT 0.0000,
+  `active` BOOLEAN NOT NULL DEFAULT 1,
+  `created_at` TIMESTAMP NULL,
+  `updated_at` TIMESTAMP NULL,
+  INDEX `psmp_section_shift_idx` (`tenant_id`, `section_id`, `shift_id`)
+);
+
+CREATE TABLE `production_section_manual_production_employees` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `manual_production_id` BIGINT UNSIGNED NOT NULL,
+  `work_center_employee_id` BIGINT UNSIGNED NOT NULL,
+  `created_at` TIMESTAMP NULL,
+  `updated_at` TIMESTAMP NULL,
+  INDEX `psmpe_manual_emp_idx` (`manual_production_id`, `work_center_employee_id`)
+);
+```
+
+---
+
+## 16. Phased Implementation Roadmap
+
+* **Phase 1: Database Migrations & Models**
+  * Update `production_machines` table with operating expense fields (`energy_source`, `consumption_per_hour`, `energy_rate_per_unit`, `operating_cost_per_hour`).
+  * Create `production_external_worker_pay_grades` table and seeder.
+  * Create `production_section_manual_productions` & pivot table for employees.
+  * Create `production_work_center_section_calculations` & `production_work_center_calculations`.
+  * Create `production_work_center_activity_logs` table.
+  * Add countdown tracking & flat daily overhead columns to `production_work_centers` (`overhead_cost`, `calculation_countdown_minutes`, `calculation_countdown_end_at`, `pending_calculation_section_ids`, `is_calculation_running`).
+  * Define Eloquent models, casts, and relationships.
+
+* **Phase 2: Core Section Calculation Engine Service & Activity Logger**
+  * Operating hours union algorithm (clock intervals).
+  * Machine capacity & operating expense aggregator (electricity, petrol, diesel, others; section-wide continuous operation).
+  * Inactive resource filter (excluding inactive machines, employees, allocations, batches).
+  * Shift-anchored manual batch capacity aggregator.
+  * Internal employee salary-to-hourly resolver with HRMS (fixed CTC model + fallback handling).
+  * External worker allocation rate calculator (`production_external_worker_pay_grades`).
+  * Timeline Interval Slicing Engine (handling overlapping shifts, peak burn rates, total daily cost, average hourly rate).
+  * Break-gap mismatch detector service (forward idle gaps & reverse production overlap non-blocking warnings).
+  * Work Center Activity Logger service to record all events.
+  * Activity Log pruning command (`production:prune-activity-logs`).
+
+* **Phase 3: Work Center Rollup Engine Service**
+  * Section capacity, labor, and machine expense aggregation.
+  * Work Center direct staff labor integration (`section_id = null`).
+  * Flat daily overhead cost integration and total hourly/daily operating cost computation.
+  * JSON audit trail generator for inspection modal.
+
+* **Phase 4: Countdown & Debounce Engine**
+  * Required `calculation_countdown_minutes` input on Work Center Create/Edit form.
+  * Countdown trigger listener on micro-actions (personnel assign, machine assign, shift changes).
+  * Dedicated "Change Countdown Duration" modal (available only when timer is inactive).
+  * UI Countdown Banner with live timer; countdown cancellation locked out.
+  * Scheduled task / artisan command to process expired countdowns.
+  * Manual "Recalculate Now" bypass button to immediately trigger execution.
+
+* **Phase 5: Frontend UI & Pop-up Inspection Modal**
+  * Machine Create/Edit form: Energy dropdown with dynamic conditional inputs (kWh, Liters, $/unit, per-hour rate).
+  * Partial Mismatch Warning Dialog with Suggestions (`Assign Anyway`, `Adjust Section Shifts`, `Choose Another Employee`).
+  * Mandatory average hourly metric warning badge & tooltip on cards/tables.
+  * Work Center Activity Logs card/table embedded on Work Center show page.
+  * Dedicated Detailed Calculation Inspection Modal (visual timeline graphs, worker rosters, machine cost breakdown, audit trail).
+  * Update Work Center and Section show cards with primary metrics.
+
+

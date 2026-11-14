@@ -12,7 +12,11 @@ class StoreMachineApiRequest extends ApiFormRequest
         $tenantId = require_tenant_id();
 
         return [
-            'work_center_id'     => 'required|exists:production_work_centers,id',
+            'section_id'         => [
+                'nullable',
+                'integer',
+                Rule::exists('production_work_center_sections', 'id')->where('tenant_id', $tenantId),
+            ],
             'name'               => 'required|string|max:255',
             'code'               => [
                 'required', 'string', 'max:50',
@@ -21,7 +25,7 @@ class StoreMachineApiRequest extends ApiFormRequest
             'machine_type'       => 'nullable|string|max:100',
             'manufacturer'       => 'nullable|string|max:255',
             'model_number'       => 'nullable|string|max:100',
-            'capacity'           => 'nullable|numeric|min:0',
+            'capacity'           => 'required|numeric|gt:0|max:99999999.9999',
             'status'             => ['required', Rule::in(Machine::STATUSES)],
             'installation_date'  => 'nullable|date',
         ];

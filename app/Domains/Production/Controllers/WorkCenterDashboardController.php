@@ -58,15 +58,15 @@ class WorkCenterDashboardController extends Controller
             ->whereDate('actual_finish', today())
             ->count();
 
-        // Utilization: sum of planned minutes vs available today (active shifts or 8h fallback)
+        // Utilization: sum of planned minutes vs available today (effective active shifts)
         $schedulingService = app(\App\Domains\Production\Services\SchedulingService::class);
-        $shifts = $workCenter->shifts()->where('active', true)->get();
+        $shifts = $workCenter->getEffectiveShifts(true);
 
         // 1. Available Capacity Today (in minutes) considering all active machines & efficiency
         $availableMinutes = $schedulingService->calculateCapacity($workCenter->id, today());
         if ($availableMinutes <= 0) {
             // Fallback for non-working days or unconfigured calendars (8h default per active machine)
-            $machineCount = $workCenter->machines()->where('status', \App\Domains\Production\Models\Machine::STATUS_ACTIVE)->count() ?: 1;
+            $machineCount = $workCenter->machines()->where('production_machines.status', \App\Domains\Production\Models\Machine::STATUS_ACTIVE)->count() ?: 1;
             $availableMinutes = (8 * 60) * $machineCount * (($workCenter->efficiency_percentage ?? 100.0) / 100.0);
         }
 
@@ -85,7 +85,7 @@ class WorkCenterDashboardController extends Controller
             return $op->planned_start->lt($todayEnd) && $op->planned_finish->gt($todayStart);
         })->sum(function ($op) use ($todayStart, $todayEnd, $workCenter) {
             if ($op->status === ProductionScheduleOperation::STATUS_RUNNING || ($op->actual_start && $op->actual_start->gte($todayStart))) {
-                $shifts = $workCenter->shifts()->where('active', true)->get();
+                $shifts = $workCenter->getEffectiveShifts(true);
                 $shiftMin = 480.0;
                 if ($shifts->isNotEmpty()) {
                     $shiftMin = 0.0;

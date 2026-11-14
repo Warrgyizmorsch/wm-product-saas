@@ -7,6 +7,7 @@ use App\Domains\Production\DTO\MachineDTO;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Repositories\MachineRepositoryInterface;
 use App\Domains\Production\Repositories\WorkCenterRepositoryInterface;
+use App\Domains\Production\Repositories\WorkCenterSectionRepositoryInterface;
 use App\Domains\Production\Requests\StoreMachineRequest;
 use App\Domains\Production\Requests\UpdateMachineRequest;
 use App\Domains\Production\Services\MachineService;
@@ -22,6 +23,7 @@ class MachineController extends Controller
     public function __construct(
         private readonly MachineRepositoryInterface $repository,
         private readonly WorkCenterRepositoryInterface $workCenterRepository,
+        private readonly WorkCenterSectionRepositoryInterface $sectionRepository,
         private readonly MachineService $service
     ) {}
 
@@ -42,9 +44,7 @@ class MachineController extends Controller
     {
         Gate::authorize('create', Machine::class);
 
-        $workCenters = $this->workCenterRepository->getActiveWorkCenters();
         $statuses    = config('production.machine_statuses', []);
-        $selectedWorkCenterId = $request->query('work_center_id');
 
         $linkedAsset = null;
         $assetId = $request->query('asset_id');
@@ -53,7 +53,7 @@ class MachineController extends Controller
                 ->find((int) $assetId);
         }
 
-        return view('modules.production.machines.create', compact('workCenters', 'statuses', 'selectedWorkCenterId', 'linkedAsset'));
+        return view('modules.production.machines.create', compact('statuses', 'linkedAsset'));
     }
 
     public function store(StoreMachineRequest $request): RedirectResponse
@@ -62,9 +62,10 @@ class MachineController extends Controller
 
         try {
             $tenantId = require_tenant_id();
-            $dto      = MachineDTO::fromArray($request->validated());
+            $dto      = MachineDTO::fromArray($this->moneyToBase($request->validated()));
             $assetId  = $request->validated('asset_id') ? (int) $request->validated('asset_id') : null;
             $machine  = $this->service->create($dto, $tenantId, $assetId);
+            $this->triggerCalculationCountdown($machine);
 
             return redirect()
                 ->route('production.machines.index')
@@ -131,14 +132,25 @@ class MachineController extends Controller
 
         Gate::authorize('update', $machine);
 
-        $machine->loadMissing('asset.category');
-        $workCenters = $this->workCenterRepository->getActiveWorkCenters();
-        $statuses    = config('production.machine_statuses', []);
+        $machine->loadMissing(['asset.category', 'section.workCenter']);
+        $statuses = config('production.machine_statuses', []);
         $linkableAssets = $machine->isLinkedToAsset()
             ? collect()
             : $this->unregisteredMachineryAssetsQuery(require_tenant_id())->get();
 
-        return view('modules.production.machines.edit', compact('machine', 'workCenters', 'statuses', 'linkableAssets'));
+        return view('modules.production.machines.edit', compact('machine', 'statuses', 'linkableAssets'));
+    }
+
+    /** Short Full Review Point 2: DB write boundary — the form sends the active currency, the DB keeps base (convert once). */
+    private function moneyToBase(array $data): array
+    {
+        foreach (['energy_rate_per_unit', 'operating_cost_per_hour'] as $field) {
+            if (isset($data[$field]) && $data[$field] !== '') {
+                $data[$field] = round(convert_to_base((float) $data[$field]), 4);
+            }
+        }
+
+        return $data;
     }
 
     public function update(UpdateMachineRequest $request, int $id): RedirectResponse
@@ -149,12 +161,14 @@ class MachineController extends Controller
         Gate::authorize('update', $machine);
 
         try {
-            $dto     = MachineDTO::fromArray($request->validated());
-            $machine = $this->service->update($id, $dto);
+            $oldSectionId = $machine->section_id;
+            $dto     = MachineDTO::fromArray($this->moneyToBase($request->validated()));
+            $updatedMachine = $this->service->update($id, $dto);
+            $this->triggerCalculationCountdown($updatedMachine, $oldSectionId ?: $updatedMachine->section_id);
 
             return redirect()
                 ->route('production.machines.index')
-                ->with('success', "Machine '{$machine->name}' updated successfully.");
+                ->with('success', "Machine '{$updatedMachine->name}' updated successfully.");
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
@@ -168,7 +182,10 @@ class MachineController extends Controller
         Gate::authorize('delete', $machine);
 
         try {
+            $sectionId = $machine->section_id;
             $this->service->delete($id);
+            $this->triggerCalculationCountdown(null, $sectionId);
+
             return redirect()
                 ->route('production.machines.index')
                 ->with('success', 'Machine deleted successfully.');
@@ -282,5 +299,19 @@ class MachineController extends Controller
 
         $machines = $this->service->getMachinesForWorkCenter($workCenter, activeOnly: true);
         return response()->json($machines);
+    }
+
+    private function triggerCalculationCountdown(?Machine $machine, ?int $sectionId = null): void
+    {
+        $targetSectionId = $sectionId ?: $machine?->section_id;
+        if (!$targetSectionId) {
+            return;
+        }
+
+        $section = \App\Domains\Production\Models\WorkCenterSection::withoutGlobalScopes()->find($targetSectionId);
+        $workCenter = $section?->workCenter;
+        if ($workCenter) {
+            app(\App\Domains\Production\Services\CountdownCalculationEngine::class)->triggerCountdown($workCenter, $targetSectionId);
+        }
     }
 }

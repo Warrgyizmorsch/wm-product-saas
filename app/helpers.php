@@ -323,6 +323,32 @@ if (! function_exists('format_indian_number')) {
     }
 }
 
+if (! function_exists('decimal_is_whole')) {
+    /** True when the value has no digits after the decimal point at the given precision (e.g. 15.00001 at 4 → true). */
+    function decimal_is_whole($value, int $decimals = 4): bool
+    {
+        $r = round((float) $value, $decimals);
+
+        return $r == floor($r);
+    }
+}
+
+if (! function_exists('format_decimal')) {
+    /**
+     * Display rule for precise figures (times, rates, quantities): 4 decimals when there are decimal digits,
+     * none when the value is whole — 11.5 → "11.5000", 0.0167 → "0.0167", 15 → "15", 0 → "0".
+     */
+    function format_decimal($value, int $decimals = 4, string $thousandsSep = ''): string
+    {
+        $v = (float) ($value ?? 0);
+        if (decimal_is_whole($v, $decimals)) {
+            $decimals = 0;
+        }
+
+        return number_format($v, $decimals, '.', $thousandsSep);
+    }
+}
+
 if (! function_exists('format_currency')) {
     function format_currency($amountInBase, int $decimals = 2, bool $includeSymbol = true): string
     {
@@ -334,6 +360,11 @@ if (! function_exists('format_currency')) {
 
         $code = active_currency();
         $isNegative = $val < 0;
+
+        // Precise figures (4+ decimals, no-rounding rule): a whole number is shown without decimals (₹15, not ₹15.0000)
+        if ($decimals >= 4 && decimal_is_whole($val, $decimals)) {
+            $decimals = 0;
+        }
 
         if ($code === 'INR') {
             $formatted = format_indian_number($val, $decimals);
@@ -354,6 +385,46 @@ if (! function_exists('format_currency')) {
         }
 
         return ($isNegative ? '-' : '') . $symbol . $formatted;
+    }
+}
+
+if (! function_exists('cost_per_unit_value')) {
+    /**
+     * Cost per unit with the zero-output rule (WC-23 rule 5):
+     * output > 0 → cost ÷ output (4 decimals); output = 0 and cost > 0 → null ("N/A"); both 0 → 0.
+     */
+    function cost_per_unit_value($cost, $output): ?float
+    {
+        $cost = (float) $cost;
+        $output = (float) $output;
+        if ($output > 0) {
+            return round($cost / $output, 4);
+        }
+
+        return $cost > 0 ? null : 0.0;
+    }
+}
+
+if (! function_exists('format_cost_per_unit')) {
+    /**
+     * Display a cost-per-unit figure. null → "N/A" with an explanation tooltip (WC-23 rule 5).
+     * Not rounded to 2 decimals (no-rounding rule) — shown with 4.
+     *
+     * @param  float|null  $valueInBase  cost per unit in base currency, or null when it cannot be calculated
+     * @param  float|null  $dailyCostInBase  daily cost being incurred (for the tooltip)
+     */
+    function format_cost_per_unit($valueInBase, $dailyCostInBase = null, string $suffix = ' / unit'): string
+    {
+        if ($valueInBase === null) {
+            $tip = 'Output is 0 — cost per unit cannot be calculated.';
+            if ($dailyCostInBase !== null && (float) $dailyCostInBase > 0) {
+                $tip .= ' Daily cost ' . format_currency($dailyCostInBase) . ' is being incurred with no production.';
+            }
+
+            return '<span class="text-warning fw-semibold" data-bs-toggle="tooltip" title="' . e($tip) . '">N/A</span>';
+        }
+
+        return e(format_currency($valueInBase, 4)) . e($suffix);
     }
 }
 
@@ -441,6 +512,57 @@ if (! function_exists('format_hours')) {
     }
 }
 
+if (! function_exists('format_duration')) {
+    /**
+     * Format minutes into human-readable clock duration string (e.g. "1h 15m 30s", "11m 30s", "12s").
+     *
+     * Example: 0.20  -> "12s"
+     *          0.19  -> "11s"
+     *          1.36  -> "1m 22s"
+     *          8.50  -> "8m 30s"
+     *          11.50 -> "11m 30s"
+     *          29.09 -> "29m 05s"
+     *          60.00 -> "1h"
+     *          90.00 -> "1h 30m"
+     */
+    function format_duration($minutes, bool $includeSeconds = true): string
+    {
+        if ($minutes === null || $minutes === '' || (float) $minutes <= 0.0) {
+            return '0s';
+        }
+
+        $mFloat = (float) $minutes;
+        if ($mFloat * 60 < 1) {
+            return '< 1s'; // anything under 1 second (0.6s too — never rounded up to "1s")
+        }
+        $totalSeconds = (int) round($mFloat * 60);
+
+        $hours = intdiv($totalSeconds, 3600);
+        $remainingSecs = $totalSeconds % 3600;
+        $mins = intdiv($remainingSecs, 60);
+        $secs = $remainingSecs % 60;
+
+        if ($hours > 0) {
+            if ($mins > 0 && $secs > 0 && $includeSeconds) {
+                return sprintf('%dh %dm %02ds', $hours, $mins, $secs);
+            }
+            if ($mins > 0) {
+                return sprintf('%dh %dm', $hours, $mins);
+            }
+            if ($secs > 0 && $includeSeconds) {
+                return sprintf('%dh %02ds', $hours, $secs);
+            }
+            return sprintf('%dh', $hours);
+        }
+
+        if ($mins > 0) {
+            if ($secs > 0 && $includeSeconds) {
+                return sprintf('%dm %02ds', $mins, $secs);
+            }
+            return sprintf('%dm', $mins);
+        }
+
+        return sprintf('%ds', $secs);
 if (! function_exists('billing_organization_details')) {
     /**
      * Resolves dynamic corporate billing/seller organization details

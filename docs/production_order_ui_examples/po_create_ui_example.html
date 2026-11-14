@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Production Order Create — Tab 2 & Child BOM Modal UI Example</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    .modal-backdrop { background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(2px); }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4 md:p-6">
+  <div class="max-w-6xl mx-auto space-y-4">
+
+    <!-- Walkthrough Controls -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-lg p-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="space-y-0.5">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="px-2 py-0.5 text-xs font-semibold rounded bg-[var(--accent)] text-[var(--primary)] border border-[var(--border)]">
+            Interactive UI Preview
+          </span>
+          <span class="text-xs font-semibold">
+            Example: Parent needs <code>M1, M2, M3, M4</code> · Child BOM <code>M2</code> needs <code>M3, M5</code> (<code>M3</code> is shared!)
+          </span>
+        </div>
+        <p class="text-xs text-[var(--muted-foreground)]">
+          Change PO Qty or toggle M2 Stock below, or switch alternatives in Tab 1, to see M3 (Parent + Child combined) &amp; M5 update live.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 text-xs">
+        <label class="flex items-center gap-1.5 font-medium">
+          <span>PO Qty (FG):</span>
+          <input id="poQtyInput" type="number" min="1" step="1" value="10"
+            class="w-20 px-2 py-1 rounded border border-[var(--border)] bg-[var(--content)] text-[var(--foreground)] font-mono tabular-nums text-xs" />
+        </label>
+        <div class="flex items-center gap-1.5">
+          <span class="font-medium">M2 Branch Stock:</span>
+          <button type="button" id="stockShortBtn"
+            class="px-2.5 py-1 rounded border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] font-medium text-xs cursor-pointer">
+            4.0000 (Produce 6 M2)
+          </button>
+          <button type="button" id="stockFullBtn"
+            class="px-2.5 py-1 rounded border border-[var(--border)] bg-[var(--content)] text-[var(--foreground)] font-medium text-xs cursor-pointer">
+            15.0000 (M2 In Stock)
+          </button>
+        </div>
+        <button type="button" id="quickOpenModalBtn"
+          class="px-2.5 py-1 rounded border border-[var(--primary)] bg-[var(--accent)] text-[var(--primary)] font-semibold text-xs cursor-pointer">
+          Open M2 Child BOM Modal
+        </button>
+      </div>
+    </div>
+
+    <!-- Main PO Create Card -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+
+      <!-- Read-Only BOM / Routing Auto-Loaded Header Strip -->
+      <div class="p-4 border-b border-[var(--border)] bg-[var(--content)]">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <h1 class="text-base font-bold">New Production Order — <span class="text-[var(--primary)]">FG-100 Finished Machine Frame</span></h1>
+            <p class="text-xs text-[var(--muted-foreground)]">Branch: Main Plant (All active branch warehouses pooled)</p>
+          </div>
+          <span class="px-2.5 py-1 text-xs font-medium rounded-full border border-[var(--border)] bg-[var(--card)] text-[var(--success)]">
+            ● BOM &amp; Routing Active &amp; Validated
+          </span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div class="flex items-center justify-between px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--card)]">
+            <span class="text-[var(--muted-foreground)] font-medium">Bill of Materials (Read-Only):</span>
+            <span class="font-semibold">BOM-FG-001 <span class="text-[var(--success)] font-normal">(v1.0 · Approved)</span></span>
+          </div>
+          <div class="flex items-center justify-between px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--card)]">
+            <span class="text-[var(--muted-foreground)] font-medium">Process Routing (Read-Only):</span>
+            <span class="font-semibold">RTG-MFG-01 <span class="text-[var(--success)] font-normal">(v1.0 · Active)</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="px-4 pt-3 border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-2 bg-[var(--card)]">
+        <div class="flex items-center gap-2" role="tablist">
+          <button type="button" id="tab1Btn" role="tab"
+            class="px-4 py-2 text-xs font-semibold rounded-t-lg border border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer">
+            1. Components (By Operation)
+          </button>
+          <button type="button" id="tab2Btn" role="tab"
+            class="px-4 py-2 text-xs font-semibold rounded-t-lg border border-b-0 border-[var(--border)] bg-[var(--content)] text-[var(--primary)] cursor-pointer flex items-center gap-1.5">
+            <span>2. Total Material Rollup (Live)</span>
+            <span id="tab2CountBadge" class="px-1.5 py-0.5 rounded-full text-xs bg-[var(--accent)] text-[var(--primary)] font-mono tabular-nums">5</span>
+          </button>
+        </div>
+        <div class="pb-2 text-xs text-[var(--muted-foreground)]">
+          Deselected primaries/alternatives in Tab 1 are completely excluded from Tab 2
+        </div>
+      </div>
+
+      <!-- ==================== TAB 1: COMPONENTS BY OPERATION ==================== -->
+      <div id="tab1Panel" class="p-4 space-y-4 hidden">
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs bg-[var(--content)] border border-[var(--border)] rounded-lg px-3 py-2">
+          <span>
+            <strong>Rule:</strong> Operations and materials with <strong>no alternative</strong> are automatically selected &amp; locked (cannot be deselected). Only items with alternatives can be switched.
+          </span>
+          <span class="text-[var(--muted-foreground)]">Parent BOM direct operations only</span>
+        </div>
+
+        <div id="tab1OperationsContainer" class="space-y-3"></div>
+      </div>
+
+      <!-- ==================== TAB 2: LIVE MATERIAL ROLLUP ==================== -->
+      <div id="tab2Panel" class="p-4 space-y-4">
+        <!-- Summary Strip -->
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-[var(--content)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-xs">
+          <div class="flex flex-wrap items-center gap-4">
+            <div>
+              <span class="text-[var(--muted-foreground)]">Selected Components:</span>
+              <strong id="summaryTotalCount" class="ml-1 font-mono tabular-nums">5</strong>
+            </div>
+            <div>
+              <span class="text-[var(--muted-foreground)]">Sufficient:</span>
+              <strong id="summaryOkCount" class="ml-1 text-[var(--success)] font-mono tabular-nums">2</strong>
+            </div>
+            <div>
+              <span class="text-[var(--muted-foreground)]">Child BOMs to Produce:</span>
+              <strong id="summaryChildCount" class="ml-1 text-[var(--warning)] font-mono tabular-nums">1</strong>
+            </div>
+            <div>
+              <span class="text-[var(--muted-foreground)]">Material Shortages:</span>
+              <strong id="summaryShortCount" class="ml-1 text-[var(--error)] font-mono tabular-nums">2</strong>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button type="button" id="filterAllBtn"
+              class="px-2.5 py-1 rounded border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-medium cursor-pointer">
+              All Selected
+            </button>
+            <button type="button" id="filterShortBtn"
+              class="px-2.5 py-1 rounded border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] text-xs font-medium cursor-pointer">
+              Shortages / Produce Only
+            </button>
+          </div>
+        </div>
+
+        <div class="text-xs text-[var(--muted-foreground)] flex flex-wrap items-center justify-between gap-2 px-1">
+          <span>
+            Includes Parent direct needs <strong>plus</strong> exploded materials from short Child BOMs. Look at <strong>M3</strong> below: Parent (<code>10</code>) + Child M2 (<code>12</code>) = <code>22</code> checked once against Branch Stock (<code>15</code>).
+          </span>
+          <span class="font-medium text-[var(--foreground)]">Branch Avail = SUM(Quantity − Reserved)</span>
+        </div>
+
+        <!-- Rollup Table -->
+        <div class="overflow-x-auto border border-[var(--border)] rounded-lg">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-[var(--content)] text-[var(--muted-foreground)] uppercase border-b border-[var(--border)]">
+              <tr>
+                <th class="w-8 px-2.5 py-2.5 text-center"></th>
+                <th class="px-3 py-2.5">Component Product</th>
+                <th class="px-3 py-2.5 text-right">Parent Qty</th>
+                <th class="px-3 py-2.5 text-right">Child BOM Qty</th>
+                <th class="px-3 py-2.5 text-right">Total PO Req</th>
+                <th class="px-3 py-2.5 text-right">Branch Avail</th>
+                <th class="px-3 py-2.5">Net PO Status</th>
+              </tr>
+            </thead>
+            <tbody id="tab2TableBody" class="divide-y divide-[var(--border)]"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== CHILD BOM MODAL (TAB 1 PRIMARY ONLY) ==================== -->
+  <div id="childBomModal" class="fixed inset-0 z-50 hidden modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="p-4 border-b border-[var(--border)] bg-[var(--content)] flex items-start justify-between gap-3">
+        <div class="space-y-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-2 py-0.5 text-xs font-semibold rounded bg-[var(--accent)] text-[var(--primary)] border border-[var(--border)]">
+              Child BOM Preview — Tab 1 Only (Primary Auto-Selected)
+            </span>
+            <span id="modalBomBadge" class="text-xs font-mono text-[var(--muted-foreground)]">BOM-M2-001 · v1.0</span>
+          </div>
+          <h2 id="modalTitle" class="text-base font-bold">M2 — Sub-Frame Assembly</h2>
+          <p id="modalContextLine" class="text-xs text-[var(--muted-foreground)]"></p>
+        </div>
+        <button type="button" id="closeModalBtn"
+          class="px-2.5 py-1 rounded border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--accent)] text-xs font-semibold cursor-pointer">
+          ✕ Close
+        </button>
+      </div>
+
+      <!-- Modal Breadcrumb (for multi-level drilldown) -->
+      <div id="modalBreadcrumbBar" class="px-4 py-2 border-b border-[var(--border)] bg-[var(--card)] text-xs flex items-center justify-between gap-2 hidden">
+        <div id="modalBreadcrumbTrail" class="flex items-center gap-1.5 font-medium"></div>
+        <button type="button" id="modalBackBtn" class="text-[var(--link)] hover:underline font-semibold cursor-pointer">
+          ← Back
+        </button>
+      </div>
+
+      <!-- Modal Body: Read-Only Primary Ops & Primary Materials ONLY -->
+      <div id="modalBody" class="p-4 overflow-y-auto space-y-3 bg-[var(--background)]"></div>
+
+      <!-- Modal Footer -->
+      <div class="p-3 border-t border-[var(--border)] bg-[var(--content)] flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span class="text-[var(--muted-foreground)]">
+          Showing Primary Operations &amp; Primary Materials only (Alternative ops &amp; alternative materials are excluded for Child BOMs).
+        </span>
+        <button type="button" id="closeModalFooterBtn"
+          class="px-3 py-1.5 rounded border border-[var(--border)] bg-[var(--card)] font-semibold cursor-pointer">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- DEMO DATA ----------
+    const BRANCH_STOCK = {
+      M1: 12.0000,
+      M2: 4.0000,      // Toggled between 4.0000 and 15.0000
+      M3: 15.0000,
+      M3_ALT: 20.0000,
+      M4: 10.0000,
+      M4_TIG: 8.0000,
+      M5: 5.0000
+    };
+
+    const CHILD_BOMS = {
+      BOM_M2: {
+        id: 'BOM_M2',
+        number: 'BOM-M2-001',
+        version: 'v1.0',
+        status: 'Approved',
+        productCode: 'M2',
+        productName: 'Sub-Frame Assembly',
+        baseQty: 1,
+        uom: 'PCS',
+        // Underlying BOM has Alt Op 15 & Alt Mat M3-ALT — hidden in Modal because Child BOM uses Primary ONLY!
+        operations: [
+          {
+            id: 'c_op10', seq: 10, name: 'Frame Bracket Prep', wc: 'Cutting WC / Laser Sec',
+            meta: 'Setup: 5m · Run: 4m/unit · Yield: 100%', isPrimary: true,
+            materials: [
+              { id: 'c_m3', code: 'M3', name: 'Steel Bolt M10', qtyPerBase: 2.0, scrapPct: 0, uom: 'PCS', isPrimary: true, childBomId: null },
+              { id: 'c_m3_alt', code: 'M3-ALT', name: 'Titanium Bolt M10 (Alt)', qtyPerBase: 2.0, scrapPct: 0, uom: 'PCS', isPrimary: false, childBomId: null }
+            ]
+          },
+          {
+            id: 'c_op15', seq: 15, name: 'Outsourced Bracket Prep (Alt Op)', wc: 'Vendor X',
+            meta: 'Lead: 2d', isPrimary: false,
+            materials: []
+          },
+          {
+            id: 'c_op20', seq: 20, name: 'Sub-Frame Riveting', wc: 'Assembly WC / Bay 1',
+            meta: 'Setup: 10m · Run: 6m/unit · Yield: 100%', isPrimary: true,
+            materials: [
+              { id: 'c_m5', code: 'M5', name: 'Rivet Gasket Pack', qtyPerBase: 1.0, scrapPct: 0, uom: 'SET', isPrimary: true, childBomId: null }
+            ]
+          }
+        ]
+      }
+    };
+
+    const PARENT_BOM = {
+      baseQty: 1,
+      stageGroups: [
+        {
+          stageKey: 'stage_10',
+          hasAltOp: false,
+          selectedOpId: 'p_op10',
+          ops: [
+            {
+              id: 'p_op10', seq: 10, name: 'Laser Cutting & Sub-Frame Fitment',
+              wc: 'Sheet Metal WC / Laser Section',
+              meta: 'Setup: 15m · Run: 10m/unit · Yield: 100%',
+              isAlternative: false,
+              allocations: [
+                { uid: 'a1', groupKey: 'g_m1', materialCode: 'M1', name: 'Aluminum Base Plate', type: 'Raw Material', baseQty: 1.0, scrapPct: 0, uom: 'PCS', isAlternative: false, childBomId: null },
+                { uid: 'a2', groupKey: 'g_m2', materialCode: 'M2', name: 'Sub-Frame Assembly', type: 'Semi-Finished', baseQty: 1.0, scrapPct: 0, uom: 'PCS', isAlternative: false, childBomId: 'BOM_M2' }
+              ]
+            }
+          ]
+        },
+        {
+          stageKey: 'stage_20',
+          hasAltOp: true,
+          selectedOpId: 'p_op20',
+          ops: [
+            {
+              id: 'p_op20', seq: 20, name: 'Robotic MIG Welding',
+              wc: 'Welding WC / Robotic Bay',
+              meta: 'Setup: 20m · Run: 12m/unit · Yield: 100%',
+              isAlternative: false,
+              allocations: [
+                { uid: 'a3', groupKey: 'g_m3', materialCode: 'M3', name: 'Steel Bolt M10', type: 'Raw Material', baseQty: 1.0, scrapPct: 0, uom: 'PCS', isAlternative: false, childBomId: null },
+                { uid: 'a3_alt', groupKey: 'g_m3', materialCode: 'M3_ALT', displayCode: 'M3-ALT', name: 'Titanium Bolt M10', type: 'Raw Material', baseQty: 1.0, scrapPct: 0, uom: 'PCS', isAlternative: true, priority: 1, replacesName: 'Steel Bolt M10', childBomId: null },
+                { uid: 'a4', groupKey: 'g_m4', materialCode: 'M4', name: 'Protective Epoxy Coating', type: 'Consumable', baseQty: 1.0, scrapPct: 0, uom: 'LTR', isAlternative: false, childBomId: null }
+              ]
+            },
+            {
+              id: 'p_op25', seq: 25, name: 'Manual TIG Welding (Backup)',
+              wc: 'Welding WC / Manual Bay',
+              meta: 'Setup: 10m · Run: 22m/unit · Yield: 100%',
+              isAlternative: true, replacesSeq: 20, priority: 1,
+              allocations: [
+                { uid: 'a5', groupKey: 'g_m3_tig', materialCode: 'M3', name: 'Steel Bolt M10', type: 'Raw Material', baseQty: 1.5, scrapPct: 0, uom: 'PCS', isAlternative: false, childBomId: null },
+                { uid: 'a6', groupKey: 'g_m4_tig', materialCode: 'M4_TIG', displayCode: 'M4-TIG', name: 'TIG Argon Shielding Pack', type: 'Consumable', baseQty: 1.0, scrapPct: 0, uom: 'SET', isAlternative: false, childBomId: null }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    const selectedMatChoice = {
+      'p_op10:g_m1': 'a1',
+      'p_op10:g_m2': 'a2',
+      'p_op20:g_m3': 'a3',
+      'p_op20:g_m4': 'a4',
+      'p_op25:g_m3_tig': 'a5',
+      'p_op25:g_m4_tig': 'a6'
+    };
+
+    let state = {
+      poQty: 10,
+      activeTab: 'tab2',
+      filterShortOnly: false,
+      expandedDrawers: new Set(['M3']),
+      modalStack: []
+    };
+
+    const fmt4 = (n) => Number(n || 0).toFixed(4);
+
+    function computeRollup() {
+      const poQty = Math.max(1, Number(state.poQty) || 1);
+      const scale = poQty / PARENT_BOM.baseQty;
+
+      const rollupMap = new Map();
+      const ensureRow = (code, meta) => {
+        if (!rollupMap.has(code)) {
+          rollupMap.set(code, {
+            code,
+            displayCode: meta.displayCode || code,
+            name: meta.name,
+            type: meta.type,
+            uom: meta.uom,
+            childBomId: meta.childBomId || null,
+            parentQty: 0,
+            childQty: 0,
+            parentSources: [],
+            childSources: []
+          });
+        }
+        return rollupMap.get(code);
+      };
+
+      const childDemands = [];
+
+      PARENT_BOM.stageGroups.forEach((stage) => {
+        const op = stage.ops.find((o) => o.id === stage.selectedOpId);
+        if (!op) return;
+
+        op.allocations.forEach((alloc) => {
+          const chosenUid = selectedMatChoice[`${op.id}:${alloc.groupKey}`];
+          if (chosenUid !== alloc.uid) return;
+
+          const grossQty = alloc.baseQty * scale * (1 + (alloc.scrapPct || 0) / 100);
+          const row = ensureRow(alloc.materialCode, alloc);
+          row.parentQty += grossQty;
+          row.parentSources.push({
+            opId: op.id,
+            opSeq: op.seq,
+            opName: op.name,
+            opSelectedAs: op.isAlternative ? 'Alt Op Selected' : 'Primary Op',
+            matSelectedAs: alloc.isAlternative ? `Alt Selected (P${alloc.priority})` : 'Primary',
+            netQty: alloc.baseQty * scale,
+            scrapPct: alloc.scrapPct || 0,
+            grossQty
+          });
+
+          if (alloc.childBomId) {
+            childDemands.push({ childBomId: alloc.childBomId, parentMatCode: alloc.materialCode });
+          }
+        });
+      });
+
+      const childSummaryMap = new Map();
+      childDemands.forEach(({ childBomId, parentMatCode }) => {
+        const parentRow = rollupMap.get(parentMatCode);
+        const totalNeeded = parentRow ? parentRow.parentQty : 0;
+        const avail = BRANCH_STOCK[parentMatCode] ?? 0;
+        const toProduce = Math.max(0, totalNeeded - avail);
+        const childBom = CHILD_BOMS[childBomId];
+
+        childSummaryMap.set(childBomId, {
+          childBom,
+          requiredQty: totalNeeded,
+          branchAvail: avail,
+          fromStock: Math.min(totalNeeded, avail),
+          toProduce,
+          hasInternalShortage: false
+        });
+
+        if (toProduce > 0 && childBom) {
+          const childScale = toProduce / childBom.baseQty;
+          childBom.operations.forEach((cOp) => {
+            if (!cOp.isPrimary) return;
+            cOp.materials.forEach((cMat) => {
+              if (!cMat.isPrimary) return;
+              const netQty = cMat.qtyPerBase * childScale;
+              const grossQty = netQty * (1 + (cMat.scrapPct || 0) / 100);
+              const row = ensureRow(cMat.code, {
+                displayCode: cMat.code,
+                name: cMat.name,
+                type: 'Raw Material',
+                uom: cMat.uom,
+                childBomId: cMat.childBomId
+              });
+              row.childQty += grossQty;
+              row.childSources.push({
+                childBomId: childBom.id,
+                bomNumber: childBom.number,
+                childProdName: childBom.productName,
+                producingQty: toProduce,
+                opSeq: cOp.seq,
+                opName: cOp.name,
+                netQty,
+                scrapPct: cMat.scrapPct || 0,
+                grossQty
+              });
+            });
+          });
+        }
+      });
+
+      const rows = Array.from(rollupMap.values()).map((r) => {
+        const totalReq = r.parentQty + r.childQty;
+        const avail = BRANCH_STOCK[r.code] ?? 0;
+        const fromStock = Math.min(totalReq, avail);
+        const shortage = Math.max(0, totalReq - avail);
+        return { ...r, totalReq, avail, fromStock, shortage };
+      });
+
+      childSummaryMap.forEach((info, cbId) => {
+        if (info.toProduce > 0) {
+          info.hasInternalShortage = rows.some(
+            (r) => r.shortage > 0 && r.childSources.some((cs) => cs.childBomId === cbId)
+          );
+        }
+      });
+
+      return { rows, childSummaryMap, poQty, scale };
+    }
+
+    function renderTab1() {
+      const poQty = Math.max(1, Number(state.poQty) || 1);
+      const scale = poQty / PARENT_BOM.baseQty;
+      const container = document.getElementById('tab1OperationsContainer');
+      container.innerHTML = '';
+
+      PARENT_BOM.stageGroups.forEach((stage) => {
+        stage.ops.forEach((op) => {
+          const isSelectedOp = stage.selectedOpId === op.id;
+          const card = document.createElement('div');
+          card.id = `op-card-${op.id}`;
+          card.className = `rounded-lg border transition-colors ${
+            isSelectedOp
+              ? 'border-[var(--primary)] bg-[var(--card)]'
+              : 'border-[var(--border)] bg-[var(--content)] opacity-70'
+          }`;
+
+          const groups = new Map();
+          op.allocations.forEach((a) => {
+            if (!groups.has(a.groupKey)) groups.set(a.groupKey, []);
+            groups.get(a.groupKey).push(a);
+          });
+
+          const headerLeft = stage.hasAltOp
+            ? `<label class="flex items-center gap-2 cursor-pointer">
+                 <input type="radio" name="op_stage_${stage.stageKey}" value="${op.id}" ${isSelectedOp ? 'checked' : ''}
+                   data-stage="${stage.stageKey}" class="op-stage-radio accent-[var(--primary)] w-4 h-4 cursor-pointer" />
+                 <span class="px-2 py-0.5 rounded bg-[var(--primary)] text-[var(--primary-foreground)] font-bold text-xs">Op ${op.seq}</span>
+                 <span class="font-bold text-sm">${op.name}</span>
+               </label>`
+            : `<div class="flex items-center gap-2">
+                 <input type="radio" checked disabled title="Auto-selected (No alternative operation)"
+                   class="accent-[var(--primary)] w-4 h-4 cursor-not-allowed" />
+                 <span class="px-2 py-0.5 rounded bg-[var(--primary)] text-[var(--primary-foreground)] font-bold text-xs">Op ${op.seq}</span>
+                 <span class="font-bold text-sm">${op.name}</span>
+               </div>`;
+
+          const statusPill = !stage.hasAltOp
+            ? `<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--accent)] text-[var(--primary)] border border-[var(--border)]">🔒 Auto-Selected (No Alt)</span>`
+            : isSelectedOp
+              ? `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--accent)] text-[var(--success)] border border-[var(--border)]">✔ ${op.isAlternative ? 'Alt Op Selected' : 'Primary Selected'}</span>`
+              : `<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--content)] text-[var(--muted-foreground)] border border-[var(--border)]">Deselected · Hidden in Tab 2</span>`;
+
+          const altMetaPill = op.isAlternative
+            ? `<span class="px-2 py-0.5 rounded text-xs bg-[var(--content)] text-[var(--warning)] border border-[var(--border)]">Alt · Substitutes Op ${op.replacesSeq} · P${op.priority}</span>`
+            : '';
+
+          let rowsHtml = '';
+          let idx = 1;
+          groups.forEach((items, groupKey) => {
+            const hasAltMat = items.length > 1;
+            const chosenUid = selectedMatChoice[`${op.id}:${groupKey}`];
+
+            items.forEach((alloc) => {
+              const isChosenMat = chosenUid === alloc.uid;
+              const isRowActive = isSelectedOp && isChosenMat;
+              const scaledQty = alloc.baseQty * scale * (1 + (alloc.scrapPct || 0) / 100);
+
+              const radioCell = !hasAltMat
+                ? `<input type="radio" checked disabled title="Auto-selected (No alternative material)" class="accent-[var(--primary)] cursor-not-allowed" />`
+                : `<input type="radio" name="mat_${op.id}_${groupKey}" value="${alloc.uid}"
+                     ${isChosenMat ? 'checked' : ''} ${!isSelectedOp ? 'disabled' : ''}
+                     data-op="${op.id}" data-group="${groupKey}"
+                     class="mat-choice-radio accent-[var(--primary)] cursor-pointer" />`;
+
+              const roleCell = !hasAltMat
+                ? `<span class="text-xs font-medium text-[var(--muted-foreground)]">🔒 Auto-Selected</span>`
+                : alloc.isAlternative
+                  ? `<span class="text-xs ${isChosenMat ? 'text-[var(--warning)] font-semibold' : 'text-[var(--muted-foreground)]'}">↳ Alt (P${alloc.priority})</span>`
+                  : `<span class="text-xs ${isChosenMat ? 'text-[var(--success)] font-semibold' : 'text-[var(--muted-foreground)]'}">Primary</span>`;
+
+              rowsHtml += `
+                <tr class="${!isChosenMat ? 'opacity-50 bg-[var(--content)]' : ''}">
+                  <td class="px-3 py-2 text-center">${radioCell}</td>
+                  <td class="px-2 py-2 text-[var(--muted-foreground)]">${alloc.isAlternative ? '' : idx++}</td>
+                  <td class="px-3 py-2">
+                    <div class="${alloc.isAlternative ? 'pl-4 border-l-2 border-[var(--border)]' : ''}">
+                      <span class="font-semibold">${alloc.displayCode || alloc.materialCode} — ${alloc.name}</span>
+                      ${alloc.childBomId ? `<span class="ml-1.5 px-1.5 py-0.5 rounded text-xs bg-[var(--accent)] text-[var(--primary)] border border-[var(--border)]">Child BOM</span>` : ''}
+                    </div>
+                  </td>
+                  <td class="px-3 py-2 text-right font-mono tabular-nums">${fmt4(alloc.baseQty)}</td>
+                  <td class="px-3 py-2 text-right font-mono tabular-nums font-semibold ${isRowActive ? '' : 'line-through text-[var(--muted-foreground)]'}">${fmt4(scaledQty)}</td>
+                  <td class="px-3 py-2 text-center"><span class="px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--content)]">${alloc.uom} 🔒</span></td>
+                  <td class="px-3 py-2 text-right font-mono tabular-nums">${alloc.scrapPct}%</td>
+                  <td class="px-3 py-2">${roleCell}</td>
+                </tr>
+              `;
+            });
+          });
+
+          card.innerHTML = `
+            <div class="px-4 py-3 border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-2">
+              <div class="flex flex-wrap items-center gap-2">
+                ${headerLeft}
+                <span class="px-2 py-0.5 rounded text-xs bg-[var(--content)] border border-[var(--border)] text-[var(--muted-foreground)]">${op.wc}</span>
+                ${altMetaPill}
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-[var(--muted-foreground)]">${op.meta}</span>
+                ${statusPill}
+              </div>
+            </div>
+            <div class="${isSelectedOp ? '' : 'hidden'} overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="bg-[var(--content)] text-[var(--muted-foreground)] border-b border-[var(--border)]">
+                  <tr>
+                    <th class="w-12 px-3 py-2 text-center">Use</th>
+                    <th class="w-8 px-2 py-2">#</th>
+                    <th class="px-3 py-2">Component Product (Read-Only)</th>
+                    <th class="px-3 py-2 text-right">Base Qty</th>
+                    <th class="px-3 py-2 text-right">PO Qty</th>
+                    <th class="px-3 py-2 text-center">UOM</th>
+                    <th class="px-3 py-2 text-right">Scrap %</th>
+                    <th class="px-3 py-2">Option</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--border)]">${rowsHtml}</tbody>
+              </table>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      });
+
+      container.querySelectorAll('.op-stage-radio').forEach((el) => {
+        el.addEventListener('change', (e) => {
+          const st = PARENT_BOM.stageGroups.find((g) => g.stageKey === e.target.dataset.stage);
+          if (st) {
+            st.selectedOpId = e.target.value;
+            renderAll();
+          }
+        });
+      });
+
+      container.querySelectorAll('.mat-choice-radio').forEach((el) => {
+        el.addEventListener('change', (e) => {
+          selectedMatChoice[`${e.target.dataset.op}:${e.target.dataset.group}`] = e.target.value;
+          renderAll();
+        });
+      });
+    }
+
+    function renderTab2() {
+      const { rows, childSummaryMap } = computeRollup();
+
+      const okCount = rows.filter((r) => !r.childBomId && r.shortage === 0).length;
+      const shortCount = rows.filter((r) => !r.childBomId && r.shortage > 0).length;
+      const childProduceCount = Array.from(childSummaryMap.values()).filter((c) => c.toProduce > 0).length;
+
+      document.getElementById('tab2CountBadge').textContent = rows.length;
+      document.getElementById('summaryTotalCount').textContent = rows.length;
+      document.getElementById('summaryOkCount').textContent = okCount;
+      document.getElementById('summaryChildCount').textContent = childProduceCount;
+      document.getElementById('summaryShortCount').textContent = shortCount;
+
+      const filteredRows = state.filterShortOnly
+        ? rows.filter((r) => {
+            if (r.childBomId) {
+              const cs = childSummaryMap.get(r.childBomId);
+              return cs && cs.toProduce > 0;
+            }
+            return r.shortage > 0;
+          })
+        : rows;
+
+      const tbody = document.getElementById('tab2TableBody');
+      tbody.innerHTML = '';
+
+      if (filteredRows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-6 text-center text-[var(--muted-foreground)]">All selected materials are sufficient in branch warehouses.</td></tr>`;
+        return;
+      }
+
+      filteredRows.forEach((row) => {
+        const isOpen = state.expandedDrawers.has(row.code);
+        const childInfo = row.childBomId ? childSummaryMap.get(row.childBomId) : null;
+        const fromChildOnly = row.parentQty === 0 && row.childQty > 0;
+
+        let statusHtml = '';
+        if (childInfo) {
+          if (childInfo.toProduce > 0) {
+            statusHtml = `
+              <div class="space-y-0.5">
+                <div class="font-semibold text-[var(--warning)]">⚙ Produce: ${fmt4(childInfo.toProduce)} ${row.uom}</div>
+                <div class="text-[var(--muted-foreground)]">From Stock: ${fmt4(childInfo.fromStock)}</div>
+              </div>`;
+          } else {
+            statusHtml = `
+              <div class="space-y-0.5">
+                <div class="font-semibold text-[var(--success)]">✔ Covered by Stock</div>
+                <div class="text-[var(--muted-foreground)]">Child BOM Not Exploded</div>
+              </div>`;
+          }
+        } else if (row.shortage > 0) {
+          statusHtml = `
+            <div class="space-y-0.5">
+              <div class="font-semibold text-[var(--error)]">⚠ Short: ${fmt4(row.shortage)} ${row.uom}</div>
+              <div class="text-[var(--muted-foreground)]">From Stock: ${fmt4(row.fromStock)}</div>
+            </div>`;
+        } else {
+          statusHtml = `<span class="font-semibold text-[var(--success)]">✔ Sufficient</span>`;
+        }
+
+        const childButton = childInfo
+          ? `<button type="button" data-open-child="${childInfo.childBom.id}"
+               class="open-child-btn mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded border border-[var(--primary)] bg-[var(--accent)] text-[var(--primary)] font-semibold hover:opacity-90 cursor-pointer">
+               🔗 ${childInfo.childBom.number} (${childInfo.childBom.version})
+               ${childInfo.hasInternalShortage ? '<span class="text-[var(--error)]">●</span>' : ''}
+             </button>`
+          : '';
+
+        const mainTr = document.createElement('tr');
+        mainTr.className = `cursor-pointer hover:bg-[var(--content)] ${isOpen ? 'bg-[var(--content)]' : ''}`;
+        mainTr.innerHTML = `
+          <td class="px-2.5 py-2.5 text-center font-bold text-[var(--muted-foreground)]">${isOpen ? '▾' : '▸'}</td>
+          <td class="px-3 py-2.5">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="font-bold">${row.displayCode} — ${row.name}</span>
+              ${fromChildOnly ? '<span class="px-1.5 py-0.5 rounded text-xs bg-[var(--content)] border border-[var(--border)] text-[var(--muted-foreground)]">Via Child BOM only</span>' : ''}
+              ${row.parentQty > 0 && row.childQty > 0 ? '<span class="px-1.5 py-0.5 rounded text-xs bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold">Used in Parent + Child BOM</span>' : ''}
+            </div>
+            <div class="text-[var(--muted-foreground)] mt-0.5">${row.type}</div>
+            ${childButton}
+          </td>
+          <td class="px-3 py-2.5 text-right font-mono tabular-nums">${row.parentQty > 0 ? fmt4(row.parentQty) : '—'}</td>
+          <td class="px-3 py-2.5 text-right font-mono tabular-nums ${row.childQty > 0 ? 'font-semibold text-[var(--primary)]' : 'text-[var(--muted-foreground)]'}">${row.childQty > 0 ? '+' + fmt4(row.childQty) : '0.0000'}</td>
+          <td class="px-3 py-2.5 text-right font-mono tabular-nums font-bold">${fmt4(row.totalReq)} <span class="font-normal text-[var(--muted-foreground)]">${row.uom}</span></td>
+          <td class="px-3 py-2.5 text-right font-mono tabular-nums">${fmt4(row.avail)}</td>
+          <td class="px-3 py-2.5">${statusHtml}</td>
+        `;
+
+        mainTr.addEventListener('click', (e) => {
+          if (e.target.closest('.open-child-btn')) return;
+          if (state.expandedDrawers.has(row.code)) {
+            state.expandedDrawers.delete(row.code);
+          } else {
+            state.expandedDrawers.add(row.code);
+          }
+          renderTab2();
+        });
+
+        tbody.appendChild(mainTr);
+
+        if (isOpen) {
+          const drawerTr = document.createElement('tr');
+          drawerTr.className = 'bg-[var(--background)]';
+
+          let breakdownRows = '';
+          row.parentSources.forEach((ps) => {
+            breakdownRows += `
+              <tr>
+                <td class="px-2.5 py-1.5"><span class="px-1.5 py-0.5 rounded bg-[var(--content)] border border-[var(--border)] font-medium">Parent BOM</span></td>
+                <td class="px-2.5 py-1.5">Op ${ps.opSeq} · ${ps.opName}</td>
+                <td class="px-2.5 py-1.5">${ps.opSelectedAs} / ${ps.matSelectedAs}</td>
+                <td class="px-2.5 py-1.5 text-right font-mono tabular-nums">${fmt4(ps.netQty)}</td>
+                <td class="px-2.5 py-1.5 text-right font-mono tabular-nums">${ps.scrapPct}%</td>
+                <td class="px-2.5 py-1.5 text-right font-mono tabular-nums font-semibold">${fmt4(ps.grossQty)}</td>
+                <td class="px-2.5 py-1.5 text-right">
+                  <button type="button" data-jump-op="${ps.opId}"
+                    class="jump-op-btn px-2 py-0.5 rounded border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--accent)] cursor-pointer">
+                    Jump to Op Card
+                  </button>
+                </td>
+              </tr>
+            `;
+          });
+
+          row.childSources.forEach((cs) => {
+            breakdownRows += `
+              <tr>
+                <td class="px-2.5 py-1.5"><span class="px-1.5 py-0.5 rounded bg-[var(--accent)] text-[var(--primary)] border border-[var(--border)] font-medium">Child: ${cs.childProdName}</span></td>
+                <td class="px-2.5 py-1.5">Op ${cs.opSeq} · ${cs.opName} <span class="text-[var(--muted-foreground)]">(Producing ${fmt4(cs.producingQty)})</span></td>
+                <td class="px-2.5 py-1.5 text-[var(--muted-foreground)]">Primary Auto</td>
+                <td class="px-2.5 py-1.5 text-right font-mono tabular-nums">${fmt4(cs.netQty)}</td>
+                <td class="px-2.5 py-1.5 text-right font-mono tabular-nums">${cs.scrapPct}%</td>
+                <td class="px-2.5 py-1.5 text-right font-mono tabular-nums font-semibold">${fmt4(cs.grossQty)}</td>
+                <td class="px-2.5 py-1.5 text-right">
+                  <button type="button" data-open-child="${cs.childBomId}"
+                    class="open-child-btn px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--accent)] cursor-pointer">
+                    View Child BOM
+                  </button>
+                </td>
+              </tr>
+            `;
+          });
+
+          drawerTr.innerHTML = `
+            <td colspan="7" class="p-3 border-b border-[var(--border)]">
+              <div class="rounded-lg border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+                <div class="px-3 py-2 bg-[var(--content)] border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span class="font-bold">Source Allocation Breakdown — ${row.displayCode}</span>
+                  <span class="text-[var(--muted-foreground)] font-mono tabular-nums">
+                    Parent (${fmt4(row.parentQty)}) + Child BOMs (${fmt4(row.childQty)}) = Total PO Req (${fmt4(row.totalReq)} ${row.uom})
+                  </span>
+                </div>
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead class="bg-[var(--content)] text-[var(--muted-foreground)] border-b border-[var(--border)]">
+                    <tr>
+                      <th class="px-2.5 py-1.5">Source Level</th>
+                      <th class="px-2.5 py-1.5">Operation / Context</th>
+                      <th class="px-2.5 py-1.5">Selection</th>
+                      <th class="px-2.5 py-1.5 text-right">Net Qty</th>
+                      <th class="px-2.5 py-1.5 text-right">Scrap %</th>
+                      <th class="px-2.5 py-1.5 text-right">Gross Qty</th>
+                      <th class="px-2.5 py-1.5 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-[var(--border)]">${breakdownRows}</tbody>
+                </table>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(drawerTr);
+        }
+      });
+
+      tbody.querySelectorAll('.open-child-btn').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openChildBomModal(btn.dataset.openChild);
+        });
+      });
+
+      tbody.querySelectorAll('.jump-op-btn').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setActiveTab('tab1');
+          const el = document.getElementById(`op-card-${btn.dataset.jumpOp}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-[var(--primary)]');
+            setTimeout(() => el.classList.remove('ring-2', 'ring-[var(--primary)]'), 1400);
+          }
+        });
+      });
+    }
+
+    function openChildBomModal(childBomId) {
+      const { childSummaryMap } = computeRollup();
+      const summary = childSummaryMap.get(childBomId);
+      if (!summary) return;
+      state.modalStack = [summary];
+      renderModal();
+      document.getElementById('childBomModal').classList.remove('hidden');
+    }
+
+    function renderModal() {
+      const current = state.modalStack[state.modalStack.length - 1];
+      if (!current || !current.childBom) return;
+      const bom = current.childBom;
+
+      document.getElementById('modalBomBadge').textContent = `${bom.number} · ${bom.version} (${bom.status})`;
+      document.getElementById('modalTitle').textContent = `${bom.productCode} — ${bom.productName}`;
+
+      if (current.toProduce > 0) {
+        document.getElementById('modalContextLine').innerHTML =
+          `PO Needs: <strong>${fmt4(current.requiredQty)} ${bom.uom}</strong> · Branch Avail: <strong>${fmt4(current.branchAvail)} ${bom.uom}</strong> · <span class="text-[var(--warning)] font-semibold">Producing Shortage: ${fmt4(current.toProduce)} ${bom.uom}</span>`;
+      } else {
+        document.getElementById('modalContextLine').innerHTML =
+          `PO Needs: <strong>${fmt4(current.requiredQty)} ${bom.uom}</strong> · Branch Avail: <strong>${fmt4(current.branchAvail)} ${bom.uom}</strong> · <span class="text-[var(--success)] font-semibold">Covered by Branch Stock (Producing 0.0000 · Base 1.0000 preview)</span>`;
+      }
+
+      const bcBar = document.getElementById('modalBreadcrumbBar');
+      if (state.modalStack.length > 1) {
+        bcBar.classList.remove('hidden');
+        document.getElementById('modalBreadcrumbTrail').textContent =
+          state.modalStack.map((s) => `${s.childBom.productCode} (${s.childBom.number})`).join(' › ');
+      } else {
+        bcBar.classList.add('hidden');
+      }
+
+      const targetProduce = current.toProduce > 0 ? current.toProduce : bom.baseQty;
+      const modalScale = targetProduce / bom.baseQty;
+
+      // Also check which materials are shared with Parent BOM so user recognizes M3 right inside modal
+      const body = document.getElementById('modalBody');
+      body.innerHTML = '';
+
+      const primaryOps = bom.operations.filter((op) => op.isPrimary);
+      primaryOps.forEach((op) => {
+        const primaryMats = op.materials.filter((m) => m.isPrimary);
+        let matRows = '';
+        primaryMats.forEach((mat, i) => {
+          const scaledQty = mat.qtyPerBase * modalScale * (1 + (mat.scrapPct || 0) / 100);
+          const isShared = mat.code === 'M3';
+          matRows += `
+            <tr>
+              <td class="px-3 py-2 text-[var(--muted-foreground)]">${i + 1}</td>
+              <td class="px-3 py-2">
+                <span class="font-semibold">${mat.code} — ${mat.name}</span>
+                ${isShared ? '<span class="ml-1.5 px-1.5 py-0.5 rounded text-xs bg-[var(--accent)] text-[var(--primary)] border border-[var(--border)]">Also in Parent BOM</span>' : ''}
+              </td>
+              <td class="px-3 py-2 text-right font-mono tabular-nums">${fmt4(mat.qtyPerBase)}</td>
+              <td class="px-3 py-2 text-right font-mono tabular-nums font-bold">${fmt4(scaledQty)}</td>
+              <td class="px-3 py-2 text-center"><span class="px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--content)]">${mat.uom}</span></td>
+              <td class="px-3 py-2 text-right font-mono tabular-nums">${mat.scrapPct}%</td>
+              <td class="px-3 py-2 text-xs text-[var(--success)] font-medium">✔ Primary Auto</td>
+            </tr>
+          `;
+        });
+
+        const opDiv = document.createElement('div');
+        opDiv.className = 'rounded-lg border border-[var(--border)] bg-[var(--card)] overflow-hidden';
+        opDiv.innerHTML = `
+          <div class="px-3.5 py-2.5 border-b border-[var(--border)] bg-[var(--content)] flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-[var(--primary)] text-[var(--primary-foreground)] font-bold">Op ${op.seq}</span>
+              <span class="font-bold text-sm">${op.name}</span>
+              <span class="px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)]">${op.wc}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[var(--muted-foreground)]">${op.meta}</span>
+              <span class="px-2 py-0.5 rounded-full bg-[var(--accent)] text-[var(--success)] border border-[var(--border)] font-medium">Primary Op Auto-Selected</span>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-[var(--content)] text-[var(--muted-foreground)] border-b border-[var(--border)]">
+                <tr>
+                  <th class="w-8 px-3 py-2">#</th>
+                  <th class="px-3 py-2">Component Product</th>
+                  <th class="px-3 py-2 text-right">Base Qty</th>
+                  <th class="px-3 py-2 text-right">${current.toProduce > 0 ? 'Qty For Shortage' : 'Base Preview Qty'}</th>
+                  <th class="px-3 py-2 text-center">UOM</th>
+                  <th class="px-3 py-2 text-right">Scrap %</th>
+                  <th class="px-3 py-2">Selection</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[var(--border)]">${matRows}</tbody>
+            </table>
+          </div>
+        `;
+        body.appendChild(opDiv);
+      });
+    }
+
+    function setActiveTab(tab) {
+      state.activeTab = tab;
+      const t1Btn = document.getElementById('tab1Btn');
+      const t2Btn = document.getElementById('tab2Btn');
+      const t1Panel = document.getElementById('tab1Panel');
+      const t2Panel = document.getElementById('tab2Panel');
+
+      if (tab === 'tab1') {
+        t1Btn.className = 'px-4 py-2 text-xs font-semibold rounded-t-lg border border-b-0 border-[var(--border)] bg-[var(--content)] text-[var(--primary)] cursor-pointer';
+        t2Btn.className = 'px-4 py-2 text-xs font-semibold rounded-t-lg border border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer flex items-center gap-1.5';
+        t1Panel.classList.remove('hidden');
+        t2Panel.classList.add('hidden');
+      } else {
+        t2Btn.className = 'px-4 py-2 text-xs font-semibold rounded-t-lg border border-b-0 border-[var(--border)] bg-[var(--content)] text-[var(--primary)] cursor-pointer flex items-center gap-1.5';
+        t1Btn.className = 'px-4 py-2 text-xs font-semibold rounded-t-lg border border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer';
+        t2Panel.classList.remove('hidden');
+        t1Panel.classList.add('hidden');
+      }
+    }
+
+    function renderAll() {
+      renderTab1();
+      renderTab2();
+      if (!document.getElementById('childBomModal').classList.contains('hidden')) {
+        renderModal();
+      }
+    }
+
+    document.getElementById('tab1Btn').addEventListener('click', () => setActiveTab('tab1'));
+    document.getElementById('tab2Btn').addEventListener('click', () => setActiveTab('tab2'));
+
+    document.getElementById('quickOpenModalBtn').addEventListener('click', () => {
+      openChildBomModal('BOM_M2');
+    });
+
+    document.getElementById('poQtyInput').addEventListener('input', (e) => {
+      state.poQty = Math.max(1, Number(e.target.value) || 1);
+      renderAll();
+    });
+
+    document.getElementById('stockShortBtn').addEventListener('click', () => {
+      BRANCH_STOCK.M2 = 4.0000;
+      document.getElementById('stockShortBtn').className = 'px-2.5 py-1 rounded border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] font-medium text-xs cursor-pointer';
+      document.getElementById('stockFullBtn').className = 'px-2.5 py-1 rounded border border-[var(--border)] bg-[var(--content)] text-[var(--foreground)] font-medium text-xs cursor-pointer';
+      renderAll();
+    });
+
+    document.getElementById('stockFullBtn').addEventListener('click', () => {
+      BRANCH_STOCK.M2 = 15.0000;
+      document.getElementById('stockFullBtn').className = 'px-2.5 py-1 rounded border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] font-medium text-xs cursor-pointer';
+      document.getElementById('stockShortBtn').className = 'px-2.5 py-1 rounded border border-[var(--border)] bg-[var(--content)] text-[var(--foreground)] font-medium text-xs cursor-pointer';
+      renderAll();
+    });
+
+    document.getElementById('filterAllBtn').addEventListener('click', () => {
+      state.filterShortOnly = false;
+      document.getElementById('filterAllBtn').className = 'px-2.5 py-1 rounded border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-medium cursor-pointer';
+      document.getElementById('filterShortBtn').className = 'px-2.5 py-1 rounded border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] text-xs font-medium cursor-pointer';
+      renderTab2();
+    });
+
+    document.getElementById('filterShortBtn').addEventListener('click', () => {
+      state.filterShortOnly = true;
+      document.getElementById('filterShortBtn').className = 'px-2.5 py-1 rounded border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-medium cursor-pointer';
+      document.getElementById('filterAllBtn').className = 'px-2.5 py-1 rounded border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] text-xs font-medium cursor-pointer';
+      renderTab2();
+    });
+
+    const closeModal = () => {
+      document.getElementById('childBomModal').classList.add('hidden');
+      state.modalStack = [];
+    };
+    document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+    document.getElementById('closeModalFooterBtn').addEventListener('click', closeModal);
+    document.getElementById('modalBackBtn').addEventListener('click', () => {
+      if (state.modalStack.length > 1) {
+        state.modalStack.pop();
+        renderModal();
+      }
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>

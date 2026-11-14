@@ -298,14 +298,61 @@ class ProductionReadinessService
 
         $bomItems = collect();
         if ($op->source_bom_id) {
+            // PO-IMPL-02: production_bom_items.is_alternative was dropped (master rows = one per material)
             $bomItems = ProductionBomItem::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('bom_id', $op->source_bom_id)
                 ->get();
-            $bomMaterialIds = $bomItems->pluck('material_id')->all();
-            $reservations = $reservations->filter(fn($r) => in_array($r->product_id, $bomMaterialIds, true) && !in_array($r->product_id, $sfgProductIds, true));
+        }
+
+        $routingOpMaterials = collect();
+        if ($op->routing_operation_id) {
+            // PO-IMPL-02 (PO-12): this BOM's allocations only, limited to the materials chosen on the order
+            $routingOpMaterials = \App\Domains\Production\Models\RoutingOperationMaterial::withoutGlobalScopes()
+                ->where('routing_operation_id', $op->routing_operation_id)
+                ->when($op->source_bom_id, fn ($q) => $q->where('bom_id', $op->source_bom_id))
+                ->when(
+                    is_array($op->selected_routing_material_ids),
+                    fn ($q) => $q->whereIn('id', $op->selected_routing_material_ids ?: [0]),
+                    fn ($q) => $q->where('is_alternative', false)
+                )
+                ->get();
+        }
+
+        // Check if the routing defines operation material assignments
+        $hasRoutingAllocations = false;
+        if ($op->source_routing_id) {
+            $hasRoutingAllocations = \App\Domains\Production\Models\RoutingOperationMaterial::withoutGlobalScopes()
+                ->when($op->source_bom_id, fn ($q) => $q->where('bom_id', $op->source_bom_id))
+                ->whereHas('routingOperation', function ($q) use ($op) {
+                    $q->where('routing_id', $op->source_routing_id);
+                })->exists();
+        }
+
+        if ($hasRoutingAllocations) {
+            if ($routingOpMaterials->isEmpty()) {
+                // This operation has no assigned material requirements -> Ready
+                return [
+                    'status' => self::STATUS_READY,
+                    'required_qty' => $orderQty,
+                    'issued_qty' => $orderQty,
+                    'reserved_qty' => 0.0,
+                    'available_stock' => 0.0,
+                    'shortage_qty' => 0.0,
+                    'ready_qty' => $orderQty,
+                    'blockers' => [],
+                    'warnings' => [],
+                ];
+            }
+            $assignedMaterialIds = $routingOpMaterials->pluck('material_id')->all();
+            $reservations = $reservations->filter(fn($r) => in_array($r->product_id, $assignedMaterialIds, true));
         } else {
-            $reservations = $reservations->filter(fn($r) => !in_array($r->product_id, $sfgProductIds, true));
+            if ($op->source_bom_id) {
+                $bomMaterialIds = $bomItems->pluck('material_id')->all();
+                $reservations = $reservations->filter(fn($r) => in_array($r->product_id, $bomMaterialIds, true) && !in_array($r->product_id, $sfgProductIds, true));
+            } else {
+                $reservations = $reservations->filter(fn($r) => !in_array($r->product_id, $sfgProductIds, true));
+            }
         }
 
         if ($reservations->isEmpty()) {
@@ -332,14 +379,32 @@ class ProductionReadinessService
         $minExecutableFromMaterial = $orderQty;
 
         foreach ($reservations as $res) {
-            $bomItem = $bomItems->firstWhere('material_id', $res->product_id);
-            if ($bomItem && (float) $bomItem->quantity > 0) {
-                $scrapFactor = 1.0 + ((float) ($bomItem->material_scrap_percentage ?? 0) / 100.0);
-                $bomRatio = (float) $bomItem->quantity * $scrapFactor;
+            $rom = $routingOpMaterials->firstWhere('material_id', $res->product_id);
+            if ($rom && (float) $rom->quantity > 0) {
+                $bom = $op->source_bom_id ? \App\Domains\Production\Models\ProductionBom::find($op->source_bom_id) : null;
+                $baseQty = ($bom && (float) $bom->base_quantity > 0) ? (float) $bom->base_quantity : 1.0;
+
+                $grossRomQty = (float) ($rom->gross_quantity ?? $rom->calculateGrossQuantity());
+                $bomRatio = $grossRomQty / $baseQty;
+
                 $req = round($bomRatio * $orderQty, 4);
             } else {
-                $req = (float) $res->quantity_planned;
-                $bomRatio = ($req / max(1.0, $orderQty));
+                $bomItem = $bomItems->firstWhere('material_id', $res->product_id);
+                if ($bomItem && (float) $bomItem->quantity > 0) {
+                    $baseQty = 1.0;
+                    if ($op->source_bom_id) {
+                        $bom = \App\Domains\Production\Models\ProductionBom::find($op->source_bom_id);
+                        if ($bom && (float) $bom->base_quantity > 0) {
+                            $baseQty = (float) $bom->base_quantity;
+                        }
+                    }
+                    $scrapFactor = 1.0 + ((float) ($bomItem->material_scrap_percentage ?? 0) / 100.0);
+                    $bomRatio = ((float) $bomItem->quantity / $baseQty) * $scrapFactor;
+                    $req = round($bomRatio * $orderQty, 4);
+                } else {
+                    $req = (float) $res->quantity_planned;
+                    $bomRatio = ($req / max(1.0, $orderQty));
+                }
             }
 
             $iss = (float) $res->quantity_issued;
@@ -545,11 +610,18 @@ class ProductionReadinessService
             $childProductId = $predOp->source_product_id;
             if (!$childProductId) continue;
 
-            $bomItem = ProductionBomItem::withoutGlobalScopes()
+            $targetBomId = $op->source_bom_id ?? $op->order->bom_id;
+            $bomAlloc = \App\Domains\Production\Models\RoutingOperationMaterial::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
-                ->where('bom_id', $op->source_bom_id ?? $op->order->bom_id)
+                ->where('bom_id', $targetBomId)
                 ->where('material_id', $childProductId)
+                ->where('is_alternative', false)
                 ->first();
+            $bomItem = $bomAlloc ?: ProductionBomItem::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('bom_id', $targetBomId)
+                ->where('material_id', $childProductId)
+                ->first(); // PO-IMPL-02: no is_alternative on master rows
             $bomRatio = ($bomItem && (float) $bomItem->quantity > 0) ? (float) $bomItem->quantity : 1.0;
 
             $issuedToOrder = (float) ProductionOrderReservation::withoutGlobalScopes()
@@ -565,24 +637,67 @@ class ProductionReadinessService
 
             $predOpFresh = ProductionOrderOperation::find($predOp->id) ?? $predOp;
             $produced = (float) $predOpFresh->quantity_produced;
+            $claimed = (float) ($predOpFresh->quantity_claimed ?? 0.0);
             $qcHold = (float) ($predOpFresh->active_qc_hold ?? 0.0);
             $rework = (float) ($predOpFresh->active_rework ?? 0.0);
             $consumed = (float) ($predOpFresh->quantity_consumed ?? 0.0);
 
+            $isQueueThreshold = (bool) (
+                $predOpFresh->queue_threshold_enabled
+                || $predOpFresh->overlap_enabled
+                || ((float) ($predOpFresh->transfer_batch_quantity ?? 0) > 0)
+                || (bool) ($predOpFresh->routingOperation?->queue_threshold_enabled ?? false)
+                || (bool) ($predOpFresh->routingOperation?->overlap_enabled ?? false)
+            );
+
+            $transferBatchQty = (float) (
+                $predOpFresh->transfer_batch_quantity > 0
+                    ? $predOpFresh->transfer_batch_quantity
+                    : ($predOpFresh->routingOperation?->transfer_batch_quantity ?? 0.0)
+            );
+
             $usableIntermediateSfg = max(0.0, $produced - ($qcHold + $rework) - $consumed);
             $totalUsableSfg = $issuedToOrder + $whStock + $usableIntermediateSfg;
+            $sfgClaimedOrProduced = max($claimed, $produced);
+            $transferredIn = (float) ($op->quantity_transferred_in ?? 0.0);
 
-            $maxExecutable = $totalUsableSfg / $bomRatio;
-            $crossReadyLimits[] = $maxExecutable;
+            if ($isQueueThreshold && $transferBatchQty > 0) {
+                // If queue threshold is enabled on SFG final op, allow parent operation to enter ready / in_progress
+                // as soon as the SFG operation claims/produces at least transfer_batch_quantity (or WIP transferred in)
+                $hasReachedThreshold = ($sfgClaimedOrProduced >= $transferBatchQty)
+                    || ($totalUsableSfg >= $transferBatchQty)
+                    || ($transferredIn > 0)
+                    || ($predOpFresh->status === ProductionOrderOperation::STATUS_COMPLETED);
 
-            if ($totalUsableSfg <= 0.0 && $predOpFresh->status !== ProductionOrderOperation::STATUS_COMPLETED) {
-                $blockers[] = [
-                    'code' => self::REASON_WIP_NOT_AVAILABLE,
-                    'dimension' => 'dependency',
-                    'message' => "Cross-assembly predecessor operation {$predOpFresh->operation_number} has insufficient usable SFG.",
-                    'severity' => 'error',
-                    'is_workflow_dependency' => true,
-                ];
+                if ($hasReachedThreshold) {
+                    $effectiveAvailable = max($totalUsableSfg, $transferredIn, $transferBatchQty);
+                    $maxExecutable = $effectiveAvailable / $bomRatio;
+                    $crossReadyLimits[] = $maxExecutable;
+                } else {
+                    $crossReadyLimits[] = 0.0;
+                    $blockers[] = [
+                        'code' => self::REASON_WIP_NOT_AVAILABLE,
+                        'dimension' => 'dependency',
+                        'message' => "Cross-assembly predecessor operation {$predOpFresh->operation_number} has not yet claimed/produced the required transfer batch threshold ({$transferBatchQty} units).",
+                        'severity' => 'error',
+                        'is_workflow_dependency' => true,
+                    ];
+                }
+            } else {
+                // Standard Finish-to-Start: requires full SFG completion or issued/warehouse stock
+                if ($totalUsableSfg <= 0.0 && $predOpFresh->status !== ProductionOrderOperation::STATUS_COMPLETED) {
+                    $crossReadyLimits[] = 0.0;
+                    $blockers[] = [
+                        'code' => self::REASON_WIP_NOT_AVAILABLE,
+                        'dimension' => 'dependency',
+                        'message' => "Cross-assembly predecessor operation {$predOpFresh->operation_number} has insufficient usable SFG.",
+                        'severity' => 'error',
+                        'is_workflow_dependency' => true,
+                    ];
+                } else {
+                    $maxExecutable = $totalUsableSfg / $bomRatio;
+                    $crossReadyLimits[] = $maxExecutable;
+                }
             }
         }
 
@@ -627,14 +742,14 @@ class ProductionReadinessService
         if (!$machine && $op->work_center_id) {
             $totalMachines = Machine::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
-                ->where('work_center_id', $op->work_center_id)
+                ->whereHas('section', fn ($q) => $q->where('work_center_id', $op->work_center_id))
                 ->count();
 
             if ($totalMachines > 0) {
                 // Check if active machines exist at Work Center
                 $activeMachines = Machine::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
-                    ->where('work_center_id', $op->work_center_id)
+                    ->whereHas('section', fn ($q) => $q->where('work_center_id', $op->work_center_id))
                     ->where('status', 'active')
                     ->get();
 
@@ -714,7 +829,7 @@ class ProductionReadinessService
             if (!$alternateAvailable && $op->work_center_id) {
                 $otherWorkCenterMachines = Machine::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
-                    ->where('work_center_id', $op->work_center_id)
+                    ->whereHas('section', fn ($q) => $q->where('work_center_id', $op->work_center_id))
                     ->where('id', '!=', $machine->id)
                     ->where('status', 'active')
                     ->exists();

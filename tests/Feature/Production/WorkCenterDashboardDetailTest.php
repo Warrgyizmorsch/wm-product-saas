@@ -6,6 +6,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Models\ProductionShift;
+use App\Domains\Production\Models\WorkCenterSection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -80,10 +81,17 @@ class WorkCenterDashboardDetailTest extends TestCase
             'active' => true,
         ]);
 
-        // Attach shifts to work center
-        $this->workCenter->shifts()->attach([
-            $shift1->id => ['tenant_id' => $this->tenant->id],
-            $shift2->id => ['tenant_id' => $this->tenant->id],
+        // Attach shifts to section
+        $section = WorkCenterSection::create([
+            'tenant_id' => $this->tenant->id,
+            'work_center_id' => $this->workCenter->id,
+            'name' => 'Main Section',
+            'code' => 'SEC-MAIN',
+            'status' => 'active',
+        ]);
+        $section->shifts()->attach([
+            $shift1->id => ['tenant_id' => $this->tenant->id, 'target_headcount' => 1, 'active' => true],
+            $shift2->id => ['tenant_id' => $this->tenant->id, 'target_headcount' => 1, 'active' => true],
         ]);
 
         $response = $this->actingAs($this->admin)

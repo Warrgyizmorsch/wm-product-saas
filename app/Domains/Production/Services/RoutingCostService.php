@@ -10,7 +10,7 @@ use InvalidArgumentException;
 /**
  * RoutingCostService — Cost Calculation Skeleton
  *
- * Current: calculates per-operation cost breakdown from rate fields.
+ * RT-IMPL-14: sums the figures saved on each operation (no recalculation).
  * Future: combine with BomExplosionService for total manufacturing cost.
  *
  * Formula per operation:
@@ -37,59 +37,103 @@ class RoutingCostService
             throw new InvalidArgumentException('Routing not found.');
         }
 
-        $operationCosts = [];
-        $totalCost      = 0.0;
+        $operationCosts    = [];
+        $totalCost         = 0.0;
+        $totalLaborCost    = 0.0;
+        $totalMachineCost  = 0.0;
+        $totalSubcontractCost = 0.0;
+        $totalOverheadCost = 0.0;
+        $totalSetupCostPerRun = 0.0;
 
         foreach ($routing->operations as $operation) {
             $cost = $this->calculateOperationCost($operation, $quantity);
             $operationCosts[] = $cost;
-            $totalCost += $cost['total_cost'];
+            if (!$operation->is_alternative) {
+                $totalCost += $cost['total_cost'];
+                $totalLaborCost += $cost['labor_cost'] ?? 0.0;
+                $totalMachineCost += $cost['machine_cost'] ?? 0.0;
+                $totalSubcontractCost += $cost['subcontract_cost'] ?? 0.0;
+                $totalOverheadCost += $cost['overhead_cost'] ?? 0.0;
+                $totalSetupCostPerRun += $cost['setup_cost_per_run'] ?? 0.0;
+            }
         }
 
         return [
-            'routing_id'      => $routing->id,
-            'routing_number'  => $routing->routing_number,
-            'routing_name'    => $routing->name,
-            'quantity'        => $quantity,
-            'operations'      => $operationCosts,
-            'total_cost'      => $totalCost,
-            'cost_per_unit'   => $quantity > 0 ? $totalCost / $quantity : 0.0,
-            'total_time_min'  => $routing->totalCycleTimeMinutes(),
+            'routing_id'        => $routing->id,
+            'routing_number'    => $routing->routing_number,
+            'routing_name'      => $routing->name,
+            'quantity'          => $quantity,
+            'operations'        => $operationCosts,
+            'total_cost'        => round($totalCost, 4),
+            'labor_cost'        => round($totalLaborCost, 4),
+            'machine_cost'      => round($totalMachineCost, 4),
+            'subcontract_cost'  => round($totalSubcontractCost, 4),
+            'overhead_cost'     => round($totalOverheadCost, 4),
+            'setup_cost_per_run' => round($totalSetupCostPerRun, 4), // RT-IMPL-13: once per production run, shown separately
+            'cost_per_unit'     => $quantity > 0 ? round($totalCost / $quantity, 4) : 0.0,
+            'total_time_min'    => $routing->totalCycleTimeMinutes(),
+            'costs_not_calculated' => collect($operationCosts)->contains(fn($c) => !empty($c['costs_not_calculated'])),
         ];
     }
 
     /**
-     * Calculate cost for a single operation.
-     * A2: Applies yield adjustment — actual input cost is higher due to losses.
+     * Cost of a single operation — RT-IMPL-14 (RT-19 rule 5): reads the SAVED figures only
+     * (calculated once in the form / API, checked by the backend). No snapshot / live / Work Center lookups.
+     * An old operation without saved figures returns 0 with `costs_not_calculated = true`
+     * ("Costs not calculated — open and save the routing").
      */
     public function calculateOperationCost(RoutingOperation $operation, float $quantity = 1.0): array
     {
-        $activeMinutes  = $operation->setup_time_minutes + $operation->processing_time_minutes;
-        $yieldFactor    = ($operation->expected_yield_percentage > 0)
-                          ? (100 / $operation->expected_yield_percentage)
-                          : 1.0;
+        $yieldFactor = ($operation->expected_yield_percentage > 0) ? (100 / $operation->expected_yield_percentage) : 1.0;
+        $notCalculated = $operation->cost_per_unit === null;
+        $costPerUnit = (float) ($operation->cost_per_unit ?? 0);
 
-        $routingLaborRate = (float) $operation->labor_cost_rate;
-        $wcLaborRate = $operation->workCenter ? ((float) $operation->workCenter->cost_per_hour / 60.0) : 0.0;
-        $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
-
-        $laborCost      = $activeMinutes * $laborRate * $quantity * $yieldFactor;
-        $machineCost    = $activeMinutes * $operation->machine_cost_rate * $quantity * $yieldFactor;
-        $totalCost      = $laborCost + $machineCost;
+        if ($operation->is_external) {
+            $laborPerUnit = 0.0;
+            $machinePerUnit = 0.0;
+            $subcontractPerUnit = $costPerUnit;
+            $resource = 'Vendor #' . ($operation->vendor_id ?? 'N/A');
+        } else {
+            $laborPerUnit = (float) ($operation->labor_cost_per_unit ?? 0);
+            $machinePerUnit = (float) ($operation->machine_cost_per_unit ?? 0);
+            // operations saved before the split columns existed: whole cost counted as labor
+            if ($operation->labor_cost_per_unit === null && $operation->machine_cost_per_unit === null) {
+                $laborPerUnit = $costPerUnit;
+            }
+            $subcontractPerUnit = 0.0;
+            $resource = $operation->machine?->name
+                ?? $operation->manualProduction?->batch_name
+                ?? '';
+        }
 
         return [
             'operation_id'              => $operation->id,
             'sequence'                  => $operation->sequence,
+            'operation_number'          => $operation->operation_number,
             'operation_name'            => $operation->name,
             'operation_type'            => $operation->operation_type,
-            'work_center'               => $operation->workCenter?->name,
+            'work_center'               => $operation->is_external ? null : $operation->workCenter?->name,
+            'section'                   => $operation->is_external ? null : $operation->section?->name,
+            'resource'                  => $resource,
+            'is_external'               => (bool) $operation->is_external,
+            'is_alternative'            => (bool) $operation->is_alternative,
+            'replaces_operation_id'     => $operation->replaces_operation_id,
+            'priority'                  => $operation->priority,
             'setup_minutes'             => $operation->setup_time_minutes,
+            'setup_per_piece_minutes'   => (float) ($operation->setup_time_per_piece_minutes ?? 0),
             'processing_minutes'        => $operation->processing_time_minutes,
             'expected_yield_percentage' => $operation->expected_yield_percentage,
             'yield_factor'              => $yieldFactor,
-            'labor_cost'                => round($laborCost, 4),
-            'machine_cost'              => round($machineCost, 4),
-            'total_cost'                => round($totalCost, 4),
+            'labor_rate_per_minute'     => (float) $operation->labor_cost_rate,
+            'machine_rate_per_minute'   => (float) $operation->machine_cost_rate,
+            'labor_cost'                => round($laborPerUnit * $quantity, 4),
+            'machine_cost'              => round($machinePerUnit * $quantity, 4),
+            'subcontract_cost'          => round($subcontractPerUnit * $quantity, 4),
+            'setup_cost_per_run'        => $operation->is_external ? 0.0 : $operation->setupCostPerRun(),
+            'cost_per_unit'             => round($costPerUnit, 4),
+            'total_cost'                => round($costPerUnit * $quantity, 4),
+            'section_snapshot_number'   => $operation->section_snapshot_number,
+            'costs_not_calculated'      => $notCalculated,
         ];
     }
 

@@ -27,6 +27,7 @@ use Tests\TestCase;
 class MultiModelPhase2Test extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\FillsRoutingFigures; // RT-IMPL-14: fill figures like the form does
 
     protected User $user;
     protected int $tenantId = 1;
@@ -92,6 +93,7 @@ class MultiModelPhase2Test extends TestCase
             'name' => 'Finished Widget',
             'sku' => 'FG-' . rand(1000, 9999),
             'type' => 'finished_good',
+            'supplier_method' => 'manufacture', // PO-02
             'status' => 'active',
             'default_production_model' => 'pure_manufacturing',
         ], $attributes));
@@ -186,7 +188,7 @@ class MultiModelPhase2Test extends TestCase
             ],
         ];
 
-        $response = $this->withHeader('X-Tenant', 'test-tenant')->post(route('production.routing.store'), $payload);
+        $response = $this->withHeader('X-Tenant', 'test-tenant')->post(route('production.routing.store'), $this->withRoutingFigures($payload));
         $response->assertSessionHasErrors(['operations.0.vendor_id']);
     }
 
@@ -217,7 +219,7 @@ class MultiModelPhase2Test extends TestCase
             ],
         ];
 
-        $response = $this->withHeader('X-Tenant', 'test-tenant')->post(route('production.routing.store'), $payload);
+        $response = $this->withHeader('X-Tenant', 'test-tenant')->post(route('production.routing.store'), $this->withRoutingFigures($payload));
         $response->assertSessionHasErrors(['operations.0.work_center_id']);
     }
 
@@ -251,7 +253,7 @@ class MultiModelPhase2Test extends TestCase
             ],
         ];
 
-        $response = $this->withHeader('X-Tenant', 'test-tenant')->post(route('production.routing.store'), $payload);
+        $response = $this->withHeader('X-Tenant', 'test-tenant')->post(route('production.routing.store'), $this->withRoutingFigures($payload));
         $response->assertSessionHasErrors([
             'operations.0.subcontract_lead_time_days',
             'operations.0.dispatch_buffer_days',
@@ -296,7 +298,7 @@ class MultiModelPhase2Test extends TestCase
             ],
         ];
 
-        $response = $this->withHeader('X-Tenant', 'test-tenant')->post(route('production.routing.store'), $payload);
+        $response = $this->withHeader('X-Tenant', 'test-tenant')->post(route('production.routing.store'), $this->withRoutingFigures($payload));
         $response->assertRedirect();
 
         $routing = Routing::where('name', 'Subcontract Surface Treatment')->firstOrFail();

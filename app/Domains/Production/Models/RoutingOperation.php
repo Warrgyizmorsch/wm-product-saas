@@ -39,8 +39,24 @@ class RoutingOperation extends BaseModel
         'description',
         'operation_type',
         'work_center_id',
+        'section_id',
         'machine_id',
-        'setup_time_minutes',
+        'section_manual_production_id',
+        'is_alternative',
+        'replaces_operation_id',
+        'priority',
+        'cost_per_unit',
+        // RT-IMPL-14: saved figures + source snapshot
+        'labor_cost_per_unit',
+        'machine_cost_per_unit',
+        'setup_cost_per_run',
+        'costs_calculated_at',
+        'section_calculation_id',
+        'section_snapshot_number',
+        'work_center_calculation_id',
+        'resource_snapshot',
+        'setup_time_minutes',          // RT-IMPL-13: setup per operation (once per run)
+        'setup_time_per_piece_minutes', // RT-IMPL-13: setup per piece
         'processing_time_minutes',
         'wait_time_minutes',
         'expected_yield_percentage', // A2: production loss tracking
@@ -68,7 +84,22 @@ class RoutingOperation extends BaseModel
 
     protected $casts = [
         'sequence'                  => 'integer',
+        'section_id'                => 'integer',
+        'section_manual_production_id' => 'integer',
+        'is_alternative'            => 'boolean',
+        'replaces_operation_id'     => 'integer',
+        'priority'                  => 'integer',
+        'cost_per_unit'             => 'float',
+        'labor_cost_per_unit'       => 'float',
+        'machine_cost_per_unit'     => 'float',
+        'setup_cost_per_run'        => 'float',
+        'costs_calculated_at'       => 'datetime',
+        'section_calculation_id'    => 'integer',
+        'section_snapshot_number'   => 'integer',
+        'work_center_calculation_id'=> 'integer',
+        'resource_snapshot'         => 'array',
         'setup_time_minutes'        => 'float',
+        'setup_time_per_piece_minutes' => 'float',
         'processing_time_minutes'   => 'float',
         'wait_time_minutes'         => 'float',
         'expected_yield_percentage' => 'float',
@@ -117,9 +148,29 @@ class RoutingOperation extends BaseModel
         return $this->belongsTo(WorkCenter::class, 'work_center_id');
     }
 
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(WorkCenterSection::class, 'section_id');
+    }
+
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
+    }
+
+    public function manualProduction(): BelongsTo
+    {
+        return $this->belongsTo(SectionManualProduction::class, 'section_manual_production_id');
+    }
+
+    public function primaryOperation(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replaces_operation_id');
+    }
+
+    public function alternativeOperations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(self::class, 'replaces_operation_id')->orderBy('priority');
     }
 
     public function vendor(): BelongsTo
@@ -135,6 +186,11 @@ class RoutingOperation extends BaseModel
     public function materials(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(RoutingOperationMaterial::class, 'routing_operation_id')->orderBy('sequence');
+    }
+
+    public function bomItems(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductionBomItem::class, 'routing_operation_id');
     }
 
     public function alternateMachines(): \Illuminate\Database\Eloquent\Relations\HasMany
@@ -167,11 +223,35 @@ class RoutingOperation extends BaseModel
     // ─── Computed Helpers ─────────────────────────────────────────────────────
 
     /**
-     * Total operation cycle time in minutes.
+     * Cycle time per piece in minutes (RT-IMPL-13): setup per piece + run time.
+     * Setup per operation (once per run) and wait time are separate.
+     */
+    public function cycleTimePerPieceMinutes(): float
+    {
+        return (float) ($this->setup_time_per_piece_minutes ?? 0) + (float) $this->processing_time_minutes;
+    }
+
+    /**
+     * Setup cost per run (RT-IMPL-13): setup per operation × (labor + machine rate per minute) — no yield.
+     */
+    public function setupCostPerRun(): float
+    {
+        if ($this->is_external) {
+            return 0.0;
+        }
+        if ($this->setup_cost_per_run !== null) {
+            return round((float) $this->setup_cost_per_run, 4); // RT-IMPL-14: saved value
+        }
+        return round((float) $this->setup_time_minutes * ((float) $this->labor_cost_rate + (float) $this->machine_cost_rate), 4);
+    }
+
+    /**
+     * Total operation time in minutes for one piece incl. setup per run and wait (scheduling view).
      */
     public function totalCycleTimeMinutes(): float
     {
         return $this->setup_time_minutes
+            + (float) ($this->setup_time_per_piece_minutes ?? 0)
             + $this->processing_time_minutes
             + $this->wait_time_minutes;
     }
@@ -187,17 +267,17 @@ class RoutingOperation extends BaseModel
     }
 
     /**
-     * Estimated operation cost per unit.
-     * Future RoutingCostService will use this for detailed costing.
+     * Operation cost per unit — RT-IMPL-14: the SAVED value (calculated once in the form / API and checked by the
+     * backend). No live lookup; an operation saved before costs were stored returns 0 (see costsNotCalculated()).
      */
     public function estimatedCostPerUnit(): float
     {
-        $totalMinutes = $this->setup_time_minutes + $this->processing_time_minutes;
-        $laborRate = (float) $this->labor_cost_rate > 0.0
-            ? (float) $this->labor_cost_rate
-            : ($this->workCenter ? ((float) $this->workCenter->cost_per_hour / 60.0) : 0.0);
+        return round((float) ($this->cost_per_unit ?? 0), 4);
+    }
 
-        return ($totalMinutes * $laborRate)
-             + ($totalMinutes * $this->machine_cost_rate);
+    /** True for operations saved before figures were stored ("Costs not calculated — open and save the routing"). */
+    public function costsNotCalculated(): bool
+    {
+        return $this->cost_per_unit === null;
     }
 }

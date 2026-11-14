@@ -27,11 +27,6 @@ class RoutingListResource extends JsonResource
             'status'         => $this->status,
             'effective_from' => $this->effective_from?->format('Y-m-d'),
             'effective_to'   => $this->effective_to?->format('Y-m-d'),
-            'product'        => $this->whenLoaded('product', fn () => [
-                'id'   => $this->product->id,
-                'name' => $this->product->name,
-                'sku'  => $this->product->sku ?? null,
-            ]),
             'created_at'     => $this->created_at?->toIso8601String(),
         ];
     }

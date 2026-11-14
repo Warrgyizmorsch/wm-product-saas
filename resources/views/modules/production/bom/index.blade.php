@@ -212,6 +212,7 @@
                                     <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>{{ __('production.draft') }}</option>
                                     <option value="pending_approval" {{ request('status') === 'pending_approval' ? 'selected' : '' }}>{{ __('production.pending_approval') }}</option>
                                     <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>{{ __('production.approved_active') }}</option>
+                                    <option value="scheduled" {{ request('status') === 'scheduled' ? 'selected' : '' }}>{{ __('production.scheduled') }}</option>
                                     <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>{{ __('production.inactive') }}</option>
                                     <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>{{ __('production.cancelled') }}</option>
                                 </x-ui.odoo-form-ui>
@@ -286,14 +287,54 @@
                                 <span class="fw-semibold text-dark">{{ $bom->bom_name ?: 'N/A' }}</span>
                             </td>
                             <td>
-                                @if($bom->status === 'approved')
-                                    <span class="erp-badge-active">{{ __('production.active') }}</span>
-                                @elseif($bom->status === 'draft')
+                                @php
+                                    $todayStr = now()->toDateString();
+                                    $effDateStr = $bom->effective_date ? $bom->effective_date->toDateString() : null;
+                                    $expDateStr = $bom->expiry_date ? $bom->expiry_date->toDateString() : null;
+                                @endphp
+                                @if($bom->status === 'draft')
                                     <span class="erp-badge-draft">{{ __('production.draft') }}</span>
                                 @elseif($bom->status === 'pending_approval')
                                     <span class="erp-badge-pending">{{ __('production.pending') }}</span>
+                                @elseif($bom->status === 'cancelled')
+                                    <span class="erp-badge-cancelled">{{ __('production.cancelled') }}</span>
+                                @elseif($bom->status === 'scheduled' || (in_array($bom->status, ['approved', 'active']) && $effDateStr && $effDateStr > $todayStr))
+                                    <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1 font-monospace fw-bold">{{ __('production.scheduled') }}</span>
+                                @elseif($bom->status === 'inactive' || ($expDateStr && $expDateStr <= $todayStr && !$bom->isCurrentlyActive()))
+                                    <span class="erp-badge-inactive">{{ __('production.inactive') }}</span>
+                                @elseif(in_array($bom->status, ['approved', 'active']))
+                                    <span class="erp-badge-active">{{ __('production.active') }}</span>
                                 @else
                                     <span class="erp-badge-draft text-uppercase">{{ __('production.' . $bom->status) }}</span>
+                                @endif
+
+                                @foreach($bom->routing_advisory as $advisory)
+                                    @php
+                                        $advClass = match ($advisory['code'] ?? '') {
+                                            'operation_removed' => 'bg-soft-danger text-danger border-danger-subtle',
+                                            'not_active'        => 'bg-soft-warning text-warning border-warning-subtle',
+                                            default             => 'bg-soft-info text-info border-info-subtle',
+                                        };
+                                        $advLabel = match ($advisory['code'] ?? '') {
+                                            'operation_removed' => __('production.routing_op_removed'),
+                                            'not_active'        => __('production.routing_not_active'),
+                                            'routing_outdated'  => __('production.routing_outdated'),
+                                            default             => __('production.routing_advisory'),
+                                        };
+                                    @endphp
+                                    <div class="mt-1">
+                                        <span class="badge {{ $advClass }} border fs-10 px-1.5 py-0.5 rounded-pill d-inline-flex align-items-center gap-1" title="{{ $advisory['message'] ?? '' }}">
+                                            <i class="feather-git-branch fs-10"></i> {{ $advLabel }}
+                                        </span>
+                                    </div>
+                                @endforeach
+                                @if(!in_array($bom->status, ['cancelled', 'inactive']) && ($bom->has_warning || $bom->hasComponentWarning()))
+                                    <div class="mt-1">
+                                        <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1.5 py-0.5 rounded-pill d-inline-flex align-items-center gap-1"
+                                              title="{{ $bom->warning_reason ?: $bom->getComponentWarningSummary() }}">
+                                            <i class="feather-alert-triangle fs-10"></i> Warning
+                                        </span>
+                                    </div>
                                 @endif
                             </td>
                             <td>
@@ -323,18 +364,12 @@
                                             </a>
                                         </li>
                                         <li>
-                                            @if($bom->routing_id)
-                                                <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}">
-                                                    @csrf
-                                                    <button type="submit" class="dropdown-item">
-                                                        <i class="feather-send me-2 text-muted fs-12"></i>{{ __('production.submit_approval') }}
-                                                    </button>
-                                                </form>
-                                            @else
-                                                <button type="button" class="dropdown-item text-muted" disabled title="Routing reference is required before submitting for approval" data-bs-toggle="tooltip" style="cursor: not-allowed;">
-                                                    <i class="feather-send me-2 text-muted fs-12"></i>{{ __('production.submit_approval_routing_required') }}
+                                            <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="feather-send me-2 text-muted fs-12"></i>{{ __('production.submit_approval') }}
                                                 </button>
-                                            @endif
+                                            </form>
                                         </li>
                                     @endif
 

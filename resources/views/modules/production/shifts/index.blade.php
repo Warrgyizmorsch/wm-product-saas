@@ -41,12 +41,12 @@
             <thead>
                 <tr>
                     <th style="width: 15%">Shift Code</th>
-                    <th style="width: 25%">Shift Name</th>
+                    <th style="width: 30%">Shift Name</th>
                     <th style="width: 15%">Start Time</th>
                     <th style="width: 15%">End Time</th>
-                    <th style="width: 15%">Break (Minutes)</th>
+                    <th style="width: 12%">Break</th>
                     <th style="width: 10%">{{ __('production.status') }}</th>
-                    <th class="text-end" style="width: 5%">{{ __('production.actions') }}</th>
+                    <th class="text-end" style="width: 3%">{{ __('production.actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -90,7 +90,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">
+                        <td colspan="8" class="text-center py-4 text-muted">
                             <i class="feather-info me-2 fs-16"></i>No production shifts configured.
                         </td>
                     </tr>

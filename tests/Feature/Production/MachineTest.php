@@ -59,6 +59,15 @@ class MachineTest extends TestCase
             'code' => 'WC-ASSY',
             'status' => 'active',
         ]);
+
+        $this->sectionA = \App\Domains\Production\Models\WorkCenterSection::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Assembly Section 1',
+            'code' => 'SEC-ASSY-1',
+            'workers_required' => 2,
+            'status' => 'active',
+        ]);
     }
 
     public function test_tenant_isolation_on_machines(): void
@@ -97,19 +106,19 @@ class MachineTest extends TestCase
         $response->assertDontSee('Machine Tenant B');
     }
 
-    public function test_machine_belongs_to_work_center_validation(): void
+    public function test_machine_belongs_to_section_validation(): void
     {
-        // Try to link machine to a non-existent work center
+        // Try to link machine to a non-existent section
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.machines.store'), [
-                'work_center_id' => 9999, // Invalid
+                'section_id' => 9999, // Invalid
                 'name' => 'Test Machine',
                 'code' => 'MCH-ERR',
                 'status' => 'active',
             ]);
 
-        $response->assertSessionHasErrors(['work_center_id']);
+        $response->assertSessionHasErrors(['section_id']);
     }
 
     public function test_successful_machine_creation(): void
@@ -117,7 +126,7 @@ class MachineTest extends TestCase
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.machines.store'), [
-                'work_center_id' => $this->workCenterA->id,
+                'section_id' => $this->sectionA->id,
                 'name' => 'Press Machine 1',
                 'code' => 'MCH-PRESS-1',
                 'machine_type' => 'Press',
@@ -127,6 +136,7 @@ class MachineTest extends TestCase
         $response->assertRedirect();
         $this->assertDatabaseHas('production_machines', [
             'tenant_id' => $this->tenantA->id,
+            'section_id' => $this->sectionA->id,
             'work_center_id' => $this->workCenterA->id,
             'code' => 'MCH-PRESS-1',
         ]);

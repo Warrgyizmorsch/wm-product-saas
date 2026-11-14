@@ -50,6 +50,7 @@ Route::middleware([
     Route::prefix('orders')->group(function () {
         Route::get('/export', [ProductionOrderApiController::class, 'export'])->name('api.v1.production.orders.export');
         Route::get('/', [ProductionOrderApiController::class, 'index'])->name('api.v1.production.orders.index');
+        Route::get('/engineering-status', [ProductionOrderApiController::class, 'engineeringStatus'])->name('api.v1.production.orders.engineering_status'); // PO-IMPL-05
         Route::post('/', [ProductionOrderApiController::class, 'store'])
             ->middleware('throttle:production-api-write')
             ->name('api.v1.production.orders.store');
@@ -141,6 +142,10 @@ Route::middleware([
         Route::post('/{bom}/clone', [ProductionBomApiController::class, 'clone'])
             ->middleware('throttle:production-api-write')
             ->name('api.v1.production.boms.clone');
+        // BM-IMPL-19 #5: duplicate (clone is the documented alias) — returns copy data, saves nothing
+        Route::post('/{bom}/duplicate', [ProductionBomApiController::class, 'duplicate'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.boms.duplicate');
     });
 
     // --- Routings ---
@@ -173,6 +178,9 @@ Route::middleware([
         Route::post('/{routing}/cancel', [RoutingApiController::class, 'cancel'])
             ->middleware('throttle:production-api-write')
             ->name('api.v1.production.routings.cancel');
+        Route::post('/{routing}/retire', [RoutingApiController::class, 'retire'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.routings.retire'); // RT-IMPL-02
         Route::post('/{routing}/duplicate', [RoutingApiController::class, 'duplicate'])
             ->middleware('throttle:production-api-write')
             ->name('api.v1.production.routings.duplicate');

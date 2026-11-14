@@ -21,6 +21,9 @@ use Illuminate\Support\Facades\Gate;
  */
 class RoutingApiController extends ApiBaseController
 {
+    /** RT-IMPL-17: what the detail resource reads (no product relation — routings have none). */
+    private const DETAIL_RELATIONS = ['operations.workCenter', 'operations.section', 'operations.machine', 'operations.manualProduction', 'operations.vendor', 'boms'];
+
     public function __construct(
         private readonly RoutingRepositoryInterface $routingRepository,
         private readonly RoutingService $routingService,
@@ -37,15 +40,11 @@ class RoutingApiController extends ApiBaseController
 
         $tenantId = $this->getTenantId();
 
-        $query = Routing::where('tenant_id', $tenantId)
-            ->with(['product:id,name,sku']);
+        // RT-IMPL-01: routings have no product (column dropped) — no product eager load / filter
+        $query = Routing::where('tenant_id', $tenantId);
 
         if ($request->filled('status')) {
             $query->where('status', $request->query('status'));
-        }
-
-        if ($request->filled('product_id')) {
-            $query->where('product_id', (int) $request->query('product_id'));
         }
 
         if ($request->filled('search')) {
@@ -76,7 +75,7 @@ class RoutingApiController extends ApiBaseController
         $tenantId = $this->getTenantId();
 
         $routing = Routing::where('tenant_id', $tenantId)
-            ->with(['product.uom', 'operations.workCenter', 'operations.machine'])
+            ->with(self::DETAIL_RELATIONS)
             ->findOrFail($id);
 
         Gate::authorize('view', $routing);
@@ -96,11 +95,16 @@ class RoutingApiController extends ApiBaseController
         Gate::authorize('create', Routing::class);
 
         try {
-            $dto = RoutingDTO::fromArray($request->validated());
-            $routing = $this->routingService->create($dto, auth()->id() ?: 1);
+            $data = $request->validated();
+            $dto = RoutingDTO::fromArray($data);
+            // was create($dto, userId) — the user id landed in the tenant id argument
+            $routing = $this->routingService->create($dto, $this->getTenantId(), auth()->id() ?: 1);
+            if (!empty($data['source_routing_id'])) { // RT-IMPL-20: saved from a duplicate copy
+                $routing = $this->routingService->recordRevisionSource($routing, (int) $data['source_routing_id'], auth()->id() ?: 1);
+            }
 
             return $this->createdResponse(
-                new RoutingDetailResource($routing->load(['product', 'operations.workCenter'])),
+                new RoutingDetailResource($routing->load(self::DETAIL_RELATIONS)),
                 'Routing created successfully in draft.'
             );
         } catch (\Throwable $e) {
@@ -128,7 +132,7 @@ class RoutingApiController extends ApiBaseController
             $routing = $this->routingService->update($id, $dto);
 
             return $this->successResponse(
-                new RoutingDetailResource($routing->fresh(['product', 'operations.workCenter'])),
+                new RoutingDetailResource($routing->fresh(self::DETAIL_RELATIONS)),
                 'Routing updated successfully.'
             );
         } catch (\Throwable $e) {
@@ -151,7 +155,7 @@ class RoutingApiController extends ApiBaseController
             $this->routingService->submitApproval($id, auth()->id() ?: 1);
 
             return $this->successResponse(
-                new RoutingDetailResource($routing->fresh(['product'])),
+                new RoutingDetailResource($routing->fresh()),
                 'Routing submitted for approval.'
             );
         } catch (\Throwable $e) {
@@ -174,7 +178,7 @@ class RoutingApiController extends ApiBaseController
             $this->routingService->approve($id, auth()->id() ?: 1);
 
             return $this->successResponse(
-                new RoutingDetailResource($routing->fresh(['product'])),
+                new RoutingDetailResource($routing->fresh()),
                 'Routing approved and set as active.'
             );
         } catch (\Throwable $e) {
@@ -198,18 +202,45 @@ class RoutingApiController extends ApiBaseController
             $currentVer = $routing->version ?: '1.0';
             $nextRev = (int) $routing->revision + 1;
             $newVersion = $currentVer . '.' . $nextRev;
-            while (Routing::where('tenant_id', $tenantId)->where('product_id', $routing->product_id)->where('version', $newVersion)->exists()) {
+            while (Routing::where('tenant_id', $tenantId)->where('name', $routing->name)->where('version', $newVersion)->exists()) { // RT-IMPL-01: name + version (RT-02)
                 $nextRev++;
                 $newVersion = $currentVer . '.' . $nextRev;
             }
         }
 
         try {
-            $newRouting = $this->routingService->duplicateVersion($id, $newVersion, auth()->id() ?: 1);
+            // RT-IMPL-20: nothing is saved — returns the copy data (figures from the latest section snapshots);
+            // the client sends it to the normal create endpoint (with source_routing_id) to save the new version.
+            $payload = $this->routingService->buildCopyPayload($id, $newVersion);
 
-            return $this->createdResponse(
-                new RoutingDetailResource($newRouting->load(['product', 'operations.workCenter'])),
-                "New routing revision created as draft."
+            return $this->successResponse(
+                $payload,
+                'Copy data for the new version — not saved. Send it to the create endpoint to save.'
+            );
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /**
+     * POST /api/v1/production/routings/{id}/retire
+     * RT-IMPL-02: active / scheduled → historical.
+     */
+    public function retire(Request $request, int $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $routing = Routing::where('tenant_id', $tenantId)->findOrFail($id);
+
+        Gate::authorize('retire', $routing);
+
+        $request->validate(['comments' => 'nullable|string|max:1000']);
+
+        try {
+            $this->routingService->retire($id, auth()->id() ?: 1, $request->input('comments'));
+
+            return $this->successResponse(
+                new RoutingDetailResource($routing->fresh()),
+                'Routing retired — now historical.'
             );
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
@@ -233,7 +264,7 @@ class RoutingApiController extends ApiBaseController
             $this->routingService->reject($id, auth()->id() ?: 1, $request->input('comments'));
 
             return $this->successResponse(
-                new RoutingDetailResource($routing->fresh(['product'])),
+                new RoutingDetailResource($routing->fresh()),
                 'Routing rejected and returned to draft.'
             );
         } catch (\Throwable $e) {
@@ -258,7 +289,7 @@ class RoutingApiController extends ApiBaseController
             $this->routingService->cancel($id, auth()->id() ?: 1, $request->input('comments'));
 
             return $this->successResponse(
-                new RoutingDetailResource($routing->fresh(['product'])),
+                new RoutingDetailResource($routing->fresh()),
                 'Routing cancelled.'
             );
         } catch (\Throwable $e) {

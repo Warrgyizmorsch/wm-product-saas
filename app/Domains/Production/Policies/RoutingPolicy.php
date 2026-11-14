@@ -31,7 +31,8 @@ class RoutingPolicy
     public function delete(User $user, Routing $routing): bool
     {
         return $routing->isDraft()
-            && $user->hasProductionPermission('production.routing.update', $routing->tenant_id);
+            && ($user->hasProductionPermission('production.routing.update', $routing->tenant_id)
+                || ($user->role === 'admin' && $user->tenant_id === $routing->tenant_id));
     }
 
     public function submit(User $user, Routing $routing): bool
@@ -57,6 +58,13 @@ class RoutingPolicy
         return !$routing->isCancelled()
             && !$routing->isHistorical()
             && $user->hasProductionPermission('production.routing.cancel', $routing->tenant_id);
+    }
+
+    /** RT-IMPL-02: retire (active / scheduled → historical) needs the approve permission. */
+    public function retire(User $user, Routing $routing): bool
+    {
+        return $routing->canBeRetired()
+            && $user->hasProductionPermission('production.routing.approve', $routing->tenant_id);
     }
 
     public function duplicate(User $user, Routing $routing): bool

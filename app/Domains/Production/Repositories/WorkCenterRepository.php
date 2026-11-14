@@ -9,7 +9,9 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
 {
     public function getAll(array $filters = []): Collection
     {
-        $query = WorkCenter::query()->withCount('machines');
+        $query = WorkCenter::query()
+            ->withCount('machines')
+            ->with('latestCalculation');
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -23,8 +25,7 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
             $search = $filters['search'];
             $query->where(function ($q) use ($search): void {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('department_name', 'like', "%{$search}%");
+                  ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
@@ -33,7 +34,9 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
 
     public function paginateAll(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $query = WorkCenter::query()->withCount('machines');
+        $query = WorkCenter::query()
+            ->withCount('machines')
+            ->with('latestCalculation');
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -47,8 +50,7 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
             $search = $filters['search'];
             $query->where(function ($q) use ($search): void {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('department_name', 'like', "%{$search}%");
+                  ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
@@ -57,7 +59,56 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
 
     public function find(int $id): ?WorkCenter
     {
-        return WorkCenter::with(['machines', 'shifts', 'calendar'])->find($id);
+        $workCenter = WorkCenter::with([
+            'machines.section',
+            'calendar',
+            'sections.machines',
+            'sections.externalWorkerAllocations.payGrade',
+            'sections.employeeAssignments.employee.designation',
+            'sections.employeeAssignments.employee.department',
+            'sections.employeeAssignments.employee.shift',
+            'employeeAssignments.employee.designation',
+            'employeeAssignments.employee.department',
+            'employeeAssignments.employee.shift',
+        ])->find($id);
+
+        if ($workCenter) {
+            $this->loadSectionShifts($workCenter);
+        }
+
+        return $workCenter;
+    }
+
+    /**
+     * Batch load assigned ProductionShift models for each section of the Work Center.
+     */
+    public function loadSectionShifts(WorkCenter $workCenter): void
+    {
+        $sections = $workCenter->sections;
+        if ($sections->isEmpty()) {
+            return;
+        }
+
+        $allShiftIds = [];
+        foreach ($sections as $section) {
+            $allShiftIds = array_merge($allShiftIds, $section->getAssignedShiftIds());
+        }
+        $allShiftIds = array_values(array_unique($allShiftIds));
+
+        $shifts = empty($allShiftIds)
+            ? new Collection()
+            : \App\Domains\Production\Models\ProductionShift::whereIn('id', $allShiftIds)->get()->keyBy('id');
+
+        foreach ($sections as $section) {
+            $sectionShiftIds = $section->getAssignedShiftIds();
+            $sectionShifts = new Collection();
+            foreach ($sectionShiftIds as $shiftId) {
+                if ($shifts->has($shiftId)) {
+                    $sectionShifts->push($shifts->get($shiftId));
+                }
+            }
+            $section->setRelation('shifts', $sectionShifts);
+        }
     }
 
     public function create(array $data): WorkCenter

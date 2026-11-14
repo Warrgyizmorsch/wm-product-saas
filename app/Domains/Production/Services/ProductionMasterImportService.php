@@ -4,6 +4,7 @@ namespace App\Domains\Production\Services;
 
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
+use App\Domains\Production\DTO\ProductionBomDTO;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionBomItem;
@@ -11,6 +12,8 @@ use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterSection;
+use App\Domains\Production\Models\SectionManualProduction;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -171,6 +174,10 @@ class ProductionMasterImportService
 
             $products = Product::where('tenant_id', $tenantId)->pluck('id', 'sku')->toArray();
             $uoms = Uom::where('tenant_id', $tenantId)->pluck('id', 'code')->toArray();
+            $routingsByNumber = Routing::where('tenant_id', $tenantId)
+                ->with('operations')
+                ->get()
+                ->keyBy('routing_number');
 
             $bomsInFile = [];
             foreach ($grouped as $bomNumber => $group) {
@@ -189,6 +196,7 @@ class ProductionMasterImportService
 
                 $bomName = trim($firstRow['bom_name'] ?? '');
                 $productSku = trim($firstRow['product_code'] ?? '');
+                $routingNumber = trim($firstRow['routing_number'] ?? '');
                 $baseQty = trim($firstRow['base_quantity'] ?? '1');
                 $baseUomCode = trim($firstRow['base_uom_code'] ?? '');
                 $version = trim($firstRow['version'] ?? '1.0.0');
@@ -199,6 +207,18 @@ class ProductionMasterImportService
 
                 if (empty($bomName)) {
                     $rowErrors[] = "BOM Name is required on the first row of BOM '{$bomNumber}'.";
+                }
+
+                $routing = null;
+                if (empty($routingNumber)) {
+                    $rowErrors[] = "Routing Number is required on the first row of BOM '{$bomNumber}'.";
+                } elseif (!$routingsByNumber->has($routingNumber)) {
+                    $rowErrors[] = "Routing Number '{$routingNumber}' does not exist.";
+                } else {
+                    $routing = $routingsByNumber->get($routingNumber);
+                    if (!in_array($routing->status, [Routing::STATUS_ACTIVE, Routing::STATUS_SCHEDULED, 'approved'], true)) {
+                        $rowErrors[] = "Routing '{$routingNumber}' has status '{$routing->status}'; only active or scheduled routings can be linked.";
+                    }
                 }
 
                 $productId = null;
@@ -223,8 +243,9 @@ class ProductionMasterImportService
                     $baseUomId = $uoms[$baseUomCode];
                 }
 
-                if (!in_array($bomType, ['manufacturing', 'phantom'])) {
-                    $rowErrors[] = "BOM Type must be 'manufacturing' or 'phantom'.";
+                $allowedBomTypes = ['manufacturing', 'engineering', 'sales', 'phantom', 'subcontracting'];
+                if (!in_array($bomType, $allowedBomTypes, true)) {
+                    $rowErrors[] = "BOM Type must be one of: " . implode(', ', $allowedBomTypes) . ".";
                 }
 
                 $effectiveDate = null;
@@ -252,17 +273,40 @@ class ProductionMasterImportService
                     $itemData = $itemRow['data'];
                     $itemRowNum = $itemRow['row_number'];
 
-                    $compSku = trim($itemData['component_code'] ?? '');
-                    $itemQty = trim($itemData['item_quantity'] ?? '');
-                    $itemUomCode = trim($itemData['item_uom_code'] ?? '');
-                    $scrap = trim($itemData['material_scrap_percentage'] ?? '0');
-                    $childBomNum = trim($itemData['child_bom_number'] ?? '');
+                    $opSeqRaw = trim((string)($itemData['operation_sequence'] ?? $itemData['operation_number'] ?? ''));
+                    $compSku = trim((string)($itemData['component_code'] ?? ''));
+                    $itemQty = trim((string)($itemData['item_quantity'] ?? ''));
+                    $itemUomCode = trim((string)($itemData['item_uom_code'] ?? ''));
+                    $scrap = trim((string)($itemData['material_scrap_percentage'] ?? '0'));
+                    $isAltRaw = strtolower(trim((string)($itemData['is_alternative'] ?? '0')));
+                    $isAlternative = in_array($isAltRaw, ['1', 'true', 'yes', 'y'], true);
+                    $alternativeOf = trim((string)($itemData['alternative_of'] ?? ''));
+                    $priorityRaw = trim((string)($itemData['priority'] ?? ''));
+                    $childBomNum = trim((string)($itemData['child_bom_number'] ?? ''));
+                    $notes = trim((string)($itemData['notes'] ?? '')) ?: null;
 
                     if (empty($compSku) && empty($itemQty)) {
                         continue;
                     }
 
                     $itemErrors = [];
+                    $routingOperationId = null;
+                    if ($routing) {
+                        if ($opSeqRaw === '') {
+                            $itemErrors[] = "Row {$itemRowNum}: Operation Sequence is required.";
+                        } else {
+                            $matchedOp = $routing->operations->first(function ($op) use ($opSeqRaw) {
+                                return (string)$op->sequence === $opSeqRaw
+                                    || (string)$op->operation_number === $opSeqRaw;
+                            });
+                            if (!$matchedOp) {
+                                $itemErrors[] = "Row {$itemRowNum}: Operation Sequence '{$opSeqRaw}' does not exist on Routing '{$routingNumber}'.";
+                            } else {
+                                $routingOperationId = $matchedOp->id;
+                            }
+                        }
+                    }
+
                     $compProductId = null;
                     if (empty($compSku)) {
                         $itemErrors[] = "Row {$itemRowNum}: Component product code is required.";
@@ -289,22 +333,65 @@ class ProductionMasterImportService
                         $itemErrors[] = "Row {$itemRowNum}: Scrap percentage must be a number between 0 and 100.";
                     }
 
+                    if ($priorityRaw !== '' && (!ctype_digit($priorityRaw) || (int)$priorityRaw < 1)) {
+                        $itemErrors[] = "Row {$itemRowNum}: Priority must be a positive integer.";
+                    }
+
+                    if ($isAlternative && $alternativeOf === '') {
+                        $itemErrors[] = "Row {$itemRowNum}: 'Alternative Of' primary Component Code is required for alternative items.";
+                    }
+
                     if (!empty($itemErrors)) {
                         $rowErrors = array_merge($rowErrors, $itemErrors);
                     } else {
                         $items[] = [
-                            'component_code' => $compSku,
-                            'material_id' => $compProductId,
-                            'quantity' => $itemQty,
-                            'item_uom_code' => $itemUomCode,
-                            'uom_id' => $itemUomId,
-                            'material_scrap_percentage' => $scrap ?: 0.0,
-                            'child_bom_number' => $childBomNum
+                            'row_number'                => $itemRowNum,
+                            'routing_operation_id'      => $routingOperationId,
+                            'operation_sequence'        => $opSeqRaw,
+                            'component_code'            => $compSku,
+                            'material_id'               => $compProductId,
+                            'quantity'                  => (float)$itemQty,
+                            'item_uom_code'             => $itemUomCode,
+                            'uom_id'                    => $itemUomId,
+                            'material_scrap_percentage' => $scrap !== '' ? (float)$scrap : 0.0,
+                            'is_alternative'            => $isAlternative,
+                            'alternative_of'            => $alternativeOf,
+                            'priority'                  => $priorityRaw !== '' ? (int)$priorityRaw : null,
+                            'child_bom_number'          => $childBomNum,
+                            'notes'                     => $notes,
                         ];
                     }
                 }
 
-                if (empty($items)) {
+                // Resolve alternative_of -> replaces_item_id (0-based index of primary on same operation)
+                if (!empty($items)) {
+                    $hasPrimary = collect($items)->contains(fn ($it) => !$it['is_alternative']);
+                    if (!$hasPrimary) {
+                        $rowErrors[] = "BOM must contain at least one primary component item.";
+                    }
+
+                    foreach ($items as $idx => &$itemRef) {
+                        if (!$itemRef['is_alternative']) {
+                            continue;
+                        }
+                        $primaryIdx = null;
+                        foreach ($items as $pIdx => $candidate) {
+                            if (!$candidate['is_alternative']
+                                && $candidate['component_code'] === $itemRef['alternative_of']
+                                && $candidate['routing_operation_id'] === $itemRef['routing_operation_id']
+                            ) {
+                                $primaryIdx = $pIdx;
+                                break;
+                            }
+                        }
+                        if ($primaryIdx === null) {
+                            $rowErrors[] = "Row {$itemRef['row_number']}: Alternative '{$itemRef['component_code']}' could not find primary '{$itemRef['alternative_of']}' on operation '{$itemRef['operation_sequence']}'.";
+                        } else {
+                            $itemRef['replaces_item_id'] = $primaryIdx;
+                        }
+                    }
+                    unset($itemRef);
+                } else {
                     $rowErrors[] = "BOM must contain at least one valid component item.";
                 }
 
@@ -312,6 +399,26 @@ class ProductionMasterImportService
                     $cycleError = $this->checkCircularDependency($productSku, $items, $bomsInFile, $tenantId);
                     if ($cycleError) {
                         $rowErrors[] = $cycleError;
+                    }
+                }
+
+                // BM-IMPL-18 #2–#3: existing BOMs are updated only while draft; then the SAME rules as the form / API
+                if (empty($rowErrors)) {
+                    $existingBom = ProductionBom::where('tenant_id', $tenantId)->where('bom_number', $bomNumber)->first();
+                    if ($existingBom && !$existingBom->isDraft()) {
+                        $rowErrors[] = "BOM '{$bomNumber}' is {$existingBom->status}. Only draft BOMs can be updated by import.";
+                    } else {
+                        $payload = [
+                            'bom_number' => $bomNumber, 'bom_name' => $bomName, 'product_id' => $productId,
+                            'routing_id' => $routing?->id, 'base_quantity' => $baseQty, 'base_uom_id' => $baseUomId,
+                            'version' => $version, 'bom_type' => $bomType, 'usage_context' => $usageContext,
+                            'effective_date' => $effectiveDate ? $effectiveDate->toDateString() : null,
+                            'expiry_date' => $expiryDate ? $expiryDate->toDateString() : null,
+                            'items' => $this->resolveBomImportItems($items, $routing?->id, $routingNumber, $tenantId),
+                        ];
+                        foreach (\App\Domains\Production\Requests\ImportBomRowValidation::errorsFor($payload, $existingBom) as $err) {
+                            $rowErrors[] = "BOM '{$bomNumber}': {$err}";
+                        }
                     }
                 }
 
@@ -325,6 +432,8 @@ class ProductionMasterImportService
                         'bom_name' => $bomName,
                         'product_code' => $productSku,
                         'product_id' => $productId,
+                        'routing_number' => $routingNumber,
+                        'routing_id' => $routing?->id,
                         'base_quantity' => $baseQty,
                         'base_uom_id' => $baseUomId,
                         'version' => $version,
@@ -358,7 +467,9 @@ class ProductionMasterImportService
 
             $products = Product::where('tenant_id', $tenantId)->pluck('id', 'sku')->toArray();
             $workCenters = WorkCenter::where('tenant_id', $tenantId)->pluck('id', 'code')->toArray();
-            $machines = Machine::where('tenant_id', $tenantId)->with('workCenter')->get();
+            $machines = Machine::where('tenant_id', $tenantId)->with(['workCenter', 'section'])->get();
+            $sections = WorkCenterSection::where('tenant_id', $tenantId)->get();
+            $manualBatches = SectionManualProduction::where('tenant_id', $tenantId)->get();
             $uoms = Uom::where('tenant_id', $tenantId)->pluck('id', 'code')->toArray();
 
             foreach ($grouped as $routingCode => $group) {
@@ -374,12 +485,9 @@ class ProductionMasterImportService
                     $rowErrors[] = "Routing Name is required on the first row of routing '{$routingCode}'.";
                 }
 
+                // [INVERSION-DECOUPLE-TRACK-11] Routings are independent of products. Product code is optional/ignored.
                 $productId = null;
-                if (empty($productSku)) {
-                    $rowErrors[] = "Product Code is required.";
-                } elseif (!isset($products[$productSku])) {
-                    $rowErrors[] = "Product Code '{$productSku}' does not exist.";
-                } else {
+                if (!empty($productSku) && isset($products[$productSku])) {
                     $productId = $products[$productSku];
                 }
 
@@ -395,11 +503,19 @@ class ProductionMasterImportService
                     $opNumber = trim($opData['operation_code'] ?? '');
                     $opType = strtolower(trim($opData['operation_type'] ?? 'manufacturing'));
                     $wcCode = trim($opData['work_center_code'] ?? '');
+                    $secCode = trim($opData['section_code'] ?? '');
                     $mchCode = trim($opData['machine_code'] ?? '');
+                    $batchName = trim($opData['manual_batch_name'] ?? '');
+                    $isAlt = in_array(strtolower(trim($opData['is_alternative'] ?? 'no')), ['yes', '1', 'true']);
+                    $replacesOpNum = trim($opData['replaces_operation_number'] ?? '');
+                    $priority = !empty($opData['priority']) ? (int) $opData['priority'] : 1;
                     $setupTime = trim($opData['setup_time_minutes'] ?? '0');
+                    $setupPerPiece = trim((string) ($opData['setup_time_per_piece_minutes'] ?? '')); // RT-IMPL-13
                     $procTime = trim($opData['processing_time_minutes'] ?? '0');
                     $yield = trim($opData['yield_percentage'] ?? '100');
                     $isExt = strtolower(trim($opData['is_external'] ?? 'no'));
+                    $vendorCode = trim((string) ($opData['vendor_code'] ?? ''));               // RT-IMPL-16: external operations
+                    $subcontractCost = trim((string) ($opData['subcontract_cost_per_unit'] ?? ''));
 
                     $matCode = trim($opData['material_code'] ?? '');
                     $matQty = trim($opData['material_quantity'] ?? '');
@@ -415,11 +531,19 @@ class ProductionMasterImportService
                             'operation_number' => $opNumber,
                             'operation_type' => $opType,
                             'work_center_code' => $wcCode,
+                            'section_code' => $secCode,
                             'machine_code' => $mchCode,
+                            'manual_batch_name' => $batchName,
+                            'is_alternative' => $isAlt,
+                            'replaces_operation_number' => $replacesOpNum,
+                            'priority' => $priority,
                             'setup_time_minutes' => $setupTime,
+                            'setup_time_per_piece_minutes' => $setupPerPiece === '' ? null : $setupPerPiece,
                             'processing_time_minutes' => $procTime,
                             'expected_yield_percentage' => $yield,
                             'is_external' => in_array($isExt, ['yes', '1', 'true', 'external']),
+                            'vendor_code' => $vendorCode,
+                            'subcontract_cost_per_unit' => $subcontractCost === '' ? 0 : $subcontractCost,
                             'materials' => []
                         ];
                     }
@@ -470,25 +594,81 @@ class ProductionMasterImportService
                         $opErrors[] = "Operation type '{$op['operation_type']}' for '{$opNumber}' is invalid.";
                     }
 
+                    $isExternal = $op['is_external'];
                     $wcId = null;
-                    if (empty($op['work_center_code'])) {
-                        $opErrors[] = "Work Center Code is required for '{$opNumber}'.";
-                    } elseif (!isset($workCenters[$op['work_center_code']])) {
-                        $opErrors[] = "Work Center '{$op['work_center_code']}' does not exist.";
-                    } else {
-                        $wcId = $workCenters[$op['work_center_code']];
+                    $secId = null;
+                    $mchId = null;
+                    $batchId = null;
+
+                    if (!$isExternal) {
+                        if (empty($op['work_center_code'])) {
+                            $opErrors[] = "Work Center Code is required for internal operation '{$opNumber}'.";
+                        } elseif (!isset($workCenters[$op['work_center_code']])) {
+                            $opErrors[] = "Work Center '{$op['work_center_code']}' does not exist.";
+                        } else {
+                            $wcId = $workCenters[$op['work_center_code']];
+                        }
+
+                        if (empty($op['section_code'])) {
+                            $opErrors[] = "Section Code is required for internal operation '{$opNumber}'."; // RT-IMPL-16 (RT-06)
+                        } else {
+                            $sec = $sections->firstWhere('code', $op['section_code']);
+                            if (!$sec) {
+                                $opErrors[] = "Section '{$op['section_code']}' does not exist.";
+                            } elseif ($wcId && $sec->work_center_id !== $wcId) {
+                                $opErrors[] = "Section '{$op['section_code']}' does not belong to Work Center '{$op['work_center_code']}'.";
+                            } else {
+                                $secId = $sec->id;
+                            }
+                        }
+
+                        // Mutual exclusivity: Machine XOR Manual Batch
+                        $hasMachine = !empty($op['machine_code']);
+                        $hasBatch = !empty($op['manual_batch_name']);
+
+                        if (!$hasMachine && !$hasBatch) {
+                            $opErrors[] = "Operation '{$opNumber}' must specify a Machine or a Manual Batch."; // RT-IMPL-16 (RT-07)
+                        } elseif ($hasMachine && $hasBatch) {
+                            $opErrors[] = "Operation '{$opNumber}' cannot specify both a Machine and a Manual Batch.";
+                        } elseif ($hasMachine) {
+                            $mach = $machines->firstWhere('code', $op['machine_code']);
+                            if (!$mach) {
+                                $opErrors[] = "Machine '{$op['machine_code']}' does not exist.";
+                            } else {
+                                $mchId = $mach->id;
+                                if ($secId && $mach->section_id !== $secId) {
+                                    $opErrors[] = "Machine '{$op['machine_code']}' does not belong to Section '{$op['section_code']}'.";
+                                }
+                            }
+                        } elseif ($hasBatch) {
+                            $batch = $manualBatches->first(fn ($b) => $b->batch_name === $op['manual_batch_name'] && (!$secId || $b->section_id === $secId));
+                            if (!$batch) {
+                                $opErrors[] = "Manual Batch '{$op['manual_batch_name']}' does not exist in Section '{$op['section_code']}'.";
+                            } else {
+                                $batchId = $batch->id;
+                            }
+                        }
                     }
 
-                    $mchId = null;
-                    if (!empty($op['machine_code'])) {
-                        $mach = $machines->firstWhere('code', $op['machine_code']);
-                        if (!$mach) {
-                            $opErrors[] = "Machine '{$op['machine_code']}' does not exist.";
+                    $vendorId = null;
+                    if ($isExternal) {
+                        if ($op['vendor_code'] === '') {
+                            $opErrors[] = "Vendor Code is required for outsourced operation '{$opNumber}'.";
                         } else {
-                            $mchId = $mach->id;
-                            if ($wcId && $mach->work_center_id !== $wcId) {
-                                $opErrors[] = "Machine/Work Center mismatch: Machine '{$op['machine_code']}' belongs to Work Center '{$mach->workCenter?->code}', not '{$op['work_center_code']}'.";
+                            $vendorId = \App\Domains\Inventory\Models\Vendor::where('tenant_id', $tenantId)->where('code', $op['vendor_code'])->value('id');
+                            if (!$vendorId) {
+                                $opErrors[] = "Vendor '{$op['vendor_code']}' does not exist.";
                             }
+                        }
+                    }
+
+                    if ($op['is_alternative']) {
+                        if (empty($op['replaces_operation_number'])) {
+                            $opErrors[] = "Alternative operation '{$opNumber}' must specify 'replaces_operation_number'.";
+                        } elseif (!isset($opsGrouped[$op['replaces_operation_number']])) {
+                            $opErrors[] = "Alternative operation '{$opNumber}' references non-existent operation '{$op['replaces_operation_number']}'.";
+                        } elseif ($op['priority'] < 1) {
+                            $opErrors[] = "Priority for alternative operation '{$opNumber}' must be at least 1.";
                         }
                     }
 
@@ -508,13 +688,34 @@ class ProductionMasterImportService
                         $rowErrors = array_merge($rowErrors, $opErrors);
                     } else {
                         $op['work_center_id'] = $wcId;
+                        $op['section_id'] = $secId;
                         $op['machine_id'] = $mchId;
+                        $op['section_manual_production_id'] = $batchId;
+                        $op['vendor_id'] = $vendorId;
                         $operations[] = $op;
                     }
                 }
 
                 if (empty($operations)) {
                     $rowErrors[] = "Routing must contain at least one valid operation.";
+                }
+
+                // RT-IMPL-16 (RT-27 rule 8): an existing routing is updated by import only while it is a draft
+                $existingRouting = Routing::where('tenant_id', $tenantId)->where('routing_number', $routingCode)->first();
+                if ($existingRouting && !$existingRouting->isDraft()) {
+                    $rowErrors[] = "Routing '{$routingCode}' is {$existingRouting->status}. Only draft routings can be updated by import.";
+                }
+
+                // RT-IMPL-16 (RT-27 rule 6–7): figures worked out by the backend from the latest section snapshot
+                // (same calculator as the form), then the SAME operation checks as the web form / API
+                if (empty($rowErrors) && !empty($operations)) {
+                    $payloadOps = $this->routingImportPayload($operations, $rowErrors);
+                    if (empty($rowErrors)) {
+                        $rowErrors = app(RoutingImportValidator::class)->validate($payloadOps);
+                    }
+                    if (empty($rowErrors)) {
+                        $operations = $payloadOps;
+                    }
                 }
 
                 $previewRows[] = [
@@ -599,7 +800,8 @@ class ProductionMasterImportService
                             $machine->update([
                                 'name' => $data['name'],
                                 'work_center_id' => $data['work_center_id'],
-                                'hourly_cost' => $data['hourly_cost'],
+                                // Short Full Review Point 2: real column, converted ONCE (sheet is in the active currency)
+                                'operating_cost_per_hour' => round(convert_to_base((float) $data['hourly_cost']), 4),
                                 'status' => $data['status']
                             ]);
                             $successCount++;
@@ -612,187 +814,91 @@ class ProductionMasterImportService
                             'code' => $data['code'],
                             'name' => $data['name'],
                             'work_center_id' => $data['work_center_id'],
-                            'hourly_cost' => $data['hourly_cost'],
+                            'operating_cost_per_hour' => round(convert_to_base((float) $data['hourly_cost']), 4),
                             'status' => $data['status']
                         ]);
                         $successCount++;
                     }
                 }
             } elseif ($type === 'boms') {
+                $bomService = app(ProductionBomService::class);
                 foreach ($validRows as $row) {
                     $data = $row['data'];
                     $bom = ProductionBom::where('tenant_id', $tenantId)->where('bom_number', $data['bom_number'])->first();
 
-                    if ($bom) {
-                        if ($strategy === 'update') {
-                            $bom->update([
-                                'bom_name' => $data['bom_name'],
-                                'product_id' => $data['product_id'],
-                                'base_quantity' => $data['base_quantity'],
-                                'base_uom_id' => $data['base_uom_id'],
-                                'version' => $data['version'],
-                                'bom_type' => $data['bom_type'],
-                                'usage_context' => $data['usage_context'],
-                                'effective_date' => $data['effective_date'],
-                                'expiry_date' => $data['expiry_date']
-                            ]);
-
-                            $bom->items()->delete();
-                            foreach ($data['items'] as $item) {
-                                $childBomId = null;
-                                if (!empty($item['child_bom_number'])) {
-                                    $child = ProductionBom::where('tenant_id', $tenantId)->where('bom_number', $item['child_bom_number'])->first();
-                                    if ($child) {
-                                        $childBomId = $child->id;
-                                    }
-                                }
-
-                                ProductionBomItem::create([
-                                    'tenant_id' => $tenantId,
-                                    'bom_id' => $bom->id,
-                                    'material_id' => $item['material_id'],
-                                    'quantity' => $item['quantity'],
-                                    'uom_id' => $item['uom_id'],
-                                    'material_scrap_percentage' => $item['material_scrap_percentage'],
-                                    'child_bom_id' => $childBomId
-                                ]);
-                            }
-                            $successCount++;
-                        } else {
-                            $failedCount++;
-                        }
-                    } else {
-                        $bom = ProductionBom::create([
-                            'tenant_id' => $tenantId,
-                            'bom_number' => $data['bom_number'],
-                            'bom_name' => $data['bom_name'],
-                            'product_id' => $data['product_id'],
-                            'base_quantity' => $data['base_quantity'],
-                            'base_uom_id' => $data['base_uom_id'],
-                            'version' => $data['version'],
-                            'bom_type' => $data['bom_type'],
-                            'usage_context' => $data['usage_context'],
-                            'effective_date' => $data['effective_date'],
-                            'expiry_date' => $data['expiry_date'],
-                            'status' => 'draft',
-                            'created_by' => $userId
-                        ]);
-
-                        foreach ($data['items'] as $item) {
-                            $childBomId = null;
-                            if (!empty($item['child_bom_number'])) {
-                                $child = ProductionBom::where('tenant_id', $tenantId)->where('bom_number', $item['child_bom_number'])->first();
-                                if ($child) {
-                                    $childBomId = $child->id;
-                                }
-                            }
-
-                            ProductionBomItem::create([
-                                'tenant_id' => $tenantId,
-                                'bom_id' => $bom->id,
-                                'material_id' => $item['material_id'],
-                                'quantity' => $item['quantity'],
-                                'uom_id' => $item['uom_id'],
-                                'material_scrap_percentage' => $item['material_scrap_percentage'],
-                                'child_bom_id' => $childBomId
-                            ]);
-                        }
-                        $successCount++;
+                    if ($bom && $strategy !== 'update') {
+                        $failedCount++;
+                        continue;
                     }
+
+                    if ($bom && !$bom->isDraft()) { // BM-IMPL-18 #3 (also reported at preview)
+                        $failedCount++;
+                        continue;
+                    }
+
+                    $routingId = $data['routing_id'] ?? (!empty($data['routing_number'])
+                        ? Routing::where('tenant_id', $tenantId)->where('routing_number', $data['routing_number'])->value('id')
+                        : null);
+                    $resolvedItems = $this->resolveBomImportItems($data['items'], $routingId, $data['routing_number'] ?? null, $tenantId);
+
+                    $payload = [
+                        'bom_number'     => $data['bom_number'],
+                        'bom_name'       => $data['bom_name'],
+                        'product_id'     => $data['product_id'],
+                        'routing_id'     => $routingId ?? $bom?->routing_id,
+                        'base_quantity'  => $data['base_quantity'],
+                        'base_uom_id'    => $data['base_uom_id'],
+                        'version'        => $data['version'],
+                        'bom_type'       => $data['bom_type'],
+                        'usage_context'  => $data['usage_context'],
+                        'effective_date' => $data['effective_date'],
+                        'expiry_date'    => $data['expiry_date'],
+                        'items'          => $resolvedItems,
+                    ];
+
+                    $dto = ProductionBomDTO::fromArray($payload);
+
+                    if ($bom) {
+                        $bomService->update($bom->id, $dto);
+                    } else {
+                        $bomService->create($dto);
+                    }
+                    $successCount++;
                 }
             } elseif ($type === 'routings') {
+                // RT-IMPL-16: create / update through RoutingService — same save as the form (figures saved as checked,
+                // operations updated IN PLACE by operation number, removed ones soft-deleted, BOM allocations never deleted)
+                $routingService = app(RoutingService::class);
                 foreach ($validRows as $row) {
                     $data = $row['data'];
                     $routing = Routing::where('tenant_id', $tenantId)->where('routing_number', $data['routing_number'])->first();
+                    $payload = [
+                        'routing_number' => $data['routing_number'],
+                        'name'           => $data['name'],
+                        'version'        => $data['version'],
+                        'operations'     => $data['operations'],
+                    ];
 
                     if ($routing) {
-                        if ($strategy === 'update') {
-                            $routing->update([
-                                'name' => $data['name'],
-                                'product_id' => $data['product_id'],
-                                'version' => $data['version']
-                            ]);
-
-                            $opIds = $routing->operations()->withTrashed()->pluck('id');
-                            RoutingOperationMaterial::whereIn('routing_operation_id', $opIds)->delete();
-                            $routing->operations()->withTrashed()->forceDelete();
-
-                            foreach ($data['operations'] as $op) {
-                                $newOp = RoutingOperation::create([
-                                    'tenant_id' => $tenantId,
-                                    'routing_id' => $routing->id,
-                                    'sequence' => $op['sequence'],
-                                    'operation_number' => $op['operation_number'],
-                                    'name' => $op['name'],
-                                    'operation_type' => $op['operation_type'],
-                                    'work_center_id' => $op['work_center_id'],
-                                    'machine_id' => $op['machine_id'],
-                                    'setup_time_minutes' => $op['setup_time_minutes'],
-                                    'processing_time_minutes' => $op['processing_time_minutes'],
-                                    'expected_yield_percentage' => $op['expected_yield_percentage'],
-                                    'is_external' => $op['is_external']
-                                ]);
-
-                                foreach ($op['materials'] as $index => $mat) {
-                                    RoutingOperationMaterial::create([
-                                        'tenant_id' => $tenantId,
-                                        'routing_operation_id' => $newOp->id,
-                                        'material_id' => $mat['material_id'],
-                                        'quantity' => $mat['quantity'],
-                                        'uom_id' => $mat['uom_id'],
-                                        'sequence' => ($index + 1) * 10
-                                    ]);
-                                }
-                            }
+                        if ($strategy === 'update' && $routing->isDraft()) {
+                            $start = $routing->effective_from && $routing->effective_from->toDateString() >= now()->toDateString()
+                                ? $routing->effective_from->toDateString() : now()->toDateString();
+                            $routingService->update($routing->id, \App\Domains\Production\DTO\RoutingDTO::fromArray(array_merge($payload, [
+                                'effective_from' => $start,
+                                'effective_to'   => $routing->effective_to?->toDateString(),
+                                'description'    => $routing->description,
+                                'is_default'     => $routing->is_default,
+                            ])));
                             $successCount++;
                         } else {
                             $failedCount++;
                         }
                     } else {
-                        $routing = Routing::create([
-                            'tenant_id' => $tenantId,
-                            'routing_number' => $data['routing_number'],
-                            'name' => $data['name'],
-                            'product_id' => $data['product_id'],
-                            'version' => $data['version'],
-                            'status' => 'draft',
-                            'created_by' => $userId
-                        ]);
-
-                        RoutingOperation::withTrashed()->where('routing_id', $routing->id)->forceDelete();
-
-                        foreach ($data['operations'] as $op) {
-                            $newOp = RoutingOperation::create([
-                                'tenant_id' => $tenantId,
-                                'routing_id' => $routing->id,
-                                'sequence' => $op['sequence'],
-                                'operation_number' => $op['operation_number'],
-                                'name' => $op['name'],
-                                'operation_type' => $op['operation_type'],
-                                'work_center_id' => $op['work_center_id'],
-                                'machine_id' => $op['machine_id'],
-                                'setup_time_minutes' => $op['setup_time_minutes'],
-                                'processing_time_minutes' => $op['processing_time_minutes'],
-                                'expected_yield_percentage' => $op['expected_yield_percentage'],
-                                'is_external' => $op['is_external']
-                            ]);
-
-                            foreach ($op['materials'] as $index => $mat) {
-                                RoutingOperationMaterial::create([
-                                    'tenant_id' => $tenantId,
-                                    'routing_operation_id' => $newOp->id,
-                                    'material_id' => $mat['material_id'],
-                                    'quantity' => $mat['quantity'],
-                                    'uom_id' => $mat['uom_id'],
-                                    'sequence' => ($index + 1) * 10
-                                ]);
-                            }
-                        }
+                        $routingService->create(\App\Domains\Production\DTO\RoutingDTO::fromArray($payload), $tenantId, $userId);
                         $successCount++;
                     }
                 }
             }
-
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -803,6 +909,124 @@ class ProductionMasterImportService
             'success_count' => $successCount,
             'failed_count' => $failedCount,
         ];
+    }
+
+    /**
+     * RT-IMPL-16: import rows → the create payload the form / API send, with every figure worked out from the latest
+     * section snapshot by the one calculator (RT-IMPL-14). Setup times and yield come from the file; run time comes
+     * from the machine / batch capacity (the file's processing time is not used). Alternatives link by sequence.
+     *
+     * @param  array<int, array>  $operations  parsed import operations
+     * @param  array<int, string> $errors      filled with "section not calculated" / "resource not in snapshot" errors
+     */
+    private function routingImportPayload(array $operations, array &$errors): array
+    {
+        $calculator = app(RoutingOperationCostCalculator::class);
+        $sectionService = app(SectionCalculationService::class);
+        $seqByNumber = collect($operations)->pluck('sequence', 'operation_number');
+        $snapshots = [];
+        $payload = [];
+
+        foreach ($operations as $op) {
+            $row = [
+                'sequence'                     => (int) $op['sequence'],
+                'operation_number'             => $op['operation_number'],
+                'name'                         => $op['name'],
+                'operation_type'               => $op['operation_type'],
+                'work_center_id'               => $op['work_center_id'],
+                'section_id'                   => $op['section_id'],
+                'machine_id'                   => $op['machine_id'],
+                'section_manual_production_id' => $op['section_manual_production_id'],
+                'is_alternative'               => (bool) $op['is_alternative'],
+                'replaces_sequence'            => $op['is_alternative'] ? ($seqByNumber[$op['replaces_operation_number']] ?? null) : null,
+                'priority'                     => (int) ($op['priority'] ?? 1),
+                'setup_time_minutes'           => (float) $op['setup_time_minutes'],
+                'setup_time_per_piece_minutes' => $op['setup_time_per_piece_minutes'] !== null ? (float) $op['setup_time_per_piece_minutes'] : null,
+                'expected_yield_percentage'    => (float) $op['expected_yield_percentage'],
+                'is_external'                  => (bool) $op['is_external'],
+                'vendor_id'                    => $op['vendor_id'] ?? null,
+                // Short Full Review Point 2: the sheet is in the active currency → DB base once, before the base calculator runs
+                'subcontract_cost_per_unit'    => round(convert_to_base((float) ($op['subcontract_cost_per_unit'] ?? 0)), 4),
+            ];
+
+            $resources = null;
+            if (!$row['is_external'] && $row['section_id']) {
+                if (!array_key_exists($row['section_id'], $snapshots)) {
+                    $section = WorkCenterSection::find($row['section_id']);
+                    $snapshots[$row['section_id']] = $section ? $sectionService->getSnapshotResourceCosts($section) : null;
+                }
+                $resources = $snapshots[$row['section_id']];
+                if (!$resources || !empty($resources['not_calculated'])) {
+                    $code = WorkCenterSection::find($row['section_id'])?->code ?? $row['section_id'];
+                    $errors[] = "Section {$code} has not been calculated yet. Recalculate the Work Center first.";
+                    continue;
+                }
+            }
+
+            $calc = $calculator->calculate($row, $resources);
+            if ($calc['error'] !== null) {
+                $errors[] = "Operation {$row['operation_number']}: the machine / batch is not in the latest section calculation (inactive or added after the last recalculation).";
+                continue;
+            }
+            foreach ($calc['figures'] as $k => $v) {
+                $row[$k] = round((float) $v, 4);
+            }
+            if ($resources) {
+                $row['section_calculation_id'] = $resources['section_calculation_id'] ?? null;
+                $row['section_snapshot_number'] = $resources['snapshot_number'] ?? null;
+                $row['work_center_calculation_id'] = $resources['work_center_calculation_id'] ?? null;
+            }
+            $row['resource_snapshot'] = $calculator->buildResourceSnapshot($row, $calc['resource'], $resources); // DB base
+            $payload[] = $row;
+        }
+
+        $errors = array_values(array_unique($errors));
+
+        return $payload;
+    }
+
+    /**
+     * BM-IMPL-18: import item rows → the allocation payload the BOM form / API send (operation by sequence or
+     * operation number of the BOM's routing, alternative link by row, sub-BOM by number). Priority is not defaulted
+     * (BM-IMPL-07 — the shared rules require it on alternatives).
+     */
+    private function resolveBomImportItems(array $items, ?int $routingId, ?string $routingNumber, int $tenantId): array
+    {
+        $routing = $routingId
+            ? Routing::where('tenant_id', $tenantId)->with('operations')->find($routingId)
+            : (!empty($routingNumber) ? Routing::where('tenant_id', $tenantId)->where('routing_number', $routingNumber)->with('operations')->first() : null);
+
+        $resolved = [];
+        foreach ($items as $idx => $item) {
+            $childBomId = null;
+            if (!empty($item['child_bom_number'])) {
+                $childBomId = ProductionBom::where('tenant_id', $tenantId)->where('bom_number', $item['child_bom_number'])->value('id');
+            }
+
+            $routingOpId = $item['routing_operation_id'] ?? null;
+            if (!$routingOpId && $routing && isset($item['operation_sequence'])) {
+                $opSeq = (string) $item['operation_sequence'];
+                $routingOpId = $routing->operations->first(fn ($op) => (string) $op->sequence === $opSeq || (string) $op->operation_number === $opSeq)?->id;
+            }
+
+            $isAlt = (bool) ($item['is_alternative'] ?? false);
+            $resolved[] = [
+                'row_uid'                   => 'imp_' . $idx,
+                'routing_operation_id'      => $routingOpId,
+                'material_id'               => $item['material_id'],
+                'quantity'                  => $item['quantity'],
+                'uom_id'                    => $item['uom_id'],
+                'material_scrap_percentage' => $item['material_scrap_percentage'] ?? 0,
+                'sequence'                  => ($idx + 1) * 10,
+                'is_alternative'            => $isAlt,
+                'replaces_row_uid'          => ($isAlt && isset($item['replaces_item_id']) && is_numeric($item['replaces_item_id'])) ? ('imp_' . (int) $item['replaces_item_id']) : null,
+                'priority'                  => isset($item['priority']) && $item['priority'] !== '' ? (int) $item['priority'] : null,
+                'child_bom_id'              => $childBomId,
+                'notes'                     => $item['notes'] ?? null,
+            ];
+        }
+
+        return $resolved;
     }
 
     /**
@@ -881,10 +1105,13 @@ class ProductionMasterImportService
                     ->whereHas('product', function($q) use ($sku) {
                         $q->where('sku', $sku);
                     })
-                    ->with('items.material')
+                    ->with(['operationMaterials.material', 'items.material'])
                     ->first();
                 if ($existingBom) {
-                    foreach ($existingBom->items as $item) {
+                    $existingRows = $existingBom->operationMaterials->isNotEmpty()
+                        ? $existingBom->operationMaterials
+                        : $existingBom->items;
+                    foreach ($existingRows as $item) {
                         if ($item->material?->sku) {
                             $components[] = $item->material->sku;
                         }

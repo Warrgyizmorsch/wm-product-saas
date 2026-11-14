@@ -25,24 +25,132 @@ class ProductionShift extends BaseModel
     ];
 
     protected $casts = [
-        'break_minutes'    => 'integer',
-        'overtime_allowed' => 'boolean',
-        'active'           => 'boolean',
+        'break_minutes'     => 'integer',
+        'overtime_allowed'  => 'boolean',
+        'active'            => 'boolean',
     ];
+
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::saving(function (self $model): void {
+            if ($model->exists && $model->isDirty('active') && !$model->active) {
+                if ($model->isAssignedToAnySection()) {
+                    throw new \InvalidArgumentException("Shift '{$model->name}' cannot be deactivated because it is currently assigned to one or more Sections.");
+                }
+            }
+        });
+    }
 
     public function company(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(\App\Domains\HRMS\Models\Company::class, 'company_id');
     }
 
-    public function workCenters(): BelongsToMany
+    /**
+     * Get sections assigned this shift via their assigned_shifts JSON.
+     * Note: production_section_shifts pivot table was dropped in schema redesign.
+     *
+     * @return \Illuminate\Support\Collection<int, WorkCenterSection>
+     */
+    public function getSectionsAttribute(): \Illuminate\Support\Collection
     {
-        return $this->belongsToMany(
-            WorkCenter::class,
-            'production_work_center_shifts',
-            'shift_id',
-            'work_center_id'
-        );
+        $allSections = WorkCenterSection::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant_id)
+            ->get();
+
+        return $allSections->filter(fn($sec) => $sec->hasShift($this->id))->values();
+    }
+
+    /**
+     * Check if this Shift is assigned to any Section.
+     */
+    public function isAssignedToAnySection(): bool
+    {
+        $sections = WorkCenterSection::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant_id)
+            ->get();
+
+        foreach ($sections as $section) {
+            if ($section->hasShift($this->id)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function externalWorkerAllocations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ExternalWorkerAllocation::class, 'shift_id');
+    }
+
+    public function isActive(): bool
+    {
+        return (bool) $this->active;
+    }
+
+    /**
+     * Shift clock hours, breaks INCLUDED (e.g. 06:00–15:00 = 9.0).
+     * Overnight shifts wrap past midnight; start = end is a 24-hour shift.
+     * This is the figure Production uses for output and labor rates (WC-02, WC-18, WC-27).
+     * Returns null when the shift has no start / end time (no guessing).
+     */
+    public function getClockHoursAttribute(): ?float
+    {
+        if (!$this->start_time || !$this->end_time) {
+            return null;
+        }
+
+        $st = \Carbon\Carbon::parse($this->start_time);
+        $et = \Carbon\Carbon::parse($this->end_time);
+        if ($et->lte($st)) {
+            $et->addDay();
+        }
+
+        return round($st->diffInMinutes($et) / 60, 4);
+    }
+
+    /**
+     * Net working hours in float (e.g. 8.5)
+     */
+    public function getWorkingHoursAttribute(): float
+    {
+        if (!$this->start_time || !$this->end_time) {
+            return 8.0;
+        }
+
+        $st = \Carbon\Carbon::parse($this->start_time);
+        $et = \Carbon\Carbon::parse($this->end_time);
+        if ($et->lt($st)) {
+            $et->addDay();
+        }
+
+        $diffMinutes = max(0, $st->diffInMinutes($et) - (int) ($this->break_minutes ?? 0));
+        return round($diffMinutes / 60, 2);
+    }
+
+    /**
+     * Net working hours formatted in minutes method (e.g. '8:30 hrs', '0:10 hrs', '7:30 hrs')
+     */
+    public function getWorkingHoursFormattedAttribute(): string
+    {
+        if (!$this->start_time || !$this->end_time) {
+            return '8:00 hrs';
+        }
+
+        $st = \Carbon\Carbon::parse($this->start_time);
+        $et = \Carbon\Carbon::parse($this->end_time);
+        if ($et->lt($st)) {
+            $et->addDay();
+        }
+
+        $diffMinutes = max(0, $st->diffInMinutes($et) - (int) ($this->break_minutes ?? 0));
+        $hrs = intdiv($diffMinutes, 60);
+        $mins = $diffMinutes % 60;
+
+        return sprintf('%d:%02d hrs', $hrs, $mins);
     }
 
     /**
@@ -95,3 +203,4 @@ class ProductionShift extends BaseModel
             : "{$startStr} - {$endStr}";
     }
 }
+

@@ -28,7 +28,7 @@ class ReworkService
             $ncr = \App\Domains\Production\Models\ProductionNcr::with('operation')->find($ncrId);
             $defaultMachineId = $data['machine_id'] ?? $ncr?->machine_id ?? $ncr?->operation?->machine_id;
             if (!$defaultMachineId && $wcId) {
-                $defaultMachineId = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->where('work_center_id', $wcId)->value('id');
+                $defaultMachineId = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->whereHas('section', fn ($q) => $q->where('work_center_id', $wcId))->value('id');
             }
 
             // Default single direct rework operation
@@ -57,9 +57,10 @@ class ReworkService
                 $opWcId = $op['work_center_id'] ?? $wcId;
                 $opMachineId = $op['machine_id'] ?? $defaultMachineId;
                 if ($opMachineId && $opWcId) {
-                    $machWc = \App\Domains\Production\Models\Machine::where('id', $opMachineId)->value('work_center_id');
+                    $mach = \App\Domains\Production\Models\Machine::with('section')->find($opMachineId);
+                    $machWc = $mach?->section?->work_center_id;
                     if ($machWc && $machWc !== $opWcId) {
-                        $opMachineId = \App\Domains\Production\Models\Machine::where('work_center_id', $opWcId)->value('id');
+                        $opMachineId = \App\Domains\Production\Models\Machine::whereHas('section', fn ($q) => $q->where('work_center_id', $opWcId))->value('id');
                     }
                 }
 
@@ -99,8 +100,8 @@ class ReworkService
             $wcId = $op['work_center_id'] ?? ($data['work_center_id'] ?? null);
             $wc = $wcId ? WorkCenter::where('tenant_id', $tenantId)->find($wcId) : null;
 
-            $laborRatePerMinute = $wc ? ((float) $wc->cost_per_hour / 60.0) : 0.0;
-            $overheadRatePerMinute = $wc ? ((float) $wc->overhead_rate / 60.0) : 0.0;
+            $laborRatePerMinute = $wc ? ($wc->calculatedLaborCostPerHour() / 60.0) : 0.0;
+            $overheadRatePerMinute = $wc ? ($wc->calculatedOverheadCostPerHour() / 60.0) : 0.0;
 
             $machineRatePerMinute = 0.0;
             if (!empty($op['machine_id'])) {
@@ -203,8 +204,8 @@ class ReworkService
             $op->loadMissing(['workCenter', 'machine', 'reworkOrder.ncr.operation.routingOperation']);
 
             $wc = $op->workCenter;
-            $wcLaborRate = $wc ? ((float) $wc->cost_per_hour / 60.0) : 0.0;
-            $wcOverheadRate = $wc ? ((float) $wc->overhead_rate / 60.0) : 0.0;
+            $wcLaborRate = $wc ? ($wc->calculatedLaborCostPerHour() / 60.0) : 0.0;
+            $wcOverheadRate = $wc ? ($wc->calculatedOverheadCostPerHour() / 60.0) : 0.0;
 
             // Resolve machine rate dynamically if machine assigned
             $machineRatePerMinute = 0.0;
@@ -255,8 +256,8 @@ class ReworkService
                         foreach ($rework->operations as $cOp) {
                             $cMins = round((float) ($cOp->setup_time_actual ?? 0.0) + ((float) ($cOp->processing_time_actual ?? 0.0) * 60.0), 2);
                             $cWc = $cOp->workCenter;
-                            $cLaborRate = $cWc ? ((float) $cWc->cost_per_hour / 60.0) : 0.0;
-                            $cOverheadRate = $cWc ? ((float) $cWc->overhead_rate / 60.0) : 0.0;
+                            $cLaborRate = $cWc ? ($cWc->calculatedLaborCostPerHour() / 60.0) : 0.0;
+                            $cOverheadRate = $cWc ? ($cWc->calculatedOverheadCostPerHour() / 60.0) : 0.0;
                             $cMachineRate = 0.0;
                             if ($cOp->machine_id) {
                                 $cMachineRate = (float) ($rework->ncr?->operation?->routingOperation?->machine_cost_rate ?? 0.0);

@@ -24,30 +24,14 @@ class StoreWorkCenterRequest extends FormRequest
             ],
             'work_center_type'      => 'nullable|string|max:100',
             'description'           => 'nullable|string',
-            'department_name'       => 'nullable|string|max:255',
             'location'              => 'nullable|string|max:255',
-            'capacity_per_hour'     => 'nullable|numeric|min:0',
-            'efficiency_percentage' => 'nullable|numeric|min:0|max:100',
-            'cost_per_hour'         => 'nullable|numeric|min:0',
-            'overhead_rate'         => 'nullable|numeric|min:0',
+            'overhead_cost'         => 'nullable|numeric|min:0',
             'status'                => 'required|in:active,inactive',
-            'parent_id'             => [
-                'nullable', 'integer',
-                Rule::exists('production_work_centers', 'id')->where('tenant_id', $tenantId)
-            ],
             'production_calendar_id' => [
                 'nullable', 'integer',
                 Rule::exists('production_calendars', 'id')->where('tenant_id', $tenantId)
             ],
-            'type'                  => [
-                'nullable', 'string',
-                Rule::in(['department', 'section', 'work_center', 'machine_group'])
-            ],
-            'shifts'                => 'nullable|array',
-            'shifts.*'              => [
-                'integer',
-                Rule::exists('production_shifts', 'id')->where('tenant_id', $tenantId)
-            ],
+            'calculation_countdown_minutes' => 'required|integer|min:1|max:1440',
         ];
     }
 
@@ -55,6 +39,9 @@ class StoreWorkCenterRequest extends FormRequest
     {
         return [
             'code.unique' => 'A work center with this code already exists in your organization.',
+            'calculation_countdown_minutes.required' => 'The debounce countdown minutes field is required.',
+            'calculation_countdown_minutes.min'      => 'The debounce countdown minutes must be at least 1.',
+            'calculation_countdown_minutes.max'      => 'The debounce countdown minutes may not be greater than 1440.',
         ];
     }
 }

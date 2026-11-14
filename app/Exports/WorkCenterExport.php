@@ -30,8 +30,7 @@ class WorkCenterExport implements FromCollection, WithHeadings, WithMapping
             $search = $this->filters['search'];
             $query->where(function($q) use ($search) {
                 $q->where('code', 'like', "%{$search}%")
-                  ->orWhere('name', 'like', "%{$search}%")
-                  ->orWhere('department_name', 'like', "%{$search}%");
+                  ->orWhere('name', 'like', "%{$search}%");
             });
         }
 

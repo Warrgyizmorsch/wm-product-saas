@@ -10,54 +10,39 @@ class WorkCenterDTO
         public readonly string  $status,
         public readonly ?string $work_center_type = null,
         public readonly ?string $description = null,
-        public readonly ?string $department_name = null,
         public readonly ?string $location = null,
-        public readonly ?float  $capacity_per_hour = null,
-        public readonly float   $efficiency_percentage = 100.00,
-        public readonly float   $cost_per_hour = 0.00,
-        public readonly float   $overhead_rate = 0.00,
-        public readonly ?int    $parent_id = null,
-        public readonly ?string $type = 'work_center',
+        public readonly float   $overhead_cost = 0.00,
         public readonly ?int    $production_calendar_id = null,
+        public readonly int     $calculation_countdown_minutes = 10,
     ) {}
 
     public static function fromArray(array $data): self
     {
         return new self(
-            name:                   $data['name'],
-            code:                   strtoupper(trim($data['code'])),
-            status:                 $data['status'] ?? 'active',
-            work_center_type:       $data['work_center_type'] ?? null,
-            description:            $data['description'] ?? null,
-            department_name:        $data['department_name'] ?? null,
-            location:               $data['location'] ?? null,
-            capacity_per_hour:      isset($data['capacity_per_hour']) ? (float) $data['capacity_per_hour'] : null,
-            efficiency_percentage:  isset($data['efficiency_percentage']) ? (float) $data['efficiency_percentage'] : 100.00,
-            cost_per_hour:          isset($data['cost_per_hour']) ? (float) $data['cost_per_hour'] : 0.00,
-            overhead_rate:          isset($data['overhead_rate']) ? (float) $data['overhead_rate'] : 0.00,
-            parent_id:              !empty($data['parent_id']) ? (int) $data['parent_id'] : null,
-            type:                   $data['type'] ?? 'work_center',
-            production_calendar_id: !empty($data['production_calendar_id']) ? (int) $data['production_calendar_id'] : null,
+            name:                           $data['name'],
+            code:                           strtoupper(trim($data['code'])),
+            status:                         $data['status'] ?? 'active',
+            work_center_type:               $data['work_center_type'] ?? null,
+            description:                    $data['description'] ?? null,
+            location:                       $data['location'] ?? null,
+            overhead_cost:                  isset($data['overhead_cost']) && $data['overhead_cost'] !== '' ? (float) $data['overhead_cost'] : (isset($data['overhead_rate']) && $data['overhead_rate'] !== '' ? (float) $data['overhead_rate'] : 0.00),
+            production_calendar_id:         !empty($data['production_calendar_id']) ? (int) $data['production_calendar_id'] : null,
+            calculation_countdown_minutes:  isset($data['calculation_countdown_minutes']) ? max(1, (int) $data['calculation_countdown_minutes']) : 10,
         );
     }
 
     public function toArray(): array
     {
         return [
-            'name'                   => $this->name,
-            'code'                   => $this->code,
-            'status'                 => $this->status,
-            'work_center_type'       => $this->work_center_type,
-            'description'            => $this->description,
-            'department_name'        => $this->department_name,
-            'location'               => $this->location,
-            'capacity_per_hour'      => $this->capacity_per_hour,
-            'efficiency_percentage'  => $this->efficiency_percentage,
-            'cost_per_hour'          => $this->cost_per_hour,
-            'overhead_rate'          => $this->overhead_rate,
-            'parent_id'              => $this->parent_id,
-            'type'                   => $this->type,
-            'production_calendar_id' => $this->production_calendar_id,
+            'name'                          => $this->name,
+            'code'                          => $this->code,
+            'status'                        => $this->status,
+            'work_center_type'              => $this->work_center_type,
+            'description'                   => $this->description,
+            'location'                      => $this->location,
+            'overhead_cost'                 => $this->overhead_cost,
+            'production_calendar_id'        => $this->production_calendar_id,
+            'calculation_countdown_minutes' => $this->calculation_countdown_minutes,
         ];
     }
 }

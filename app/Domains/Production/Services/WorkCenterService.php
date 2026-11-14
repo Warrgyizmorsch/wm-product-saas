@@ -10,7 +10,9 @@ use InvalidArgumentException;
 class WorkCenterService
 {
     public function __construct(
-        private readonly WorkCenterRepositoryInterface $repository
+        private readonly WorkCenterRepositoryInterface $repository,
+        private readonly ?SectionCalculationService $calculationService = null,
+        private readonly ?WorkCenterCalculationService $workCenterCalculationService = null,
     ) {}
 
     public function create(WorkCenterDTO $dto, int $tenantId): WorkCenter
@@ -22,9 +24,17 @@ class WorkCenterService
             );
         }
 
-        return $this->repository->create(
-            array_merge($dto->toArray(), ['tenant_id' => $tenantId])
-        );
+        $data = array_merge($dto->toArray(), ['tenant_id' => $tenantId]);
+        if (empty($data['production_calendar_id'])) {
+            $defaultCalId = \App\Domains\Production\Models\ProductionCalendar::where('tenant_id', $tenantId)
+                ->where('is_default', true)
+                ->value('id');
+            if ($defaultCalId) {
+                $data['production_calendar_id'] = $defaultCalId;
+            }
+        }
+
+        return $this->repository->create($data);
     }
 
     public function update(int $id, WorkCenterDTO $dto): WorkCenter
@@ -43,20 +53,20 @@ class WorkCenterService
             );
         }
 
-        if ($dto->parent_id) {
-            if ($dto->parent_id === $id) {
-                throw new \InvalidArgumentException('A work center cannot be its own parent.');
-            }
-            $parent = $this->repository->find($dto->parent_id);
-            while ($parent) {
-                if ($parent->id === $id) {
-                    throw new \InvalidArgumentException('Circular work center hierarchy cycle detected.');
-                }
-                $parent = $parent->parent_id ? $this->repository->find($parent->parent_id) : null;
+        $data = $dto->toArray();
+        if (empty($data['production_calendar_id'])) {
+            $defaultCalId = \App\Domains\Production\Models\ProductionCalendar::where('tenant_id', $workCenter->tenant_id)
+                ->where('is_default', true)
+                ->value('id');
+            if ($defaultCalId) {
+                $data['production_calendar_id'] = $defaultCalId;
             }
         }
 
-        return $this->repository->update($id, $dto->toArray());
+        $updated = $this->repository->update($id, $data);
+        app(CountdownCalculationEngine::class)->triggerCountdown($updated, null);
+
+        return $updated;
     }
 
     public function delete(int $id): bool
@@ -75,5 +85,18 @@ class WorkCenterService
         }
 
         return $this->repository->delete($id);
+    }
+
+
+
+    public function recalculate(WorkCenter $workCenter): WorkCenter
+    {
+        // Note: Calculations are managed through CountdownCalculationEngine or explicit manual triggers.
+        return $workCenter->fresh();
+    }
+
+    private function getWorkCenterCalculationService(): WorkCenterCalculationService
+    {
+        return $this->workCenterCalculationService ?? app(WorkCenterCalculationService::class);
     }
 }

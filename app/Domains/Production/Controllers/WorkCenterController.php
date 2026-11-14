@@ -16,6 +16,8 @@ use Illuminate\View\View;
 
 use App\Domains\Production\Models\ProductionShift;
 use App\Domains\Production\Models\ProductionCalendar;
+use App\Domains\Production\Services\CountdownCalculationEngine;
+use Illuminate\Http\JsonResponse;
 
 class WorkCenterController extends Controller
 {
@@ -41,11 +43,9 @@ class WorkCenterController extends Controller
         Gate::authorize('create', WorkCenter::class);
 
         $tenantId = require_tenant_id();
-        $shifts = $this->repository->getActiveShifts($tenantId);
         $workCenterTypes = config('production.work_center_types', []);
-        $parentOptions = $this->repository->getAllOrderedByName();
         $calendars = ProductionCalendar::where('tenant_id', $tenantId)->orderBy('name')->get();
-        return view('modules.production.work-centers.create', compact('workCenterTypes', 'parentOptions', 'shifts', 'calendars'));
+        return view('modules.production.work-centers.create', compact('workCenterTypes', 'calendars'));
     }
 
     public function store(StoreWorkCenterRequest $request): RedirectResponse
@@ -55,26 +55,18 @@ class WorkCenterController extends Controller
         try {
             $tenantId = require_tenant_id();
             $data = $request->validated();
-            if (isset($data['cost_per_hour'])) {
-                $data['cost_per_hour'] = convert_to_base($data['cost_per_hour']);
-            }
-            if (isset($data['overhead_rate'])) {
-                $data['overhead_rate'] = convert_to_base($data['overhead_rate']);
+            unset($data['capacity_per_hour'], $data['efficiency_percentage'], $data['cost_per_hour']);
+            if (isset($data['overhead_cost'])) {
+                $data['overhead_cost'] = convert_to_base($data['overhead_cost']);
             }
             $dto = WorkCenterDTO::fromArray($data);
             $wc  = $this->service->create($dto, $tenantId);
 
-            // Sync shifts
-            $shifts = $request->input('shifts', []);
-            $syncData = [];
-            foreach ($shifts as $shiftId) {
-                $syncData[$shiftId] = ['tenant_id' => $tenantId];
-            }
-            $wc->shifts()->sync($syncData);
-
             return redirect()
                 ->route('production.work-centers.show', $wc->id)
                 ->with('success', "Work center '{$wc->name}' created successfully.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
@@ -87,7 +79,89 @@ class WorkCenterController extends Controller
 
         Gate::authorize('view', $workCenter);
 
-        return view('modules.production.work-centers.show', compact('workCenter'));
+        $tenantId = require_tenant_id();
+        $eligibleMachines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)
+            ->whereNull('section_id')
+            ->where('status', '!=', \App\Domains\Production\Models\Machine::STATUS_DECOMMISSIONED)
+            ->orderBy('name')
+            ->get();
+
+        $availableShifts = ProductionShift::where('tenant_id', $tenantId)
+            ->where('active', true)
+            ->orderBy('name')
+            ->get();
+
+        $activePayGrades = \App\Domains\Production\Models\ExternalWorkerPayGrade::where('tenant_id', $tenantId)
+            ->where('active', true)
+            ->orderBy('name')
+            ->get();
+
+        $availableEmployees = class_exists(\App\Domains\HRMS\Models\Employee::class)
+            ? \App\Domains\HRMS\Models\Employee::with(['designation', 'department', 'shift'])
+                ->where('tenant_id', $tenantId)
+                ->orderBy('full_name')
+                ->get()
+            : collect();
+
+        $employeesWithActiveSection = \App\Domains\Production\Models\WorkCenterEmployeeAssignment::where('tenant_id', $tenantId)
+            ->whereNotNull('section_id')
+            ->where('active', true)
+            ->with('section')
+            ->get()
+            ->keyBy('employee_id');
+
+        $employeesWithActiveWorkCenter = \App\Domains\Production\Models\WorkCenterEmployeeAssignment::where('tenant_id', $tenantId)
+            ->whereNull('section_id')
+            ->where('active', true)
+            ->with('workCenter')
+            ->get()
+            ->groupBy('employee_id');
+
+        $countdownEngine = app(CountdownCalculationEngine::class);
+
+        // Auto-process expired countdown if user opens/reloads page after timer elapsed.
+        // WC-IMPL-13: an empty queue (Work Center-level edit) is processed too — as a roll-up only.
+        if ($workCenter->calculation_countdown_end_at
+            && now()->gte($workCenter->calculation_countdown_end_at)
+            && !$workCenter->is_calculation_running
+        ) {
+            try {
+                $countdownEngine->recalculateNow($workCenter, triggerType: 'countdown_timer', scope: CountdownCalculationEngine::SCOPE_QUEUE);
+                $workCenter->refresh();
+            } catch (\Throwable $e) {}
+        }
+
+        $isCountdownActive = $countdownEngine->isCountdownActive($workCenter);
+        $countdownRemainingSeconds = ($workCenter->calculation_countdown_end_at && $isCountdownActive)
+            ? max(0, (int) now()->diffInSeconds($workCenter->calculation_countdown_end_at, false))
+            : 0;
+
+        $workCenter->load([
+            'latestCalculation',
+            'sections.latestCalculation',
+            'sections.machines',
+            'sections.manualProductions.employees.employee.shift',
+            'sections.manualProductions.externalAllocations.payGrade',
+            'sections.manualProductions.externalAllocations.shift',
+            'sections.manualProductions.shift',
+            'sections.externalWorkerAllocations.payGrade',
+            'sections.externalWorkerAllocations.shift',
+            'sections.employeeAssignments.employee.shift',
+            'employeeAssignments.employee.shift',
+            'activityLogs' => fn($q) => $q->orderByDesc('id')->take(20),
+        ]);
+
+        return view('modules.production.work-centers.show', compact(
+            'workCenter',
+            'eligibleMachines',
+            'availableShifts',
+            'activePayGrades',
+            'availableEmployees',
+            'employeesWithActiveSection',
+            'employeesWithActiveWorkCenter',
+            'isCountdownActive',
+            'countdownRemainingSeconds'
+        ));
     }
 
     public function edit(int $id): View
@@ -98,11 +172,9 @@ class WorkCenterController extends Controller
         Gate::authorize('update', $workCenter);
 
         $tenantId = require_tenant_id();
-        $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->orderBy('name')->get();
         $workCenterTypes = config('production.work_center_types', []);
-        $parentOptions = WorkCenter::where('id', '!=', $id)->orderBy('name')->get();
         $calendars = ProductionCalendar::where('tenant_id', $tenantId)->orderBy('name')->get();
-        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'parentOptions', 'shifts', 'calendars'));
+        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'calendars'));
     }
 
     public function update(UpdateWorkCenterRequest $request, int $id): RedirectResponse
@@ -115,27 +187,19 @@ class WorkCenterController extends Controller
         try {
             $tenantId = require_tenant_id();
             $data = $request->validated();
-            if (isset($data['cost_per_hour'])) {
-                $data['cost_per_hour'] = convert_to_base($data['cost_per_hour']);
-            }
-            if (isset($data['overhead_rate'])) {
-                $data['overhead_rate'] = convert_to_base($data['overhead_rate']);
+            unset($data['capacity_per_hour'], $data['efficiency_percentage'], $data['cost_per_hour']);
+            $data['calculation_countdown_minutes'] = $workCenter->calculation_countdown_minutes ?? 10;
+            if (isset($data['overhead_cost'])) {
+                $data['overhead_cost'] = convert_to_base($data['overhead_cost']);
             }
             $dto = WorkCenterDTO::fromArray($data);
             $wc  = $this->service->update($id, $dto);
 
-
-            // Sync shifts
-            $shifts = $request->input('shifts', []);
-            $syncData = [];
-            foreach ($shifts as $shiftId) {
-                $syncData[$shiftId] = ['tenant_id' => $tenantId];
-            }
-            $wc->shifts()->sync($syncData);
-
             return redirect()
                 ->route('production.work-centers.show', $wc->id)
                 ->with('success', "Work center '{$wc->name}' updated successfully.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
@@ -237,4 +301,135 @@ class WorkCenterController extends Controller
 
         return redirect()->back()->with($failedCount > 0 ? 'warning' : 'success', $message);
     }
+
+    public function recalculateNow(int $id, CountdownCalculationEngine $engine): RedirectResponse|JsonResponse
+    {
+        $workCenter = $this->repository->find($id);
+        abort_if(!$workCenter, 404, 'Work center not found.');
+        Gate::authorize('update', $workCenter);
+
+        // WC-IMPL-13: header button = scope 'all'; banner button / browser timer = scope 'queue'.
+        $scope = request()->input('scope') === CountdownCalculationEngine::SCOPE_ALL
+            ? CountdownCalculationEngine::SCOPE_ALL
+            : CountdownCalculationEngine::SCOPE_QUEUE;
+
+        // The browser timer posts trigger=countdown_timer. Accept it only when the countdown has really ended;
+        // if it has not ended yet, or was already processed (e.g. by the cron), do not calculate again.
+        $triggerType = 'manual';
+        if (request()->input('trigger') === 'countdown_timer') {
+            $endAt = $workCenter->calculation_countdown_end_at;
+            if (!$endAt || now()->lt($endAt) || $workCenter->is_calculation_running) {
+                $msg = 'Countdown already processed or not finished yet — no recalculation run.';
+                if (request()->wantsJson()) {
+                    return response()->json(['success' => true, 'skipped' => true, 'message' => $msg]);
+                }
+                return redirect()->route('production.work-centers.show', $workCenter->id);
+            }
+            $triggerType = 'countdown_timer';
+            $scope = CountdownCalculationEngine::SCOPE_QUEUE;
+        }
+
+        try {
+            $snapshot = $engine->recalculateNow($workCenter, $triggerType, $scope);
+            $msg = "Work Center '{$workCenter->name}' recalculated successfully. Daily Capacity: {$snapshot->daily_capacity} units.";
+            if (request()->wantsJson()) {
+                return response()->json(['success' => true, 'message' => $msg, 'snapshot' => $snapshot]);
+            }
+            return redirect()->route('production.work-centers.show', $workCenter->id)->with('success', $msg);
+        } catch (\Exception $e) {
+            if (request()->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function updateCountdownDuration(Request $request, int $id, CountdownCalculationEngine $engine): RedirectResponse|JsonResponse
+    {
+        $workCenter = $this->repository->find($id);
+        abort_if(!$workCenter, 404, 'Work center not found.');
+        Gate::authorize('update', $workCenter);
+
+        $validated = $request->validate([
+            'calculation_countdown_minutes' => 'required|integer|min:1|max:1440',
+        ]);
+
+        try {
+            $updated = $engine->updateCountdownDuration($workCenter, (int) $validated['calculation_countdown_minutes'], auth()->id());
+            $msg = "Countdown debounce duration updated to {$updated->calculation_countdown_minutes} minutes.";
+            if ($request->wantsJson()) {
+                return response()->json(['success' => true, 'message' => $msg, 'minutes' => $updated->calculation_countdown_minutes]);
+            }
+            return redirect()->route('production.work-centers.show', $workCenter->id)->with('success', $msg);
+        } catch (\InvalidArgumentException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function calculationDetails(int $id): JsonResponse
+    {
+        $workCenter = $this->repository->find($id);
+        abort_if(!$workCenter, 404, 'Work center not found.');
+        Gate::authorize('view', $workCenter);
+
+        $latestSnapshot = $workCenter->latestCalculation;
+        // Per ISSUE-02: HTTP GET requests remain strictly read-only.
+        // Uncalculated state returns a null snapshot; calculations are only executed via countdown or explicit user action.
+        return response()->json([
+            'success'  => true,
+            'snapshot' => $latestSnapshot,
+        ]);
+    }
+
+    /**
+     * WC-IMPL-20 (WC-38 rule 3): rendered breakdown modal for ONE exact Work Center snapshot.
+     * Read-only — never calculates (WC-31). Snapshot must belong to this Work Center (tenant-scoped), else 404.
+     */
+    public function workCenterSnapshotModal(int $work_center, int $snapshot): View
+    {
+        $workCenter = $this->repository->find($work_center);
+        abort_if(!$workCenter, 404, 'Work center not found.');
+        Gate::authorize('view', $workCenter);
+
+        $snapshotModel = \App\Domains\Production\Models\WorkCenterCalculation::where('id', $snapshot)
+            ->where('work_center_id', $workCenter->id)
+            ->first();
+        abort_if(!$snapshotModel, 404, 'Snapshot not found.');
+
+        return view('modules.production.work-centers.partials.work-center-calculation-modal', [
+            'workCenter'     => $workCenter,
+            'snapshot'       => $snapshotModel,
+            'modalElementId' => 'snapshotViewerModal_wc_' . $snapshotModel->id,
+        ]);
+    }
+
+    /**
+     * WC-IMPL-20 (WC-38 rule 3): rendered breakdown modal for ONE exact section snapshot.
+     * Read-only — never calculates (WC-31). Section must belong to this Work Center and the snapshot to that section, else 404.
+     */
+    public function sectionSnapshotModal(int $work_center, int $section, int $snapshot): View
+    {
+        $workCenter = $this->repository->find($work_center);
+        abort_if(!$workCenter, 404, 'Work center not found.');
+        Gate::authorize('view', $workCenter);
+
+        $sectionModel = $workCenter->sections->firstWhere('id', $section);
+        abort_if(!$sectionModel, 404, 'Section not found.');
+
+        $snapshotModel = \App\Domains\Production\Models\WorkCenterSectionCalculation::where('id', $snapshot)
+            ->where('section_id', $sectionModel->id)
+            ->first();
+        abort_if(!$snapshotModel, 404, 'Snapshot not found.');
+
+        return view('modules.production.work-centers.partials.section-calculation-modal', [
+            'workCenter'     => $workCenter,
+            'section'        => $sectionModel,
+            'snapshot'       => $snapshotModel,
+            'modalElementId' => 'snapshotViewerModal_sec_' . $snapshotModel->id,
+        ]);
+    }
 }
+

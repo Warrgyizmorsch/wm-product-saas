@@ -106,6 +106,7 @@ class RoutingDrivenSubcontractingTest extends TestCase
             'name' => "Product {$sku}",
             'sku' => $sku,
             'type' => 'finished_good',
+            'supplier_method' => 'manufacture', // PO-02
             'uom_id' => $this->uom->id,
         ]);
 
@@ -156,8 +157,11 @@ class RoutingDrivenSubcontractingTest extends TestCase
                 'processing_time_minutes' => 30,
                 'setup_time_minutes' => 10,
                 'is_external' => false,
+                'cost_per_unit' => 1, // PO-02: costs calculated
             ], $opData));
         }
+
+        $bom->update(['routing_id' => $routing->id]); // PO-01: the routing comes from the BOM
 
         return [$fg, $bom, $routing, $raw];
     }

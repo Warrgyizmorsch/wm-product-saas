@@ -11,6 +11,8 @@ use App\Domains\Inventory\Models\Uom;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionBomItem;
 use App\Domains\Production\Models\Routing;
+use App\Domains\Production\Models\RoutingOperation;
+use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Services\BomExplosionService;
 use App\Domains\Production\Services\ProductionBomService;
 use Database\Seeders\RbacSeeder;
@@ -33,6 +35,7 @@ class ProductionBomTest extends TestCase
     private Product $finishedGoodB;
     private Product $rawMaterialB;
     private Routing $routingA;
+    private RoutingOperation $opA;
 
     protected function setUp(): void
     {
@@ -84,8 +87,16 @@ class ProductionBomTest extends TestCase
         
         $this->routingA = Routing::create([
             'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RT-A-001',
             'name' => 'Standard Assembly Line Routing',
             'status' => 'active',
+        ]);
+        $this->opA = RoutingOperation::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_id' => $this->routingA->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
         ]);
 
         $this->finishedGoodA = Product::create([
@@ -173,15 +184,16 @@ class ProductionBomTest extends TestCase
                 'bom_name' => 'Car Door Standard BOM',
                 'bom_type' => 'manufacturing',
                 'product_id' => $this->finishedGoodA->id,
+                'routing_id' => $this->routingA->id,
                 'base_quantity' => 100, // base quantity basis
                 'base_uom_id' => $this->uomA->id,
                 'version' => '1.0.0',
-                'routing_id' => $this->routingA->id,
                 'effective_date' => now()->toDateString(),
                 'notes' => 'Standard Door assembly',
                 'items' => [
                     [
                         'material_id' => $this->rawMaterialA->id,
+                        'routing_operation_id' => $this->opA->id,
                         'quantity' => 200,
                         'uom_id' => $this->uomA->id,
                         'material_scrap_percentage' => 5.00,
@@ -199,10 +211,10 @@ class ProductionBomTest extends TestCase
         $this->assertEquals('Car Door Standard BOM', $bom->bom_name);
         $this->assertEquals('manufacturing', $bom->bom_type);
         $this->assertEquals(100.0, $bom->base_quantity);
-        $this->assertEquals($this->routingA->id, $bom->routing_id);
         $this->assertEquals('draft', $bom->status);
-        $this->assertCount(1, $bom->items);
-        $this->assertEquals(5.00, $bom->items->first()->material_scrap_percentage);
+        $this->assertCount(1, $bom->operationMaterials);
+        $this->assertEquals(5.00, (float) $bom->operationMaterials->first()->material_scrap_percentage);
+        $this->assertEquals(210.0, (float) $bom->operationMaterials->first()->gross_quantity);
     }
 
     public function test_auto_bom_number_generation(): void
@@ -214,6 +226,7 @@ class ProductionBomTest extends TestCase
                 'bom_name' => 'Auto BOM',
                 'bom_type' => 'manufacturing',
                 'product_id' => $this->finishedGoodA->id,
+                'routing_id' => $this->routingA->id,
                 'base_quantity' => 1.0,
                 'base_uom_id' => $this->uomA->id,
                 'version' => '1.0.0',
@@ -221,6 +234,7 @@ class ProductionBomTest extends TestCase
                 'items' => [
                     [
                         'material_id' => $this->rawMaterialA->id,
+                        'routing_operation_id' => $this->opA->id,
                         'quantity' => 2.0,
                         'uom_id' => $this->uomA->id,
                     ],
@@ -242,6 +256,7 @@ class ProductionBomTest extends TestCase
                 'bom_name' => 'Custom BOM',
                 'bom_type' => 'manufacturing',
                 'product_id' => $this->finishedGoodA->id,
+                'routing_id' => $this->routingA->id,
                 'base_quantity' => 1.0,
                 'base_uom_id' => $this->uomA->id,
                 'version' => '1.0.0',
@@ -249,6 +264,7 @@ class ProductionBomTest extends TestCase
                 'items' => [
                     [
                         'material_id' => $this->rawMaterialA->id,
+                        'routing_operation_id' => $this->opA->id,
                         'quantity' => 2.0,
                         'uom_id' => $this->uomA->id,
                     ],
@@ -270,6 +286,7 @@ class ProductionBomTest extends TestCase
             'bom_name' => 'Duplicate 1',
             'bom_type' => 'manufacturing',
             'product_id' => $this->finishedGoodA->id,
+            'routing_id' => $this->routingA->id,
             'base_quantity' => 1.0,
             'version' => '1.0.0',
             'effective_date' => now()->toDateString(),
@@ -284,6 +301,7 @@ class ProductionBomTest extends TestCase
                 'bom_name' => 'Duplicate 2',
                 'bom_type' => 'manufacturing',
                 'product_id' => $this->finishedGoodA->id,
+                'routing_id' => $this->routingA->id,
                 'base_quantity' => 1.0,
                 'base_uom_id' => $this->uomA->id,
                 'version' => '2.0.0',
@@ -291,6 +309,7 @@ class ProductionBomTest extends TestCase
                 'items' => [
                     [
                         'material_id' => $this->rawMaterialA->id,
+                        'routing_operation_id' => $this->opA->id,
                         'quantity' => 2.0,
                         'uom_id' => $this->uomA->id,
                     ],
@@ -309,6 +328,7 @@ class ProductionBomTest extends TestCase
                 'bom_name' => 'Zero Qty BOM',
                 'bom_type' => 'manufacturing',
                 'product_id' => $this->finishedGoodA->id,
+                'routing_id' => $this->routingA->id,
                 'base_quantity' => 0.0, // Invalid zero quantity
                 'base_uom_id' => $this->uomA->id,
                 'version' => '1.0.0',
@@ -316,6 +336,7 @@ class ProductionBomTest extends TestCase
                 'items' => [
                     [
                         'material_id' => $this->rawMaterialA->id,
+                        'routing_operation_id' => $this->opA->id,
                         'quantity' => 2.0,
                         'uom_id' => $this->uomA->id,
                     ],
@@ -333,6 +354,7 @@ class ProductionBomTest extends TestCase
             'bom_number' => 'BOM-CD-1',
             'bom_name' => 'V1',
             'product_id' => $this->finishedGoodA->id,
+            'routing_id' => $this->routingA->id,
             'base_quantity' => 1.0,
             'version' => '1.0.0',
             'effective_date' => now()->toDateString(),
@@ -346,11 +368,24 @@ class ProductionBomTest extends TestCase
             'bom_number' => 'BOM-CD-1',
             'bom_name' => 'V1.1',
             'product_id' => $this->finishedGoodA->id,
+            'routing_id' => $this->routingA->id,
             'base_quantity' => 1.0,
             'version' => '1.1.0',
             'effective_date' => now()->toDateString(),
             'status' => 'draft',
             'created_by' => $this->userA->id,
+        ]);
+
+        RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_id' => $bom2->id,
+            'routing_operation_id' => $this->opA->id,
+            'material_id' => $this->rawMaterialA->id,
+            'quantity' => 5.0,
+            'gross_quantity' => 5.0,
+            'uom_id' => $this->uomA->id,
+            'is_alternative' => false,
+            'sequence' => 1,
         ]);
 
         // Submit for approval
@@ -389,7 +424,9 @@ class ProductionBomTest extends TestCase
             'bom_number' => 'BOM-DUP-TEST',
             'bom_name' => 'BOM standard',
             'product_id' => $this->finishedGoodA->id,
+            'routing_id' => $this->routingA->id,
             'base_quantity' => 10.0,
+            'base_uom_id' => $this->uomA->id,
             'version' => '1.0.0',
             'revision' => 0,
             'effective_date' => now()->toDateString(),
@@ -397,11 +434,13 @@ class ProductionBomTest extends TestCase
             'created_by' => $this->userA->id,
         ]);
 
-        ProductionBomItem::create([
+        RoutingOperationMaterial::create([
             'tenant_id' => $this->tenantA->id,
             'bom_id' => $bom->id,
+            'routing_operation_id' => $this->opA->id,
             'material_id' => $this->rawMaterialA->id,
             'quantity' => 20.0000,
+            'gross_quantity' => 22.0000,
             'uom_id' => $this->uomA->id,
             'material_scrap_percentage' => 10.00,
         ]);
@@ -412,21 +451,52 @@ class ProductionBomTest extends TestCase
                 'new_version' => '1.1.0',
             ]);
 
-        $response->assertStatus(302);
-        
+        // BM-IMPL-03: Copy-without-saving redirects to pre-filled create form without creating DB record yet
+        $response->assertRedirect(route('production.boms.create', [
+            'copy_from' => $bom->id,
+            'mode' => 'duplicate',
+            'version' => '1.1.0',
+        ]));
+        $this->assertNull(ProductionBom::where('version', '1.1.0')->first());
+
+        $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->get($response->headers->get('Location'))
+            ->assertStatus(200);
+        $this->assertNull(ProductionBom::where('version', '1.1.0')->first());
+
+        // Saving the pre-filled form persists the new draft revision
+        $storeResponse = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.boms.store'), [
+                'bom_number' => 'BOM-DUP-TEST-2',
+                'bom_name' => 'BOM standard',
+                'bom_type' => 'manufacturing',
+                'product_id' => $this->finishedGoodA->id,
+                'routing_id' => $this->routingA->id,
+                'base_quantity' => 10.0,
+                'base_uom_id' => $this->uomA->id,
+                'version' => '1.1.0',
+                'effective_date' => now()->toDateString(),
+                'items' => [
+                    [
+                        'routing_operation_id' => $this->opA->id,
+                        'material_id' => $this->rawMaterialA->id,
+                        'quantity' => 20.0,
+                        'uom_id' => $this->uomA->id,
+                        'material_scrap_percentage' => 10.0,
+                    ],
+                ],
+            ]);
+        $storeResponse->assertRedirect();
+
         $newBom = ProductionBom::where('version', '1.1.0')->first();
         $this->assertNotNull($newBom);
         $this->assertEquals('draft', $newBom->status);
-        $this->assertEquals(1, $newBom->revision); // revision increments
-        $this->assertCount(1, $newBom->items);
-        $this->assertEquals(20.0, $newBom->items->first()->quantity);
-        $this->assertEquals(10.00, $newBom->items->first()->material_scrap_percentage);
-
-        // Check history log
-        $this->assertDatabaseHas('production_bom_approvals', [
-            'bom_id' => $newBom->id,
-            'action' => 'Revision Created',
-        ]);
+        $this->assertCount(1, $newBom->operationMaterials);
+        $this->assertEquals(20.0, (float) $newBom->operationMaterials->first()->quantity);
+        $this->assertEquals(10.00, (float) $newBom->operationMaterials->first()->material_scrap_percentage);
+        $this->assertEquals(22.0, (float) $newBom->operationMaterials->first()->gross_quantity);
     }
 
     public function test_scrap_logic_computes_correct_gross_material(): void
@@ -721,8 +791,8 @@ class ProductionBomTest extends TestCase
         $response->assertRedirect(route('production.boms.index'));
         $response->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('production_boms', ['id' => $bom1->id]);
-        $this->assertDatabaseMissing('production_boms', ['id' => $bom2->id]);
+        $this->assertSoftDeleted('production_boms', ['id' => $bom1->id]);
+        $this->assertSoftDeleted('production_boms', ['id' => $bom2->id]);
         $this->assertDatabaseHas('production_boms', ['id' => $bom3->id]);
     }
 
@@ -734,11 +804,23 @@ class ProductionBomTest extends TestCase
             'bom_name' => 'BOM Sub 1',
             'bom_type' => 'manufacturing',
             'product_id' => $this->finishedGoodA->id,
+            'routing_id' => $this->routingA->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomA->id,
             'version' => '1.0.0',
             'status' => 'draft',
             'effective_date' => now()->toDateString(),
+        ]);
+
+        RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_id' => $bom1->id,
+            'routing_operation_id' => $this->opA->id,
+            'material_id' => $this->rawMaterialA->id,
+            'quantity' => 2.0,
+            'gross_quantity' => 2.0,
+            'uom_id' => $this->uomA->id,
+            'is_alternative' => false,
         ]);
 
         $bom2 = ProductionBom::create([
@@ -747,6 +829,7 @@ class ProductionBomTest extends TestCase
             'bom_name' => 'BOM Sub 2',
             'bom_type' => 'manufacturing',
             'product_id' => $this->finishedGoodA->id,
+            'routing_id' => $this->routingA->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomA->id,
             'version' => '1.0.1',
@@ -776,11 +859,23 @@ class ProductionBomTest extends TestCase
             'bom_name' => 'BOM App 1',
             'bom_type' => 'manufacturing',
             'product_id' => $this->finishedGoodA->id,
+            'routing_id' => $this->routingA->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomA->id,
             'version' => '1.0.0',
             'status' => 'pending_approval',
             'effective_date' => now()->toDateString(),
+        ]);
+
+        RoutingOperationMaterial::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_id' => $bom1->id,
+            'routing_operation_id' => $this->opA->id,
+            'material_id' => $this->rawMaterialA->id,
+            'quantity' => 2.0,
+            'gross_quantity' => 2.0,
+            'uom_id' => $this->uomA->id,
+            'is_alternative' => false,
         ]);
 
         $bom2 = ProductionBom::create([
@@ -789,6 +884,7 @@ class ProductionBomTest extends TestCase
             'bom_name' => 'BOM App 2',
             'bom_type' => 'manufacturing',
             'product_id' => $this->finishedGoodA->id,
+            'routing_id' => $this->routingA->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uomA->id,
             'version' => '1.0.1',
