@@ -28,8 +28,8 @@ class PurchaseRequisitionApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -39,6 +39,7 @@ class PurchaseRequisitionApiController extends Controller
      */
     public function meta(): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseRequisition::class);
         [$tenantId] = $this->resolveTenantContext();
         $products   = Product::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'sku', 'cost_price', 'unit_cost']);
         $warehouses = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'code']);
@@ -59,6 +60,7 @@ class PurchaseRequisitionApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseRequisition::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = PurchaseRequisition::query()
@@ -105,6 +107,8 @@ class PurchaseRequisitionApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', PurchaseRequisition::class);
+
         $validator = Validator::make($request->all(), [
             'requisition_date'               => ['required', 'date'],
             'expected_date'                  => ['nullable', 'date'],
@@ -169,6 +173,8 @@ class PurchaseRequisitionApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $requisition);
+
         return response()->json([
             'success' => true,
             'data'    => $requisition,
@@ -189,6 +195,8 @@ class PurchaseRequisitionApiController extends Controller
                 'message' => 'Purchase Requisition not found',
             ], 404);
         }
+
+        $this->authorize('update', $requisition);
 
         if ($requisition->status !== 'Draft') {
             return response()->json([
@@ -249,6 +257,8 @@ class PurchaseRequisitionApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $requisition);
+
         if ($requisition->status !== 'Draft') {
             return response()->json([
                 'success' => false,
@@ -278,6 +288,8 @@ class PurchaseRequisitionApiController extends Controller
                 'message' => 'Purchase Requisition not found',
             ], 404);
         }
+
+        $this->authorize('approve', $requisition);
 
         if ($requisition->status !== 'Draft') {
             return response()->json([
@@ -313,6 +325,8 @@ class PurchaseRequisitionApiController extends Controller
                 'message' => 'Purchase Requisition not found',
             ], 404);
         }
+
+        $this->authorize('approve', $requisition);
 
         if ($requisition->status !== 'Draft') {
             return response()->json([
@@ -356,6 +370,8 @@ class PurchaseRequisitionApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $requisition);
+
         if ($requisition->status !== 'Draft') {
             return response()->json([
                 'success' => false,
@@ -386,6 +402,7 @@ class PurchaseRequisitionApiController extends Controller
      */
     public function pendingItems(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseRequisition::class);
         $data = $this->requisitionRepo->getPendingItemsData($request->all());
 
         return response()->json([
@@ -399,6 +416,7 @@ class PurchaseRequisitionApiController extends Controller
      */
     public function createPosFromPendingItems(Request $request): JsonResponse
     {
+        $this->authorize('create', PurchaseOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [
@@ -433,6 +451,7 @@ class PurchaseRequisitionApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', PurchaseRequisition::class);
         [$tenantId] = $this->resolveTenantContext();
 
         return Excel::download(

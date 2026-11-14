@@ -4,6 +4,7 @@ namespace App\Domains\HRMS\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\WfhRequest;
 use App\Domains\HRMS\Repositories\WfhRequestRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -276,7 +277,7 @@ class WfhRequestApiController extends Controller
 
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('wfh_attachments', 'public');
+            $attachmentPath = $request->file('attachment')->storeTenantFile('wfh_attachments', 'public');
         }
 
         $user = auth()->user();

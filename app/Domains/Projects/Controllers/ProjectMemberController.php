@@ -63,12 +63,14 @@ class ProjectMemberController extends Controller
                 'id' => $member->id,
                 'user_id' => $member->user_id,
                 'name' => $member->user->name,
+                'rate_per_hour' => $member->rate_per_hour,
             ],
             'avatar_html' => view('modules.projects._collaborator_avatar', [
                 'name' => $member->user->name,
                 'index' => $activeCount - 1,
                 'memberId' => $member->id,
                 'role' => $this->members->roleLabel($member, $project),
+                'rate' => $member->rate_per_hour,
             ])->render(),
             'active_count' => $activeCount,
         ]);

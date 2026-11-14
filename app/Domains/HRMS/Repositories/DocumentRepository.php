@@ -23,10 +23,19 @@ class DocumentRepository implements DocumentRepositoryInterface
     {
         $activeTab = $inputs['tab'] ?? 'employee';
 
+        $currentEmployee = $user ? $this->scopeService->resolveEmployee($user) : null;
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $canSelfManage = $workflowService->allowsSelfApproval($user, null, 'hrms.documents.manage');
+
         $query = Document::with(['documentable', 'documentMaster', 'requestedBy'])
             ->where('documentable_type', Employee::class);
 
         $this->scopeService->applyEmployeeScope($query, $user, 'documentable_id');
+
+        // Hierarchy rule: An admin cannot see or manage their own documents in the admin registry
+        if ($currentEmployee && !$canSelfManage) {
+            $query->where('documentable_id', '!=', $currentEmployee->id);
+        }
 
         if ($activeTab === 'employee') {
             $query->whereHasMorph('documentable', [Employee::class], function ($q) {
@@ -91,13 +100,21 @@ class DocumentRepository implements DocumentRepositoryInterface
 
         $documents = $query->paginate(10)->withQueryString();
 
-        $employees = Employee::orderBy('full_name')->get();
+        $employeeQuery = Employee::orderBy('full_name');
+        if ($currentEmployee && !$canSelfManage) {
+            $employeeQuery->where('id', '!=', $currentEmployee->id);
+        }
+        $employees = $employeeQuery->get();
+
         $categories = DocumentCategory::orderBy('name')->get();
         $templates = DocumentMaster::where('status', 'active')->orderBy('name')->get();
         $documentTemplates = DocumentTemplate::where('status', 'active')->orderBy('name')->get();
 
         $allQuery = Document::where('documentable_type', Employee::class);
         $this->scopeService->applyEmployeeScope($allQuery, $user, 'documentable_id');
+        if ($currentEmployee && !$canSelfManage) {
+            $allQuery->where('documentable_id', '!=', $currentEmployee->id);
+        }
 
         $empQuery = (clone $allQuery)->whereHasMorph('documentable', [Employee::class], function ($q) {
             $q->whereColumn('user_id', 'documents.requested_by_id');
@@ -132,24 +149,54 @@ class DocumentRepository implements DocumentRepositoryInterface
     public function storeDocument(array $validated, Request $request, ?User $user): Document
     {
         $file = $request->file('file');
-        $path = $file->store('documents/employee', 'public');
+        $path = $file->storeTenantFile('documents/employee', 'public');
 
         $docMaster = !empty($validated['document_master_id']) ? DocumentMaster::find($validated['document_master_id']) : null;
         $name = !empty($validated['name']) ? $validated['name'] : ($docMaster?->name ?? $file->getClientOriginalName());
+        $status = ($docMaster?->requires_signature) ? 'pending_signature' : 'approved';
 
-        return Document::create([
+        $doc = Document::create([
             'documentable_type'   => Employee::class,
             'documentable_id'     => $validated['employee_id'],
             'document_master_id'  => $validated['document_master_id'] ?? null,
             'name'                => $name,
+            'file_name'           => $file->getClientOriginalName(),
             'file_path'           => $path,
             'file_type'           => $file->getClientOriginalExtension(),
             'file_size'           => $file->getSize(),
-            'status'              => 'approved',
+            'has_expiry'          => (bool) ($docMaster?->expiry_applicable ?? false),
+            'status'              => $status,
+            'requires_signature'  => (bool) ($docMaster?->requires_signature ?? false),
             'requested_by_id'     => $user?->id,
-            'approved_by_id'      => $user?->id,
-            'approved_at'         => now(),
         ]);
+
+        try {
+            $emp = Employee::find($validated['employee_id']);
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.uploaded', [
+                'tenant_id'     => $doc->tenant_id,
+                'employee_name' => $emp?->full_name ?? 'Employee',
+                'document_type' => $name,
+                'category_name' => $docMaster?->category?->name ?? 'General Documents',
+                'uploaded_at'   => now()->format('d M Y, h:i A'),
+                'employee_id'   => $emp?->id,
+                'user_id'       => $emp?->user_id,
+            ], $doc);
+
+            if ($status === 'pending_signature') {
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.signature_requested', [
+                    'tenant_id'      => $doc->tenant_id,
+                    'employee_name'  => $emp?->full_name ?? 'Employee',
+                    'document_title' => $name,
+                    'due_date'       => now()->addDays(7)->format('d M Y'),
+                    'employee_id'    => $emp?->id,
+                    'user_id'        => $emp?->user_id,
+                ], $doc);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed for document upload: " . $e->getMessage());
+        }
+
+        return $doc;
     }
 
     public function updateDocument(Document $document, array $validated, Request $request): bool
@@ -165,7 +212,7 @@ class DocumentRepository implements DocumentRepositoryInterface
             }
 
             $file = $request->file('file');
-            $updateData['file_path'] = $file->store('documents/employee', 'public');
+            $updateData['file_path'] = $file->storeTenantFile('documents/employee', 'public');
             $updateData['file_type'] = $file->getClientOriginalExtension();
             $updateData['file_size'] = $file->getSize();
         }
@@ -175,19 +222,36 @@ class DocumentRepository implements DocumentRepositoryInterface
 
     public function updateStatus(Document $document, string $status, ?string $reason, ?User $user): bool
     {
-        $updateData = ['status' => $status];
-
-        if ($status === 'approved') {
-            $updateData['approved_by_id'] = $user?->id;
-            $updateData['approved_at']    = now();
-            $updateData['rejection_reason'] = null;
-        } elseif ($status === 'rejected') {
-            $updateData['rejection_reason'] = $reason;
-            $updateData['approved_by_id'] = null;
-            $updateData['approved_at']    = null;
+        $updated = $document->update(['status' => $status]);
+        if ($updated) {
+            try {
+                $emp = $document->documentable;
+                if ($status === 'approved') {
+                    \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.approved', [
+                        'tenant_id'     => $document->tenant_id,
+                        'employee_name' => $emp?->full_name ?? 'Employee',
+                        'document_type' => $document->name ?? 'Document',
+                        'approved_by'   => $user?->name ?? 'HR Department',
+                        'date'          => now()->format('d M Y'),
+                        'employee_id'   => $emp?->id,
+                        'user_id'       => $emp?->user_id,
+                    ], $document);
+                } elseif ($status === 'rejected') {
+                    \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.rejected', [
+                        'tenant_id'     => $document->tenant_id,
+                        'employee_name' => $emp?->full_name ?? 'Employee',
+                        'document_type' => $document->name ?? 'Document',
+                        'reason'        => $reason ?? 'Document rejected upon verification',
+                        'rejected_by'   => $user?->name ?? 'HR Department',
+                        'employee_id'   => $emp?->id,
+                        'user_id'       => $emp?->user_id,
+                    ], $document);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed for document status update: " . $e->getMessage());
+            }
         }
-
-        return $document->update($updateData);
+        return $updated;
     }
 
     public function deleteDocument(Document $document): bool
@@ -196,27 +260,61 @@ class DocumentRepository implements DocumentRepositoryInterface
             Storage::disk('public')->delete($document->file_path);
         }
 
+        if ($document->signed_file_path && Storage::disk('public')->exists($document->signed_file_path)) {
+            Storage::disk('public')->delete($document->signed_file_path);
+        }
+
         return (bool) $document->delete();
     }
 
     public function bulkApprove(array $ids, ?User $user): int
     {
-        return Document::whereIn('id', $ids)->update([
-            'status'            => 'approved',
-            'approved_by_id'    => $user?->id,
-            'approved_at'       => now(),
-            'rejection_reason'  => null,
+        $docs = Document::whereIn('id', $ids)->get();
+        $count = Document::whereIn('id', $ids)->update([
+            'status' => 'approved',
         ]);
+
+        foreach ($docs as $document) {
+            try {
+                $emp = $document->documentable;
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.approved', [
+                    'tenant_id'     => $document->tenant_id,
+                    'employee_name' => $emp?->full_name ?? 'Employee',
+                    'document_type' => $document->name ?? 'Document',
+                    'approved_by'   => $user?->name ?? 'HR Department',
+                    'date'          => now()->format('d M Y'),
+                    'employee_id'   => $emp?->id,
+                    'user_id'       => $emp?->user_id,
+                ], $document);
+            } catch (\Throwable $e) {}
+        }
+
+        return $count;
     }
 
     public function bulkReject(array $ids, ?string $reason, ?User $user): int
     {
-        return Document::whereIn('id', $ids)->update([
-            'status'           => 'rejected',
-            'rejection_reason' => $reason ?? 'Rejected in bulk review',
-            'approved_by_id'   => null,
-            'approved_at'      => null,
+        $docs = Document::whereIn('id', $ids)->get();
+        $count = Document::whereIn('id', $ids)->update([
+            'status' => 'rejected',
         ]);
+
+        foreach ($docs as $document) {
+            try {
+                $emp = $document->documentable;
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.rejected', [
+                    'tenant_id'     => $document->tenant_id,
+                    'employee_name' => $emp?->full_name ?? 'Employee',
+                    'document_type' => $document->name ?? 'Document',
+                    'reason'        => $reason ?? 'Document rejected upon verification',
+                    'rejected_by'   => $user?->name ?? 'HR Department',
+                    'employee_id'   => $emp?->id,
+                    'user_id'       => $emp?->user_id,
+                ], $document);
+            } catch (\Throwable $e) {}
+        }
+
+        return $count;
     }
 
     public function bulkDelete(array $ids): int
@@ -225,6 +323,9 @@ class DocumentRepository implements DocumentRepositoryInterface
         foreach ($docs as $doc) {
             if ($doc->file_path && Storage::disk('public')->exists($doc->file_path)) {
                 Storage::disk('public')->delete($doc->file_path);
+            }
+            if ($doc->signed_file_path && Storage::disk('public')->exists($doc->signed_file_path)) {
+                Storage::disk('public')->delete($doc->signed_file_path);
             }
             $doc->delete();
         }

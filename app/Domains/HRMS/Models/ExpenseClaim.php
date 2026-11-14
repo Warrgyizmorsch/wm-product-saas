@@ -34,14 +34,15 @@ class ExpenseClaim extends Model
      */
     public function getReceiptPathsAttribute(): array
     {
-        if (empty($this->receipt_path)) {
+        $raw = trim((string)$this->receipt_path);
+        if ($raw === '') {
             return [];
         }
-        if (str_starts_with($this->receipt_path, '[') || str_starts_with($this->receipt_path, '{')) {
-            $decoded = json_decode($this->receipt_path, true);
-            return is_array($decoded) ? $decoded : [$this->receipt_path];
+        if (str_starts_with($raw, '[') || str_starts_with($raw, '{')) {
+            $decoded = json_decode($raw, true);
+            return is_array($decoded) ? $decoded : [$raw];
         }
-        return [$this->receipt_path];
+        return [$raw];
     }
 
     /**

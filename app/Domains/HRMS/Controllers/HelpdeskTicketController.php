@@ -6,11 +6,14 @@ use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\HelpdeskCategory;
 use App\Domains\HRMS\Models\HelpdeskSatisfactionRating;
 use App\Domains\HRMS\Models\HelpdeskTicket;
+use App\Domains\HRMS\Models\HelpdeskTicketAttachment;
 use App\Domains\HRMS\Repositories\HelpdeskTicketRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class HelpdeskTicketController extends Controller
@@ -37,12 +40,13 @@ class HelpdeskTicketController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $tenantId = tenant_id();
         $request->validate([
-            'category_id'   => 'required|exists:helpdesk_categories,id',
+            'category_id'   => ['required', Rule::exists('helpdesk_categories', 'id')->where('tenant_id', $tenantId)],
             'subject'       => 'required|string|max:255',
             'description'   => 'required|string',
             'priority'      => 'required|in:low,medium,high,urgent',
-            'attachments.*' => 'nullable|file|max:10240',
+            'attachments.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
         $files = $request->file('attachments');
@@ -57,22 +61,37 @@ class HelpdeskTicketController extends Controller
             iconClass: 'feather-help-circle'
         );
 
+        // Send Notification to assigned agent if auto-assigned
+        if ($ticket->assignedAgent) {
+            \App\Services\Notification\NotificationService::sendToEmployee(
+                employee: $ticket->assignedAgent,
+                title: "Ticket Assigned #{$ticket->ticket_number}",
+                message: "You have been assigned to ticket: {$ticket->subject}",
+                actionUrl: route('hrms.helpdesk.tickets.show', $ticket->id),
+                type: 'helpdesk_ticket',
+                iconClass: 'feather-user-check'
+            );
+        }
+
         try {
             \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.ticket.created', [
-                'tenant_id'     => $ticket->tenant_id,
-                'ticket_no'     => $ticket->ticket_number ?? ('#' . $ticket->id),
-                'subject'       => $ticket->subject,
-                'category'      => $ticket->category?->name ?? 'General',
-                'priority'      => ucfirst($ticket->priority),
-                'employee_name' => $ticket->employee?->full_name ?? (auth()->user()?->name ?? 'Employee'),
-                'action_url'    => route('hrms.helpdesk.tickets.show', $ticket->id),
-            ]);
+                'tenant_id'        => $ticket->tenant_id,
+                'ticket_no'        => $ticket->ticket_number ?? ('#' . $ticket->id),
+                'subject'          => $ticket->subject,
+                'category'         => $ticket->category?->name ?? 'General',
+                'priority'         => ucfirst($ticket->priority),
+                'employee_name'    => $ticket->employee?->full_name ?? (auth()->user()?->name ?? 'Employee'),
+                'action_url'       => route('hrms.helpdesk.tickets.show', $ticket->id),
+                'employee_id'      => $ticket->employee_id,
+                'user_id'          => $ticket->employee?->user_id,
+                'assigned_user_id' => $ticket->assignedAgent?->user_id,
+            ], $ticket);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
         }
 
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
-            ->with('success', "Helpdesk Ticket #{$ticket->ticket_number} created successfully.");
+            ->with('success', __('hrms.helpdesk.flash_ticket_created', ['number' => $ticket->ticket_number]));
     }
 
     public function show(int $id): View
@@ -85,14 +104,46 @@ class HelpdeskTicketController extends Controller
         $user = auth()->user();
         $currentEmployee = Employee::resolveForUser($user);
 
-        $canManage = $user && ($this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
-            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
+        $isSuperAdmin = $user && (strtolower($user->role ?? '') === 'super_admin'
+            || strtolower($user->role ?? '') === 'super-admin'
+            || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin())
+            || $user->is_admin);
 
-        if (!$canManage && $currentEmployee) {
-            if ((int)$currentEmployee->id !== (int)$ticket->employee_id && (int)$currentEmployee->id !== (int)$ticket->assigned_to) {
+        $context = [
+            'tenant_id'     => $tenantId,
+            'company_id'    => $user?->company_id,
+            'branch_id'     => $user?->branch_id ?? $currentEmployee?->branch_id,
+            'department_id' => $user?->department_id ?? $currentEmployee?->department_id,
+            'owner_id'      => $ticket->employee_id,
+        ];
+
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', $context)
+            || $this->access->allows($user, 'hr.settings.manage', $context));
+
+        $isAssignedAgent = $currentEmployee && $ticket->assigned_to && (int)$currentEmployee->id === (int)$ticket->assigned_to;
+        $isOwnTicket = $currentEmployee && (int)$currentEmployee->id === (int)$ticket->employee_id;
+
+        // Scoped Head: Department Head / Branch Manager / Reporting Manager access for non-confidential tickets
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $isScopedHead = false;
+        if ($currentEmployee && $ticket->employee_id && !$ticket->is_confidential) {
+            $isScopedHead = $scopeService->canAccessEmployee($user ?? $currentEmployee, $ticket->employee_id);
+        }
+
+        if (!$canManage) {
+            if (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent && !$isScopedHead)) {
                 abort(403, 'Unauthorized access to this support ticket.');
             }
+            // Defend internal notes from ticket owners and non-managing scoped users
+            $ticket->setRelation(
+                'replies',
+                $ticket->replies->filter(fn ($r) => !$r->is_internal_note)->values()
+            );
         }
+
+        // Anti-conflict-of-interest check: ticket creator cannot manage/update their own ticket unless Super Admin
+        $canUpdate = ($canManage || $isAssignedAgent || $isScopedHead) && (!$isOwnTicket || $isSuperAdmin);
 
         $agents = Employee::where('tenant_id', $tenantId)
             ->where(function ($q) {
@@ -105,7 +156,7 @@ class HelpdeskTicketController extends Controller
         }
         $categories = HelpdeskCategory::where('tenant_id', $tenantId)->where('is_active', true)->get();
 
-        return view('modules.hrms.helpdesk.show', compact('ticket', 'canManage', 'currentEmployee', 'agents', 'categories'));
+        return view('modules.hrms.helpdesk.show', compact('ticket', 'canManage', 'canUpdate', 'currentEmployee', 'isOwnTicket', 'agents', 'categories', 'isSuperAdmin'));
     }
 
     public function reply(Request $request, int $id): RedirectResponse
@@ -113,18 +164,48 @@ class HelpdeskTicketController extends Controller
         $request->validate([
             'message'          => 'required|string',
             'is_internal_note' => 'nullable|boolean',
-            'attachments.*'    => 'nullable|file|max:10240',
+            'attachments.*'    => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
         $tenantId = tenant_id();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
+        if ($ticket->status === 'closed') {
+            return redirect()->back()->with('error', __('hrms.helpdesk.flash_cannot_reply_closed'));
+        }
+
         $user = auth()->user();
-        $canManage = $user && ($this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
-            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
+        $currentEmployee = Employee::resolveForUser($user);
+
+        $context = [
+            'tenant_id'     => $tenantId,
+            'company_id'    => $user?->company_id,
+            'branch_id'     => $user?->branch_id ?? $currentEmployee?->branch_id,
+            'department_id' => $user?->department_id ?? $currentEmployee?->department_id,
+            'owner_id'      => $ticket->employee_id,
+        ];
+
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', $context)
+            || $this->access->allows($user, 'hr.settings.manage', $context));
+
+        $isAssignedAgent = $currentEmployee && $ticket->assigned_to && (int)$currentEmployee->id === (int)$ticket->assigned_to;
+        $isOwnTicket = $currentEmployee && (int)$currentEmployee->id === (int)$ticket->employee_id;
+
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $isScopedHead = false;
+        if ($currentEmployee && $ticket->employee_id && !$ticket->is_confidential) {
+            $isScopedHead = $scopeService->canAccessEmployee($user ?? $currentEmployee, $ticket->employee_id);
+        }
+
+        if (!$canManage) {
+            if (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent && !$isScopedHead)) {
+                abort(403, 'Unauthorized to reply to this support ticket.');
+            }
+        }
 
         if ($request->boolean('is_internal_note') && !$canManage) {
-            return redirect()->back()->with('error', 'Only authorized HR staff can post internal notes.');
+            return redirect()->back()->with('error', __('hrms.helpdesk.flash_internal_note_unauthorized'));
         }
 
         $files = $request->file('attachments');
@@ -154,32 +235,64 @@ class HelpdeskTicketController extends Controller
         }
 
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
-            ->with('success', $request->boolean('is_internal_note') ? 'Internal note added.' : 'Reply posted successfully.');
+            ->with('success', $request->boolean('is_internal_note') ? __('hrms.helpdesk.flash_internal_note_added') : __('hrms.helpdesk.flash_reply_posted'));
     }
 
     public function updateStatus(Request $request, int $id): RedirectResponse
     {
+        $tenantId = tenant_id();
         $request->validate([
             'status'      => 'required|in:open,in_progress,pending_employee,resolved,closed',
-            'assigned_to' => 'nullable|exists:employees,id',
+            'assigned_to' => ['nullable', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'priority'    => 'nullable|in:low,medium,high,urgent',
         ]);
 
-        $tenantId = tenant_id();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
-        app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->authorizeTicketManagement(auth()->user(), $ticket);
+        $user = auth()->user();
+        $isSuperAdmin = $user && (strtolower($user->role ?? '') === 'super_admin'
+            || strtolower($user->role ?? '') === 'super-admin'
+            || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin())
+            || $user->is_admin);
+
+        $wasClosed = $ticket->status === 'closed';
+
+        // Option 3: Lock on Closed - only Super Admin can reopen or modify a closed ticket
+        if ($wasClosed && !$isSuperAdmin) {
+            return redirect()->back()->with('error', __('hrms.helpdesk.flash_ticket_closed_locked'));
+        }
+
+        app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->authorizeTicketManagement($user, $ticket);
+
+        $newStatus = $request->input('status');
+        $previousAssignedTo = $ticket->assigned_to;
+        $newAssignedTo = $request->input('assigned_to');
 
         $this->ticketRepository->updateTicketStatus(
             $ticket,
-            $request->input('status'),
-            $request->input('assigned_to'),
+            $newStatus,
+            $newAssignedTo,
             $request->input('priority')
         );
 
+        // Notify assigned agent if assigned or reassigned
+        if ($newAssignedTo && (int)$newAssignedTo !== (int)$previousAssignedTo) {
+            $assignedEmployee = Employee::where('tenant_id', $tenantId)->find($newAssignedTo);
+            if ($assignedEmployee) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $assignedEmployee,
+                    title: "Ticket Assigned #{$ticket->ticket_number}",
+                    message: "You have been assigned to ticket: {$ticket->subject}",
+                    actionUrl: route('hrms.helpdesk.tickets.show', $ticket->id),
+                    type: 'helpdesk_ticket',
+                    iconClass: 'feather-user-check'
+                );
+            }
+        }
+
         // Notify employee on status change
         if ($ticket->employee) {
-            $statusLabel = ucfirst(str_replace('_', ' ', $request->input('status')));
+            $statusLabel = ucfirst(str_replace('_', ' ', $newStatus));
             \App\Services\Notification\NotificationService::sendToEmployee(
                 employee: $ticket->employee,
                 title: "Ticket #{$ticket->ticket_number} Updated",
@@ -190,7 +303,7 @@ class HelpdeskTicketController extends Controller
             );
         }
 
-        if ($request->input('status') === 'resolved') {
+        if ($newStatus === 'resolved') {
             try {
                 \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.ticket.resolved', [
                     'tenant_id'   => $ticket->tenant_id,
@@ -198,14 +311,18 @@ class HelpdeskTicketController extends Controller
                     'subject'     => $ticket->subject,
                     'resolved_by' => auth()->user()?->name ?? 'Support Agent',
                     'action_url'  => route('hrms.helpdesk.tickets.show', $ticket->id),
-                ]);
+                    'employee_id' => $ticket->employee_id,
+                    'user_id'     => $ticket->employee?->user_id,
+                ], $ticket);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
             }
         }
 
+        $isReopened = $wasClosed && $newStatus !== 'closed';
+
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
-            ->with('success', 'Ticket updated successfully.');
+            ->with('success', $isReopened ? __('hrms.helpdesk.flash_ticket_reopened') : __('hrms.helpdesk.flash_ticket_updated'));
     }
 
     public function submitCsat(Request $request, int $id): RedirectResponse
@@ -218,6 +335,15 @@ class HelpdeskTicketController extends Controller
         $tenantId = tenant_id();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
+        if (!in_array($ticket->status, ['resolved', 'closed'])) {
+            return redirect()->back()->with('error', __('hrms.helpdesk.flash_csat_resolved_only'));
+        }
+
+        $employee = Employee::resolveForUser(auth()->user());
+        if (!$employee || (int)$employee->id !== (int)$ticket->employee_id) {
+            return redirect()->back()->with('error', __('hrms.helpdesk.flash_csat_owner_only'));
+        }
+
         HelpdeskSatisfactionRating::updateOrCreate(
             ['ticket_id' => $ticket->id],
             [
@@ -227,6 +353,52 @@ class HelpdeskTicketController extends Controller
         );
 
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
-            ->with('success', 'Thank you for your feedback!');
+            ->with('success', __('hrms.helpdesk.flash_csat_thank_you'));
+    }
+
+    public function downloadAttachment(int $ticketId, int $attachmentId)
+    {
+        $tenantId = tenant_id();
+        $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($ticketId);
+
+        $user = auth()->user();
+        $currentEmployee = Employee::resolveForUser($user);
+
+        $context = [
+            'tenant_id'     => $tenantId,
+            'company_id'    => $user?->company_id,
+            'branch_id'     => $user?->branch_id ?? $currentEmployee?->branch_id,
+            'department_id' => $user?->department_id ?? $currentEmployee?->department_id,
+            'owner_id'      => $ticket->employee_id,
+        ];
+
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', $context)
+            || $this->access->allows($user, 'hr.settings.manage', $context));
+
+        $isAssignedAgent = $currentEmployee && $ticket->assigned_to && (int)$currentEmployee->id === (int)$ticket->assigned_to;
+        $isOwnTicket = $currentEmployee && (int)$currentEmployee->id === (int)$ticket->employee_id;
+
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $isScopedHead = false;
+        if ($currentEmployee && $ticket->employee_id && !$ticket->is_confidential) {
+            $isScopedHead = $scopeService->canAccessEmployee($user ?? $currentEmployee, $ticket->employee_id);
+        }
+
+        if (!$canManage && (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent && !$isScopedHead))) {
+            abort(403, 'Unauthorized access to this support ticket.');
+        }
+
+        $attachment = HelpdeskTicketAttachment::where('ticket_id', $ticket->id)->findOrFail($attachmentId);
+
+        if ($attachment->reply && $attachment->reply->is_internal_note && !$canManage) {
+            abort(403, 'Unauthorized access to internal note attachments.');
+        }
+
+        if (!Storage::disk('public')->exists($attachment->file_path)) {
+            abort(404, 'Attachment file not found on disk.');
+        }
+
+        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
     }
 }

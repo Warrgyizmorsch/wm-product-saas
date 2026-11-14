@@ -20,6 +20,7 @@ class QuotationItem extends Model
         'quantity',
         'unit_price',
         'tax_rate',
+        'discount',
         'amount',
     ];
 
@@ -28,6 +29,7 @@ class QuotationItem extends Model
         'quantity' => 'integer',
         'unit_price' => 'decimal:2',
         'tax_rate' => 'decimal:2',
+        'discount' => 'decimal:2',
         'amount' => 'decimal:2',
     ];
 

@@ -1746,6 +1746,12 @@
                                                     @else
                                                         @php
                                                             $activeAssignment = $op->operatorAssignments->whereIn('status', ['assigned', 'accepted'])->first();
+                                                            $schedOp = $schedOpsMap->get($op->id);
+                                                            $isOpStarted = in_array($op->status, ['running', 'paused', 'completed'])
+                                                                || ($schedOp && in_array($schedOp->status, ['running', 'paused', 'completed']))
+                                                                || !empty($op->actual_start_time)
+                                                                || ($schedOp && !empty($schedOp->actual_start))
+                                                                || ((float) ($op->quantity_produced ?? 0) > 0);
                                                         @endphp
                                                         @if($activeAssignment)
                                                             <div>
@@ -1759,7 +1765,7 @@
                                                                         <span
                                                                             class="badge bg-soft-warning text-warning fs-9 py-0.5 px-1">Pending</span>
                                                                     @endif
-                                                                    @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
+                                                                    @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed' && !$isOpStarted)
                                                                         @if($order->schedules->isNotEmpty())
                                                                             <button type="button"
                                                                                 class="btn btn-xs btn-outline-secondary p-0.5 border-0"

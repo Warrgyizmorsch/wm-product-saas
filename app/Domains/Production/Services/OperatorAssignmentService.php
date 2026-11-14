@@ -21,6 +21,18 @@ class OperatorAssignmentService
             $this->validateSchedulingRequirements($op);
             $this->validateOperatorQualification($operatorId, $op, $tenantId);
 
+            $hasExistingAssignment = ProductionOperatorAssignment::where('tenant_id', $tenantId)
+                ->where('production_order_operation_id', $operationId)
+                ->whereIn('status', [
+                    ProductionOperatorAssignment::STATUS_ASSIGNED,
+                    ProductionOperatorAssignment::STATUS_ACCEPTED
+                ])
+                ->exists();
+
+            if (($hasExistingAssignment || $op->operator_id) && $this->isOperationStarted($op)) {
+                throw new \LogicException("Cannot change operator: This operation has already started.");
+            }
+
             // Cancel any existing pending/active assignments for this operation
             ProductionOperatorAssignment::where('tenant_id', $tenantId)
                 ->where('production_order_operation_id', $operationId)
@@ -69,6 +81,10 @@ class OperatorAssignmentService
 
             $this->validateSchedulingRequirements($op);
             $this->validateOperatorQualification($newOperatorId, $op, $tenantId);
+
+            if ($this->isOperationStarted($op)) {
+                throw new \LogicException("Cannot change operator: This operation has already started.");
+            }
 
             $oldOperatorId = $assignment->user_id;
 
@@ -269,5 +285,27 @@ class OperatorAssignmentService
         if (!$order || $order->schedules()->count() === 0) {
             throw new \LogicException("Cannot assign operator: A schedule must be generated for the production order first.");
         }
+    }
+
+    /**
+     * Check if an operation has started execution.
+     */
+    public function isOperationStarted(ProductionOrderOperation $op): bool
+    {
+        $schedOp = \App\Domains\Production\Models\ProductionScheduleOperation::where('production_order_operation_id', $op->id)->first();
+
+        return ($schedOp && in_array($schedOp->status, [
+            \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_RUNNING,
+            \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_PAUSED,
+            \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_COMPLETED,
+        ]))
+        || in_array($op->status, [
+            ProductionOrderOperation::STATUS_RUNNING,
+            ProductionOrderOperation::STATUS_PAUSED,
+            ProductionOrderOperation::STATUS_COMPLETED,
+        ])
+        || !empty($op->actual_start_time)
+        || ($schedOp && !empty($schedOp->actual_start))
+        || (float)($op->quantity_produced ?? 0) > 0;
     }
 }

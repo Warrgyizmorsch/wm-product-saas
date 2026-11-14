@@ -478,6 +478,10 @@ Route::prefix('api/hrms/attendance')
         Route::delete('/date/{date}', [AttendanceApiController::class, 'destroyDate'])->name('destroy-date');
         Route::post('/track-location', [AttendanceApiController::class, 'trackLocation'])->name('track-location');
         Route::get('/employee/{employee}', [AttendanceApiController::class, 'getEmployeeLocationLogs'])->name('employee-logs');
+        Route::get('/{attendance}/route', [AttendanceApiController::class, 'getRoute'])->name('route');
+        Route::post('/{attendance}/snapshot', [AttendanceApiController::class, 'uploadSnapshot'])->name('snapshot');
+        Route::post('/{attendance}/consolidate-route', [AttendanceApiController::class, 'consolidateRoute'])->name('consolidate-route');
+        Route::post('/prune-logs', [AttendanceApiController::class, 'pruneLocationLogs'])->name('prune-logs');
     });
 
 
@@ -528,23 +532,26 @@ Route::prefix('api/hrms/travel-expense')
     ->group(function () {
         // Summary & Dashboard
         Route::get('/', [TravelExpenseApiController::class, 'index'])->name('index');
+        Route::get('/paying-accounts', [TravelExpenseApiController::class, 'payingAccounts'])->name('paying-accounts');
         
-        // Travel Requests (Individual list, single get, store, approve, reject)
+        // Travel Requests (Individual list, single get, store, approve, reject, delete)
         Route::get('/travel', [TravelExpenseApiController::class, 'indexTravelRequests'])->name('travel.index');
         Route::get('/travel/{id}', [TravelExpenseApiController::class, 'showTravelRequest'])->name('travel.show');
         Route::post('/travel/store', [TravelExpenseApiController::class, 'storeTravelRequest'])->name('travel.store');
         Route::post('/travel/{travelRequest}/approve', [TravelExpenseApiController::class, 'approveTravelRequest'])->name('travel.approve');
         Route::post('/travel/{travelRequest}/reject', [TravelExpenseApiController::class, 'rejectTravelRequest'])->name('travel.reject');
+        Route::delete('/travel/{travelRequest}', [TravelExpenseApiController::class, 'destroyTravelRequest'])->name('travel.destroy');
         
-        // Cash Advances (Individual list, single get, store, approve, disburse, reject)
+        // Cash Advances (Individual list, single get, store, approve, disburse, reject, delete)
         Route::get('/advance', [TravelExpenseApiController::class, 'indexCashAdvances'])->name('advance.index');
         Route::get('/advance/{id}', [TravelExpenseApiController::class, 'showCashAdvance'])->name('advance.show');
         Route::post('/advance/store', [TravelExpenseApiController::class, 'storeCashAdvance'])->name('advance.store');
         Route::post('/advance/{cashAdvance}/approve', [TravelExpenseApiController::class, 'approveCashAdvance'])->name('advance.approve');
         Route::post('/advance/{cashAdvance}/disburse', [TravelExpenseApiController::class, 'disburseCashAdvance'])->name('advance.disburse');
         Route::post('/advance/{cashAdvance}/reject', [TravelExpenseApiController::class, 'rejectCashAdvance'])->name('advance.reject');
+        Route::delete('/advance/{cashAdvance}', [TravelExpenseApiController::class, 'destroyCashAdvance'])->name('advance.destroy');
         
-        // Expense Reports (Individual list, single get, store, update, submit, approve, reject, pay)
+        // Expense Reports (Individual list, single get, store, update, submit, approve, reject, pay, delete)
         Route::get('/report', [TravelExpenseApiController::class, 'indexExpenseReports'])->name('report.index');
         Route::get('/report/{id}', [TravelExpenseApiController::class, 'showExpenseReport'])->name('report.show');
         Route::post('/report/store', [TravelExpenseApiController::class, 'storeExpenseReport'])->name('report.store');
@@ -553,6 +560,7 @@ Route::prefix('api/hrms/travel-expense')
         Route::post('/report/{expenseReport}/approve', [TravelExpenseApiController::class, 'approveExpenseReport'])->name('report.approve');
         Route::post('/report/{expenseReport}/reject', [TravelExpenseApiController::class, 'rejectExpenseReport'])->name('report.reject');
         Route::post('/report/{expenseReport}/pay', [TravelExpenseApiController::class, 'payExpenseReport'])->name('report.pay');
+        Route::delete('/report/{expenseReport}', [TravelExpenseApiController::class, 'destroyExpenseReport'])->name('report.destroy');
         
         // Policy lookup
         Route::get('/employee-policy/{employee}', [TravelExpenseApiController::class, 'getEmployeePolicy'])->name('employee-policy');
@@ -712,8 +720,9 @@ Route::prefix('api/hrms/pip')
         Route::put('/{pip}/checkins/{checkin}', [PipApiController::class, 'updateCheckin'])->name('checkins.update');
         Route::delete('/{pip}/checkins/{checkin}', [PipApiController::class, 'destroyCheckin'])->name('checkins.destroy');
 
-        // Final Evaluation
+        // Final Evaluation & Acknowledgement
         Route::post('/{pip}/evaluate', [PipApiController::class, 'evaluate'])->name('evaluate');
+        Route::post('/{pip}/acknowledge', [PipApiController::class, 'acknowledge'])->name('acknowledge');
     });
 
 // ==========================================
@@ -749,6 +758,7 @@ Route::prefix('api/hrms/helpdesk')
         Route::post('/tickets/{id}/reply', [HelpdeskApiController::class, 'replyTicket'])->name('tickets.reply');
         Route::put('/tickets/{id}/status', [HelpdeskApiController::class, 'updateTicketStatus'])->name('tickets.status');
         Route::post('/tickets/{id}/csat', [HelpdeskApiController::class, 'submitCsat'])->name('tickets.csat');
+        Route::get('/tickets/{id}/attachments/{attachmentId}', [HelpdeskApiController::class, 'downloadAttachment'])->name('tickets.attachment');
 
         // Categories Master
         Route::get('/categories', [HelpdeskApiController::class, 'indexCategories'])->name('categories.index');
@@ -815,11 +825,9 @@ Route::prefix('api/hrms/kra-kpi')
         Route::post('/scorecards/{id}/submit-goals', [KraKpiApiController::class, 'submitGoals'])->name('scorecards.submit-goals');
         Route::post('/scorecards/{id}/approve-goals', [KraKpiApiController::class, 'approveGoals'])->name('scorecards.approve-goals');
 
-        // Appraisal Review Phases: Self, Manager, Calibration, Sign-off & PIP
+        // Appraisal Review Phases: Self, Manager & PIP
         Route::post('/scorecards/{id}/self-appraisal', [KraKpiApiController::class, 'submitSelfAppraisal'])->name('scorecards.self-appraisal');
         Route::post('/scorecards/{id}/manager-appraisal', [KraKpiApiController::class, 'submitManagerAppraisal'])->name('scorecards.manager-appraisal');
-        Route::post('/scorecards/{id}/calibrate', [KraKpiApiController::class, 'calibrateAppraisal'])->name('scorecards.calibrate');
-        Route::post('/scorecards/{id}/sign-off', [KraKpiApiController::class, 'signOffAppraisal'])->name('scorecards.sign-off');
         Route::post('/scorecards/{id}/trigger-pip', [KraKpiApiController::class, 'triggerPip'])->name('scorecards.trigger-pip');
     });
 
@@ -918,6 +926,7 @@ Route::prefix('api/hrms/goals')
         // Goal Cycles Master (must be before /{id} wildcard)
         Route::get('/cycles', [GoalApiController::class, 'indexCycles'])->name('cycles.index');
         Route::post('/cycles', [GoalApiController::class, 'storeCycle'])->name('cycles.store');
+        Route::put('/cycles/{id}', [GoalApiController::class, 'updateCycle'])->name('cycles.update')->whereNumber('id');
         Route::delete('/cycles/{id}', [GoalApiController::class, 'destroyCycle'])->name('cycles.destroy')->whereNumber('id');
 
         // Goal Strategic Categories / Pillars Master (must be before /{id} wildcard)
@@ -933,6 +942,7 @@ Route::prefix('api/hrms/goals')
         Route::get('/', [GoalApiController::class, 'index'])->name('index');
         Route::post('/', [GoalApiController::class, 'store'])->name('store');
         Route::post('/{id}/check-in', [GoalApiController::class, 'checkIn'])->name('check-in')->whereNumber('id');
+        Route::post('/{id}/approve', [GoalApiController::class, 'approve'])->name('approve')->whereNumber('id');
         Route::get('/{id}', [GoalApiController::class, 'show'])->name('show')->whereNumber('id');
         Route::put('/{id}', [GoalApiController::class, 'update'])->name('update')->whereNumber('id');
         Route::delete('/{id}', [GoalApiController::class, 'destroy'])->name('destroy')->whereNumber('id');
@@ -955,8 +965,10 @@ Route::prefix('api/hrms/feedback-360')
         Route::post('/cycles/{id}/participants', [Feedback360ApiController::class, 'addParticipants'])->name('cycles.participants')->whereNumber('id');
         Route::post('/cycles/{id}/bulk-remind', [Feedback360ApiController::class, 'bulkRemind'])->name('cycles.bulk-remind')->whereNumber('id');
 
-        // 2. Peer Nominations & Approvals
+        // 2. Peer & Upward Nominations & Approvals
         Route::post('/participants/{participantId}/nominate-peers', [Feedback360ApiController::class, 'nominatePeers'])->name('participants.nominate-peers')->whereNumber('participantId');
+        Route::post('/participants/{participantId}/add-rater', [Feedback360ApiController::class, 'addRater'])->name('participants.add-rater')->whereNumber('participantId');
+        Route::delete('/nominations/{nominationId}', [Feedback360ApiController::class, 'destroyNomination'])->name('nominations.destroy')->whereNumber('nominationId');
         Route::post('/nominations/{nominationId}/approve', [Feedback360ApiController::class, 'approveNomination'])->name('nominations.approve')->whereNumber('nominationId');
         Route::post('/nominations/batch-approve', [Feedback360ApiController::class, 'batchApproveNominations'])->name('nominations.batch-approve');
 

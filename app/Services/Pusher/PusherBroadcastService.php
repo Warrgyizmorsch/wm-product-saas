@@ -51,7 +51,7 @@ class PusherBroadcastService
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
-            ])->timeout(3)->withBody($body, 'application/json')->post($url);
+            ])->connectTimeout(2)->timeout(3)->withBody($body, 'application/json')->post($url);
 
             if ($response->successful()) {
                 return true;

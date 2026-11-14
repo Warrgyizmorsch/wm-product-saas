@@ -78,7 +78,7 @@ class ChangeRequestService
                 'cr_number'            => $crNumber,
                 'title'                => $data['title'],
                 'description'          => $data['description'],
-                'requested_by'         => $requester->id,
+                'requested_by'         => !empty($data['requested_by']) ? (int) $data['requested_by'] : $requester->id,
                 'impact_schedule_days' => (int) ($data['impact_schedule_days'] ?? 0),
                 'impact_budget_amount' => (float) ($data['impact_budget_amount'] ?? 0.00),
                 'impact_budget_hours'  => (float) ($data['impact_budget_hours'] ?? 0.00),
@@ -118,11 +118,12 @@ class ChangeRequestService
             ]);
         }
 
-        // Separation of duty: Requester cannot approve their own CR unless Project Manager or Project Owner
+        // Separation of duty: Requester cannot approve their own CR unless Project Manager, Project Owner, or System Admin
         if ((int) $cr->requested_by === (int) $approver->id) {
             $project = $cr->project;
             $isLead = (int) $project->manager_id === (int) $approver->id
-                || (int) $project->owner_id === (int) $approver->id;
+                || (int) $project->owner_id === (int) $approver->id
+                || $approver->hasRole('admin', 'super_admin', 'tenant_owner');
 
             if (! $isLead) {
                 throw ValidationException::withMessages([

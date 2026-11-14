@@ -113,10 +113,10 @@ class EmployeeGoalPlan extends BaseModel
     public function getOverdueStatus(): ?string
     {
         if ($this->isGoalSettingOverdue()) {
-            return 'Goals Overdue';
+            return __('hrms.kra_kpi.goals_overdue');
         }
         if ($this->isSelfReviewOverdue()) {
-            return 'Review Overdue';
+            return __('hrms.kra_kpi.review_overdue');
         }
         return null;
     }

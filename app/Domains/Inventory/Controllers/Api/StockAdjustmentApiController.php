@@ -21,8 +21,8 @@ class StockAdjustmentApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -32,6 +32,7 @@ class StockAdjustmentApiController extends Controller
      */
     public function meta(): JsonResponse
     {
+        $this->authorize('viewAny', StockAdjustment::class);
         [$tenantId] = $this->resolveTenantContext();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'code']);
         $products   = Product::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'sku', 'unit_cost', 'cost_price']);
@@ -53,6 +54,7 @@ class StockAdjustmentApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', StockAdjustment::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = StockAdjustment::query()
@@ -93,6 +95,8 @@ class StockAdjustmentApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', StockAdjustment::class);
+
         $validator = Validator::make($request->all(), [
             'warehouse_id'        => ['required', 'integer'],
             'adjustment_date'     => ['required', 'date'],
@@ -219,6 +223,8 @@ class StockAdjustmentApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $adj);
+
         return response()->json([
             'success' => true,
             'data'    => $adj,
@@ -239,6 +245,8 @@ class StockAdjustmentApiController extends Controller
                 'message' => 'Stock Adjustment not found',
             ], 404);
         }
+
+        $this->authorize('approve', $adjustment);
 
         if ($adjustment->status !== 'Draft') {
             return response()->json([
@@ -308,6 +316,8 @@ class StockAdjustmentApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $adjustment);
+
         if ($adjustment->status === 'Approved') {
             return response()->json([
                 'success' => false,
@@ -329,6 +339,7 @@ class StockAdjustmentApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', StockAdjustment::class);
         [$tenantId] = $this->resolveTenantContext();
 
         return Excel::download(

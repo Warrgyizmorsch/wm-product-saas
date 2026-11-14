@@ -2,26 +2,39 @@
 
 namespace App\Domains\HRMS\Policies;
 
+use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\EmployeeExit;
+use App\Domains\HRMS\Services\HrmsScopeService;
 use App\Models\User;
 use App\Services\Access\AccessService;
 
 class EmployeeExitPolicy
 {
-    public function __construct(private readonly AccessService $access)
-    {
+    public function __construct(
+        private readonly AccessService $access,
+        private readonly HrmsScopeService $scopeService
+    ) {
     }
 
     public function viewAny(User $user): bool
     {
+        if ($this->scopeService->isCompanyAdmin($user)) {
+            return true;
+        }
+
         return $this->access->allows($user, 'hrms.employee_exits.view', [
             'tenant_id' => $user->tenant_id,
-        ]);
+        ]) || ($user->employee !== null || Employee::resolveForUser($user) !== null);
     }
 
     public function view(User $user, EmployeeExit $exit): bool
     {
-        if ($user->employee?->id === $exit->employee_id) {
+        $userEmpId = $user->employee?->id ?? Employee::resolveForUser($user)?->id;
+        if ($userEmpId && (int) $userEmpId === (int) $exit->employee_id) {
+            return true;
+        }
+
+        if ($this->scopeService->canAccessEmployee($user, $exit->employee_id)) {
             return true;
         }
 
@@ -36,11 +49,15 @@ class EmployeeExitPolicy
             'tenant_id' => $user->tenant_id,
         ]) || $this->access->allows($user, 'hrms.employees.update', [
             'tenant_id' => $user->tenant_id,
-        ]) || ($user->employee !== null);
+        ]) || ($user->employee !== null || Employee::resolveForUser($user) !== null);
     }
 
     public function approve(User $user, mixed $exit = null): bool
     {
+        if ($this->scopeService->isCompanyAdmin($user)) {
+            return true;
+        }
+
         $tenantId = $exit instanceof EmployeeExit ? $exit->tenant_id : $user->tenant_id;
 
         return $this->access->allows($user, 'hrms.employee_exits.approve', [
@@ -50,9 +67,12 @@ class EmployeeExitPolicy
 
     public function approveManager(User $user, EmployeeExit $exit): bool
     {
-        $userEmpId = $user->employee?->id ?? \App\Domains\HRMS\Models\Employee::where('user_id', $user->id)->value('id');
-        $exit->loadMissing('employee');
-        if ($userEmpId && $exit->employee && $userEmpId === $exit->employee->reporting_manager_id) {
+        $userEmpId = $user->employee?->id ?? Employee::resolveForUser($user)?->id;
+        if ($userEmpId && (int) $userEmpId === (int) $exit->employee_id) {
+            return false; // Prevent conflict of interest
+        }
+
+        if ($this->scopeService->canAccessEmployee($user, $exit->employee_id)) {
             return true;
         }
 
@@ -63,9 +83,12 @@ class EmployeeExitPolicy
 
     public function reject(User $user, EmployeeExit $exit): bool
     {
-        $userEmpId = $user->employee?->id ?? \App\Domains\HRMS\Models\Employee::where('user_id', $user->id)->value('id');
-        $exit->loadMissing('employee');
-        if ($userEmpId && $exit->employee && $userEmpId === $exit->employee->reporting_manager_id) {
+        $userEmpId = $user->employee?->id ?? Employee::resolveForUser($user)?->id;
+        if ($userEmpId && (int) $userEmpId === (int) $exit->employee_id) {
+            return false; // Prevent conflict of interest
+        }
+
+        if ($this->scopeService->canAccessEmployee($user, $exit->employee_id)) {
             return true;
         }
 

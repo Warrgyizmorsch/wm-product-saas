@@ -349,15 +349,22 @@ class EmployeeExitApiController extends Controller
             return $this->sendError("Exit record not found.", 404);
         }
 
+        $noticePeriodDays = (int) ($exit->notice_period_days ?? 90);
+
         $validator = Validator::make($request->all(), [
             'approved_lwd'          => 'required|date',
             'notice_action'         => 'required|in:serve,waive,recover',
-            'notice_shortfall_days' => 'nullable|integer|min:0',
+            'notice_shortfall_days' => "nullable|integer|min:0|max:{$noticePeriodDays}",
             'hr_remarks'            => 'nullable|string|max:1000',
         ]);
 
         if ($validator->fails()) {
             return $this->sendError('Validation failed.', 422, $validator->errors());
+        }
+
+        $validated = $validator->validated();
+        if (isset($validated['notice_shortfall_days']) && (int)$validated['notice_shortfall_days'] > $noticePeriodDays) {
+            return $this->sendError("Notice shortfall days ({$validated['notice_shortfall_days']}) cannot exceed notice period days ({$noticePeriodDays}).", 422);
         }
 
         try {
@@ -730,8 +737,26 @@ class EmployeeExitApiController extends Controller
             return $this->sendError('Validation failed.', 422, $validator->errors());
         }
 
+        $validated = $validator->validated();
+
+        $totalEarnings = floatval($validated['unpaid_salary'])
+            + floatval($validated['leave_encashment_amount'])
+            + floatval($validated['gratuity_amount'])
+            + floatval($validated['bonus_amount'])
+            + floatval($validated['other_earnings'] ?? 0);
+
+        $totalDeductions = floatval($validated['notice_recovery_amount'])
+            + floatval($validated['asset_recovery_amount'])
+            + floatval($validated['loan_deduction_amount'])
+            + floatval($validated['tax_deduction_amount'])
+            + floatval($validated['other_deductions'] ?? 0);
+
+        if ($totalDeductions > $totalEarnings) {
+            return $this->sendError("Total deductions (₹" . number_format($totalDeductions, 2) . ") cannot exceed total earnings (₹" . number_format($totalEarnings, 2) . "). Negative settlement recovery is not allowed.", 422);
+        }
+
         try {
-            $settlement = $this->exitRepository->saveFnf($exit, $validator->validated());
+            $settlement = $this->exitRepository->saveFnf($exit, $validated);
             return $this->sendSuccess($settlement, 'FnF settlement finalized and saved successfully.');
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), 400);

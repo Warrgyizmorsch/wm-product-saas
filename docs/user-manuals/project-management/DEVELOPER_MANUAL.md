@@ -14,7 +14,7 @@ app/Domains/Projects/
 ├── Requests/            ← 29 Form Request validation classes
 ├── Policies/            ← 10 Authorization Policies bound in AppServiceProvider
 ├── Events/              ← 12 Strongly-typed Domain Event classes
-├── Listeners/           ← ProjectNotificationListener
+├── Listeners/           ← ProjectNotificationListener, SyncProductionTaskCompletionListener
 ├── Jobs/                ← SendProjectNotificationEmailJob (asynchronous email queue worker)
 ├── DTO/                 ← Data Transfer Objects (DashboardKpiDTO, ReportFilterDTO)
 ├── Exports/             ← ProjectReportExport, ProjectsExport (CSV/XLSX export pipelines)
@@ -32,14 +32,14 @@ Every model defines an explicit table name with the `project_` prefix (except `p
 
 | Model Class | Database Table | Primary Foreign Keys | Key Attributes & Business Scopes |
 | :--- | :--- | :--- | :--- |
-| `Project` | `projects` | `tenant_id`, `company_id`, `branch_id`, `customer_id`, `manager_id`, `owner_id`, `closed_by` | `code`, `name`, `type`, `billing_type`, `budget_amount`, `status`, `closure_status`, `closed_at`. |
+| `Project` | `projects` | `tenant_id`, `company_id`, `branch_id`, `customer_id`, `sales_order_id`, `crm_deal_id`, `client_contact_id`, `cost_center_id`, `manager_id`, `owner_id`, `closed_by` | `code`, `name`, `type`, `billing_type`, `budget_amount`, `status`, `closure_status`, `closed_at`. |
 | `ProjectMember` | `project_members` | `tenant_id`, `project_id`, `user_id` | `project_role`, `rate_per_hour`, `cost_per_hour`, `budget_hours`, `is_active`. |
 | `TaskList` | `project_task_lists` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `milestone_id`, `owner_id` | `name`, `description`, `position`. |
-| `Task` | `project_tasks` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `task_list_id`, `milestone_id`, `assigned_to` | `title`, `description`, `priority`, `status`, `estimated_hours`, `actual_hours`, `start_date`, `due_date`, `total_float`, `is_critical`. |
+| `Task` | `project_tasks` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `task_list_id`, `milestone_id`, `assigned_to` | `title`, `description`, `priority`, `status`, `estimated_hours`, `actual_hours`, `start_date`, `due_date`, `total_float`, `is_critical`. Links to `production_orders` and `purchase_requisition_items`. |
 | `SubTask` | `project_sub_tasks` | `tenant_id`, `company_id`, `branch_id`, `task_id`, `assigned_to` | `title`, `is_completed`, `completed_at`, `position`. |
 | `TaskDependency` | `project_task_dependencies` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `task_id`, `depends_on_task_id` | `dependency_type` (`Finish-to-Start`, `Start-to-Start`, `Finish-to-Finish`, `Start-to-Finish`), `lag_days`. |
-| `Milestone` | `project_milestones` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `invoice_id` | `name`, `due_date`, `completion_date`, `completion_percentage`, `billing_amount`, `is_completed`, `is_invoiced`, `status`. |
-| `TimeLog` | `project_time_logs` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `task_id`, `user_id`, `approved_by`, `invoice_id` | `log_date`, `hours`, `is_billable`, `hourly_rate`, `approval_status` (`Pending`, `Approved`, `Rejected`), `approved_at`, `is_invoiced`. |
+| `Milestone` | `project_milestones` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `sales_order_item_id`, `invoice_id` | `name`, `due_date`, `completion_date`, `completion_percentage`, `billing_amount`, `is_completed`, `is_invoiced`, `status`. |
+| `TimeLog` | `project_time_logs` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `task_id`, `user_id`, `approved_by`, `invoice_id` | `log_date`, `hours` (0.01–24.00), `is_billable`, `hourly_rate`, `approval_status` (`Pending`, `Approved`, `Rejected`), `approved_at`, `is_invoiced`. |
 | `Issue` | `project_issues` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `task_id`, `assigned_to`, `reported_by` | `title`, `severity` (`Minor`, `Major`, `Critical`), `priority`, `status` (`Open`, `Assigned`, `In Progress`, `Resolved`, `Closed`), `resolved_at`. |
 | `ProjectDocument` | `project_documents` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `uploaded_by`, `attachable` (morph) | `title`, `file_name`, `file_path`, `file_size`, `mime_type`, `category`. |
 | `ProjectReview` | `project_reviews` | `tenant_id`, `company_id`, `branch_id`, `project_id`, `reviewer_id` | `title`, `review_type`, `status` (`Pending`, `Approved`, `Rework Required`), `sign_off_date`. |
@@ -66,25 +66,26 @@ $this->app->bind(
 ```
 
 ### Domain Services Reference
-1. `ProjectService`: Lifecycle state machine (`planning` → `active` → `on_hold` → `closed` / `cancelled`).
-2. `ProjectMemberService`: Roster management, rate card lookup (`rate_per_hour`, `cost_per_hour`).
-3. `TaskListService`: WBS category creation and sort position sequencing.
-4. `TaskService`: Task status transitions, progress rollups, and assignee dispatches.
-5. `SubTaskService`: Checklist lifecycle; triggers parent task completion percentage recalculations.
-6. `TaskDependencyService`: Dependency CRUD; executes Depth-First Search cycle detection.
-7. `ProjectScheduleService`: Critical Path Method (CPM) calculation engine.
-8. `MilestoneService`: Milestone achievement tracking and billing readiness.
-9. `TimeLogService`: Time tracking, rate lookup from `project_members`, billability, and approval transitions.
-10. `IssueService`: Defect lifecycle transitions and assignment notifications.
-11. `ProjectDocumentService`: Secure file upload (`local` disk), download streaming, and access audits.
-12. `ProjectReviewService`: Quality reviews and UAT milestone sign-offs.
-13. `ChangeRequestService`: Scope change evaluation, schedule adjustments, and budget revisions.
-14. `ProjectBillingService`: Unbilled item aggregation and bridge to `SalesInvoiceCreationService::createDraftInvoice()`.
-15. `ProjectClosureService`: Evaluates 5 formal condition gates and finalizes project closure.
-16. `ProjectNotificationService`: Dispatches in-app alerts and asynchronous email notification jobs.
-17. `ProjectDashboardService`: Computes real-time KPI metrics (`DashboardKpiDTO`) and portfolio health scoring.
-18. `ProjectReportService`: Generates database-level paginated queries and collections for 7 reports.
-19. `ActivityLogService`: Records fine-grained change audits and event history.
+1. `ProjectService`: Lifecycle state machine (`Draft` → `Active` → `On Hold` → `Completed` → `Closed` / `Cancelled`). `Closed` and `Cancelled` are terminal states with zero outgoing transitions.
+2. `SalesOrderProjectBridgeService` (`App\Domains\Sales\Services\`): Converts confirmed Sales Orders into delivery projects, generating milestone deliverables and fulfillment task lists.
+3. `ProjectMemberService`: Roster management, rate card lookup (`rate_per_hour`, `cost_per_hour`).
+4. `TaskListService`: WBS category creation and sort position sequencing.
+5. `TaskService`: Task status transitions, progress rollups, assignee dispatches, and shop-floor production/purchasing linking.
+6. `SubTaskService`: Checklist lifecycle; triggers parent task completion percentage recalculations.
+7. `TaskDependencyService`: Dependency CRUD; executes Depth-First Search cycle detection.
+8. `ProjectScheduleService`: Critical Path Method (CPM) calculation engine.
+9. `MilestoneService`: Milestone achievement tracking and billing readiness.
+10. `TimeLogService`: Time tracking, rate lookup from `project_members`, billability, and approval transitions.
+11. `IssueService`: Defect lifecycle transitions and assignment notifications.
+12. `ProjectDocumentService`: Secure file upload (`local` disk), download streaming, and access audits.
+13. `ProjectReviewService`: Quality reviews and UAT milestone sign-offs.
+14. `ChangeRequestService`: Scope change evaluation, schedule adjustments, and budget revisions.
+15. `ProjectBillingService`: Unbilled item aggregation and bridge to `SalesInvoiceCreationService::createDraftInvoice()`.
+16. `ProjectClosureService`: Evaluates 5 formal condition gates and finalizes project closure.
+17. `ProjectNotificationService`: Dispatches in-app alerts and asynchronous email notification jobs.
+18. `ProjectDashboardService`: Computes real-time KPI metrics (`DashboardKpiDTO`) and portfolio health scoring.
+19. `ProjectReportService`: Generates database-level paginated queries and collections for 7 reports.
+20. `ActivityLogService`: Records fine-grained change audits and event history.
 
 ---
 
@@ -157,7 +158,29 @@ sequenceDiagram
 
 ---
 
-## 6. Controlled Closure: 5 Condition Gates (`ProjectClosureService`)
+## 6. Manufacturing & Procurement Integration Architecture
+
+### Shop-Floor Manufacturing & Aggregate Yield Synchronization
+Project tasks bridge to shop-floor manufacturing through task-level Production Order associations:
+1. **Relational Linkage**: A task may be linked to one or more Production Orders via `TaskController::linkProductionOrder` (`POST /tasks/{task}/production-orders`). This sets `production_orders.project_id`, `project_milestone_id`, and `project_task_id`.
+2. **Tenant & Organizational Boundary Enforcement**: Both the project task and the target production order must belong to the exact same tenant, company (`company_id`), and branch (`branch_id`). Cross-branch or cross-company linking is rejected with HTTP 422.
+3. **Aggregate Yield Completion Logic**: The listener `\App\Domains\Projects\Listeners\SyncProductionTaskCompletionListener` listens for `\App\Domains\Production\Events\ProductionOrderCompleted` (registered in `AppServiceProvider.php` line 583):
+   - Fetches all Production Orders linked to the task.
+   - Verifies that **all** linked orders have reached `status = 'Completed'`.
+   - Computes aggregate output: $\sum \text{produced\_quantity}$.
+   - Compares against ordered threshold: $\sum \text{produced\_quantity} \ge \left(\sum \text{quantity} - 0.0001\right)$.
+   - If satisfied, transitions the parent task to `status = 'Completed'` and invokes `MilestoneService::recalculateMilestoneProgress()`.
+   - If a yield shortfall exists, the task remains open and logs a `production.shortfall_warning` activity log.
+
+### Procurement Item Association
+Project tasks associate with procurement via Purchase Requisition items:
+1. **Relational Linkage**: Tasks link to `purchase_requisition_items` by setting `project_task_id` via `TaskController::linkPurchaseRequisition` (`POST /tasks/{task}/purchase-requisitions`).
+2. **Scope Enforcement**: Requisition items must share the project's `tenant_id`, `company_id`, and `branch_id`.
+3. **Operational Boundary**: Requisition linking provides cost and item visibility. Automated Purchase Order creation directly from project tasks is deliberately not implemented; PO generation is executed through the Purchasing module.
+
+---
+
+## 7. Controlled Closure: 5 Condition Gates (`ProjectClosureService`)
 
 Project closure is strictly evaluated by `ProjectClosureService::evaluateGates(Project $project)` and enforced by `assertClosable()`:
 
@@ -190,13 +213,13 @@ $incompleteMilestonesCount = Milestone::where('project_id', $project->id)
     ->whereNotIn('status', ['Completed', 'Closed'])->count();
 ```
 
-If any gate fails, `assertClosable()` throws a `ValidationException`, completely preventing project closure.
+If any gate fails, `assertClosable()` throws a `ValidationException`, completely preventing project closure. Once closed, the project lifecycle status is immutable (`TRANSITIONS[STATUS_CLOSED] => []`).
 
 ---
 
-## 7. Event Bus & Notification Pipeline
+## 8. Event Bus & Notification Pipeline
 
-The module defines 12 domain event classes in `app/Domains/Projects/Events/`, registered in `app/Providers/AppServiceProvider.php` (lines 583–601):
+The module defines 12 domain event classes in `app/Domains/Projects/Events/`, registered in `app/Providers/AppServiceProvider.php` (lines 588–606):
 
 1. `TaskAssigned`: Dispatched when a task is assigned or reassigned.
 2. `TaskCompleted`: Dispatched when a task transitions to `'Completed'`.
@@ -211,11 +234,15 @@ The module defines 12 domain event classes in `app/Domains/Projects/Events/`, re
 11. `ChangeRequestCreated`: Dispatched when a scope variation is logged.
 12. `ProjectClosed`: Dispatched when project closure gates pass and closure is finalized.
 
-All 12 events are handled by `\App\Domains\Projects\Listeners\ProjectNotificationListener`, which routes alerts through `ProjectNotificationService`. In-app notifications optionally attach the recipient's `employee_id` if linked to an HRMS Employee record.
+All 12 domain events are handled by `\App\Domains\Projects\Listeners\ProjectNotificationListener`, which routes alerts through `ProjectNotificationService`. In-app notifications optionally attach the recipient's `employee_id` if linked to an HRMS Employee record.
+
+Additionally, cross-domain manufacturing integration is handled by:
+- Event: `\App\Domains\Production\Events\ProductionOrderCompleted`
+- Listener: `\App\Domains\Projects\Listeners\SyncProductionTaskCompletionListener` (registered in `AppServiceProvider.php` lines 582–585)
 
 ---
 
-## 8. Document Storage Architecture
+## 9. Document Storage Architecture
 
 - **Disk**: Stored on Laravel's `local` disk.
 - **Directory Path**: `tenants/{tenant_id}/projects/{project_id}/documents/`

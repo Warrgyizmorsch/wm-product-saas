@@ -8,10 +8,12 @@ use App\Domains\CRM\Models\CrmAccount;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
+use App\Domains\Sales\Models\PaymentAllocation;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use App\Services\TaxIdentityService;
 
 class CustomerApiController extends Controller
 {
@@ -19,8 +21,8 @@ class CustomerApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -51,6 +53,11 @@ class CustomerApiController extends Controller
         $query = Customer::query()
             ->where('tenant_id', $tenantId)
             ->withCount(['salesOrders', 'invoices', 'payments']);
+
+        $authUser = auth()->user();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'crm.customers.view', ['tenant_id' => $tenantId])) {
+            $query->whereHas('crmAccount', fn($q) => $q->where('owner_id', $authUser->id));
+        }
 
         // Search
         if ($search = $request->input('search')) {
@@ -110,12 +117,16 @@ class CustomerApiController extends Controller
             'name'             => ['required', 'string', 'max:255'],
             'company_name'     => ['nullable', 'string', 'max:255'],
             'email'            => ['nullable', 'email', 'max:255'],
-            'phone'            => ['nullable', 'string', 'max:50'],
-            'gstin'            => ['nullable', 'string', 'max:50'],
+            'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'gstin'            => TaxIdentityService::gstinRules(false),
             'status'           => ['nullable', 'in:active,inactive,blocked'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'opening_balance'  => ['nullable', 'numeric'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
+        ], [
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         if ($validator->fails()) {
@@ -142,11 +153,16 @@ class CustomerApiController extends Controller
             'billing_address'  => $validated['billing_address'] ?? null,
             'shipping_address' => $validated['shipping_address'] ?? null,
             'opening_balance'  => $validated['opening_balance'] ?? 0.00,
+            'opening_balance_type' => $validated['opening_balance_type'] ?? 'debit',
         ]);
+
+        // Previously saved on the customer only, never posted to the ledger.
+        $openingWarning = app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer);
 
         return response()->json([
             'success' => true,
             'message' => 'Customer created successfully',
+            'warning' => $openingWarning,
             'data'    => $customer,
         ], 201);
     }
@@ -174,18 +190,48 @@ class CustomerApiController extends Controller
             ], 404);
         }
 
+        $authUser = auth()->user();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'crm.customers.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $customer->crmAccount?->owner_id,
+        ])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to view this customer.',
+            ], 403);
+        }
+
         $totalInvoiced = (float) Invoice::where('tenant_id', $tenantId)->where('customer_id', $id)->sum('total_amount');
         $totalPaid     = (float) CustomerPayment::where('tenant_id', $tenantId)->where('customer_id', $id)->sum('amount');
         $balanceDue    = (float) Invoice::where('tenant_id', $tenantId)->where('customer_id', $id)->sum('balance_due');
+
+        $postedPayments = CustomerPayment::where('tenant_id', $tenantId)
+            ->where('customer_id', $id)
+            ->whereIn('status', ['Posted', 'posted', 'completed', 'paid'])
+            ->with('allocations')
+            ->get();
+
+        $unallocatedAdvanceAllocs = (float) PaymentAllocation::whereHas('payment', function ($q) use ($id, $tenantId) {
+            $q->where('tenant_id', $tenantId)->where('customer_id', $id)->whereIn('status', ['Posted', 'posted', 'completed', 'paid']);
+        })->whereNull('invoice_id')->sum('allocated_amount');
+
+        $unallocatedPaymentsBal = (float) $postedPayments->sum(function ($p) {
+            return max(0, (float) $p->amount - (float) $p->allocations->sum('allocated_amount'));
+        });
+
+        $availableAdvance = round($unallocatedAdvanceAllocs + $unallocatedPaymentsBal, 2);
+        $netReceivables   = max(0, round($balanceDue - $availableAdvance, 2));
 
         return response()->json([
             'success' => true,
             'data'    => [
                 'customer' => $customer,
                 'stats'    => [
-                    'total_invoiced' => $totalInvoiced,
-                    'total_paid'     => $totalPaid,
-                    'balance_due'    => $balanceDue,
+                    'total_invoiced'    => $totalInvoiced,
+                    'total_paid'        => $totalPaid,
+                    'balance_due'       => $balanceDue,
+                    'available_advance' => $availableAdvance,
+                    'net_receivables'   => $netReceivables,
                 ],
             ],
         ]);
@@ -207,16 +253,31 @@ class CustomerApiController extends Controller
             ], 404);
         }
 
+        $authUser = auth()->user();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'crm.customers.update', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $customer->crmAccount?->owner_id,
+        ])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to update this customer.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'name'             => ['sometimes', 'required', 'string', 'max:255'],
             'company_name'     => ['nullable', 'string', 'max:255'],
             'email'            => ['nullable', 'email', 'max:255'],
-            'phone'            => ['nullable', 'string', 'max:50'],
-            'gstin'            => ['nullable', 'string', 'max:50'],
+            'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'gstin'            => TaxIdentityService::gstinRules(false),
             'status'           => ['nullable', 'in:active,inactive,blocked'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'opening_balance'  => ['nullable', 'numeric'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
+        ], [
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         if ($validator->fails()) {
@@ -229,9 +290,12 @@ class CustomerApiController extends Controller
 
         $customer->update($validator->validated());
 
+        $openingWarning = app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer->fresh());
+
         return response()->json([
             'success' => true,
             'message' => 'Customer updated successfully',
+            'warning' => $openingWarning,
             'data'    => $customer->fresh(),
         ]);
     }
@@ -249,6 +313,17 @@ class CustomerApiController extends Controller
                 'success' => false,
                 'message' => 'Customer not found',
             ], 404);
+        }
+
+        $authUser = auth()->user();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'crm.customers.delete', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $customer->crmAccount?->owner_id,
+        ])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to delete this customer.',
+            ], 403);
         }
 
         // Check active orders or pending balances

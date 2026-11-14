@@ -291,7 +291,9 @@
 </head>
 <body>
     @php
-        $company = $exit->employee->company ?: \App\Domains\HRMS\Models\Company::first();
+        $settlement = $settlement ?? ($fnf ?? ($exit->fnfSettlement ?? null));
+        $fnf = $settlement;
+        $company = $company ?? ($exit->employee->company ?: \App\Domains\HRMS\Models\Company::first());
         $companyName = $company->company_name ?? 'Warrgyizmorsch Pvt Ltd';
         $companyInitials = strtoupper(substr($companyName, 0, 2));
         $refNumber = 'FNF/' . ($company->code ?? 'ORG') . '/' . date('Y') . '/' . str_pad((string)$exit->id, 4, '0', STR_PAD_LEFT);

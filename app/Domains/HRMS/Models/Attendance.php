@@ -29,6 +29,10 @@ class Attendance extends BaseModel
         'check_out_longitude',
         'check_in_selfie_path',
         'check_out_selfie_path',
+        'total_distance_km',
+        'route_polyline',
+        'route_snapshot_url',
+        'route_summary',
     ];
 
     protected $casts = [
@@ -37,7 +41,158 @@ class Attendance extends BaseModel
         'check_out' => 'datetime',
         'total_work_hours' => 'decimal:2',
         'total_break_hours' => 'decimal:2',
+        'total_distance_km' => 'decimal:2',
+        'route_summary' => 'array',
     ];
+
+    /**
+     * Get normalized route snapshot URL.
+     */
+    public function getRouteSnapshotUrlAttribute(?string $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://') || str_starts_with($value, 'data:image/')) {
+            return $value;
+        }
+        if (str_starts_with($value, 'storage/') || str_starts_with($value, '/storage/')) {
+            return asset(ltrim($value, '/'));
+        }
+        return asset('storage/' . ltrim($value, '/'));
+    }
+
+    /**
+     * Get normalized Check-In Selfie URL.
+     */
+    public function getCheckInSelfieUrlAttribute(): ?string
+    {
+        $val = $this->check_in_selfie_path;
+        if (empty($val)) {
+            return null;
+        }
+        if (str_starts_with($val, 'http://') || str_starts_with($val, 'https://')) {
+            return $val;
+        }
+        if (str_starts_with($val, 'storage/') || str_starts_with($val, '/storage/')) {
+            return asset(ltrim($val, '/'));
+        }
+        return asset('storage/' . ltrim($val, '/'));
+    }
+
+    /**
+     * Get normalized Check-Out Selfie URL.
+     */
+    public function getCheckOutSelfieUrlAttribute(): ?string
+    {
+        $val = $this->check_out_selfie_path;
+        if (empty($val)) {
+            return null;
+        }
+        if (str_starts_with($val, 'http://') || str_starts_with($val, 'https://')) {
+            return $val;
+        }
+        if (str_starts_with($val, 'storage/') || str_starts_with($val, '/storage/')) {
+            return asset(ltrim($val, '/'));
+        }
+        return asset('storage/' . ltrim($val, '/'));
+    }
+
+    /**
+     * Get total distance traveled in km dynamically if not yet consolidated.
+     */
+    public function getTotalDistanceKmAttribute(?float $value): float
+    {
+        if ($value !== null && (float) $value > 0) {
+            return (float) $value;
+        }
+
+        $logs = $this->formatted_location_logs;
+        $points = [];
+        if (!empty($this->check_in_latitude) && !empty($this->check_in_longitude)) {
+            $points[] = [(float)$this->check_in_latitude, (float)$this->check_in_longitude];
+        }
+        foreach ($logs as $l) {
+            if (!empty($l['lat']) && !empty($l['lng'])) {
+                $points[] = [(float)$l['lat'], (float)$l['lng']];
+            }
+        }
+        if (!empty($this->check_out_latitude) && !empty($this->check_out_longitude)) {
+            $points[] = [(float)$this->check_out_latitude, (float)$this->check_out_longitude];
+        }
+
+        if (count($points) >= 2) {
+            $dist = 0.0;
+            for ($i = 1; $i < count($points); $i++) {
+                $dLat = deg2rad($points[$i][0] - $points[$i - 1][0]);
+                $dLon = deg2rad($points[$i][1] - $points[$i - 1][1]);
+                $a = sin($dLat / 2) * sin($dLat / 2) +
+                     cos(deg2rad($points[$i - 1][0])) * cos(deg2rad($points[$i][0])) *
+                     sin($dLon / 2) * sin($dLon / 2);
+                $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+                $seg = 6371 * $c;
+                if ($seg >= 0.01) { // Filter stationary jitter below 10m
+                    $dist += $seg;
+                }
+            }
+            return round($dist, 2);
+        }
+
+        return (float) ($value ?? 0);
+    }
+
+    /**
+     * Get location logs seamlessly: uses live raw logs if present,
+     * or decoded polyline points if raw logs have been purged after checkout.
+     */
+    public function getFormattedLocationLogsAttribute(): array
+    {
+        if ($this->relationLoaded('locationLogs') ? $this->locationLogs->isNotEmpty() : $this->locationLogs()->exists()) {
+            return $this->locationLogs->map(fn($l) => [
+                'lat'  => (float) $l->latitude,
+                'lng'  => (float) $l->longitude,
+                'time' => $l->created_at ? $l->created_at->format('h:i A') : '',
+            ])->values()->toArray();
+        }
+
+        if (!empty($this->route_polyline)) {
+            $summary = is_array($this->route_summary) ? $this->route_summary : (json_decode($this->route_summary, true) ?: []);
+            $times = $summary['waypoint_times'] ?? [];
+            $decoded = app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->decodePolyline($this->route_polyline, $times);
+            if (!empty($decoded)) {
+                return $decoded;
+            }
+        }
+
+        $summary = is_array($this->route_summary) ? $this->route_summary : (json_decode($this->route_summary, true) ?: []);
+        $lastKnown = $summary['last_known_location'] ?? ($summary['end_point'] ?? null);
+        if ($lastKnown && !empty($lastKnown['lat']) && !empty($lastKnown['lng'])) {
+            return [$lastKnown];
+        }
+
+        return [];
+    }
+
+    /**
+     * Location tracking settings from Attendance Rules:
+     * If unchecked in rules, tracking is skipped.
+     * If checked, interval_minutes comes from the rule.
+     */
+    public function getTrackingConfigAttribute(): array
+    {
+        $employee = $this->employee;
+        $rule = AttendanceRule::forEmployee($employee);
+
+        $locationType = $this->location_type;
+        $isTracking = $rule ? $rule->isTrackingEnabled($locationType) : false;
+        $intervalMinutes = $isTracking ? $rule->getTrackingMinutes($locationType) : null;
+
+        return [
+            'enabled'          => $isTracking,
+            'interval_minutes' => $intervalMinutes,
+            'interval_seconds' => $intervalMinutes ? ($intervalMinutes * 60) : null,
+        ];
+    }
 
     public function employee(): BelongsTo
     {
@@ -94,8 +249,11 @@ class Attendance extends BaseModel
     public function getFormattedLocationTypeAttribute(): string
     {
         $loc = $this->location_type;
+        if (!$loc && $this->employee) {
+            $loc = $this->employee->office;
+        }
         if (!$loc) {
-            return '-';
+            return 'Office';
         }
         $lower = strtolower($loc);
         if ($lower === 'office') {
@@ -104,10 +262,10 @@ class Attendance extends BaseModel
         if ($lower === 'wfh') {
             return 'WFH';
         }
-        if ($lower === 'onsite') {
+        if (in_array($lower, ['onsite', 'on-site', 'site'])) {
             return 'On-Site';
         }
-        return $loc;
+        return ucfirst($loc);
     }
 
     public function locationLogs(): HasMany

@@ -9,7 +9,7 @@
 
 ## 1. ERP Integration Topology
 
-The Production module acts as the core manufacturing engine within the multi-tenant ERP suite. It interfaces with five adjacent functional domains while maintaining strict architectural boundaries.
+The Production module acts as the core manufacturing engine within the multi-tenant ERP suite. It interfaces with six adjacent functional domains while maintaining strict architectural boundaries.
 
 ```mermaid
 graph TD
@@ -25,8 +25,8 @@ graph TD
     Prod -->|"4. Operator Metadata (employee_id)"| HRMS["HRMS Module (App\\Domains\\HRMS)"]
     
     Prod -.->|"5. Machine Capitalization (fixed_asset_id)"| Acc["Accounting & Assets (App\\Domains\\Accounting)"]
-    
-    Note["Note: Project Management module has NO direct DB foreign keys or automated workflows linking to Production."]
+
+    Projects["Project Management (App\\Domains\\Projects)"] <-->|"6. Task Association & Event Sync (project_id, project_task_id, SyncProductionTaskCompletionListener)"| Prod
 ```
 
 ---
@@ -165,10 +165,100 @@ The Inventory domain is Production's primary operational partner. All physical w
 
 ---
 
-## 7. Project Management Relationship (Verified Independent)
+## 7. Integration with Project Management Domain (`App\Domains\Projects`)
 
-* **Comprehensive Audit Verification:** An exhaustive search of the entire database schema, migrations, models, services, controllers, events, and routes confirms that **no direct `project_id` foreign key exists** on any Production table (`production_orders`, `production_plans`, `routings`, `work_centers`, `machines`, `production_batches`, etc.).
-* **Architectural & Operational Independence:**
-  * Production operates as an independent manufacturing engine driven by **Sales Orders** (`sales_order_id` on `production_orders` and `production_plans`) for Make-to-Order jobs or **Inventory Replenishment / Forecast** via MRP for Make-to-Stock jobs.
-  * There are no automated event listeners, listeners, background jobs, or API endpoints linking Project Management milestone tasks or project budgets to production orders.
-  * If manufacturing activity relates to a customer project, it connects upstream through Sales Orders (`sales_orders`), where the Sales Order represents the commercial contract. Any project-to-production correlation is an external business-process handoff rather than an automated software integration.
+### 7.1 Relationship & Data Flow Architecture
+The Production module integrates with the Project Management domain to support project-driven manufacturing (Make-to-Project), linking physical shopfloor execution directly to project delivery milestones and operational tasks.
+
+* **Database Association:** Migration `2026_10_03_000003_add_project_links_to_production_orders_table.php` established indexed foreign keys on `production_orders`:
+  * `project_id`: Nullable foreign key constrained to `projects.id` (`nullOnDelete`).
+  * `project_milestone_id`: Nullable foreign key constrained to `project_milestones.id` (`nullOnDelete`).
+  * `project_task_id`: Nullable foreign key constrained to `project_tasks.id` (`nullOnDelete`).
+  * Composite indexes: `production_orders_tenant_project_idx` (`['tenant_id', 'project_id']`) and `production_orders_tenant_task_idx` (`['tenant_id', 'project_task_id']`).
+* **Eloquent Relationships:** `App\Domains\Production\Models\ProductionOrder` defines:
+  ```php
+  public function project(): BelongsTo
+  {
+      return $this->belongsTo(\App\Domains\Projects\Models\Project::class, 'project_id');
+  }
+
+  public function projectMilestone(): BelongsTo
+  {
+      return $this->belongsTo(\App\Domains\Projects\Models\Milestone::class, 'project_milestone_id');
+  }
+
+  public function projectTask(): BelongsTo
+  {
+      return $this->belongsTo(\App\Domains\Projects\Models\Task::class, 'project_task_id');
+  }
+  ```
+* **Supported Navigation & Creation Directions:**
+  1. **Initiation from Project Task Workspace:** In the Project Management workspace, actionable manufacturing tasks display an explicit action button navigating to `/production/orders/create?project_id={id}&project_task_id={id}`.
+  2. **Prefilled Context:** The Production Order create screen detects these parameters, renders a "Linked to Project" contextual banner, and preselects the target product and quantity derived from the project task's milestone item.
+  3. **Task-Level Direct Linking:** Alternatively, users can link existing production orders to a task via `TaskController::linkProductionOrder` (`POST /tasks/{task}/production-orders`), strictly scoped to the same tenant, company, and branch.
+  4. **Reverse Navigation:** Production order list and detail screens (`production.orders.index`, `production.orders.show`) display interactive badges linking directly back to the parent Project workspace and Task card.
+
+### 7.2 Creation, Scoping & Validation Pipeline
+Form submission and persistence are protected by multi-layer security and business consistency checks in `StoreProductionOrderRequest`:
+* **Tenancy Enforcement:** Verifies that the supplied `project_id`, `project_task_id`, and `project_milestone_id` exist within the active `tenant_id` resolved by `require_tenant_id()`.
+* **Structural Hierarchy Validation:** Confirms that the specified `project_task_id` and `project_milestone_id` legitimately belong to the specified `project_id`. Mismatched hierarchy triggers immediate validation errors.
+* **Company & Branch Isolation:** Enforces strict boundary isolation between tenant entities. If the project belongs to Company A or Branch X, a Production Order originating under Company B or Branch Y is rejected:
+  * Company mismatch error: `projects.company_mismatch_error` ("Project belongs to a different company.").
+  * Branch mismatch error: `projects.branch_mismatch_error` ("Project belongs to a different branch.").
+* **Persistence & Audit Logging:** In `ProductionOrderService::create()`, when `project_id` is present, the service persists the association and automatically records an audit entry in `project_activity_logs` via `ActivityLogService::record()` with event type `production.created` ("Production Order {order_number} created from Project Task").
+
+### 7.3 Event-Driven Completion Synchronization
+Synchronization between shopfloor execution and project delivery is entirely automated through event-driven architecture, avoiding manual double-entry:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Operator as Shopfloor Lead / Operator
+    participant Order as ProductionOrder
+    participant Event as ProductionOrderCompleted Event
+    participant Listener as SyncProductionTaskCompletionListener
+    participant Task as Project Task
+    participant Milestone as MilestoneService
+    participant Log as ActivityLog
+
+    Operator->>Order: Mark Order Completed (POST /production/orders/{id}/complete)
+    Order-->>Order: Status -> STATUS_COMPLETED
+    Order->>Event: dispatch(new ProductionOrderCompleted($order))
+    Event->>Listener: handle($event)
+
+    Listener->>Order: Query all production orders with project_task_id = $task->id
+    Note over Listener: Check 1: Are ALL linked orders completed?<br/>Check 2: Is aggregate produced >= (ordered - 0.0001)?
+
+    alt All Orders Completed & Aggregate Yield Satisfied
+        Listener->>Task: Update status = STATUS_COMPLETED, completed_at = now()
+        Listener->>Milestone: recalculateProgress($task->milestone_id)
+        Listener->>Log: Create ActivityLog ('production.completed')
+    else Shortfall Detected OR Uncompleted Sibling Orders Exist
+        Listener->>Task: Keep status = STATUS_IN_PROGRESS
+        Listener->>Log: Create ActivityLog ('production.shortfall_warning')
+    end
+```
+
+* **Canonical Event:** When an order transitions to `STATUS_COMPLETED`, `ProductionOrder::save()` or `ProductionExecutionService` dispatches `App\Domains\Production\Events\ProductionOrderCompleted($order)`.
+* **Registered Listener:** `App\Domains\Projects\Listeners\SyncProductionTaskCompletionListener` (registered in `AppServiceProvider.php` line 584) listens for this event.
+* **Decoupled Guard:** If the completed order does not have `project_task_id`, the listener returns immediately with zero overhead.
+* **Aggregate Yield & Sibling Evaluation:**
+  1. The listener queries all `ProductionOrder` records sharing the same `tenant_id` and `project_task_id`.
+  2. It evaluates whether **every** linked sibling order has achieved `status === ProductionOrder::STATUS_COMPLETED`.
+  3. It aggregates output volume across all linked orders:
+     $$\text{Total Ordered} = \sum \text{quantity\_ordered}, \quad \text{Total Produced} = \sum \text{quantity\_produced}$$
+  4. It evaluates the aggregate yield satisfaction condition with floating-point tolerance:
+     $$\text{Total Ordered} \le 0 \quad \text{OR} \quad \text{Total Produced} \ge (\text{Total Ordered} - 0.0001)$$
+* **Successful Task & Milestone Completion:**
+  * When all linked orders are completed and aggregate yield is satisfied, the listener updates `Task.status = Task::STATUS_COMPLETED` and stamps `completed_at = now()`.
+  * If the task is associated with a milestone (`task->milestone_id`), the listener triggers `MilestoneService::recalculateProgress($task->milestone_id)`, dynamically updating the milestone's overall completion percentage based on completed task weights.
+  * Records an audited `ActivityLog` entry (`event_type = 'production.completed'`) capturing total good output, order numbers, and actor metadata.
+* **Shortfall & Sibling Order Safeguards:**
+  * If sibling production orders remain in progress, or if completed orders experienced quality scrap/rejection resulting in a net yield shortfall ($\text{Total Produced} < \text{Total Ordered} - 0.0001$), the task **safely remains `IN_PROGRESS`**.
+  * The listener logs an audited warning in `project_activity_logs` (`event_type = 'production.shortfall_warning'`) detailing the shortfall quantity or open sibling orders, alerting project managers without prematurely closing the delivery scope.
+
+### 7.4 Architectural Invariants & Integration Boundaries
+To prevent architectural coupling, the system strictly enforces the following boundaries:
+1. **Manufacturing Ownership:** Production is the authoritative domain for Bills of Materials, routings, operations, work centers, machines, operator execution, scrap, and rework. Project Management models never duplicate or bypass manufacturing domain rules.
+2. **Standalone Independence:** Production Orders operate completely and reliably without project links. Linking is entirely optional; unlinked discrete orders proceed through planning, execution, and closure without evaluating project listeners.
+3. **Downstream Boundaries:** Task completion via production sync does **not** automate billing, invoice creation, revenue recognition, purchase order generation, or inventory dispatch to customers. Invoicing and delivery follow their respective commercial workflows in the Projects, Sales, and Accounting domains.

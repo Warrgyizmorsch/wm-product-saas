@@ -83,13 +83,22 @@
                 <div class="col-lg-6">
                     <h6 class="fw-bold text-primary mb-3"><i class="feather-grid me-2"></i>{{ __('crm.deal_classification') }}</h6>
 
-                    <x-ui.odoo-form-ui type="select" :label="__('crm.pipeline_stage_label')" name="stage" required="true">
-                        @foreach($dealStatuses as $st)
-                            <option value="{{ $st->name }}" @selected(old('stage', $deal->stage) == $st->name)>
-                                {{ $st->name }}
-                            </option>
-                        @endforeach
-                    </x-ui.odoo-form-ui>
+                    @if(in_array(strtolower((string)$deal->stage), ['won', 'closed won']))
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.pipeline_stage_label') }} <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm bg-light fw-bold text-success" value="{{ $deal->stage }} (100% - Locked)" readonly>
+                            <input type="hidden" name="stage" value="{{ $deal->stage }}">
+                            <small class="text-success fw-semibold"><i class="feather-lock me-1"></i>This deal is Won and finalized. Stage cannot be changed.</small>
+                        </div>
+                    @else
+                        <x-ui.odoo-form-ui type="select" :label="__('crm.pipeline_stage_label')" name="stage" required="true">
+                            @foreach($dealStatuses as $st)
+                                <option value="{{ $st->name }}" @selected(old('stage', $deal->stage) == $st->name)>
+                                    {{ $st->name }}
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    @endif
 
                     <x-ui.odoo-form-ui type="input" :label="__('crm.close_reason_notes')" name="close_reason" :value="old('close_reason', $deal->close_reason)" placeholder="e.g. Lowest Price / Lost to Competitor X" />
 

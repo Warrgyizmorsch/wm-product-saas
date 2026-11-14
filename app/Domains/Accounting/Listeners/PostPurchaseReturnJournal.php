@@ -77,6 +77,8 @@ class PostPurchaseReturnJournal
                 $bill = VendorBill::with('items')->find($return->vendor_bill_id);
             } elseif ($return->goods_receipt_note_id) {
                 $bill = VendorBill::with('items')->where('goods_receipt_note_id', $return->goods_receipt_note_id)->first();
+            } elseif ($return->purchase_order_id) {
+                $bill = VendorBill::with('items')->where('purchase_order_id', $return->purchase_order_id)->first();
             }
 
             foreach ($return->items as $item) {
@@ -219,6 +221,10 @@ class PostPurchaseReturnJournal
                 'memo'                  => "Purchase Return / Debit Note {$return->return_number} ({$return->vendor?->name})",
                 'voucher_type'          => VoucherType::DEBIT_NOTE,
                 'journal_number_prefix' => VoucherType::prefix(VoucherType::DEBIT_NOTE),
+                // Reduces the returned vendor bill; unlinked returns stay On Account.
+                'bill_allocations'      => $return->vendor_bill_id
+                    ? [\App\Domains\Accounting\Services\BillWise\BillAllocationService::againstRef('payable', 'vendor_bill', (int) $return->vendor_bill_id)]
+                    : [],
             ]);
 
             VoucherDetail::create([

@@ -29,6 +29,7 @@ class HrmsDashboardController extends Controller
 {
     public function __construct(
         private readonly \App\Domains\Platform\Services\DashboardService $layouts,
+        private readonly \App\Domains\HRMS\Repositories\AttendanceRepositoryInterface $attendanceRepository,
     ) {
     }
     /**
@@ -64,7 +65,10 @@ class HrmsDashboardController extends Controller
         $todayAttendances = Attendance::where('tenant_id', $tenantId)
             ->whereDate('date', $today)
             ->get();
-        $presentCount = $todayAttendances->whereIn('status', ['present', 'late', 'half_day'])->count();
+        $presentCount = $todayAttendances->where(function ($att) {
+            return in_array($att->status, ['present', 'late', 'half_day', 'wfh', 'onsite'], true)
+                || ($att->status === 'missing_logs' && !empty($att->check_in));
+        })->count();
         $lateCount = $todayAttendances->where('status', 'late')->count();
 
         $wfhCount = WfhRequest::where('tenant_id', $tenantId)
@@ -92,11 +96,28 @@ class HrmsDashboardController extends Controller
         ];
 
         if ($currentEmployee) {
-            $myTodayAttendance = Attendance::with('breaks')
-                ->where('tenant_id', $tenantId)
-                ->where('employee_id', $currentEmployee->id)
-                ->whereDate('date', $today)
-                ->first();
+            $myTodayAttendance = $this->resolveActiveAttendance($currentEmployee, $tenantId, $now);
+
+            // Self-heal open break state if latest punch was a break start
+            if ($myTodayAttendance && !$myTodayAttendance->activeBreak()) {
+                $latestPunch = BiometricPunchLog::where('employee_id', $currentEmployee->id)
+                    ->whereDate('punch_time', $myTodayAttendance->date)
+                    ->latest('punch_time')
+                    ->first();
+                if ($latestPunch && in_array(strtolower((string) $latestPunch->punch_type), ['start_break', 'break_out'], true)) {
+                    AttendanceBreak::firstOrCreate(
+                        [
+                            'attendance_id' => $myTodayAttendance->id,
+                            'break_out' => null,
+                        ],
+                        [
+                            'break_in' => $latestPunch->punch_time,
+                            'duration_minutes' => 0,
+                        ]
+                    );
+                    $myTodayAttendance->load('breaks');
+                }
+            }
 
             // 7-day recent punch history (for 7-day visual mini-strip)
             for ($i = 6; $i >= 0; $i--) {
@@ -161,14 +182,14 @@ class HrmsDashboardController extends Controller
             $fields = [
                 $currentEmployee->full_name,
                 $currentEmployee->office_email,
-                $currentEmployee->phone_number,
+                $currentEmployee->personal_mobile_number ?? $currentEmployee->phone_number,
                 $currentEmployee->date_of_birth,
                 $currentEmployee->pan_card_number,
                 $currentEmployee->aadhaar_card_number,
                 $currentEmployee->bank_name,
                 $currentEmployee->account_number,
                 $currentEmployee->ifsc_code,
-                $currentEmployee->emergency_contact_phone ?? $currentEmployee->phone_number,
+                $currentEmployee->emergency_contact_number ?? $currentEmployee->emergency_contact_phone,
             ];
             $filled = count(array_filter($fields));
             $profileCompletion = count($fields) > 0 ? round(($filled / count($fields)) * 100) : 100;
@@ -435,13 +456,35 @@ class HrmsDashboardController extends Controller
         // 13. Active Company Broadcasts & Announcements
         app(\App\Domains\HRMS\Services\BroadcastService::class)->processScheduledBroadcasts($tenantId);
 
-        $totalBroadcastsCount = Broadcast::where('tenant_id', $tenantId)
-            ->where('status', 'published')
-            ->count();
+        $user = auth()->user();
+        $isHrOrAdmin = $user && (
+            app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
+            || app(\App\Services\Access\AccessService::class)->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
 
-        $allPublishedBroadcasts = Broadcast::with(['creator', 'receipts', 'comments.employee'])
-            ->where('tenant_id', $tenantId)
+        $broadcastsBaseQuery = Broadcast::where('tenant_id', $tenantId)
             ->where('status', 'published')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            });
+
+        if (!$isHrOrAdmin) {
+            if ($currentEmployee) {
+                $broadcastsBaseQuery->where(function ($q) use ($currentEmployee) {
+                    $q->where('target_type', 'all')
+                      ->orWhereHas('receipts', fn($rq) => $rq->where('employee_id', $currentEmployee->id));
+                });
+            } else {
+                $broadcastsBaseQuery->where('target_type', 'all');
+            }
+        }
+
+        $totalBroadcastsCount = (clone $broadcastsBaseQuery)->count();
+
+        $allPublishedBroadcasts = (clone $broadcastsBaseQuery)
+            ->with(['creator', 'receipts', 'comments.employee'])
             ->get();
 
         $latestBroadcasts = $allPublishedBroadcasts->sort(function ($a, $b) use ($currentEmployee) {
@@ -470,13 +513,6 @@ class HrmsDashboardController extends Controller
             // 3. Newest published date
             return strtotime($b->published_at ?? $b->created_at) <=> strtotime($a->published_at ?? $a->created_at);
         })->take(3)->values();
-
-        $user = auth()->user();
-        $isHrOrAdmin = $user && (
-            app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
-            || app(\App\Services\Access\AccessService::class)->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
-            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
-        );
         $activeView = $request->input('view', 'overview');
 
         $widgetQuery = array_filter([
@@ -540,6 +576,65 @@ class HrmsDashboardController extends Controller
         return app(\App\Domains\HRMS\Services\HrmsScopeService::class)->resolveEmployee($user, $tenantId);
     }
 
+    /**
+     * Resolves the active Attendance record for the current shift.
+     * Prevents previous day unclosed shifts from bleeding into today unless on an active overnight shift.
+     */
+    private function resolveActiveAttendance(Employee $employee, int $tenantId, Carbon $now): ?Attendance
+    {
+        $today = $now->format('Y-m-d');
+
+        // 1. Check for TODAY's attendance record first
+        $todayAttendance = Attendance::with('breaks')
+            ->where('tenant_id', $tenantId)
+            ->where('employee_id', $employee->id)
+            ->whereDate('date', $today)
+            ->latest('check_in')
+            ->first();
+
+        if ($todayAttendance) {
+            return $todayAttendance;
+        }
+
+        // 2. Only consider yesterday's unclosed attendance IF employee is on an actual OVERNIGHT shift
+        $yesterday = $now->copy()->subDay()->format('Y-m-d');
+        $yesterdayShift = $employee->resolveShiftForDate($yesterday);
+
+        if ($yesterdayShift && $yesterdayShift->isOvernight()) {
+            $shiftEndTime = Carbon::parse($today . ' ' . $yesterdayShift->end_time);
+            if ($now->lte($shiftEndTime->copy()->addHours(3))) {
+                $overnightAttendance = Attendance::with('breaks')
+                    ->where('tenant_id', $tenantId)
+                    ->where('employee_id', $employee->id)
+                    ->whereDate('date', $yesterday)
+                    ->whereNotNull('check_in')
+                    ->whereNull('check_out')
+                    ->latest('check_in')
+                    ->first();
+
+                if ($overnightAttendance) {
+                    return $overnightAttendance;
+                }
+            }
+        }
+
+        // 3. Yesterday's shift was a day shift or overnight shift that already ended.
+        // Auto-close / flag past unclosed attendance as missing_logs so it never bleeds into today.
+        $pastUnclosed = Attendance::where('tenant_id', $tenantId)
+            ->where('employee_id', $employee->id)
+            ->whereDate('date', '<', $today)
+            ->whereNotNull('check_in')
+            ->whereNull('check_out')
+            ->latest('check_in')
+            ->first();
+
+        if ($pastUnclosed && $pastUnclosed->status !== 'missing_logs') {
+            $pastUnclosed->update(['status' => 'missing_logs']);
+        }
+
+        return null;
+    }
+
     public function getWebPunchData(?\App\Models\User $user, int $tenantId): array
     {
         $today = Carbon::today()->format('Y-m-d');
@@ -551,11 +646,28 @@ class HrmsDashboardController extends Controller
         $activeShift = null;
 
         if ($currentEmployee) {
-            $myTodayAttendance = Attendance::with('breaks')
-                ->where('tenant_id', $tenantId)
-                ->where('employee_id', $currentEmployee->id)
-                ->whereDate('date', $today)
-                ->first();
+            $myTodayAttendance = $this->resolveActiveAttendance($currentEmployee, $tenantId, $now);
+
+            // Self-heal open break state if latest punch was a break start
+            if ($myTodayAttendance && !$myTodayAttendance->activeBreak()) {
+                $latestPunch = BiometricPunchLog::where('employee_id', $currentEmployee->id)
+                    ->whereDate('punch_time', $myTodayAttendance->date)
+                    ->latest('punch_time')
+                    ->first();
+                if ($latestPunch && in_array(strtolower((string) $latestPunch->punch_type), ['start_break', 'break_out'], true)) {
+                    AttendanceBreak::firstOrCreate(
+                        [
+                            'attendance_id' => $myTodayAttendance->id,
+                            'break_out' => null,
+                        ],
+                        [
+                            'break_in' => $latestPunch->punch_time,
+                            'duration_minutes' => 0,
+                        ]
+                    );
+                    $myTodayAttendance->load('breaks');
+                }
+            }
 
             for ($i = 6; $i >= 0; $i--) {
                 $pastDate = $now->copy()->subDays($i);
@@ -590,6 +702,80 @@ class HrmsDashboardController extends Controller
             $activeShift = $currentEmployee->resolveShiftForDate($today);
         }
 
+        $workLocation = 'office';
+        $formattedWorkLocation = 'Office';
+        $trackingConfig = [
+            'enabled' => false,
+            'interval_seconds' => null,
+            'location_type' => 'office',
+        ];
+
+        if ($currentEmployee) {
+            $hasWfhToday = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $currentEmployee->id)
+                ->where('status', 'approved')
+                ->whereDate('start_date', '<=', $today)
+                ->whereDate('end_date', '>=', $today)
+                ->exists();
+
+            if ($hasWfhToday) {
+                $workLocation = 'wfh';
+                $formattedWorkLocation = 'WFH';
+            } else {
+                $empLoc = strtolower(trim((string)$currentEmployee->office));
+                if (in_array($empLoc, ['onsite', 'on-site', 'site'])) {
+                    $workLocation = 'onsite';
+                    $formattedWorkLocation = 'On-Site';
+                } elseif ($empLoc === 'wfh') {
+                    $workLocation = 'wfh';
+                    $formattedWorkLocation = 'WFH';
+                } else {
+                    $workLocation = 'office';
+                    $formattedWorkLocation = 'Office';
+                }
+            }
+
+            if ($myTodayAttendance && !empty($myTodayAttendance->location_type)) {
+                $recLoc = strtolower(trim((string)$myTodayAttendance->location_type));
+                if ($recLoc === 'wfh') {
+                    $workLocation = 'wfh';
+                    $formattedWorkLocation = 'WFH';
+                } elseif (in_array($recLoc, ['onsite', 'on-site', 'site'])) {
+                    $workLocation = 'onsite';
+                    $formattedWorkLocation = 'On-Site';
+                } else {
+                    $workLocation = 'office';
+                    $formattedWorkLocation = 'Office';
+                }
+            } elseif ($myTodayAttendance && empty($myTodayAttendance->location_type)) {
+                $myTodayAttendance->update(['location_type' => $workLocation]);
+            }
+
+            $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($currentEmployee);
+
+            $trackingSelected = $rule ? $rule->isTrackingEnabled($workLocation) : false;
+            $trackingMinutes = $trackingSelected ? $rule->getTrackingMinutes($workLocation) : null;
+            $trackingConfigError = $trackingSelected && (!$trackingMinutes || $trackingMinutes < 1);
+            $selfieRequired = $workLocation === 'wfh'
+                ? (bool) ($rule?->wfh_selfie ?? false)
+                : ($workLocation === 'onsite' ? (bool) ($rule?->site_selfie ?? false) : false);
+            $trackingConfig = [
+                'enabled' => $trackingSelected && !$trackingConfigError,
+                'configuration_error' => $trackingConfigError,
+                'interval_seconds' => $trackingConfigError ? null : ($trackingMinutes !== null ? $trackingMinutes * 60 : null),
+                'location_type' => $workLocation,
+                'selfie_required' => $selfieRequired,
+                'punch_allowed' => $workLocation !== 'office' || !$rule || (bool) $rule->office_web,
+                'pause_tracking_on_break' => (bool) ($rule?->pause_tracking_on_break ?? false),
+                'office_break_geofence' => (bool) ($rule?->office_break_geofence ?? false),
+                'allow_multiple_punches' => (bool) ($rule?->allow_multiple_punches ?? false),
+                'location_required' => $trackingSelected || ($workLocation === 'onsite'
+                    ? (bool) ($rule?->site_location ?? false)
+                    : ($workLocation === 'office'
+                        ? (bool) ($rule?->office_geofence ?? false)
+                        : (bool) (($rule?->wfh_location ?? false) || ($rule?->wfh_geofence ?? false)))),
+            ];
+        }
+
         $startTime = $activeShift?->start_time ? Carbon::parse($activeShift->start_time)->format('h:i A') : '09:00 AM';
         $endTime   = $activeShift?->end_time ? Carbon::parse($activeShift->end_time)->format('h:i A') : '06:00 PM';
         $myShiftDetails = [
@@ -598,7 +784,7 @@ class HrmsDashboardController extends Controller
             'timing' => $startTime . ' - ' . $endTime,
         ];
 
-        return compact('currentEmployee', 'myTodayAttendance', 'recentPunches', 'myShiftDetails');
+        return compact('currentEmployee', 'myTodayAttendance', 'recentPunches', 'myShiftDetails', 'workLocation', 'formattedWorkLocation', 'trackingConfig');
     }
 
     public function getApprovalsData(?\App\Models\User $user, int $tenantId): array
@@ -723,14 +909,37 @@ class HrmsDashboardController extends Controller
     {
         $currentEmployee = $this->resolveCurrentEmployee($user, $tenantId);
 
-        $latestBroadcasts = Broadcast::with(['receipts', 'comments.employee'])
-            ->where('tenant_id', $tenantId)
+        $isHrOrAdmin = $user && (
+            app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
+            || app(\App\Services\Access\AccessService::class)->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
+
+        $broadcastsBaseQuery = Broadcast::where('tenant_id', $tenantId)
             ->where('status', 'published')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            });
+
+        if (!$isHrOrAdmin) {
+            if ($currentEmployee) {
+                $broadcastsBaseQuery->where(function ($q) use ($currentEmployee) {
+                    $q->where('target_type', 'all')
+                      ->orWhereHas('receipts', fn($rq) => $rq->where('employee_id', $currentEmployee->id));
+                });
+            } else {
+                $broadcastsBaseQuery->where('target_type', 'all');
+            }
+        }
+
+        $latestBroadcasts = (clone $broadcastsBaseQuery)
+            ->with(['receipts', 'comments.employee'])
             ->latest()
             ->take(5)
             ->get();
 
-        $totalBroadcastsCount = Broadcast::where('tenant_id', $tenantId)->where('status', 'published')->count();
+        $totalBroadcastsCount = (clone $broadcastsBaseQuery)->count();
 
         return compact('latestBroadcasts', 'totalBroadcastsCount', 'currentEmployee');
     }
@@ -783,7 +992,10 @@ class HrmsDashboardController extends Controller
         $attQuery = Attendance::where('tenant_id', $tenantId)->whereDate('date', $today);
         $scopeService->applyRelatedScope($attQuery, $user);
         $todayAttendances = $attQuery->get();
-        $presentCount = $todayAttendances->whereIn('status', ['present', 'late', 'half_day'])->count();
+        $presentCount = $todayAttendances->where(function ($att) {
+            return in_array($att->status, ['present', 'late', 'half_day', 'wfh', 'onsite'], true)
+                || ($att->status === 'missing_logs' && !empty($att->check_in));
+        })->count();
         $lateCount = $todayAttendances->where('status', 'late')->count();
 
         $wfhQuery = WfhRequest::where('tenant_id', $tenantId)->where('status', 'approved')->whereDate('start_date', '<=', $today)->whereDate('end_date', '>=', $today);
@@ -941,7 +1153,6 @@ class HrmsDashboardController extends Controller
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $action = $request->input('action', 'in'); // in, out, break_out, break_in
-        $locationType = $request->input('location_type', 'office');
         $now = Carbon::now();
         $today = $now->format('Y-m-d');
 
@@ -952,58 +1163,68 @@ class HrmsDashboardController extends Controller
             return redirect()->back()->with('error', 'No active employee profile linked to your account to record attendance.');
         }
 
-        // Fetch today's Attendance record
-        $attendance = Attendance::where('tenant_id', $tenantId)
-            ->where('employee_id', $employee->id)
-            ->whereDate('date', $today)
+        $validated = $request->validate([
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'selfie' => ['nullable', 'string', 'max:4000000'],
+        ]);
+        $latitude = isset($validated['latitude']) ? (float) $validated['latitude'] : null;
+        $longitude = isset($validated['longitude']) ? (float) $validated['longitude'] : null;
+        $selfie = $validated['selfie'] ?? null;
+
+        // 1. Detect if employee applied and has an approved WFH request for today
+        $hasWfhToday = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
             ->first();
+
+        if ($hasWfhToday) {
+            $locationType = 'wfh';
+        } else {
+            // 2. Use the work location configured in the employee's profile
+            $empLocation = strtolower(trim((string)$employee->office));
+            if (in_array($empLocation, ['onsite', 'on-site', 'site'])) {
+                $locationType = 'onsite';
+            } elseif ($empLocation === 'wfh') {
+                $locationType = 'wfh';
+            } else {
+                $locationType = 'office';
+            }
+
+        }
+
+        // Fetch active/today's Attendance record
+        $attendance = $this->resolveActiveAttendance($employee, $tenantId, $now);
+
+        // Graceful fallback for clock-out or breaks if shift started before overnight cutoff
+        if (!$attendance && in_array($action, ['out', 'break_out', 'break_in', 'start_break', 'end_break'], true)) {
+            $attendance = Attendance::where('tenant_id', $tenantId)
+                ->where('employee_id', $employee->id)
+                ->whereNotNull('check_in')
+                ->whereNull('check_out')
+                ->latest('check_in')
+                ->first();
+        }
 
         // 1. Clock In (Check-In)
         if ($action === 'in') {
             if ($attendance && $attendance->check_in) {
-                return redirect()->back()->with('error', 'You have already clocked in today at ' . Carbon::parse($attendance->check_in)->format('h:i A') . '.');
-            }
-
-            $inStatus = 'present';
-            $resolvedShift = $employee->resolveShiftForDate($today);
-            if ($resolvedShift) {
-                $shiftStartStr = $resolvedShift->start_time;
-                $shiftStart = Carbon::parse($today . ' ' . $shiftStartStr);
-
-                if ($now->greaterThan($shiftStart)) {
-                    $penaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
-                            $q->where('company_id', $employee->company_id)
-                              ->orWhereNull('company_id');
-                        })
-                        ->where('rule_type', 'late_arrival')
-                        ->where('status', true)
-                        ->orderByRaw('company_id IS NULL ASC')
-                        ->first();
-
-                    $graceMinutes = $penaltyRule ? (int)$penaltyRule->grace_period_minutes : 15;
-                    if ($now->diffInMinutes($shiftStart) > $graceMinutes) {
-                        $inStatus = 'late';
-                    }
+                if (empty($attendance->check_out)) {
+                    return redirect()->back()->with('error', 'You have already clocked in today at ' . Carbon::parse($attendance->check_in)->format('h:i A') . '.');
                 }
-            } elseif ($now->format('H:i') > '09:45') {
-                $inStatus = 'late';
+
+                $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
+                if (!$rule || empty($rule->allow_multiple_punches)) {
+                    return redirect()->back()->with('error', 'You have already completed your shift today at ' . Carbon::parse($attendance->check_out)->format('h:i A') . '. Multiple punches are not permitted.');
+                }
             }
 
-            if (!$attendance) {
-                $attendance = Attendance::create([
-                    'tenant_id' => $tenantId,
-                    'employee_id' => $employee->id,
-                    'date' => $today,
-                    'check_in' => $now,
-                    'location_type' => $locationType,
-                    'status' => $inStatus,
-                ]);
-            } else {
-                $attendance->update([
-                    'check_in' => $now,
-                    'location_type' => $locationType,
-                    'status' => $inStatus,
-                ]);
+            try {
+                $attendance = $this->attendanceRepository->checkIn($employee->id, $latitude, $longitude, $selfie);
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                $message = collect($exception->errors())->flatten()->first() ?? 'Attendance rules rejected this check-in.';
+                return redirect()->back()->with('error', $message);
             }
 
             BiometricPunchLog::create([
@@ -1013,7 +1234,8 @@ class HrmsDashboardController extends Controller
                 'punch_type' => 'in',
             ]);
 
-            return redirect()->back()->with('success', 'Web Clock-In successful! Logged in at ' . $now->format('h:i A') . ' (' . ucfirst($locationType) . ').');
+            $locationFormatted = $locationType === 'onsite' ? 'On-Site' : ($locationType === 'wfh' ? 'WFH' : 'Office');
+            return redirect()->back()->with('success', 'Web Clock-In successful! Logged in at ' . $now->format('h:i A') . ' (' . $locationFormatted . ').');
         }
 
         if (!$attendance || !$attendance->check_in) {
@@ -1021,52 +1243,42 @@ class HrmsDashboardController extends Controller
         }
 
         // 2. Start Break (Take Break)
-        if ($action === 'break_out') {
+        if ($action === 'start_break' || $action === 'break_out') {
             if (!$attendance->check_in) {
                 return redirect()->back()->with('error', 'Please clock-in first before taking a break.');
             }
 
-            // Create open break record (break_in records the start of break timestamp)
-            AttendanceBreak::create([
-                'attendance_id' => $attendance->id,
-                'break_in' => $now,
-            ]);
+            try {
+                $this->attendanceRepository->breakIn($attendance->id, $latitude, $longitude);
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                $message = collect($exception->errors())->flatten()->first() ?? 'Unable to start break.';
+                return redirect()->back()->with('error', $message);
+            }
 
             BiometricPunchLog::create([
                 'tenant_id' => $tenantId,
                 'employee_id' => $employee->id,
                 'punch_time' => $now,
-                'punch_type' => 'break_out',
+                'punch_type' => 'start_break',
             ]);
 
             return redirect()->back()->with('success', 'Break started at ' . $now->format('h:i A') . '. Enjoy your break!');
         }
 
         // 3. End Break (Resume Work)
-        if ($action === 'break_in') {
-            $activeBreak = AttendanceBreak::where('attendance_id', $attendance->id)
-                ->whereNull('break_out')
-                ->latest()
-                ->first();
-
-            if ($activeBreak) {
-                $duration = max(0, intval(Carbon::parse($activeBreak->break_in)->diffInMinutes($now)));
-                $activeBreak->update([
-                    'break_out' => $now,
-                    'duration_minutes' => $duration,
-                ]);
-
-                $totalBreakMinutes = AttendanceBreak::where('attendance_id', $attendance->id)->sum('duration_minutes') ?? 0;
-                $attendance->update([
-                    'total_break_hours' => round($totalBreakMinutes / 60, 2),
-                ]);
+        if ($action === 'end_break' || $action === 'break_in') {
+            try {
+                $this->attendanceRepository->breakOut($attendance->id, $latitude, $longitude);
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                $message = collect($exception->errors())->flatten()->first() ?? 'Unable to end break.';
+                return redirect()->back()->with('error', $message);
             }
 
             BiometricPunchLog::create([
                 'tenant_id' => $tenantId,
                 'employee_id' => $employee->id,
                 'punch_time' => $now,
-                'punch_type' => 'break_in',
+                'punch_type' => 'end_break',
             ]);
 
             return redirect()->back()->with('success', 'Break concluded at ' . $now->format('h:i A') . '. Resumed work!');
@@ -1078,28 +1290,12 @@ class HrmsDashboardController extends Controller
                 return redirect()->back()->with('error', 'Cannot clock-out without a prior clock-in record today.');
             }
 
-            // Auto-close any pending break
-            $openBreak = AttendanceBreak::where('attendance_id', $attendance->id)->whereNull('break_out')->latest()->first();
-            if ($openBreak) {
-                $duration = max(0, intval(Carbon::parse($openBreak->break_in)->diffInMinutes($now)));
-                $openBreak->update([
-                    'break_out' => $now,
-                    'duration_minutes' => $duration,
-                ]);
+            try {
+                $attendance = $this->attendanceRepository->checkOut($attendance->id, $latitude, $longitude, $selfie);
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                $message = collect($exception->errors())->flatten()->first() ?? 'Attendance rules rejected this check-out.';
+                return redirect()->back()->with('error', $message);
             }
-
-            // Calculate total work hours
-            $checkInTime = Carbon::parse($attendance->check_in);
-            $grossMinutes = max(0, intval($now->diffInMinutes($checkInTime)));
-            $totalBreakMinutes = AttendanceBreak::where('attendance_id', $attendance->id)->sum('duration_minutes') ?? 0;
-            $netMinutes = max(0, $grossMinutes - $totalBreakMinutes);
-            $totalWorkHours = round($netMinutes / 60, 2);
-
-            $attendance->update([
-                'check_out' => $now,
-                'total_work_hours' => $totalWorkHours,
-                'total_break_hours' => round($totalBreakMinutes / 60, 2),
-            ]);
 
             BiometricPunchLog::create([
                 'tenant_id' => $tenantId,
@@ -1108,9 +1304,10 @@ class HrmsDashboardController extends Controller
                 'punch_type' => 'out',
             ]);
 
-            return redirect()->back()->with('success', 'Web Clock-Out successful! Shift finalized at ' . $now->format('h:i A') . ' (Total Work: ' . $totalWorkHours . ' hrs).');
+            return redirect()->back()->with('success', 'Web Clock-Out successful! Shift finalized at ' . Carbon::parse($attendance->check_out)->format('h:i A') . ' (Total Work: ' . $attendance->total_work_hours . ' hrs).');
         }
 
         return redirect()->back();
     }
+
 }

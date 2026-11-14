@@ -17,7 +17,7 @@ class CrmAccountApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
+        $companyId = company_id() ?? $user?->company_id;
         $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
@@ -28,6 +28,8 @@ class CrmAccountApiController extends Controller
      */
     public function meta(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CrmAccount::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $owners = User::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'email']);
@@ -47,6 +49,8 @@ class CrmAccountApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CrmAccount::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $query = CrmAccount::where('tenant_id', $tenantId)
@@ -96,6 +100,37 @@ class CrmAccountApiController extends Controller
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
 
+        $this->authorize('view', $account);
+
+        if ($account->customer) {
+            $customer = $account->customer;
+            $invoices = $customer->invoices()->whereNotIn('status', ['cancelled', 'void'])->get();
+            $invoiceOutstanding = (float) $invoices->sum('balance_due');
+            $postedPayments = $customer->payments()
+                ->whereIn('status', ['Posted', 'posted', 'completed', 'paid'])
+                ->with('allocations')
+                ->get();
+
+            $unallocatedAdvance = (float) \App\Domains\Sales\Models\PaymentAllocation::whereHas('payment', function ($q) use ($customer) {
+                $q->where('customer_id', $customer->id)->whereIn('status', ['Posted', 'posted', 'completed', 'paid']);
+            })->whereNull('invoice_id')->sum('allocated_amount');
+
+            $paymentsWithoutAlloc = (float) $postedPayments->sum(function ($p) {
+                return max(0, (float) $p->amount - (float) $p->allocations->sum('allocated_amount'));
+            });
+
+            $totalAdvanceHold = round($unallocatedAdvance + $paymentsWithoutAlloc, 2);
+            $grossReceivables = max(0, (float) $customer->signedOpeningBalance() + $invoiceOutstanding);
+            $netReceivables   = max(0, round($grossReceivables - $totalAdvanceHold, 2));
+
+            $account->financial_summary = [
+                'total_billed'            => round((float) $invoices->sum('total_amount'), 2),
+                'outstanding_receivables' => round($grossReceivables, 2),
+                'available_advance'       => $totalAdvanceHold,
+                'net_due_balance'         => $netReceivables,
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'data'    => $account,
@@ -107,27 +142,47 @@ class CrmAccountApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', CrmAccount::class);
+
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [
-            'name'           => 'required|string|max:255',
-            'email'          => 'nullable|email|max:255',
-            'phone'          => 'nullable|string|max:50',
-            'website'        => 'nullable|string|max:255',
-            'industry'       => 'nullable|string|max:255',
-            'gstin'          => 'nullable|string|max:50',
-            'account_type'   => 'nullable|string|max:50',
-            'billing_street' => 'nullable|string',
-            'billing_city'   => 'nullable|string|max:100',
-            'billing_state'  => 'nullable|string|max:100',
-            'billing_country'=> 'nullable|string|max:100',
-            'owner_id'       => 'nullable|integer',
-            'status'         => 'nullable|string|in:active,inactive',
-            'contacts'       => 'nullable|array',
-            'contacts.*.name'=> 'required|string|max:255',
+            'name'            => 'required|string|max:255',
+            'email'           => 'required|email|max:255',
+            'phone'           => 'nullable|string|regex:/^[0-9]+$/|max:20',
+            'website'         => 'nullable|string|max:255',
+            'industry'        => 'nullable|string|max:255',
+            'industry_type'   => 'nullable|string|max:255',
+            'gstin'           => 'nullable|string|max:50',
+            'credit_limit'    => 'nullable|numeric|min:0',
+            'opening_balance' => 'nullable|numeric|min:0',
+            'account_type'    => 'nullable|string|max:50',
+            'street'          => 'nullable|string|max:255',
+            'city'            => 'nullable|string|max:100',
+            'state'           => 'nullable|string|max:100',
+            'country'         => 'nullable|string|max:100',
+            'zip_code'        => 'nullable|string|regex:/^[0-9]+$/|max:10',
+            'billing_street'  => 'nullable|string|max:255',
+            'billing_city'    => 'nullable|string|max:100',
+            'billing_state'   => 'nullable|string|max:100',
+            'billing_country' => 'nullable|string|max:100',
+            'billing_zip'     => 'nullable|string|regex:/^[0-9]+$/|max:10',
+            'owner_id'        => 'nullable|integer|exists:users,id',
+            'status'          => 'nullable|string|in:active,inactive',
+            // Primary contact fields (flat from screen)
+            'contact_name'    => 'nullable|string|max:255',
+            'designation'     => 'nullable|string|max:255',
+            'role'            => 'nullable|string|max:100',
+            'contact_email'   => 'nullable|email|max:255',
+            'contact_phone'   => 'nullable|string|regex:/^[0-9]+$/|max:20',
+            // Nested contacts array
+            'contacts'        => 'nullable|array',
+            'contacts.*.name' => 'required|string|max:255',
             'contacts.*.email'=> 'nullable|email|max:255',
-            'contacts.*.phone'=> 'nullable|string|max:50',
-        ]);
+            'contacts.*.phone'=> 'nullable|string|regex:/^[0-9]+$/|max:20',
+            'contacts.*.designation' => 'nullable|string|max:255',
+            'contacts.*.role' => 'nullable|string|max:100',
+        ], $this->accountValidationMessages());
 
         if ($validator->fails()) {
             return response()->json([
@@ -140,6 +195,13 @@ class CrmAccountApiController extends Controller
         $validated = $validator->validated();
         $ownerId = $validated['owner_id'] ?? (auth()->id() ?? User::where('tenant_id', $tenantId)->value('id') ?? 1);
 
+        $industry = $validated['industry_type'] ?? ($validated['industry'] ?? null);
+        $street = $validated['street'] ?? ($validated['billing_street'] ?? null);
+        $city = $validated['city'] ?? ($validated['billing_city'] ?? null);
+        $state = $validated['state'] ?? ($validated['billing_state'] ?? null);
+        $country = $validated['country'] ?? ($validated['billing_country'] ?? null);
+        $zipCode = $validated['zip_code'] ?? ($validated['billing_zip'] ?? null);
+
         $account = CrmAccount::create([
             'tenant_id'       => $tenantId,
             'company_id'      => $companyId,
@@ -149,26 +211,50 @@ class CrmAccountApiController extends Controller
             'email'           => $validated['email'] ?? null,
             'phone'           => $validated['phone'] ?? null,
             'website'         => $validated['website'] ?? null,
-            'industry'        => $validated['industry'] ?? null,
+            'industry_type'   => $industry,
             'gstin'           => $validated['gstin'] ?? null,
-            'account_type'    => $validated['account_type'] ?? 'Customer',
-            'billing_street'  => $validated['billing_street'] ?? null,
-            'billing_city'    => $validated['billing_city'] ?? null,
-            'billing_state'   => $validated['billing_state'] ?? null,
-            'billing_country' => $validated['billing_country'] ?? null,
+            'credit_limit'    => $validated['credit_limit'] ?? 0.00,
+            'street'          => $street,
+            'city'            => $city,
+            'state'           => $state,
+            'country'         => $country,
+            'zip_code'        => $zipCode,
             'owner_id'        => $ownerId,
             'status'          => $validated['status'] ?? 'active',
         ]);
+
+        if (!empty($validated['contact_name']) || !empty($validated['contact_email']) || !empty($validated['contact_phone'])) {
+            CrmContact::create([
+                'tenant_id'      => $tenantId,
+                'company_id'     => $companyId,
+                'branch_id'      => $branchId,
+                'crm_account_id' => $account->id,
+                'name'           => $validated['contact_name'] ?? $validated['name'],
+                'designation'    => $validated['designation'] ?? null,
+                'role'           => $validated['role'] ?? 'Purchase Decision Maker',
+                'email'          => $validated['contact_email'] ?? $validated['email'] ?? null,
+                'phone'          => $validated['contact_phone'] ?? $validated['phone'] ?? null,
+                'mobile'         => $validated['contact_phone'] ?? null,
+                'is_primary'     => true,
+                'status'         => 'active',
+            ]);
+        }
 
         if (!empty($validated['contacts'])) {
             foreach ($validated['contacts'] as $contactData) {
                 CrmContact::create([
                     'tenant_id'      => $tenantId,
+                    'company_id'     => $companyId,
+                    'branch_id'      => $branchId,
                     'crm_account_id' => $account->id,
                     'name'           => $contactData['name'],
                     'email'          => $contactData['email'] ?? null,
                     'phone'          => $contactData['phone'] ?? null,
-                    'is_primary'     => true,
+                    'mobile'         => $contactData['phone'] ?? null,
+                    'designation'    => $contactData['designation'] ?? null,
+                    'role'           => $contactData['role'] ?? 'Purchase Decision Maker',
+                    'is_primary'     => false,
+                    'status'         => 'active',
                 ]);
             }
         }
@@ -192,13 +278,17 @@ class CrmAccountApiController extends Controller
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
 
+        $this->authorize('update', $account);
+
         $validator = Validator::make($request->all(), [
             'name'        => 'required|string|max:255',
             'email'       => 'nullable|email|max:255',
-            'phone'       => 'nullable|string|max:50',
+            'phone'       => 'nullable|string|regex:/^[0-9]+$/|max:20',
+            'mobile'      => 'nullable|string|regex:/^[0-9]+$/|max:20',
             'designation' => 'nullable|string|max:100',
+            'role'        => 'nullable|string|max:100',
             'is_primary'  => 'nullable|boolean',
-        ]);
+        ], $this->accountValidationMessages());
 
         if ($validator->fails()) {
             return response()->json([
@@ -232,21 +322,31 @@ class CrmAccountApiController extends Controller
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
 
+        $this->authorize('update', $account);
+
         $validator = Validator::make($request->all(), [
-            'name'           => 'sometimes|required|string|max:255',
-            'email'          => 'nullable|email|max:255',
-            'phone'          => 'nullable|string|max:50',
-            'website'        => 'nullable|string|max:255',
-            'industry'       => 'nullable|string|max:255',
-            'gstin'          => 'nullable|string|max:50',
-            'account_type'   => 'nullable|string|max:50',
-            'billing_street' => 'nullable|string',
-            'billing_city'   => 'nullable|string|max:100',
-            'billing_state'  => 'nullable|string|max:100',
-            'billing_country'=> 'nullable|string|max:100',
-            'owner_id'       => 'nullable|integer',
-            'status'         => 'nullable|string|in:active,inactive',
-        ]);
+            'name'            => 'sometimes|required|string|max:255',
+            'email'           => 'nullable|email|max:255',
+            'phone'           => 'nullable|string|regex:/^[0-9]+$/|max:20',
+            'website'         => 'nullable|string|max:255',
+            'industry'        => 'nullable|string|max:255',
+            'industry_type'   => 'nullable|string|max:255',
+            'gstin'           => 'nullable|string|max:50',
+            'credit_limit'    => 'nullable|numeric|min:0',
+            'account_type'    => 'nullable|string|max:50',
+            'street'          => 'nullable|string|max:255',
+            'city'            => 'nullable|string|max:100',
+            'state'           => 'nullable|string|max:100',
+            'country'         => 'nullable|string|max:100',
+            'zip_code'        => 'nullable|string|regex:/^[0-9]+$/|max:10',
+            'billing_street'  => 'nullable|string|max:255',
+            'billing_city'    => 'nullable|string|max:100',
+            'billing_state'   => 'nullable|string|max:100',
+            'billing_country' => 'nullable|string|max:100',
+            'billing_zip'     => 'nullable|string|regex:/^[0-9]+$/|max:10',
+            'owner_id'        => 'nullable|integer|exists:users,id',
+            'status'          => 'nullable|string|in:active,inactive',
+        ], $this->accountValidationMessages());
 
         if ($validator->fails()) {
             return response()->json([
@@ -256,7 +356,33 @@ class CrmAccountApiController extends Controller
             ], 422);
         }
 
-        $account->update($validator->validated());
+        $validated = $validator->validated();
+        if (isset($validated['industry']) && !isset($validated['industry_type'])) {
+            $validated['industry_type'] = $validated['industry'];
+            unset($validated['industry']);
+        }
+        if (isset($validated['billing_street']) && !isset($validated['street'])) {
+            $validated['street'] = $validated['billing_street'];
+            unset($validated['billing_street']);
+        }
+        if (isset($validated['billing_city']) && !isset($validated['city'])) {
+            $validated['city'] = $validated['billing_city'];
+            unset($validated['billing_city']);
+        }
+        if (isset($validated['billing_state']) && !isset($validated['state'])) {
+            $validated['state'] = $validated['billing_state'];
+            unset($validated['billing_state']);
+        }
+        if (isset($validated['billing_country']) && !isset($validated['country'])) {
+            $validated['country'] = $validated['billing_country'];
+            unset($validated['billing_country']);
+        }
+        if (isset($validated['billing_zip']) && !isset($validated['zip_code'])) {
+            $validated['zip_code'] = $validated['billing_zip'];
+            unset($validated['billing_zip']);
+        }
+
+        $account->update($validated);
 
         return response()->json([
             'success' => true,
@@ -276,6 +402,8 @@ class CrmAccountApiController extends Controller
         if (!$account) {
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
+
+        $this->authorize('update', $account);
 
         $validator = Validator::make($request->all(), [
             'account_owner_id' => 'nullable|integer|exists:users,id',
@@ -312,6 +440,8 @@ class CrmAccountApiController extends Controller
      */
     public function bulkAssign(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CrmAccount::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [
@@ -365,11 +495,31 @@ class CrmAccountApiController extends Controller
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
 
+        $this->authorize('delete', $account);
+
         $account->delete();
 
         return response()->json([
             'success' => true,
             'message' => "Account #{$id} deleted successfully.",
         ]);
+    }
+
+    private function accountValidationMessages(): array
+    {
+        return [
+            'name.required'          => 'Company Name is required.',
+            'email.required'         => 'Contact Email is required.',
+            'email.email'            => 'Please enter a valid email address for Company Email.',
+            'phone.regex'            => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'contact_phone.regex'    => 'Primary contact phone number must contain digits/numbers only (no special characters or letters).',
+            'contacts.*.phone.regex' => 'Contact phone number must contain digits/numbers only (no special characters or letters).',
+            'contact_email.email'    => 'Please enter a valid email address for Contact.',
+            'zip_code.regex'         => 'Zip / Postal code must contain digits/numbers only (no special characters or letters).',
+            'billing_zip.regex'      => 'Zip / Postal code must contain digits/numbers only (no special characters or letters).',
+            'credit_limit.numeric'   => 'Credit limit must be a valid number.',
+            'opening_balance.numeric'=> 'Opening balance must be a valid number.',
+            'mobile.regex'           => 'Mobile number must contain digits/numbers only (no special characters or letters).',
+        ];
     }
 }

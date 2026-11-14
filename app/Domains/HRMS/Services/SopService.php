@@ -78,7 +78,8 @@ class SopService
 
             // Create Sections / Procedure Steps
             if (!empty($data['sections']) && is_array($data['sections'])) {
-                foreach ($data['sections'] as $index => $secData) {
+                $stepNumber = 1;
+                foreach ($data['sections'] as $secData) {
                     if (empty($secData['title']) && empty($secData['content'])) {
                         continue;
                     }
@@ -96,8 +97,8 @@ class SopService
                     SopSection::create([
                         'tenant_id' => $tenantId,
                         'sop_document_id' => $sop->id,
-                        'step_number' => $index + 1,
-                        'title' => $secData['title'] ?? ('Step ' . ($index + 1)),
+                        'step_number' => $stepNumber++,
+                        'title' => $secData['title'] ?? ('Step ' . $stepNumber),
                         'content' => $secData['content'] ?? '',
                         'has_checklist' => !empty($checklistItems),
                         'checklist_items' => $checklistItems,
@@ -118,8 +119,10 @@ class SopService
                 'snapshot_data' => $sop->toArray(),
             ]);
 
-            // Dispatch assignments to target staff
-            $this->dispatchAssignments($sop);
+            // Dispatch assignments to target staff only if published
+            if ($sop->status === 'published') {
+                $this->dispatchAssignments($sop);
+            }
 
             return $sop;
         });
@@ -255,6 +258,10 @@ class SopService
      */
     public function dispatchAssignments(SopDocument $sop): int
     {
+        if ($sop->status !== 'published') {
+            return 0;
+        }
+
         $empQuery = Employee::where('tenant_id', $sop->tenant_id)
             ->where(function ($q) {
                 $q->where('status', true)->orWhere('status', 1)->orWhereNull('status');
@@ -306,8 +313,8 @@ class SopService
                 try {
                     \App\Services\Notification\NotificationService::sendToEmployee(
                         employee: $emp,
-                        title: 'New SOP Assigned for Sign-Off',
-                        message: "You have been assigned Standard Operating Procedure: {$sop->title} ({$sop->code}).",
+                        title: __('hrms.sop.notif_assigned_title'),
+                        message: __('hrms.sop.notif_assigned_message', ['title' => $sop->title, 'code' => $sop->code]),
                         actionUrl: route('hrms.sop.show', $sop->id),
                         module: 'hrms',
                         type: 'sop_assigned',
@@ -338,10 +345,16 @@ class SopService
 
             if ($sop->target_audience_type === 'all') {
                 $isEligible = true;
-            } elseif ($sop->target_audience_type === 'department' && in_array($employee->department_id, (array) $sop->target_department_ids)) {
-                $isEligible = true;
-            } elseif ($sop->target_audience_type === 'designation' && in_array($employee->designation_id, (array) $sop->target_designation_ids)) {
-                $isEligible = true;
+            } elseif ($sop->target_audience_type === 'department') {
+                if (!empty($sop->target_department_ids)) {
+                    $isEligible = in_array($employee->department_id, (array) $sop->target_department_ids);
+                } elseif (!empty($sop->department_id)) {
+                    $isEligible = ((int) $employee->department_id === (int) $sop->department_id);
+                }
+            } elseif ($sop->target_audience_type === 'designation') {
+                if (!empty($sop->target_designation_ids)) {
+                    $isEligible = in_array($employee->designation_id, (array) $sop->target_designation_ids);
+                }
             }
 
             if ($isEligible) {
@@ -364,8 +377,8 @@ class SopService
                 try {
                     \App\Services\Notification\NotificationService::sendToEmployee(
                         employee: $employee,
-                        title: 'New SOP Assigned for Sign-Off',
-                        message: "You have been assigned Standard Operating Procedure: {$sop->title} ({$sop->code}).",
+                        title: __('hrms.sop.notif_assigned_title'),
+                        message: __('hrms.sop.notif_assigned_message', ['title' => $sop->title, 'code' => $sop->code]),
                         actionUrl: route('hrms.sop.show', $sop->id),
                         module: 'hrms',
                         type: 'sop_assigned',
@@ -396,10 +409,11 @@ class SopService
             $assignment->loadMissing('employee', 'document');
             $emp = $assignment->employee;
             $doc = $assignment->document;
+            $targetUrl = $doc ? route('hrms.sop.show', $doc->id) : route('hrms.sop.index');
             \App\Services\Notification\NotificationService::sendToHrAdmins(
-                'SOP Acknowledged',
-                "{$emp?->full_name} has acknowledged Standard Operating Procedure: {$doc?->title} ({$doc?->code}).",
-                route('hrms.sop.show', $doc?->id ?? 1),
+                __('hrms.sop.notif_acknowledged_title'),
+                __('hrms.sop.notif_acknowledged_message', ['name' => $emp?->full_name ?? __('hrms.common.employee'), 'title' => $doc?->title ?? '', 'code' => $doc?->code ?? '']),
+                $targetUrl,
                 'sop_acknowledged_hr',
                 'feather-check-circle'
             );
@@ -425,8 +439,8 @@ class SopService
         if ($emp && $doc) {
             \App\Services\Notification\NotificationService::sendToEmployee(
                 employee: $emp,
-                title: 'Action Required: SOP Sign-Off',
-                message: "Please review and acknowledge Standard Operating Procedure: {$doc->title} ({$doc->code}).",
+                title: __('hrms.sop.notif_reminder_title'),
+                message: __('hrms.sop.notif_reminder_message', ['title' => $doc->title, 'code' => $doc->code]),
                 actionUrl: route('hrms.sop.show', $doc->id),
                 module: 'hrms',
                 type: 'sop_reminder',
@@ -463,7 +477,13 @@ class SopService
             }
         }
 
-        $count = SopDocument::where('tenant_id', $tenantId)->count() + 1;
-        return sprintf('%s-%03d', $prefix, $count);
+        $count = SopDocument::withTrashed()->where('tenant_id', $tenantId)->count() + 1;
+        $code = sprintf('%s-%03d', $prefix, $count);
+        while (SopDocument::withTrashed()->where('tenant_id', $tenantId)->where('code', $code)->exists()) {
+            $count++;
+            $code = sprintf('%s-%03d', $prefix, $count);
+        }
+
+        return $code;
     }
 }

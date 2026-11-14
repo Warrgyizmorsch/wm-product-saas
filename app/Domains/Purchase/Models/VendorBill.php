@@ -64,6 +64,13 @@ class VendorBill extends BaseModel
         'total_amount',
         'paid_amount',
         'due_amount',
+        'tds_section_id',
+        'tds_base_amount',
+        'tds_rate',
+        'tds_amount',
+        'tds_catchup_base',
+        'tds_reason',
+        'tds_overridden',
         'notes',
         'created_by',
     ];
@@ -74,18 +81,63 @@ class VendorBill extends BaseModel
         'hold_released_at' => 'datetime',
         'bill_date' => 'date',
         'due_date' => 'date',
-        'freight_amount' => 'decimal:2',
-        'subtotal' => 'decimal:2',
-        'tax_amount' => 'decimal:2',
-        'cgst_amount' => 'decimal:2',
-        'sgst_amount' => 'decimal:2',
-        'igst_amount' => 'decimal:2',
-        'grand_total' => 'decimal:2',
-        'total_amount' => 'decimal:2',
-        'paid_amount' => 'decimal:2',
-        'due_amount' => 'decimal:2',
+        'freight_amount' => 'decimal:4',
+        'subtotal' => 'decimal:4',
+        'tax_amount' => 'decimal:4',
+        'cgst_amount' => 'decimal:4',
+        'sgst_amount' => 'decimal:4',
+        'igst_amount' => 'decimal:4',
+        'grand_total' => 'decimal:4',
+        'total_amount' => 'decimal:4',
+        'paid_amount' => 'decimal:4',
+        'due_amount' => 'decimal:4',
+        'tds_base_amount' => 'decimal:4',
+        'tds_rate' => 'float',
+        'tds_amount' => 'decimal:4',
+        'tds_overridden' => 'boolean',
         'landed_cost_revaluation_data' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        // TDS is worked out once, when the bill is made (see VendorBillTdsService).
+        static::creating(fn (VendorBill $bill) => app(\App\Domains\Purchase\Services\VendorBillTdsService::class)->apply($bill));
+    }
+
+    /**
+     * Total refund amount from completed purchase returns / debit notes against this bill.
+     */
+    public function returnsTotal(): float
+    {
+        if ($this->relationLoaded('purchaseReturns')) {
+            return (float) $this->purchaseReturns->where('status', 'Completed')->sum('total_refund_amount');
+        }
+        return (float) $this->purchaseReturns()->where('status', 'Completed')->sum('total_refund_amount');
+    }
+
+    /**
+     * What the vendor is owed for this bill in total: the bill less the TDS
+     * withheld and less any completed Purchase Returns / Debit Notes.
+     * Paid + due always adds up to this, never to grand_total.
+     */
+    public function netPayable(): float
+    {
+        $gross = (float) ($this->grand_total ?: ($this->attributes['total_amount'] ?? 0));
+        $tds = (float) ($this->tds_amount ?? 0);
+        $returns = $this->returnsTotal();
+        return max(0.0, round($gross - $tds - $returns, 4));
+    }
+
+    /** What is still due once $paid has been paid against the bill in total. */
+    public function dueAfterPaying(float $paid): float
+    {
+        return max(0.0, round($this->netPayable() - $paid, 4));
+    }
+
+    public function tdsSection(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\TdsSection::class, 'tds_section_id');
+    }
 
     public function items(): HasMany
     {
@@ -122,6 +174,11 @@ class VendorBill extends BaseModel
     public function dispatchOrder(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Sales\Models\DispatchOrder::class, 'dispatch_order_id');
+    }
+
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class, 'vendor_bill_id');
     }
 
     public function creator(): BelongsTo

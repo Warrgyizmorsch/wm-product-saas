@@ -9,6 +9,8 @@ use App\Domains\HRMS\Models\Branch;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\PayrollRun;
+use App\Domains\HRMS\Models\Attendance;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -173,7 +175,7 @@ class OrgApiController extends Controller
             'cin_number'          => 'nullable|max:255',
             'registration_number' => 'nullable|max:255',
             'email'               => 'required|email|max:255',
-            'phone'               => 'nullable|max:50',
+            'phone'               => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'website'             => 'nullable|max:255',
             'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
@@ -182,13 +184,13 @@ class OrgApiController extends Controller
             'postal_code'         => 'nullable|max:20',
             'currency'            => 'required|string|max:10',
             'time_zone'           => 'required|string|max:50',
-            'status'              => 'required',
+            'status'              => 'required|in:0,1',
             'logo'                => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
         $logo = null;
         if ($request->hasFile('logo')) {
-            $logo = $request->file('logo')->store('legal_entities', 'public');
+            $logo = $request->file('logo')->storeTenantFile('legal_entities', 'public');
         }
 
         $currency = null;
@@ -247,7 +249,7 @@ class OrgApiController extends Controller
             'cin_number'          => 'nullable|max:255',
             'registration_number' => 'nullable|max:255',
             'email'               => 'required|email|max:255',
-            'phone'               => 'nullable|max:50',
+            'phone'               => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'website'             => 'nullable|max:255',
             'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
@@ -256,13 +258,13 @@ class OrgApiController extends Controller
             'postal_code'         => 'nullable|max:20',
             'currency'            => 'required|string|max:10',
             'time_zone'           => 'required|string|max:50',
-            'status'              => 'required',
+            'status'              => 'required|in:0,1',
             'logo'                => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
         $logo = $company->logo;
         if ($request->hasFile('logo')) {
-            $logo = $request->file('logo')->store('legal_entities', 'public');
+            $logo = $request->file('logo')->storeTenantFile('legal_entities', 'public');
         }
 
         $currency = null;
@@ -311,6 +313,28 @@ class OrgApiController extends Controller
         $company = Company::find($id);
         if (!$company) {
             return $this->sendError("Company with ID '{$id}' not found.", 404);
+        }
+
+        // Dependency Guards: Check for active or historical payroll runs
+        $activePayrollRunsCount = PayrollRun::where('company_id', $company->id)
+            ->whereIn('status', ['draft', 'processing', 'locked'])
+            ->count();
+        if ($activePayrollRunsCount > 0) {
+            return $this->sendError("Cannot delete company. There are {$activePayrollRunsCount} active payroll run(s) associated with this company.", 422);
+        }
+
+        $allPayrollRunsCount = PayrollRun::where('company_id', $company->id)->count();
+        if ($allPayrollRunsCount > 0) {
+            return $this->sendError("Cannot delete company. There are {$allPayrollRunsCount} historical payroll run(s) associated with this company.", 422);
+        }
+
+        // Dependency Guards: Check for historical attendance records
+        $companyEmployeeIds = Employee::withTrashed()->where('company_id', $company->id)->pluck('id');
+        if ($companyEmployeeIds->isNotEmpty()) {
+            $attendanceCount = Attendance::whereIn('employee_id', $companyEmployeeIds)->count();
+            if ($attendanceCount > 0) {
+                return $this->sendError("Cannot delete company. There are {$attendanceCount} historical attendance record(s) linked to employees of this company.", 422);
+            }
         }
 
         Employee::withTrashed()->where('company_id', $company->id)->update(['company_id' => null]);
@@ -404,7 +428,7 @@ class OrgApiController extends Controller
             'code'             => 'required|max:50',
             'description'      => 'nullable',
             'head_employee_id' => 'nullable|exists:employees,id',
-            'status'           => 'required',
+            'status'           => 'required|in:0,1',
         ]);
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -442,7 +466,7 @@ class OrgApiController extends Controller
             'code'             => 'required|max:50',
             'description'      => 'nullable',
             'head_employee_id' => 'nullable|exists:employees,id',
-            'status'           => 'required',
+            'status'           => 'required|in:0,1',
         ]);
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -569,14 +593,14 @@ class OrgApiController extends Controller
             'name'                => 'required|max:255',
             'code'                => 'required|max:50',
             'manager_employee_id' => 'nullable|exists:employees,id',
-            'phone'               => 'nullable|max:20',
+            'phone'               => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'email'               => 'nullable|email|max:255',
             'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
             'postal_code'         => 'nullable|max:20',
-            'status'              => 'required',
+            'status'              => 'required|in:0,1',
         ]);
 
         $companyId = $validated['company_id'] ?? null;
@@ -629,14 +653,14 @@ class OrgApiController extends Controller
             'name'                => 'required|max:255',
             'code'                => 'required|max:50',
             'manager_employee_id' => 'nullable|exists:employees,id',
-            'phone'               => 'nullable|max:20',
+            'phone'               => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'email'               => 'nullable|email|max:255',
             'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
             'postal_code'         => 'nullable|max:20',
-            'status'              => 'required',
+            'status'              => 'required|in:0,1',
         ]);
 
         $companyId = $validated['company_id'] ?? null;
@@ -783,7 +807,7 @@ class OrgApiController extends Controller
             'head_employee_id'     => 'nullable|exists:employees,id',
             'parent_department_id' => 'nullable|exists:departments,id',
             'description'          => 'nullable',
-            'status'               => 'required',
+            'status'               => 'required|in:0,1',
         ]);
 
         $companyId      = $validated['company_id'] ?? null;
@@ -844,7 +868,7 @@ class OrgApiController extends Controller
             'head_employee_id'     => 'nullable|exists:employees,id',
             'parent_department_id' => 'nullable|exists:departments,id',
             'description'          => 'nullable',
-            'status'               => 'required',
+            'status'               => 'required|in:0,1',
         ]);
 
         $companyId      = $validated['company_id'] ?? null;
@@ -979,7 +1003,7 @@ class OrgApiController extends Controller
             'name'          => 'required|max:255',
             'level'         => 'nullable|max:50',
             'description'   => 'nullable',
-            'status'        => 'required',
+            'status'        => 'required|in:0,1',
         ]);
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -1015,7 +1039,7 @@ class OrgApiController extends Controller
             'name'          => 'required|max:255',
             'level'         => 'nullable|max:50',
             'description'   => 'nullable',
-            'status'        => 'required',
+            'status'        => 'required|in:0,1',
         ]);
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);

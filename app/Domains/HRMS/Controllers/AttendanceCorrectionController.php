@@ -55,15 +55,18 @@ class AttendanceCorrectionController extends Controller
         }
 
         $user = auth()->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
         $isHrAdmin = $user && (
             $user->is_admin
+            || $workflowService->isHrOrAdminActor($user)
+            || $user->hasHrPermission('hrms.attendance_corrections.approve')
+            || $user->hasHrPermission('hrms.attendance.approve')
             || in_array(strtolower($user->role ?? ''), ['admin', 'super_admin', 'super admin', 'hr_manager', 'tenant_owner'])
         );
         $isOwner = $user && $correction->employee && ($correction->employee->user_id === $user->id || $correction->employee->office_email === $user->email);
         $isManager = false;
         if ($user && $correction->employee) {
-            $currentEmp = \App\Domains\HRMS\Models\Employee::resolveForUser($user);
-            $isManager = $currentEmp && $correction->employee->reporting_manager_id === $currentEmp->id;
+            $isManager = $workflowService->canApprove($user, $correction->employee, $correction, 'hrms.attendance_corrections.approve');
         }
 
         $data = $this->attendanceCorrectionRepository->getSingleCorrection($correction);
@@ -134,7 +137,7 @@ class AttendanceCorrectionController extends Controller
      */
     public function approve(Request $request, AttendanceCorrection $correction): JsonResponse|\Illuminate\Http\RedirectResponse
     {
-        $this->authorizeHrms('hrms.attendance_corrections.approve');
+        $this->authorizeHrms('hrms.attendance_corrections.approve', $correction);
 
         $approvedCheckIn = $request->input('approved_check_in');
         $approvedCheckOut = $request->input('approved_check_out');
@@ -166,7 +169,7 @@ class AttendanceCorrectionController extends Controller
      */
     public function reject(Request $request, AttendanceCorrection $correction): JsonResponse|\Illuminate\Http\RedirectResponse
     {
-        $this->authorizeHrms('hrms.attendance_corrections.approve');
+        $this->authorizeHrms('hrms.attendance_corrections.approve', $correction);
 
         $validated = $request->validate([
             'rejected_reason' => 'nullable|string|max:500',
@@ -228,7 +231,7 @@ class AttendanceCorrectionController extends Controller
      */
     public function approveCancellation(Request $request, AttendanceCorrection $correction): JsonResponse
     {
-        $this->authorizeHrms('hrms.attendance_corrections.approve');
+        $this->authorizeHrms('hrms.attendance_corrections.approve', $correction);
 
         $res = $this->attendanceCorrectionRepository->approveCancellation($correction, auth()->user());
 
@@ -245,7 +248,7 @@ class AttendanceCorrectionController extends Controller
      */
     public function denyCancellation(Request $request, AttendanceCorrection $correction): JsonResponse
     {
-        $this->authorizeHrms('hrms.attendance_corrections.approve');
+        $this->authorizeHrms('hrms.attendance_corrections.approve', $correction);
 
         $validated = $request->validate([
             'cancellation_denial_reason' => 'nullable|string|max:500',
@@ -260,21 +263,35 @@ class AttendanceCorrectionController extends Controller
         ], $res['status_code']);
     }
 
-    private function authorizeHrms(string $permission): void
+    private function authorizeHrms(string $permission, ?AttendanceCorrection $correction = null): void
     {
         $user = auth()->user();
         if (!$user) {
             abort(401, 'Unauthenticated.');
         }
 
-        $context = ['tenant_id' => $user->tenant_id];
+        $context = [
+            'tenant_id' => $user->tenant_id,
+            'company_id' => $user->company_id,
+            'branch_id' => $user->branch_id,
+            'department_id' => $user->department_id,
+            'owner_id' => $user->id,
+        ];
         $access = app(\App\Services\Access\AccessService::class);
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
 
-        $allowed = $access->allows($user, $permission, $context)
+        $isManager = false;
+        if ($correction && $correction->employee) {
+            $isManager = $workflowService->canApprove($user, $correction->employee, $correction, $permission);
+        }
+
+        $allowed = $isManager
+            || $access->allows($user, $permission, $context)
             || $access->allows($user, 'hrms.attendance_corrections.manage', $context)
             || $access->allows($user, 'hrms.attendance.approve', $context)
             || $access->allows($user, 'hrms.attendance.manage', $context)
             || $access->allows($user, 'hr.settings.manage', $context)
+            || $workflowService->isHrOrAdminActor($user)
             || in_array($user->role, ['admin', 'super_admin', 'company_admin', 'hr_manager']);
 
         abort_unless($allowed, 403, 'Unauthorized action in Attendance Corrections.');

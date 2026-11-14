@@ -21,6 +21,7 @@ class DispatchOrderItem extends Model
         'company_id',
         'branch_id',
         'dispatch_order_id',
+        'sales_order_item_id',
         'material_requirement_item_id',
         'invoice_item_id',
         'product_id',
@@ -39,6 +40,11 @@ class DispatchOrderItem extends Model
     public function dispatchOrder(): BelongsTo
     {
         return $this->belongsTo(DispatchOrder::class, 'dispatch_order_id');
+    }
+
+    public function salesOrderItem(): BelongsTo
+    {
+        return $this->belongsTo(SalesOrderItem::class, 'sales_order_item_id');
     }
 
     public function materialRequirementItem(): BelongsTo

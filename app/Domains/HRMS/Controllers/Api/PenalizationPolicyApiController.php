@@ -166,7 +166,7 @@ class PenalizationPolicyApiController extends Controller
         $validationRules = [
             'rule_type'  => 'required|in:late_arrival,under_hours,missing_logs',
             'company_id' => 'nullable|integer',
-            'status'     => 'required',
+            'status'     => 'required|in:0,1',
         ];
 
         if ($request->rule_type === 'late_arrival') {
@@ -197,6 +197,29 @@ class PenalizationPolicyApiController extends Controller
         }
 
         $validated = $request->validate($validationRules);
+
+        // Monotonicity check for occurrence tiers
+        if (in_array($request->rule_type, ['late_arrival', 'missing_logs']) && $request->has('penalty_tiers') && is_array($request->penalty_tiers)) {
+            $prevMax = null;
+            foreach ($request->penalty_tiers as $index => $tier) {
+                $min = (int) $tier['min_occurrence'];
+                $max = isset($tier['max_occurrence']) && $tier['max_occurrence'] !== '' && $tier['max_occurrence'] !== null ? (int) $tier['max_occurrence'] : null;
+
+                if ($max !== null && $max < $min) {
+                    return $this->sendError("Tier " . ($index + 1) . " maximum occurrence ({$max}) cannot be less than minimum occurrence ({$min}).", 422);
+                }
+
+                if ($index > 0) {
+                    if ($prevMax === null) {
+                        return $this->sendError("Tier " . ($index + 1) . " cannot follow an unbounded tier. Preceding tier must specify a maximum occurrence.", 422);
+                    }
+                    if ($min <= $prevMax) {
+                        return $this->sendError("Tier " . ($index + 1) . " minimum occurrence ({$min}) must be strictly greater than preceding tier's maximum occurrence ({$prevMax}).", 422);
+                    }
+                }
+                $prevMax = $max;
+            }
+        }
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
@@ -263,12 +286,18 @@ class PenalizationPolicyApiController extends Controller
         }
 
         $companyId = $request->company_id ?: null;
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+
+        $matchAttributes = [
+            'rule_type'  => $request->rule_type,
+            'company_id' => $companyId,
+        ];
+        if ($tenantId) {
+            $matchAttributes['tenant_id'] = $tenantId;
+        }
 
         $policy = AttendancePenalty::updateOrCreate(
-            [
-                'rule_type'  => $request->rule_type,
-                'company_id' => $companyId,
-            ],
+            $matchAttributes,
             $updateData
         );
 
@@ -337,30 +366,59 @@ class PenalizationPolicyApiController extends Controller
             'branch_id'              => 'nullable|integer|exists:branches,id',
             'office_latitude'        => 'nullable|string',
             'office_longitude'       => 'nullable|string',
-            'office_radius'          => 'required|integer|min:1',
+            'office_radius'          => 'nullable|integer|min:1',
             'office_tracking_minutes'=> 'nullable|integer|min:1|max:120',
-            'wfh_tracking_meters'    => 'required|integer|min:1',
+            'wfh_tracking_meters'    => 'nullable|integer|min:1',
             'wfh_tracking_minutes'   => 'nullable|integer|min:1|max:120',
-            'site_tracking_meters'   => 'required|integer|min:1',
+            'site_tracking_meters'   => 'nullable|integer|min:1',
             'site_tracking_minutes'  => 'nullable|integer|min:1|max:120',
-            'status'                 => 'required',
+            'status'                 => 'required|in:0,1',
         ]);
 
         $validated['office_biometric']       = $request->boolean('office_biometric');
         $validated['office_web']             = $request->boolean('office_web');
         $validated['office_geofence']        = $request->boolean('office_geofence');
         $validated['office_tracking']        = $request->boolean('office_tracking');
-        $validated['office_tracking_minutes']= $request->filled('office_tracking_minutes') ? (int) $request->office_tracking_minutes : 15;
-        $validated['wfh_location']           = $request->boolean('wfh_location');
-        $validated['wfh_selfie']             = $request->boolean('wfh_selfie');
         $validated['wfh_geofence']           = $request->boolean('wfh_geofence');
         $validated['wfh_tracking']           = $request->boolean('wfh_tracking');
-        $validated['wfh_tracking_minutes']   = $request->filled('wfh_tracking_minutes') ? (int) $request->wfh_tracking_minutes : 15;
+        $validated['site_tracking']           = $request->boolean('site_tracking');
+        $requiredRuleFields = [];
+        if ($validated['office_geofence']) {
+            $requiredRuleFields += [
+                'office_latitude' => 'required|numeric|between:-90,90',
+                'office_longitude' => 'required|numeric|between:-180,180',
+                'office_radius' => 'required|integer|min:1',
+            ];
+        }
+        if ($validated['office_tracking']) {
+            $requiredRuleFields['office_tracking_minutes'] = 'required|integer|min:1|max:120';
+        }
+        if ($validated['wfh_geofence'] || $validated['wfh_tracking']) {
+            $requiredRuleFields['wfh_tracking_meters'] = 'required|integer|min:1';
+        }
+        if ($validated['wfh_tracking']) {
+            $requiredRuleFields['wfh_tracking_minutes'] = 'required|integer|min:1|max:120';
+        }
+        if ($validated['site_tracking']) {
+            $requiredRuleFields['site_tracking_meters'] = 'required|integer|min:1';
+            $requiredRuleFields['site_tracking_minutes'] = 'required|integer|min:1|max:120';
+        }
+        if ($requiredRuleFields) {
+            $request->validate($requiredRuleFields);
+        }
+        $validated['office_tracking_minutes']= $request->filled('office_tracking_minutes') ? (int) $request->office_tracking_minutes : null;
+        $validated['wfh_location']           = $request->boolean('wfh_location');
+        $validated['wfh_selfie']             = $request->boolean('wfh_selfie');
+        $validated['wfh_tracking']           = $request->boolean('wfh_tracking');
+        $validated['wfh_tracking_minutes']   = $request->filled('wfh_tracking_minutes') ? (int) $request->wfh_tracking_minutes : null;
         $validated['site_location']          = $request->boolean('site_location');
         $validated['site_selfie']            = $request->boolean('site_selfie');
         $validated['site_geofence']          = false;
-        $validated['site_tracking']          = $request->boolean('site_tracking');
-        $validated['site_tracking_minutes']  = $request->filled('site_tracking_minutes') ? (int) $request->site_tracking_minutes : 15;
+        $validated['site_tracking_minutes']  = $request->filled('site_tracking_minutes') ? (int) $request->site_tracking_minutes : null;
+
+        $validated['office_break_geofence']   = $request->boolean('office_break_geofence');
+        $validated['pause_tracking_on_break'] = $request->boolean('pause_tracking_on_break');
+        $validated['allow_multiple_punches']  = $request->boolean('allow_multiple_punches');
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 

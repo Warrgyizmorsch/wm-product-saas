@@ -18,6 +18,7 @@ Route::prefix('sales')
         Route::delete('orders/{order}', [SalesOrderController::class, 'destroy'])->name('orders.destroy');
         Route::post('orders/{order}/confirm', [SalesOrderController::class, 'confirm'])->name('orders.confirm');
         Route::post('orders/{order}/cancel', [SalesOrderController::class, 'cancel'])->name('orders.cancel');
+        Route::post('orders/{order}/short-close', [SalesOrderController::class, 'shortClose'])->name('orders.short-close');
         Route::post('orders/{order}/convert-to-project', [SalesOrderController::class, 'convertToProject'])->name('orders.convert-to-project');
         Route::get('orders/{order}/download', [SalesOrderController::class, 'downloadPdf'])->name('orders.download');
 
@@ -28,6 +29,7 @@ Route::prefix('sales')
         Route::get('material-requirements/{delivery}', fn($delivery) => redirect()->route('inventory.material-requirements.show', $delivery))->name('material-requirements.show');
         Route::post('material-requirements/{delivery}/ship', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'ship'])->name('material-requirements.ship');
         Route::post('material-requirements/{delivery}/cancel', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'cancel'])->name('material-requirements.cancel');
+        Route::post('material-requirements/{delivery}/release', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'releaseForDispatch'])->name('material-requirements.release');
 
         Route::post('material-requirements/items/{itemId}/warehouse', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'updateWarehouse'])->name('material-requirements.update-warehouse');
         Route::post('material-requirements/items/{itemId}/reserve', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'reserveQty'])->name('material-requirements.reserve-qty');
@@ -66,6 +68,7 @@ Route::prefix('sales')
         Route::get('dispatches/{dispatch}', fn($dispatch) => redirect()->route('inventory.dispatches.show', $dispatch))->name('dispatches.show');
         Route::post('dispatches/{dispatch}/confirm', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'confirm'])->name('dispatches.confirm');
         Route::post('dispatches/{dispatch}/ship', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'ship'])->name('dispatches.ship');
+        Route::post('dispatches/{dispatch}/cancel', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'cancel'])->name('dispatches.cancel');
 
         // Invoices Routes
         Route::get('invoices', [\App\Domains\Sales\Controllers\InvoiceController::class, 'index'])->name('invoices.index');
@@ -78,8 +81,11 @@ Route::prefix('sales')
         Route::post('invoices/{invoice}/send-email', [\App\Domains\Sales\Controllers\InvoiceController::class, 'sendEmail'])->name('invoices.sendEmail');
         Route::post('invoices/{invoice}/send-whatsapp', [\App\Domains\Sales\Controllers\InvoiceController::class, 'sendWhatsApp'])->name('invoices.sendWhatsApp');
         Route::post('invoices/{invoice}/post', [\App\Domains\Sales\Controllers\InvoiceController::class, 'post'])->name('invoices.post');
+        Route::post('invoices/{invoice}/credit-note', [\App\Domains\Sales\Controllers\InvoiceController::class, 'storeCreditNote'])->name('invoices.credit-note');
         Route::post('invoices/{invoice}/send', [\App\Domains\Sales\Controllers\InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/pay', [\App\Domains\Sales\Controllers\InvoiceController::class, 'pay'])->name('invoices.pay');
+        Route::post('invoices/{invoice}/apply-advance', [\App\Domains\Sales\Controllers\InvoiceController::class, 'applyAdvance'])->name('invoices.apply-advance');
+        Route::post('invoices/{invoice}/remove-advance/{allocation}', [\App\Domains\Sales\Controllers\InvoiceController::class, 'removeAdvance'])->name('invoices.remove-advance');
 
         // E-Invoice & E-Way Bill Routes
         Route::post('invoices/{id}/einvoice/generate', [\App\Domains\Sales\Controllers\EInvoiceController::class, 'generateEInvoice'])->name('invoices.einvoice.generate');
@@ -94,6 +100,7 @@ Route::prefix('sales')
         Route::get('payments/create', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'create'])->name('payments.create');
         Route::post('payments', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'store'])->name('payments.store');
         Route::get('payments/{payment}', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'show'])->name('payments.show');
+        Route::get('payments/{payment}/download', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'downloadPdf'])->name('payments.download');
         Route::post('payments/{payment}/confirm', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'confirm'])->name('payments.confirm');
 
         // Returns Routes
@@ -102,6 +109,7 @@ Route::prefix('sales')
         Route::get('returns/create', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'create'])->name('returns.create');
         Route::post('returns', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'store'])->name('returns.store');
         Route::get('returns/{return}', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'show'])->name('returns.show');
+        Route::get('returns/{return}/download', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'downloadPdf'])->name('returns.download');
         Route::post('returns/{return}/approve', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'approve'])->name('returns.approve');
         Route::post('returns/{return}/complete', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'complete'])->name('returns.complete');
 

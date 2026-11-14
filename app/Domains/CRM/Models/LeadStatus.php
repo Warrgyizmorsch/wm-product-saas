@@ -36,6 +36,21 @@ class LeadStatus extends Model
         'is_active' => 'boolean',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saved(function ($status) {
+            \Illuminate\Support\Facades\Cache::forget("lead_ordered_statuses_" . ($status->tenant_id ?? 0));
+            \Illuminate\Support\Facades\Cache::forget("lead_ordered_statuses_0");
+        });
+
+        static::deleted(function ($status) {
+            \Illuminate\Support\Facades\Cache::forget("lead_ordered_statuses_" . ($status->tenant_id ?? 0));
+            \Illuminate\Support\Facades\Cache::forget("lead_ordered_statuses_0");
+        });
+    }
+
     /**
      * Default protected statuses that can never be deleted or renamed.
      */
@@ -47,11 +62,14 @@ class LeadStatus extends Model
      */
     public static function getOrderedStatuses(?int $tenantId = null): Collection
     {
-        return static::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order', 'asc')
-            ->orderBy('id', 'asc')
-            ->get();
+        $cacheKey = "lead_ordered_statuses_" . ($tenantId ?? 0);
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () {
+            return static::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order', 'asc')
+                ->orderBy('id', 'asc')
+                ->get();
+        });
     }
 
     /**

@@ -53,13 +53,15 @@ class VoucherService
             'company_id' => $meta['company_id'] ?? null,
             'branch_id' => $meta['branch_id'] ?? null,
             'journal_date' => $meta['journal_date'] ?? now(),
-            'source' => Journal::SOURCE_MANUAL,
+            'source' => $meta['source'] ?? Journal::SOURCE_MANUAL,
+            'idempotency_key' => $meta['idempotency_key'] ?? null,
             'voucher_type' => $voucherType,
             'journal_number_prefix' => VoucherType::prefix($voucherType),
             'reference_type' => $meta['reference_type'] ?? null,
             'reference_id' => $meta['reference_id'] ?? null,
             'memo' => $meta['memo'] ?? null,
             'posted_by' => $meta['posted_by'] ?? null,
+            'bill_allocations' => $meta['bill_allocations'] ?? null,
         ], fn ($value) => $value !== null);
 
         $journal = ($meta['through_approval'] ?? false)

@@ -20,6 +20,8 @@ class VisitorApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', VisitorPass::class);
+
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $visitors = Visitor::where('tenant_id', $tenantId)->latest()->paginate(20);
 
@@ -34,6 +36,8 @@ class VisitorApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', VisitorPass::class);
+
         [$tenantId, $companyId, $branchId] = $this->visitorService->resolveTenantContext();
 
         $validated = $request->validate([
@@ -62,6 +66,8 @@ class VisitorApiController extends Controller
      */
     public function passes(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', VisitorPass::class);
+
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $passes = VisitorPass::where('tenant_id', $tenantId)->with(['visitor', 'host'])->latest()->paginate(20);
 
@@ -76,6 +82,8 @@ class VisitorApiController extends Controller
      */
     public function preRegister(Request $request): JsonResponse
     {
+        $this->authorize('create', VisitorPass::class);
+
         // Initial pre-register skeleton
         return response()->json([
             'success' => true,
@@ -90,6 +98,8 @@ class VisitorApiController extends Controller
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $pass = VisitorPass::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $this->authorize('checkIn', $pass);
 
         $pass->update([
             'status'      => 'Checked-In',
@@ -113,6 +123,8 @@ class VisitorApiController extends Controller
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $pass = VisitorPass::where('tenant_id', $tenantId)->findOrFail($id);
 
+        $this->authorize('checkOut', $pass);
+
         $pass->update([
             'status'       => 'Checked-Out',
             'check_out_at' => now(),
@@ -132,6 +144,8 @@ class VisitorApiController extends Controller
      */
     public function liveHeadcount(): JsonResponse
     {
+        $this->authorize('viewAny', VisitorPass::class);
+
         [$tenantId, , $branchId] = $this->visitorService->resolveTenantContext();
         $count = $this->visitorService->getActiveVisitorsCount($tenantId, $branchId);
 

@@ -16,6 +16,7 @@ use App\Domains\Purchase\Models\PurchaseRequisition;
 use App\Domains\Purchase\Models\PurchaseBill;
 use App\Domains\Purchase\Models\GoodsReceiptNote;
 use App\Domains\Inventory\Models\Vendor;
+use App\Domains\Production\Models\ProductionRequisitionSlip;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -85,7 +86,49 @@ class SupplyChainDashboardController extends Controller
         // 4. Monthly Trend Data (Last 6 Months)
         $monthlyTrend = $this->calculateMonthlyTrend($tenantId);
 
-        // 5. Recent Records
+        // 5. Recent Records & Material Requirements
+        $pendingMrStatuses = ['Pending', 'Draft', 'Processing', 'Partially Ready', 'Partially Dispatched', 'Partially Delivered'];
+        $pendingMaterialRequirementsQuery = MaterialRequirement::where('tenant_id', $tenantId)
+            ->whereIn('status', $pendingMrStatuses);
+
+        $pendingMaterialRequirementsCount = (clone $pendingMaterialRequirementsQuery)->count();
+        $totalMaterialRequirementsCount = MaterialRequirement::where('tenant_id', $tenantId)->count();
+
+        $pendingMaterialRequirements = (clone $pendingMaterialRequirementsQuery)
+            ->with(['salesOrder.customer', 'items.product'])
+            ->orderBy('requirement_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->limit(10)
+            ->get();
+
+        // 5b. Pending Production Material Requisition Slips (Shop Floor Requests)
+        $pendingProdStatuses = ['pending', 'draft', 'partial', 'partially issued', 'reserved', 'Pending', 'Draft', 'Partial', 'Partially Issued', 'Reserved'];
+        $pendingProdQuery = ProductionRequisitionSlip::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($pendingProdStatuses) {
+                $q->whereIn(DB::raw('LOWER(status)'), array_map('strtolower', $pendingProdStatuses))
+                  ->orWhereNull('status');
+            });
+
+        $pendingProductionRequisitionsCount = (clone $pendingProdQuery)->count();
+        $totalProductionRequisitionsCount = ProductionRequisitionSlip::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->count();
+
+        $pendingProductionRequisitions = (clone $pendingProdQuery)
+            ->with(['order.product', 'maintenanceWorkOrder.machine', 'items.product'])
+            ->orderBy('requisition_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->limit(10)
+            ->get();
+
+        $recentMaterialRequirements = MaterialRequirement::where('tenant_id', $tenantId)
+            ->with(['salesOrder.customer', 'items'])
+            ->orderBy('requirement_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->limit(5)
+            ->get();
+
         $recentSalesOrders = SalesOrder::where('tenant_id', $tenantId)
             ->orderBy('created_at', 'desc')
             ->limit(5)
@@ -102,31 +145,38 @@ class SupplyChainDashboardController extends Controller
             ->get();
 
         return view('modules.inventory.supply_chain_dashboard', [
-            'preset'                     => $preset,
-            'startDate'                  => $startDate,
-            'endDate'                    => $endDate,
-            'totalSalesValue'            => $totalSalesValue,
-            'salesOrdersCount'           => $salesOrdersCount,
-            'pendingSalesOrdersCount'    => $pendingSalesOrdersCount,
-            'invoicesTotalValue'         => $invoicesTotalValue,
-            'invoicesCount'              => $invoicesCount,
-            'paymentsTotalValue'         => $paymentsTotalValue,
-            'paymentsCount'              => $paymentsCount,
-            'totalProductsCount'         => $totalProductsCount,
-            'totalInventoryValuation'    => $totalInventoryValuation,
-            'lowStockCount'              => $lowStockCount,
-            'lowStockProductsList'       => $lowStockProductsList,
-            'materialRequestsCount'      => $materialRequestsCount,
-            'dispatchOrdersCount'        => $dispatchOrdersCount,
-            'totalPurchaseValue'         => $totalPurchaseValue,
-            'purchaseOrdersCount'        => $purchaseOrdersCount,
-            'pendingPurchaseOrdersCount' => $pendingPurchaseOrdersCount,
-            'goodsReceiptsCount'         => $goodsReceiptsCount,
-            'vendorsCount'               => $vendorsCount,
-            'monthlyTrend'               => $monthlyTrend,
-            'recentSalesOrders'          => $recentSalesOrders,
-            'recentPurchaseOrders'       => $recentPurchaseOrders,
-            'recentGoodsReceipts'        => $recentGoodsReceipts,
+            'preset'                             => $preset,
+            'startDate'                          => $startDate,
+            'endDate'                            => $endDate,
+            'totalSalesValue'                    => $totalSalesValue,
+            'salesOrdersCount'                   => $salesOrdersCount,
+            'pendingSalesOrdersCount'            => $pendingSalesOrdersCount,
+            'invoicesTotalValue'                 => $invoicesTotalValue,
+            'invoicesCount'                      => $invoicesCount,
+            'paymentsTotalValue'                 => $paymentsTotalValue,
+            'paymentsCount'                      => $paymentsCount,
+            'totalProductsCount'                 => $totalProductsCount,
+            'totalInventoryValuation'            => $totalInventoryValuation,
+            'lowStockCount'                      => $lowStockCount,
+            'lowStockProductsList'               => $lowStockProductsList,
+            'materialRequestsCount'              => $materialRequestsCount,
+            'dispatchOrdersCount'                => $dispatchOrdersCount,
+            'totalPurchaseValue'                 => $totalPurchaseValue,
+            'purchaseOrdersCount'                => $purchaseOrdersCount,
+            'pendingPurchaseOrdersCount'         => $pendingPurchaseOrdersCount,
+            'goodsReceiptsCount'                 => $goodsReceiptsCount,
+            'vendorsCount'                       => $vendorsCount,
+            'monthlyTrend'                       => $monthlyTrend,
+            'recentSalesOrders'                  => $recentSalesOrders,
+            'recentPurchaseOrders'               => $recentPurchaseOrders,
+            'recentGoodsReceipts'                => $recentGoodsReceipts,
+            'pendingMaterialRequirements'        => $pendingMaterialRequirements,
+            'pendingMaterialRequirementsCount'   => $pendingMaterialRequirementsCount,
+            'totalMaterialRequirementsCount'     => $totalMaterialRequirementsCount,
+            'pendingProductionRequisitions'      => $pendingProductionRequisitions,
+            'pendingProductionRequisitionsCount' => $pendingProductionRequisitionsCount,
+            'totalProductionRequisitionsCount'   => $totalProductionRequisitionsCount,
+            'recentMaterialRequirements'         => $recentMaterialRequirements,
         ]);
     }
 

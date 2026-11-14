@@ -55,7 +55,9 @@ class HelpdeskTicketPolicy
 
     public function canManage(User $user): bool
     {
-        return $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $user->tenant_id])
-            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
+        $tenantId = tenant_id() ?? $user->tenant_id ?: app(\App\Core\Tenant\TenantContext::class)->id();
+        return $user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
+            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]);
     }
 }

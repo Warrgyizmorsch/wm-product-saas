@@ -18,15 +18,23 @@ class DispatchOrderRepository
 
         if (!empty($filters['search'])) {
             $search = trim($filters['search']);
-            $query->where(function ($q) use ($search) {
+            $cleanSoSearch = str_replace('SO-', '', $search);
+
+            $query->where(function ($q) use ($search, $cleanSoSearch) {
                 $q->where('dispatch_number', 'like', "%{$search}%")
-                  ->orWhere('shipping_agent', 'like', "%{$search}%")
+                  ->orWhere('carrier', 'like', "%{$search}%")
+                  ->orWhere('tracking_number', 'like', "%{$search}%")
+                  ->orWhere('gate_pass_number', 'like', "%{$search}%")
                   ->orWhere('vehicle_number', 'like', "%{$search}%")
                   ->orWhereHas('customer', function ($cq) use ($search) {
                       $cq->where('name', 'like', "%{$search}%");
                   })
-                  ->orWhereHas('salesOrder', function ($sq) use ($search) {
-                      $sq->where('sales_order_number', 'like', "%{$search}%");
+                  ->orWhereHas('salesOrder', function ($sq) use ($search, $cleanSoSearch) {
+                      $sq->where('sales_order_number', 'like', "%{$search}%")
+                         ->orWhere('sales_order_number', 'like', "%{$cleanSoSearch}%");
+                  })
+                  ->orWhereHas('materialRequirement', function ($mq) use ($search) {
+                      $mq->where('requirement_number', 'like', "%{$search}%");
                   });
             });
         }
@@ -56,15 +64,22 @@ class DispatchOrderRepository
 
     public function getPendingDOs(int $limit = 5): Collection
     {
-        return MaterialRequirement::with(['salesOrder.customer'])
+        return MaterialRequirement::with(['salesOrder.customer', 'items.product'])
             ->whereHas('salesOrder', function ($q) {
-                $q->whereIn('status', ['Confirmed', 'Partially Shipped']);
+                $q->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered']);
             })
             ->whereNotIn('id', DispatchOrder::pluck('material_requirement_id'))
-            ->whereNotIn('status', ['Cancelled', 'Delivered'])
+            ->whereIn('status', ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Partially Dispatched', 'Partially Delivered'])
             ->latest()
+            ->get()
+            ->filter(function ($mr) {
+                if ($mr->salesOrder && $mr->salesOrder->hasOnlyServices()) {
+                    return false;
+                }
+                return $mr->items->filter(fn($item) => $item->product && !$item->product->isService())->isNotEmpty();
+            })
             ->take($limit)
-            ->get();
+            ->values();
     }
 
     public function getAllPendingMaterialRequirements(): Collection
@@ -73,27 +88,45 @@ class DispatchOrderRepository
             'salesOrder.customer',
             'items.product',
             'items.warehouse',
+            'items.serialNumbers',
         ])
         ->whereHas('salesOrder', function ($q) {
-            $q->whereIn('status', ['Confirmed', 'Partially Shipped']);
+            $q->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered']);
         })
-        ->whereNotIn('status', ['Cancelled'])
+        ->whereIn('status', ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Partially Dispatched', 'Dispatched', 'Partially Delivered'])
         ->latest()
-        ->get();
+        ->get()
+        ->filter(function ($mr) {
+            if ($mr->salesOrder && $mr->salesOrder->hasOnlyServices()) {
+                return false;
+            }
+            return $mr->items->filter(fn($item) => $item->product && !$item->product->isService())->isNotEmpty();
+        })
+        ->values();
     }
 
     public function getPendingSalesOrders(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $salesOrdersQuery = \App\Domains\Sales\Models\SalesOrder::query()
             ->where('tenant_id', $tenantId)
-            ->whereIn('status', ['Confirmed', 'Partially Shipped'])
-            ->with(['customer', 'items.product.uom', 'items.warehouse'])
+            ->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])
+            ->with([
+                'customer',
+                'materialRequirements',
+                'items.product.uom',
+                'items.warehouse',
+                'dispatches' => function ($q) {
+                    $q->with(['items.product.uom'])->latest('dispatch_date')->latest('id');
+                }
+            ])
             ->latest('order_date');
 
         if (!empty($filters['search'])) {
             $search = trim($filters['search']);
-            $salesOrdersQuery->where(function ($q) use ($search) {
+            $cleanSoSearch = str_replace('SO-', '', $search);
+            $salesOrdersQuery->where(function ($q) use ($search, $cleanSoSearch) {
                 $q->where('sales_order_number', 'like', "%{$search}%")
+                  ->orWhere('sales_order_number', 'like', "%{$cleanSoSearch}%")
                   ->orWhereHas('customer', function ($cq) use ($search) {
                       $cq->where('name', 'like', "%{$search}%")
                         ->orWhere('phone', 'like', "%{$search}%")
@@ -116,29 +149,71 @@ class DispatchOrderRepository
         $pendingList = collect();
 
         foreach ($allOrders as $order) {
+            if ($order->hasOnlyServices()) {
+                continue;
+            }
+
+            // Must be released by Store Incharge via Material Requirement if MR exists
+            $mrs = $order->materialRequirements;
+            $hasMr = $mrs && $mrs->isNotEmpty();
+            if ($hasMr) {
+                $isReleased = $mrs->contains(function ($mr) {
+                    return in_array($mr->status, ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Dispatched', 'Partially Dispatched', 'Partially Delivered'])
+                        || $mr->items->contains(fn($i) => (float)($i->quantity_released ?? 0) > 0);
+                });
+                if (!$isReleased) {
+                    continue; // Skip until Store Incharge releases this requirement
+                }
+            }
+
+            $mrItems = $hasMr ? $mrs->flatMap->items : collect();
             $orderDispatches = $dispatchedAggregates->get($order->id, collect());
             $totalOrdered = 0;
             $totalDispatched = 0;
             $itemsDetail = [];
 
             foreach ($order->items as $item) {
-                $ordered = (float) $item->quantity;
+                if ($item->isService()) {
+                    continue;
+                }
+
+                $matchingMrItem = null;
+                if ($hasMr) {
+                    $matchingMrItem = $mrItems->firstWhere('sales_order_item_id', $item->id)
+                        ?? $mrItems->firstWhere('product_id', $item->product_id);
+
+                    // If an MR exists, only show items that have been released by Store Incharge!
+                    $releasedQty = (float)($matchingMrItem?->quantity_released ?? 0);
+                    $isItemReleased = in_array($matchingMrItem?->status, ['Released', 'Picked', 'Packed', 'Dispatched', 'Partially Dispatched', 'Partially Delivered']) || $releasedQty > 0;
+
+                    if (!$isItemReleased) {
+                        continue; // Skip unreleased shortage items!
+                    }
+
+                    $effectiveOrdered = $releasedQty > 0 ? $releasedQty : (float)$item->quantity;
+                } else {
+                    $effectiveOrdered = (float)$item->quantity;
+                }
+
                 $dispRow = $orderDispatches->firstWhere('product_id', $item->product_id);
                 $dispatched = $dispRow ? (float) $dispRow->total_dispatched : 0.0;
-                $pending = max(0, $ordered - $dispatched);
+                $pending = max(0, $effectiveOrdered - $dispatched);
 
-                $totalOrdered += $ordered;
-                $totalDispatched += min($ordered, $dispatched);
+                $totalOrdered += $effectiveOrdered;
+                $totalDispatched += min($effectiveOrdered, $dispatched);
 
-                $availStock = \App\Domains\Inventory\Services\StockService::getAvailableStock((int) $item->product_id, (int) $item->warehouse_id);
+                // Use the warehouse selected during MR release!
+                $itemWarehouseId = $matchingMrItem?->warehouse_id ?: $item->warehouse_id;
+                $itemWarehouseName = $matchingMrItem?->warehouse?->name ?: ($item->warehouse?->name ?? 'Main');
+                $availStock = \App\Domains\Inventory\Services\StockService::getAvailableStock((int) $item->product_id, (int) $itemWarehouseId);
 
                 $itemsDetail[] = [
                     'product_id'     => $item->product_id,
                     'product_name'   => $item->product?->name ?? $item->item_name ?? 'Item',
                     'sku'            => $item->product?->sku ?? '',
                     'uom'            => $item->product?->uom?->code ?? 'Units',
-                    'warehouse_name' => $item->warehouse?->name ?? 'Main',
-                    'ordered_qty'    => $ordered,
+                    'warehouse_name' => $itemWarehouseName,
+                    'ordered_qty'    => $effectiveOrdered,
                     'dispatched_qty' => $dispatched,
                     'pending_qty'    => $pending,
                     'available_stock'=> $availStock,
@@ -147,7 +222,7 @@ class DispatchOrderRepository
 
             $totalPending = max(0, $totalOrdered - $totalDispatched);
 
-            if ($totalPending > 0) {
+            if ($totalPending > 0 && !empty($itemsDetail)) {
                 $progress = $totalOrdered > 0 ? round(($totalDispatched / $totalOrdered) * 100) : 0;
                 $order->total_ordered_qty = $totalOrdered;
                 $order->total_dispatched_qty = $totalDispatched;
@@ -178,8 +253,8 @@ class DispatchOrderRepository
     public function getPendingSalesOrdersCount(int $tenantId): int
     {
         $allOrders = \App\Domains\Sales\Models\SalesOrder::where('tenant_id', $tenantId)
-            ->whereIn('status', ['Confirmed', 'Partially Shipped'])
-            ->with(['items'])
+            ->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])
+            ->with(['items.product', 'materialRequirements'])
             ->get();
 
         $dispatchedAggregates = DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId) {
@@ -193,17 +268,55 @@ class DispatchOrderRepository
 
         $count = 0;
         foreach ($allOrders as $order) {
-            $orderDispatches = $dispatchedAggregates->get($order->id, collect());
-            $totalOrdered = (float) $order->items->sum('quantity');
-            $totalDispatched = 0;
-
-            foreach ($order->items as $item) {
-                $dispRow = $orderDispatches->firstWhere('product_id', $item->product_id);
-                $dispatched = $dispRow ? (float) $dispRow->total_dispatched : 0.0;
-                $totalDispatched += min((float) $item->quantity, $dispatched);
+            if ($order->hasOnlyServices()) {
+                continue;
             }
 
-            if (($totalOrdered - $totalDispatched) > 0) {
+            // Must be released by Store Incharge via Material Requirement if MR exists
+            $mrs = $order->materialRequirements;
+            $hasMr = $mrs && $mrs->isNotEmpty();
+            if ($hasMr) {
+                $isReleased = $mrs->contains(function ($mr) {
+                    return in_array($mr->status, ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Dispatched', 'Partially Dispatched', 'Partially Delivered'])
+                        || $mr->items->contains(fn($i) => (float)($i->quantity_released ?? 0) > 0);
+                });
+                if (!$isReleased) {
+                    continue; // Skip until Store Incharge releases this requirement
+                }
+            }
+
+            $mrItems = $hasMr ? $mrs->flatMap->items : collect();
+            $orderDispatches = $dispatchedAggregates->get($order->id, collect());
+            $totalOrdered = 0;
+            $totalDispatched = 0;
+            $hasPhysical = false;
+
+            foreach ($order->items as $item) {
+                if ($item->isService()) {
+                    continue;
+                }
+
+                if ($hasMr) {
+                    $matchingMrItem = $mrItems->firstWhere('sales_order_item_id', $item->id)
+                        ?? $mrItems->firstWhere('product_id', $item->product_id);
+                    $relQty = (float)($matchingMrItem?->quantity_released ?? 0);
+                    $isRel = in_array($matchingMrItem?->status, ['Released', 'Picked', 'Packed', 'Dispatched']) || $relQty > 0;
+                    if (!$isRel) {
+                        continue;
+                    }
+                    $ordered = $relQty > 0 ? $relQty : (float)$item->quantity;
+                } else {
+                    $ordered = (float)$item->quantity;
+                }
+
+                $hasPhysical = true;
+                $totalOrdered += $ordered;
+                $dispRow = $orderDispatches->firstWhere('product_id', $item->product_id);
+                $dispatched = $dispRow ? (float) $dispRow->total_dispatched : 0.0;
+                $totalDispatched += min($ordered, $dispatched);
+            }
+
+            if ($hasPhysical && ($totalOrdered - $totalDispatched) > 0) {
                 $count++;
             }
         }
@@ -256,9 +369,15 @@ class DispatchOrderRepository
 
     public function getDispatchedQtyForSalesOrder(int $salesOrderId): float
     {
+        $soItemDispatched = (float) \App\Domains\Sales\Models\SalesOrderItem::where('sales_order_id', $salesOrderId)->sum('dispatched_qty');
+        if ($soItemDispatched > 0) {
+            return $soItemDispatched;
+        }
+
         return (float) DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($salesOrderId) {
-            $q->where('sales_order_id', $salesOrderId)->where('status', 'Dispatched');
-        })->sum('quantity_dispatched');
+            $q->where('sales_order_id', $salesOrderId)
+              ->whereIn('status', ['Shipped', 'Dispatched', 'Delivered']);
+        })->sum(DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
     }
 
     public function createDispatchOrder(array $dispatchData, array $itemsData): DispatchOrder
@@ -267,18 +386,30 @@ class DispatchOrderRepository
             $dispatch = DispatchOrder::create($dispatchData);
 
             foreach ($itemsData as $item) {
+                $soItemId = $item['sales_order_item_id'] ?? null;
+                if (!$soItemId && !empty($dispatch->sales_order_id)) {
+                    $matchedSoItem = \App\Domains\Sales\Models\SalesOrderItem::where('sales_order_id', $dispatch->sales_order_id)
+                        ->where('product_id', $item['product_id'])
+                        ->whereRaw('(quantity - (dispatched_qty + cancelled_qty)) > 0')
+                        ->first();
+                    $soItemId = $matchedSoItem?->id ?? \App\Domains\Sales\Models\SalesOrderItem::where('sales_order_id', $dispatch->sales_order_id)
+                        ->where('product_id', $item['product_id'])
+                        ->first()?->id;
+                }
+
                 DispatchOrderItem::create([
                     'tenant_id' => $dispatch->tenant_id,
                     'company_id' => $dispatch->company_id,
                     'branch_id' => $dispatch->branch_id,
                     'dispatch_order_id' => $dispatch->id,
+                    'sales_order_item_id' => $soItemId,
                     'material_requirement_item_id' => $item['material_requirement_item_id'] ?? null,
                     'invoice_item_id' => $item['invoice_item_id'] ?? null,
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $item['warehouse_id'],
                     'quantity_ordered' => $item['quantity'],
                     'quantity_dispatched' => $item['quantity'],
-                    'serial_numbers' => $item['serial_numbers'] ?? null,
+                    'serial_numbers' => is_array($item['serial_numbers'] ?? null) ? implode(', ', array_filter(array_map('trim', $item['serial_numbers']))) : (isset($item['serial_numbers']) ? trim((string)$item['serial_numbers']) : null),
                     'batch_number' => $item['batch_number'] ?? null,
                 ]);
             }

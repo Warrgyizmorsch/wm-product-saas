@@ -14,7 +14,7 @@ class PaymentTermController extends Controller
 {
     public function index(Request $request): View
     {
-        $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $query = PaymentTerm::query()->where('tenant_id', $tenantId);
 
@@ -42,7 +42,7 @@ class PaymentTermController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -59,8 +59,8 @@ class PaymentTermController extends Controller
         }
 
         $validated['tenant_id'] = $tenantId;
-        $validated['company_id'] = session('company_id') ?? 1;
-        $validated['branch_id'] = session('branch_id') ?? 1;
+        $validated['company_id'] = current_company_id();
+        $validated['branch_id'] = current_branch_id();
         $validated['created_by'] = Auth::id();
         $validated['discount_days'] = $validated['discount_days'] ?? 0;
         $validated['discount_percentage'] = $validated['discount_percentage'] ?? 0.00;

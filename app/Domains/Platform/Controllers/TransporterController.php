@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use App\Services\TaxIdentityService;
 
 class TransporterController extends Controller
 {
@@ -40,6 +41,13 @@ class TransporterController extends Controller
         $autoCode = 'TRP-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
         return view('modules.platform.transporters.create', compact('autoCode'));
+    }
+
+    public function edit(Transporter $transporter): View
+    {
+        $this->authorize('update', $transporter);
+
+        return view('modules.platform.transporters.edit', compact('transporter'));
     }
 
     public function show(Transporter $transporter): View
@@ -212,14 +220,14 @@ class TransporterController extends Controller
             'name'                  => 'required|string|max:255',
             'code'                  => 'nullable|string|max:50',
             'transporter_id'        => 'nullable|string|max:50',
-            'gstin'                 => 'nullable|string|max:20',
-            'pan_number'            => 'nullable|string|max:20',
-            'phone'                 => 'nullable|string|max:30',
+            'gstin'                 => TaxIdentityService::gstinRules(false),
+            'pan_number'            => TaxIdentityService::panRules(false),
+            'phone'                 => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'email'                 => 'nullable|email|max:150',
             'address'               => 'nullable|string',
             'city'                  => 'nullable|string|max:100',
             'state'                 => 'nullable|string|max:100',
-            'pincode'               => 'nullable|string|max:20',
+            'pincode'               => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:10'],
             'status'                => 'nullable|string|in:active,inactive',
             'tds_section'           => 'nullable|string|max:50',
             'tds_rate'              => 'nullable|numeric',
@@ -232,13 +240,22 @@ class TransporterController extends Controller
             'bank_name'             => 'nullable|string|max:150',
             'branch_name'           => 'nullable|string|max:150',
             'account_name'          => 'nullable|string|max:150',
-            'account_number'        => 'nullable|string|max:50',
+            'account_number'        => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code'             => 'nullable|string|max:20',
             'payment_terms'         => 'nullable|string|max:100',
             'opening_balance'       => 'nullable|numeric',
             'contact_person_name'   => 'nullable|string|max:150',
-            'contact_person_phone'  => 'nullable|string|max:30',
+            'contact_person_phone'  => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'contact_person_email'  => 'nullable|email|max:150',
+        ], [
+            'email.email'                 => 'The email field must be a valid email address.',
+            'phone.regex'                 => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'                   => 'Phone number cannot exceed 20 digits.',
+            'contact_person_phone.regex'  => 'Contact person phone must contain digits/numbers only (no special characters or letters).',
+            'contact_person_phone.max'    => 'Contact person phone cannot exceed 20 digits.',
+            'contact_person_email.email'  => 'Contact person email must be a valid email address.',
+            'pincode.regex'               => 'Pincode must contain digits/numbers only.',
+            'account_number.regex'        => 'Bank account number must contain digits/numbers only.',
         ]);
 
         $validated['tenant_id'] = $tenantId;
@@ -258,14 +275,14 @@ class TransporterController extends Controller
             'name'                  => 'required|string|max:255',
             'code'                  => 'nullable|string|max:50',
             'transporter_id'        => 'nullable|string|max:50',
-            'gstin'                 => 'nullable|string|max:20',
-            'pan_number'            => 'nullable|string|max:20',
-            'phone'                 => 'nullable|string|max:30',
+            'gstin'                 => TaxIdentityService::gstinRules(false),
+            'pan_number'            => TaxIdentityService::panRules(false),
+            'phone'                 => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'email'                 => 'nullable|email|max:150',
             'address'               => 'nullable|string',
             'city'                  => 'nullable|string|max:100',
             'state'                 => 'nullable|string|max:100',
-            'pincode'               => 'nullable|string|max:20',
+            'pincode'               => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:10'],
             'status'                => 'required|string|in:active,inactive',
             'tds_section'           => 'nullable|string|max:50',
             'tds_rate'              => 'nullable|numeric',
@@ -278,13 +295,22 @@ class TransporterController extends Controller
             'bank_name'             => 'nullable|string|max:150',
             'branch_name'           => 'nullable|string|max:150',
             'account_name'          => 'nullable|string|max:150',
-            'account_number'        => 'nullable|string|max:50',
+            'account_number'        => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code'             => 'nullable|string|max:20',
             'payment_terms'         => 'nullable|string|max:100',
             'opening_balance'       => 'nullable|numeric',
             'contact_person_name'   => 'nullable|string|max:150',
-            'contact_person_phone'  => 'nullable|string|max:30',
+            'contact_person_phone'  => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'contact_person_email'  => 'nullable|email|max:150',
+        ], [
+            'email.email'                 => 'The email field must be a valid email address.',
+            'phone.regex'                 => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'                   => 'Phone number cannot exceed 20 digits.',
+            'contact_person_phone.regex'  => 'Contact person phone must contain digits/numbers only (no special characters or letters).',
+            'contact_person_phone.max'    => 'Contact person phone cannot exceed 20 digits.',
+            'contact_person_email.email'  => 'Contact person email must be a valid email address.',
+            'pincode.regex'               => 'Pincode must contain digits/numbers only.',
+            'account_number.regex'        => 'Bank account number must contain digits/numbers only.',
         ]);
 
         $transporter->update($validated);
@@ -316,10 +342,14 @@ class TransporterController extends Controller
             'transport_mode' => 'nullable|string|max:50',
             'gstin'          => 'nullable|string|max:20',
             'pan_number'     => 'nullable|string|max:20',
-            'phone'          => 'nullable|string|max:30',
+            'phone'          => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'email'          => 'nullable|email|max:150',
             'city'           => 'nullable|string|max:100',
             'state'          => 'nullable|string|max:100',
+        ], [
+            'email.email' => 'The email field must be a valid email address.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         if (empty($validated['code'])) {

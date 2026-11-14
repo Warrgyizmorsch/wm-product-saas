@@ -776,7 +776,7 @@ class BankReconciliationService
 
     private function storeUpload(BankReconciliation $reconciliation, UploadedFile $file, string $provider): BankStatementUpload
     {
-        $path = $file->store(
+        $path = $file->storeTenantFile(
             "bank-statements/tenant_{$reconciliation->tenant_id}/reconciliation_{$reconciliation->id}",
             'local'
         );

@@ -35,9 +35,11 @@ class LeaveEncashmentController extends Controller
 
     public function approve(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        abort_unless($request->user()?->hasHrPermission('hr.settings.manage') || $request->user()?->hasHrPermission('hrms.leave_requests.approve') || $request->user()?->hasHrPermission('hrms.leave_encashments.approve'), 403);
-        abort_unless((int) $leaveEncashment->tenant_id === (int) $request->user()?->tenant_id, 404);
-        $res = $this->leaveEncashmentRepository->approve($leaveEncashment, $request, $request->user());
+        $user = $request->user();
+        abort_unless($user?->is_super_admin || $user?->hasHrPermission('hr.settings.manage') || $user?->hasHrPermission('hrms.leave_requests.approve') || $user?->hasHrPermission('hrms.leave_encashments.approve'), 403);
+        $effectiveTenantId = tenant_id() ?? $user?->tenant_id;
+        abort_unless($user?->is_super_admin || (int) $leaveEncashment->tenant_id === (int) $effectiveTenantId, 404);
+        $res = $this->leaveEncashmentRepository->approve($leaveEncashment, $request, $user);
 
         if (!$res['success']) {
             return redirect()->back()->with('error', $res['message']);
@@ -48,19 +50,23 @@ class LeaveEncashmentController extends Controller
 
     public function reject(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        abort_unless($request->user()?->hasHrPermission('hr.settings.manage') || $request->user()?->hasHrPermission('hrms.leave_requests.approve') || $request->user()?->hasHrPermission('hrms.leave_encashments.approve'), 403);
-        abort_unless((int) $leaveEncashment->tenant_id === (int) $request->user()?->tenant_id, 404);
+        $user = $request->user();
+        abort_unless($user?->is_super_admin || $user?->hasHrPermission('hr.settings.manage') || $user?->hasHrPermission('hrms.leave_requests.approve') || $user?->hasHrPermission('hrms.leave_encashments.approve'), 403);
+        $effectiveTenantId = tenant_id() ?? $user?->tenant_id;
+        abort_unless($user?->is_super_admin || (int) $leaveEncashment->tenant_id === (int) $effectiveTenantId, 404);
         $request->validate(['rejection_reason' => 'nullable|string|max:1000']);
 
-        $res = $this->leaveEncashmentRepository->reject($leaveEncashment, $request->rejection_reason, $request->user());
+        $res = $this->leaveEncashmentRepository->reject($leaveEncashment, $request->rejection_reason, $user);
 
         return redirect()->back()->with($res['success'] ? 'success' : 'error', $res['message']);
     }
 
     public function destroy(LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        abort_unless(auth()->user()?->hasHrPermission('hr.settings.manage') || auth()->user()?->hasHrPermission('hrms.leave_encashments.approve'), 403);
-        abort_unless((int) $leaveEncashment->tenant_id === (int) auth()->user()?->tenant_id, 404);
+        $user = auth()->user();
+        abort_unless($user?->is_super_admin || $user?->hasHrPermission('hr.settings.manage') || $user?->hasHrPermission('hrms.leave_encashments.approve'), 403);
+        $effectiveTenantId = tenant_id() ?? $user?->tenant_id;
+        abort_unless($user?->is_super_admin || (int) $leaveEncashment->tenant_id === (int) $effectiveTenantId, 404);
         if (!$this->leaveEncashmentRepository->delete($leaveEncashment)) {
             return redirect()->back()->with('error', __('hrms.leave.encashment_app.ticket_not_found', ['id' => $leaveEncashment->id]));
         }

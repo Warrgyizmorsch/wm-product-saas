@@ -16,8 +16,8 @@ class BatchApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -27,6 +27,7 @@ class BatchApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Batch::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = Batch::query()
@@ -67,6 +68,8 @@ class BatchApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Batch::class);
+
         $validator = Validator::make($request->all(), [
             'product_id'         => ['required', 'integer'],
             'warehouse_id'       => ['required', 'integer'],
@@ -125,6 +128,8 @@ class BatchApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $batch);
+
         return response()->json([
             'success' => true,
             'data'    => $batch,
@@ -136,6 +141,7 @@ class BatchApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', Batch::class);
         [$tenantId] = $this->resolveTenantContext();
 
         return \Maatwebsite\Excel\Facades\Excel::download(
@@ -159,6 +165,8 @@ class BatchApiController extends Controller
                 'message' => 'Batch not found',
             ], 404);
         }
+
+        $this->authorize('update', $batch);
 
         $validator = Validator::make($request->all(), [
             'batch_number'       => ['sometimes', 'required', 'string', 'max:100'],
@@ -201,6 +209,8 @@ class BatchApiController extends Controller
                 'message' => 'Batch not found',
             ], 404);
         }
+
+        $this->authorize('delete', $batch);
 
         $batch->delete();
 

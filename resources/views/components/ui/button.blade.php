@@ -25,7 +25,7 @@
 {{-- Styling comes from the global design system (public/assets/css/apex-ui.css). --}}
 
 @if($href)
-    <a href="{{ $href }}" {{ $attributes->class([$classes]) }}>
+    <a href="{!! $href !!}" {{ $attributes->class([$classes]) }}>
         @if($icon && $iconPosition === 'left')
             <i class="{{ $icon }}{{ trim((string)$slot) ? ' me-2' : '' }}"></i>
         @endif

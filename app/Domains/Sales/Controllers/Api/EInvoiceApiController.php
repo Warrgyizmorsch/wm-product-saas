@@ -30,6 +30,10 @@ class EInvoiceApiController extends Controller
 
         $this->authorize('update', $invoice);
 
+        if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void'])) {
+            return response()->json(['success' => false, 'message' => 'Cannot generate E-Invoice for a cancelled invoice.'], 422);
+        }
+
         $result = $this->eInvoiceService->generate($invoice);
 
         return response()->json($result, $result['success'] ? 200 : 422);
@@ -78,6 +82,10 @@ class EInvoiceApiController extends Controller
         }
 
         $this->authorize('update', $invoice);
+
+        if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void'])) {
+            return response()->json(['success' => false, 'message' => 'Cannot generate E-Way Bill for a cancelled invoice.'], 422);
+        }
 
         $validator = Validator::make($request->all(), [
             'transport_mode'     => ['required', 'string'],

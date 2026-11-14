@@ -53,6 +53,37 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
         $salaryStructuresQuery = SalaryStructure::with(['company', 'items.component']);
 
         if ($selectedPayGroup) {
+            // Ensure all structure items in this pay group reference components belonging specifically to this pay group
+            $structureItems = SalaryStructureItem::with(['component'])
+                ->whereHas('structure', function ($sq) use ($selectedPayGroup) {
+                    $sq->where('pay_group_id', $selectedPayGroup->id);
+                })
+                ->get();
+
+            foreach ($structureItems as $item) {
+                $comp = $item->component;
+                if ($comp && $comp->pay_group_id !== $selectedPayGroup->id) {
+                    $pgComp = SalaryComponent::firstOrCreate(
+                        [
+                            'company_id' => $selectedPayGroup->company_id ?? $comp->company_id,
+                            'pay_group_id' => $selectedPayGroup->id,
+                            'code' => $comp->code,
+                        ],
+                        [
+                            'name' => $comp->name,
+                            'type' => $comp->type,
+                            'calculation_type' => $comp->calculation_type,
+                            'default_value' => $comp->default_value,
+                            'description' => $comp->description,
+                            'status' => $comp->status,
+                            'is_adhoc' => $comp->is_adhoc,
+                        ]
+                    );
+
+                    $item->update(['salary_component_id' => $pgComp->id]);
+                }
+            }
+
             $salaryComponentsQuery->where('pay_group_id', $selectedPayGroup->id);
             $salaryStructuresQuery->where('pay_group_id', $selectedPayGroup->id);
         } else {
@@ -191,11 +222,25 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
         );
     }
 
+    private function resolveTenantCompanyId(?int $companyId = null): int
+    {
+        if ($companyId) {
+            return $companyId;
+        }
+
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+
+        return auth()->user()?->company_id
+            ?? ($tenantId ? Company::where('tenant_id', $tenantId)->value('id') : null)
+            ?? Company::first()?->id
+            ?? 1;
+    }
+
     public function storeStructure(array $validated): SalaryStructure
     {
         return DB::transaction(function () use ($validated) {
             $salaryStructure = SalaryStructure::create([
-                'company_id' => $validated['company_id'] ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+                'company_id' => $this->resolveTenantCompanyId($validated['company_id'] ?? null),
                 'pay_group_id' => $validated['pay_group_id'] ?? null,
                 'name' => $validated['name'],
                 'min_ctc' => $validated['min_ctc'],
@@ -227,7 +272,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
     {
         return DB::transaction(function () use ($salaryStructure, $validated) {
             $salaryStructure->update([
-                'company_id' => $validated['company_id'] ?? $salaryStructure->company_id ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+                'company_id' => $this->resolveTenantCompanyId($validated['company_id'] ?? $salaryStructure->company_id),
                 'pay_group_id' => $validated['pay_group_id'] ?? $salaryStructure->pay_group_id,
                 'name' => $validated['name'],
                 'min_ctc' => $validated['min_ctc'],
@@ -270,6 +315,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
                 : strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $itemData['name']), 0, 8));
 
             $existing = SalaryComponent::where('company_id', $companyId)
+                ->where('pay_group_id', $payGroupId)
                 ->where('code', $code)
                 ->first();
 
@@ -278,7 +324,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
             }
 
             $newComponent = SalaryComponent::create([
-                'company_id' => $companyId ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+                'company_id' => $this->resolveTenantCompanyId($companyId),
                 'pay_group_id' => $payGroupId,
                 'name' => trim($itemData['name']),
                 'code' => $code,
@@ -294,6 +340,25 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
         return null;
     }
 
+    public function findOverlappingStructure(?int $payGroupId, float $minCtc, float $maxCtc, ?int $ignoreId = null): ?SalaryStructure
+    {
+        $query = SalaryStructure::where('status', true);
+        if ($payGroupId) {
+            $query->where('pay_group_id', $payGroupId);
+        } else {
+            $query->whereNull('pay_group_id');
+        }
+
+        if ($ignoreId) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        return $query->where(function ($q) use ($minCtc, $maxCtc) {
+            $q->where('min_ctc', '<=', $maxCtc)
+              ->where('max_ctc', '>=', $minCtc);
+        })->first();
+    }
+
     public function destroyStructure(SalaryStructure $salaryStructure): bool
     {
         return $salaryStructure->delete();
@@ -301,9 +366,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
 
     public function storeComponent(array $validated): SalaryComponent
     {
-        if (empty($validated['company_id'])) {
-            $validated['company_id'] = \App\Domains\HRMS\Models\Company::first()?->id ?? 1;
-        }
+        $validated['company_id'] = $this->resolveTenantCompanyId($validated['company_id'] ?? null);
         return SalaryComponent::create($validated);
     }
 

@@ -6,7 +6,7 @@
 **Yes.** The `customer_id` field on the project master is entirely optional. When creating non-client engagements (such as internal IT migrations, research and development, or corporate process initiatives), set the Project Type to `Internal` and leave the Customer field blank. The system will bypass client billing checks.
 
 ### Q1.2: What happens if I leave the Project Code blank during creation?
-If you do not specify an explicit code, `ProjectService` automatically generates a standardized sequence number following the pattern `PRJ-YYYY-XXXX` (where `YYYY` is the current calendar year and `XXXX` is a zero-padded incremental sequence scoped to the tenant).
+If you do not specify an explicit code, `ProjectService` automatically generates a standardized sequence number following the pattern `PRJ-%04d` (e.g. `PRJ-0001`, `PRJ-0042`), incrementally scoped to the company and branch.
 
 ### Q1.3: How does the system ensure multi-tenant data isolation?
 Every domain model in the Project module extends `App\Core\Database\BaseModel`, which applies global tenant scoping traits (`BelongsToTenant`, `BelongsToCompany`, `BelongsToBranch`). All queries automatically append `WHERE tenant_id = :current_tenant_id`. Additionally, the web routing middleware (`tenant.context`) rejects any request attempting to access resources outside the authenticated user's organization.
@@ -78,7 +78,7 @@ To ensure compliance with corporate governance and segregation of duties, the sy
 ## 6. Billing, Invoices & Accounting
 
 ### Q6.1: Does the Project Management module create General Ledger journal entries?
-**No.** Project Management has no direct coupling with the General Ledger. When you click **Generate Invoice**, the module aggregates unbilled work and invokes `SalesInvoiceCreationService::createDraftInvoice()` in the **Sales** domain. Sales creates the official draft invoice. When the Sales department posts the invoice, Sales's listener `PostSalesInvoiceJournal` reacts to the `InvoicePosted` event and delegates to `SalesAccountingService::postInvoiceJournal()` to book the double-entry accounting journals.
+**No.** Project Management has no direct coupling with the General Ledger. When you click **Generate Invoice**, the module aggregates unbilled work and invokes `SalesInvoiceCreationService::createDraftInvoice()` in the **Sales** domain. Sales creates the official draft invoice. When the Sales department posts the invoice, Sales's listener `PostSalesInvoiceJournal` reacts to the `InvoicePosted` event and delegates to `SalesAccountingService::postInvoiceJournal()` to book the double-entry accounting journals. Note that invoice generation requires dual permissions: `projects.billing.generate_invoice` (or `projects.projects.update`) AND `sales.invoices.create`.
 
 ### Q6.2: What happens if a sales invoice generated from a project is cancelled or voided in Sales?
 If a draft invoice is deleted or cancelled prior to posting, the Project Manager can reopen the project billing screen to inspect the associated logs. If an invoice is cancelled after posting, standard credit note procedures in Sales and Accounting apply.
@@ -88,7 +88,7 @@ If a draft invoice is deleted or cancelled prior to posting, the Project Manager
 ## 7. Project Closure & Quality Gates
 
 ### Q7.1: Can a closed project be reopened?
-A closed project is read-only by default. If a project was closed prematurely or scope is added post-handover, an Administrator with `projects.projects.edit` privileges can reopen the project by transitioning its status back to `active`.
+**No.** In accordance with enterprise governance, project closure is strictly final and irreversible. `ProjectService::TRANSITIONS[Project::STATUS_CLOSED]` is an empty set (`[]`). Any attempt to transition a closed project to another status throws a `ValidationException`. Once closed, the project record, tasks, milestones, and financial logs become permanently read-only.
 
 ### Q7.2: What are the five mandatory gates evaluated during closure?
 `ProjectClosureService::evaluateGates()` programmatically evaluates **five strict condition gates**:
@@ -100,10 +100,13 @@ A closed project is read-only by default. If a project was closed prematurely or
 
 ---
 
-## 8. Cross-Module Handoffs: Production & Purchase
+## 8. Cross-Module Handoffs: Sales, Production & Purchasing
 
-### Q8.1: Can I trigger a Production Work Order directly from a project task?
-**Not automatically in the current release.** Production Orders do not contain a `project_id` foreign key, and exhaustive code search confirms zero project integrations in the Production domain. If a project requires custom physical manufacturing, the standard ERP business practice is to raise a Sales Order linked to the client; Production then executes the Work Orders against that Sales Order.
+### Q8.1: Can I link a Production Order to a project task, and does it auto-complete?
+**Yes.** Tasks can be linked to one or more Production Orders via `TaskController::linkProductionOrder` (`POST /tasks/{task}/production-orders`), strictly scoped to the same company and branch. When all linked production orders complete, `SyncProductionTaskCompletionListener` calculates aggregate output ($\sum \text{produced\_quantity}$). If output satisfies the threshold $\sum \text{produced\_quantity} \ge \left(\sum \text{quantity} - 0.0001\right)$, the listener automatically marks the task `Completed` and recalculates milestone progress. If a yield shortfall exists, the task remains open with a shortfall warning logged.
 
-### Q8.2: Can procurement expenses from Purchase Orders be allocated to a project?
-Currently, there is no direct foreign key on Purchase Orders or Purchase Requisitions linking them to project tasks. Procurement expenses incurred for project materials can be recorded manually as financial adjustments or tracked through standard departmental expense reports.
+### Q8.2: Can procurement items from Purchase Requisitions be linked to a project task?
+**Yes.** Tasks can link to one or more Purchase Requisition line items via `TaskController::linkPurchaseRequisition` (`POST /tasks/{task}/purchase-requisitions`), establishing `purchase_requisition_items.project_task_id`. Both must share the same company and branch. However, automated generation of Purchase Orders directly from project tasks is deliberately not implemented; purchasing execution is handled within the Purchasing module.
+
+### Q8.3: How does Sales Order conversion to a project work?
+A confirmed Sales Order (`status === 'Confirmed'`) can be converted into a project either from the Sales Order view (`POST /sales/orders/{order}/convert-to-project`) or during project creation. `SalesOrderProjectBridgeService` auto-generates a delivery project, copies client details, creates a `Fulfillment & Delivery` task list, creates milestone records for order line items, and generates fulfillment tasks. Duplicate conversion is prevented via database checks.

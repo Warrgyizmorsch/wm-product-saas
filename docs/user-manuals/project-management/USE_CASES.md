@@ -1,7 +1,7 @@
 # Project Management Module — Enterprise Use Cases
 
 ## Overview
-This document details 11 verified, end-to-end enterprise use cases supported by the current codebase of the Project Management module. Each scenario is mapped to actual database schema impacts, domain services, authorization checks, event dispatches, and automated test cases.
+This document details 13 verified, end-to-end enterprise use cases supported by the current codebase of the Project Management module. Each scenario is mapped to actual database schema impacts, domain services, authorization checks, event dispatches, and automated test cases.
 
 ---
 
@@ -17,8 +17,8 @@ This document details 11 verified, end-to-end enterprise use cases supported by 
   5. Selects internal Network Engineer as Project Manager.
   6. Saves project; creates Task Lists ("Procurement", "Cabling", "Configuration").
 - **Alternative Flow**: If budget is exceeded during execution, the system highlights cost variance in the Budget Cost report.
-- **System Behavior**: `ProjectService::createProject()` auto-assigns code `PRJ-YYYY-XXXX`; attaches tenant context.
-- **Database Impact**: `INSERT INTO projects (tenant_id, company_id, code, name, customer_id, type, billing_type, budget_amount, status) VALUES (?, ?, ?, ?, NULL, 'Internal', 'Non-Billable', 15000, 'planning')`.
+- **System Behavior**: `ProjectService::createProject()` auto-assigns code `PRJ-%04d` (e.g. `PRJ-0001`); attaches tenant context.
+- **Database Impact**: `INSERT INTO projects (tenant_id, company_id, branch_id, code, name, customer_id, type, billing_type, budget_amount, status) VALUES (?, ?, ?, ?, NULL, 'Internal', 'Non-Billable', 15000, 'Draft')`.
 - **Events**: Activity log recorded in `project_activity_logs`.
 - **Permissions**: `projects.projects.create`.
 - **Expected Result**: Project appears in Portfolio; billing cards remain hidden since project is non-billable.
@@ -186,7 +186,7 @@ This document details 11 verified, end-to-end enterprise use cases supported by 
 - **System Behavior**: Atomic transaction with pessimistic locking in `ProjectBillingService::generateInvoice()`.
 - **Database Impact**: `INSERT INTO invoices (customer_id, project_id, total_amount, status) ...`; `UPDATE project_time_logs SET is_invoiced = 1, invoice_id = ?`; `UPDATE project_milestones SET is_invoiced = 1, invoice_id = ?`.
 - **Events**: Dispatches `InvoiceCreated` (Sales domain).
-- **Permissions**: `projects.projects.edit`.
+- **Permissions**: `projects.billing.generate_invoice` (or `projects.projects.update`) AND `sales.invoices.create`.
 - **Expected Result**: Project work billed accurately without double-billing or orphaned timesheets.
 - **Relevant Test**: `tests/Feature/ProjectBillingTest.php`.
 
@@ -206,16 +206,16 @@ This document details 11 verified, end-to-end enterprise use cases supported by 
   2. PM selects `closure_status = 'Completed'`.
   3. Enters `client_feedback_rating = 5`, `lessons_learned = 'Early CPM analysis prevented critical path delays'`.
   4. Clicks **Finalize Project Closure**.
-  5. Project transitions to `closed` status; `closed_at` and `closed_by` timestamps recorded.
+  5. Project transitions to `closed` status; `closed_at` and `closed_by` timestamps recorded. Once closed, the project is permanently read-only and immutable; reopening is forbidden (`TRANSITIONS[STATUS_CLOSED] => []`).
 - **Alternative Flow (Gate Blocked)**:
   1. One issue remains in `in_progress` status or an approved billable time log remains uninvoiced.
   2. Gate 2 or Gate 4 triggers a hard blocker error.
   3. PM cannot click Finalize Closure; must resolve blocker before closure is allowed.
 - **System Behavior**: `ProjectClosureService::assertClosable()` throws `ValidationException` if any gate fails.
-- **Database Impact**: `UPDATE projects SET status = 'closed', closure_status = 'Completed', closed_at = NOW(), closed_by = ? WHERE id = ?`.
+- **Database Impact**: `UPDATE projects SET status = 'Closed', closure_status = 'Completed', closed_at = NOW(), closed_by = ? WHERE id = ?`.
 - **Events**: `ProjectClosed`.
-- **Permissions**: `projects.projects.edit`.
-- **Expected Result**: Project becomes read-only; historical performance recorded in corporate memory.
+- **Permissions**: `projects.projects.close` (or `projects.projects.update`).
+- **Expected Result**: Project becomes permanently read-only; historical performance recorded in corporate memory.
 - **Relevant Test**: `tests/Feature/ProjectClosureTest.php`, `tests/Feature/ProjectLifecycleEndToEndTest.php`.
 
 ---
@@ -239,3 +239,52 @@ This document details 11 verified, end-to-end enterprise use cases supported by 
 - **Permissions**: `projects.projects.view`.
 - **Expected Result**: Immediate cross-project transparency and verified exportable analytics.
 - **Relevant Test**: `tests/Feature/ProjectDashboardTest.php`, `tests/Feature/ProjectReportTest.php`.
+
+---
+
+### Use Case 12: Sales Order Conversion to Client Delivery Project
+- **Actor**: Sales Operations Lead / Project Manager
+- **Goal**: Seamlessly convert a customer's confirmed Sales Order into an execution project with pre-populated deliverables and tasks.
+- **Preconditions**: Sales Order is in `'Confirmed'` status; order is not already linked to an existing project; user has `sales.orders.view` and `projects.projects.create`.
+- **Main Flow**:
+  1. User opens confirmed Sales Order in Sales module (`/sales/orders/{order}`).
+  2. Clicks **Convert to Delivery Project** (`POST /sales/orders/{order}/convert-to-project`).
+  3. `SalesOrderProjectBridgeService` creates a new delivery project:
+     - Assigns name, customer link (`customer_id`), company, branch, and active status.
+     - Creates default `Fulfillment & Delivery` task list.
+     - Iterates through sales order items, creating corresponding milestone deliverables linked via `sales_order_item_id`.
+     - Generates item fulfillment tasks grouped under the task list.
+  4. System redirects user to the newly created project workspace (`/projects/{project}`) with confirmation notice.
+- **Alternative Flow (Validation Failure)**:
+  1. Order is in `Draft` status: system redirects back with error: *"Only Confirmed Sales Orders can be converted to a Delivery Project."*
+  2. Order already has a linked project: system blocks duplicate conversion with error: *"This Sales Order is already linked to an existing project."*
+- **System Behavior**: `SalesOrderProjectBridgeService::convertSalesOrderToProject()` runs inside `DB::transaction()`.
+- **Database Impact**: `INSERT INTO projects (sales_order_id, customer_id, ...)`; `INSERT INTO project_task_lists (...)`; `INSERT INTO project_milestones (sales_order_item_id, ...)`; `INSERT INTO project_tasks (...)`.
+- **Events**: Activity log recorded.
+- **Permissions**: `sales.orders.view`, `projects.projects.create`.
+- **Expected Result**: Complete commercial-to-operational handoff without re-entering line item deliverables manually.
+- **Relevant Test**: Inspected in code (`SalesOrderProjectBridgeService.php`, `SalesOrderController.php`).
+
+---
+
+### Use Case 13: Shop-Floor Manufacturing Execution with Task-Linked Production Orders
+- **Actor**: Production Supervisor & Project Manager
+- **Goal**: Link shop-floor Production Orders to a project task, track real-time manufacturing output, and automatically complete the task when aggregate output satisfies demand.
+- **Preconditions**: Project task exists; Production Orders created within the identical company and branch.
+- **Main Flow**:
+  1. PM opens task details drawer and clicks **Link Production Order** (`POST /tasks/{task}/production-orders`).
+  2. System validates company and branch alignment; updates `production_orders.project_id`, `project_milestone_id`, `project_task_id`.
+  3. Shop floor operators execute manufacturing and complete work orders in the Production module.
+  4. When the final linked order completes, the `ProductionOrderCompleted` event fires.
+  5. `SyncProductionTaskCompletionListener` calculates aggregate output: $\sum \text{produced\_quantity}$.
+  6. Aggregate output satisfies ordered quantity: $\sum \text{produced\_quantity} \ge \left(\sum \text{quantity} - 0.0001\right)$.
+  7. Task automatically transitions to `'Completed'`, and `MilestoneService::recalculateMilestoneProgress()` updates parent milestone progress.
+- **Alternative Flow (Yield Shortfall)**:
+  1. Material defect or scrap causes final produced quantity to fall below ordered threshold.
+  2. Listener identifies shortfall: task remains `'In Progress'`, and system logs a `production.shortfall_warning` activity log.
+- **System Behavior**: Event listener recalculates yield within transaction and syncs task status.
+- **Database Impact**: `UPDATE production_orders SET project_task_id = ?`; `UPDATE project_tasks SET status = 'Completed'` (if yield met); `project_activity_logs` entry.
+- **Events**: `ProductionOrderCompleted`, `TaskCompleted`.
+- **Permissions**: `projects.projects.edit`.
+- **Expected Result**: Automated bridge between physical manufacturing yield and project schedule completion.
+- **Relevant Test**: Inspected in code (`SyncProductionTaskCompletionListener.php`, `TaskController.php`).

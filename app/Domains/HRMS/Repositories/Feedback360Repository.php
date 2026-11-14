@@ -12,18 +12,37 @@ use App\Domains\HRMS\Models\Feedback360Participant;
 use App\Domains\HRMS\Models\Feedback360Question;
 use App\Domains\HRMS\Models\Feedback360Response;
 use App\Models\User;
+use App\Services\Access\AccessService;
 use App\Services\Notification\NotificationService;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class Feedback360Repository implements Feedback360RepositoryInterface
 {
     /**
+     * Ensure the competency_ids column exists on feedback_360_cycles.
+     */
+    protected function ensureCycleCompetenciesColumn(): void
+    {
+        try {
+            if (!Schema::hasColumn('feedback_360_cycles', 'competency_ids')) {
+                Schema::table('feedback_360_cycles', function (Blueprint $table) {
+                    $table->json('competency_ids')->nullable()->after('status');
+                });
+            }
+        } catch (\Throwable $e) {
+            // Defensive handling: column may already exist
+        }
+    }
+
+    /**
      * Resolve the employee associated with a user.
      */
-    protected function resolveEmployee(?User $user, int $tenantId): ?Employee
+    public function resolveEmployee(?User $user, int $tenantId): ?Employee
     {
         if (!$user) {
             return null;
@@ -40,6 +59,44 @@ class Feedback360Repository implements Feedback360RepositoryInterface
     }
 
     /**
+     * Determine if a user has HR Administrative privileges for 360 Feedback.
+     */
+    public function isHrAdminUser(?User $user, int $tenantId): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if (app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)) {
+            return true;
+        }
+
+        $access = app(AccessService::class);
+        $context = ['tenant_id' => $tenantId];
+
+        return $access->allows($user, 'hrms.feedback_360.manage', $context)
+            || $access->allows($user, 'hrms.feedback_360.create', $context)
+            || $access->allows($user, 'hrms.performance.manage', $context)
+            || $access->allows($user, 'hr.settings.manage', $context);
+    }
+
+    /**
+     * Determine if a given manager is the direct supervisor or scoped organizational head of a subordinate employee.
+     */
+    public function isManagerOf(?Employee $manager, ?Employee $subordinate, int $tenantId): bool
+    {
+        if (!$manager || !$subordinate) {
+            return false;
+        }
+
+        if ((int) $subordinate->reporting_manager_id === (int) $manager->id) {
+            return true;
+        }
+
+        return app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($manager, $subordinate->id);
+    }
+
+    /**
      * Ensure default standard competencies and questions exist for the tenant (Disabled: only user-defined data).
      */
     protected function ensureDefaultCompetenciesAndQuestions(int $tenantId, ?int $companyId = null): void
@@ -48,19 +105,102 @@ class Feedback360Repository implements Feedback360RepositoryInterface
     }
 
     /**
+     * Check and automatically advance cycle lifecycle stage based on deadlines and completion rates.
+     */
+    public function autoAdvanceCycleStage(Feedback360Cycle $cycle): bool
+    {
+        if (in_array($cycle->status, ['completed', 'closed'])) {
+            return false;
+        }
+
+        $now = Carbon::now();
+        $updated = false;
+
+        // Stage 1: Nomination Phase -> In Progress
+        if ($cycle->status === 'nomination') {
+            if ($cycle->nomination_deadline && $now->startOfDay()->gt(Carbon::parse($cycle->nomination_deadline)->endOfDay())) {
+                $cycle->status = 'in_progress';
+                $updated = true;
+
+                // Auto-approve any pending nominations that were submitted before deadline
+                Feedback360Nomination::where('tenant_id', $cycle->tenant_id)
+                    ->where('cycle_id', $cycle->id)
+                    ->where('status', 'pending_approval')
+                    ->update(['status' => 'approved']);
+            }
+        }
+
+        // Stage 2: In Progress -> Manager Review / Calibration
+        if ($cycle->status === 'in_progress') {
+            $totalNominations = Feedback360Nomination::where('tenant_id', $cycle->tenant_id)
+                ->where('cycle_id', $cycle->id)
+                ->whereIn('status', ['approved', 'in_progress', 'completed'])
+                ->count();
+            $completedNominations = Feedback360Nomination::where('tenant_id', $cycle->tenant_id)
+                ->where('cycle_id', $cycle->id)
+                ->where('status', 'completed')
+                ->count();
+
+            // Auto-advance if 100% of active reviews are completed OR submission deadline passed
+            $allCompleted = ($totalNominations > 0 && $completedNominations >= $totalNominations);
+            $deadlinePassed = ($cycle->submission_deadline && $now->startOfDay()->gt(Carbon::parse($cycle->submission_deadline)->endOfDay()));
+
+            if ($allCompleted || $deadlinePassed) {
+                $cycle->status = 'review';
+                $updated = true;
+            }
+        }
+
+        // Stage 3: Manager Review -> Completed
+        if ($cycle->status === 'review') {
+            $totalParticipants = Feedback360Participant::where('tenant_id', $cycle->tenant_id)
+                ->where('cycle_id', $cycle->id)
+                ->count();
+            $publishedReports = Feedback360Participant::where('tenant_id', $cycle->tenant_id)
+                ->where('cycle_id', $cycle->id)
+                ->where('status', 'published')
+                ->count();
+
+            $allPublished = ($totalParticipants > 0 && $publishedReports >= $totalParticipants);
+            $endDatePassed = ($cycle->end_date && $now->startOfDay()->gt(Carbon::parse($cycle->end_date)->endOfDay()));
+
+            if ($allPublished || $endDatePassed) {
+                $cycle->status = 'completed';
+                $updated = true;
+            }
+        }
+
+        if ($updated) {
+            $cycle->save();
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Check and auto-advance all active cycles for tenant.
+     */
+    public function autoAdvanceActiveCycles(int $tenantId): void
+    {
+        $activeCycles = Feedback360Cycle::where('tenant_id', $tenantId)
+            ->whereIn('status', ['nomination', 'in_progress', 'review'])
+            ->get();
+
+        foreach ($activeCycles as $cycle) {
+            $this->autoAdvanceCycleStage($cycle);
+        }
+    }
+
+    /**
      * Get all dataset required for the 360 Feedback Main Hub.
      */
     public function getIndexData(array $inputs, ?User $user, int $tenantId): array
     {
+        // 0. Automatically advance active cycles whose deadlines arrived or reviews completed
+        $this->autoAdvanceActiveCycles($tenantId);
+
         $currentEmployee = $this->resolveEmployee($user, $tenantId);
-        $isHrAdmin = (bool) ($user && (
-            $user->is_admin ||
-            in_array(strtolower($user->role ?? ''), ['admin', 'super_admin', 'super admin', 'hr', 'hr_admin']) ||
-            $user->hasHrPermission('hrms.performance.manage') ||
-            $user->hasHrPermission('hr.settings.manage') ||
-            $user->hasHrPermission('hrms.feedback_360.manage') ||
-            $user->hasHrPermission('hrms.employees.view')
-        ));
+        $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
         $isManager = (bool) ($user && (
             $isHrAdmin ||
             ($currentEmployee && \App\Domains\HRMS\Models\Employee::where('tenant_id', $tenantId)->where('reporting_manager_id', $currentEmployee->id)->exists())
@@ -151,57 +291,45 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             $myEvaluations = Feedback360Participant::where('tenant_id', $tenantId)
                 ->where('employee_id', $currentEmployee->id)
                 ->whereHas('cycle')
-                ->with(['cycle', 'manager', 'nominations.reviewer'])
+                ->with(['cycle', 'manager', 'nominations.reviewer', 'employee.directReports.designation'])
                 ->latest('id')
                 ->get();
 
             $myEvaluations->transform(function ($eval) use ($currentEmployee) {
                 $eval->capabilities = [
                     'can_view'           => true,
-                    'can_nominate_peers' => ($currentEmployee && $eval->employee_id === $currentEmployee->id && ($eval->cycle->allow_self_nomination ?? true) && in_array($eval->cycle->status ?? '', ['nomination', 'draft'])),
+                    'can_nominate_peers' => ($currentEmployee && $eval->employee_id === $currentEmployee->id && ($eval->cycle->allow_self_nomination ?? true) && in_array($eval->cycle->status ?? '', ['nomination', 'draft', 'in_progress'])),
                 ];
                 return $eval;
             });
         } else {
-            $myPendingReviews = Feedback360Nomination::where('tenant_id', $tenantId)
-                ->whereIn('status', ['approved', 'in_progress'])
-                ->whereHas('cycle', function($q) {
-                    $q->whereIn('status', ['in_progress', 'review']);
-                })
-                ->with(['cycle', 'employee.department', 'employee.designation'])
-                ->latest('id')
-                ->take(20)
-                ->get();
-
-            $mySubmittedReviews = Feedback360Nomination::where('tenant_id', $tenantId)
-                ->where('status', 'completed')
-                ->whereHas('cycle')
-                ->with(['cycle', 'employee.department', 'employee.designation'])
-                ->latest('submitted_at')
-                ->take(20)
-                ->get();
-
-            $myEvaluations = Feedback360Participant::where('tenant_id', $tenantId)
-                ->whereHas('cycle')
-                ->with(['cycle', 'manager', 'nominations.reviewer'])
-                ->latest('id')
-                ->take(20)
-                ->get();
+            $myPendingReviews = collect();
+            $mySubmittedReviews = collect();
+            $myEvaluations = collect();
         }
 
-        // All pending nominations needing approval
-        $pendingApprovals = Feedback360Nomination::where('tenant_id', $tenantId)
+        // Pending nominations needing approval (Rule-Based Access: HR Admin sees all, Manager sees direct reports only, Employees see none)
+        $pendingApprovalsQuery = Feedback360Nomination::where('tenant_id', $tenantId)
             ->where('status', 'pending_approval')
             ->whereHas('cycle')
             ->with(['cycle', 'employee.department', 'reviewer.designation', 'nominator'])
-            ->latest('id')
-            ->get();
+            ->latest('id');
+
+        if (!$isHrAdmin) {
+            if ($currentEmployee && $isManager) {
+                $pendingApprovalsQuery->whereHas('employee', function ($q) use ($currentEmployee) {
+                    $q->where('reporting_manager_id', $currentEmployee->id);
+                });
+            } else {
+                $pendingApprovalsQuery->whereRaw('1 = 0');
+            }
+        }
+        $pendingApprovals = $pendingApprovalsQuery->get();
 
         // 3. Competencies & Questions for configuration tab
         $competencies = Feedback360Competency::where('tenant_id', $tenantId)
             ->withCount('questions')
-            ->with(['cycle', 'questions'])
-            ->orderBy('category')
+            ->with('questions')
             ->orderBy('name')
             ->get();
 
@@ -229,11 +357,15 @@ class Feedback360Repository implements Feedback360RepositoryInterface
         }
 
         // Dropdown references
-        $employees = Employee::where('tenant_id', $tenantId)
+        $empQuery = Employee::where('tenant_id', $tenantId)
             ->where('status', true)
-            ->with(['department', 'designation'])
-            ->orderBy('full_name')
-            ->get();
+            ->with(['department', 'designation']);
+
+        if (!empty($cycle->company_id)) {
+            $empQuery->where('company_id', $cycle->company_id);
+        }
+
+        $employees = $empQuery->orderBy('full_name')->get();
 
         $companies = Company::where('tenant_id', $tenantId)->orderBy('company_name')->get();
         $departments = Department::where('tenant_id', $tenantId)->orderBy('name')->get();
@@ -266,15 +398,11 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             ->with(['company', 'creator'])
             ->findOrFail($id);
 
+        // Auto-advance lifecycle stage if deadlines arrived or reviews completed
+        $this->autoAdvanceCycleStage($cycle);
+
         $currentEmployee = $this->resolveEmployee($user, $tenantId);
-        $isHrAdmin = (bool) ($user && (
-            $user->is_admin ||
-            in_array(strtolower($user->role ?? ''), ['admin', 'super_admin', 'super admin', 'hr', 'hr_admin']) ||
-            $user->hasHrPermission('hrms.performance.manage') ||
-            $user->hasHrPermission('hr.settings.manage') ||
-            $user->hasHrPermission('hrms.feedback_360.manage') ||
-            $user->hasHrPermission('hrms.employees.view')
-        ));
+        $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
 
         $cycle->capabilities = [
             'can_view'             => true,
@@ -290,6 +418,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             ->with([
                 'employee.department',
                 'employee.designation',
+                'employee.directReports.designation',
                 'manager',
                 'nominations.reviewer.designation',
             ])
@@ -297,21 +426,46 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             ->get();
 
         $participants->transform(function ($p) use ($currentEmployee, $cycle, $isHrAdmin) {
+            $isDirectManager = $currentEmployee && (
+                $p->manager_id === $currentEmployee->id ||
+                $p->employee?->reporting_manager_id === $currentEmployee->id
+            );
+            $isScopedManager = false;
+            if ($currentEmployee && $p->employee_id && (int) $p->employee_id !== (int) $currentEmployee->id) {
+                $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $p->employee_id);
+            }
+            $isManager = $isDirectManager || $isScopedManager;
+            $isSelf = $currentEmployee && ($p->employee_id === $currentEmployee->id);
+
             $p->capabilities = [
                 'can_view'           => true,
-                'can_nominate_peers' => $isHrAdmin || ($currentEmployee && $p->employee_id === $currentEmployee->id && ($cycle->allow_self_nomination ?? true) && in_array($cycle->status ?? '', ['nomination', 'draft'])),
-                'can_publish_report' => $isHrAdmin,
+                'can_nominate_peers' => ($isHrAdmin || $isManager || ($isSelf && ($cycle->allow_self_nomination ?? true))) && in_array($cycle->status ?? '', ['nomination', 'draft', 'in_progress']),
+                'can_publish_report' => ($isHrAdmin || $isManager) && in_array($cycle->status ?? '', ['review', 'completed']),
             ];
             return $p;
         });
 
-        $questions = Feedback360Question::where('tenant_id', $tenantId)
-            ->where(function ($q) use ($cycle) {
-                $q->whereNull('cycle_id')->orWhere('cycle_id', $cycle->id);
-            })
-            ->with('competency')
+        $this->ensureCycleCompetenciesColumn();
+
+        $selectedCompIds = !empty($cycle->competency_ids) ? (array) $cycle->competency_ids : null;
+
+        $questionQuery = Feedback360Question::where('tenant_id', $tenantId);
+        if (!empty($selectedCompIds)) {
+            $questionQuery->whereIn('competency_id', $selectedCompIds);
+            $cycleCompetencies = Feedback360Competency::where('tenant_id', $tenantId)
+                ->whereIn('id', $selectedCompIds)
+                ->withCount('questions')
+                ->get();
+        } else {
+            $cycleCompetencies = Feedback360Competency::where('tenant_id', $tenantId)
+                ->withCount('questions')
+                ->get();
+        }
+
+        $questions = $questionQuery->with('competency')
             ->orderBy('sort_order')
             ->get();
+
 
         $allNominations = Feedback360Nomination::where('tenant_id', $tenantId)
             ->where('cycle_id', $cycle->id)
@@ -331,14 +485,19 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             ? round(($stats['completed_raters'] / $stats['total_raters']) * 100, 1)
             : 0.0;
 
-        $employees = Employee::where('tenant_id', $tenantId)
+        $empQuery = Employee::where('tenant_id', $tenantId)
             ->where('status', true)
-            ->with(['department', 'designation'])
-            ->orderBy('full_name')
-            ->get();
+            ->with(['department', 'designation']);
+
+        if (!empty($cycle->company_id)) {
+            $empQuery->where('company_id', $cycle->company_id);
+        }
+
+        $employees = $empQuery->orderBy('full_name')->get();
 
         return compact(
             'cycle',
+            'cycleCompetencies',
             'participants',
             'questions',
             'allNominations',
@@ -365,19 +524,31 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             ->findOrFail($nominationId);
 
         $currentEmployee = $this->resolveEmployee($user, $tenantId);
+        $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
+
+        // RBAC Enforcement: Only the assigned reviewer or HR Admin can access this workspace
+        if (!$isHrAdmin && (!$currentEmployee || $nomination->reviewer_id !== $currentEmployee->id)) {
+            abort(403, 'Unauthorized. You are not assigned as the reviewer for this evaluation.');
+        }
+
+        $cycle = $nomination->cycle;
+        $selectedCompIds = !empty($cycle?->competency_ids) ? (array) $cycle->competency_ids : null;
 
         // Fetch questions applicable for this cycle & reviewer type
-        $questions = Feedback360Question::where('tenant_id', $tenantId)
-            ->where(function ($q) use ($nomination) {
-                $q->whereNull('cycle_id')->orWhere('cycle_id', $nomination->cycle_id);
-            })
+        $questionQuery = Feedback360Question::where('tenant_id', $tenantId)
             ->where(function ($q) use ($nomination) {
                 $q->where('target_reviewer_type', 'all')
                   ->orWhere('target_reviewer_type', $nomination->reviewer_type);
-            })
-            ->with('competency')
+            });
+
+        if (!empty($selectedCompIds)) {
+            $questionQuery->whereIn('competency_id', $selectedCompIds);
+        }
+
+        $questions = $questionQuery->with('competency')
             ->orderBy('sort_order')
             ->get();
+
 
         // Group questions by competency category
         $competencyGroups = $questions->groupBy(function ($q) {
@@ -415,18 +586,43 @@ class Feedback360Repository implements Feedback360RepositoryInterface
 
         $cycle = $participant->cycle;
         $currentEmployee = $this->resolveEmployee($user, $tenantId);
-        $isHrAdmin = true;
+        $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
+        $isDirectManager = $currentEmployee && (
+            $participant->manager_id === $currentEmployee->id ||
+            $participant->employee?->reporting_manager_id === $currentEmployee->id
+        );
+        $isSelf = $currentEmployee && ($participant->employee_id === $currentEmployee->id);
+        $isPublished = ($participant->status === 'published');
 
-        // Fetch all competencies evaluated (Global + this Cycle)
-        $cycleId = $participant->cycle_id;
-        $competencies = Feedback360Competency::where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->where(function ($q) use ($cycleId) {
-                $q->whereNull('cycle_id')->orWhere('cycle_id', $cycleId);
-            })
-            ->orderBy('category')
-            ->orderBy('name')
-            ->get();
+        // RBAC Enforcement:
+        // - HR Admin can view anytime
+        // - Direct Manager can view during calibration ('review', 'completed') or once published
+        // - Reviewee (Self) can ONLY view once published
+        // - Unauthorized users cannot view
+        if (!$isHrAdmin) {
+            if ($isDirectManager) {
+                // Allowed for manager calibration & review
+            } elseif ($isSelf) {
+                if (!$isPublished) {
+                    abort(403, 'Your 360-degree feedback assessment report has not been published yet. Please await manager calibration.');
+                }
+            } else {
+                abort(403, 'Unauthorized. You do not have permission to view this 360-degree evaluation report.');
+            }
+        }
+
+        // Fetch all competencies evaluated in this cycle
+        $selectedCompIds = !empty($cycle?->competency_ids) ? (array) $cycle->competency_ids : null;
+        $compQuery = Feedback360Competency::where('tenant_id', $tenantId);
+
+        if (!empty($selectedCompIds)) {
+            $compQuery->whereIn('id', $selectedCompIds);
+        } else {
+            $compQuery->where('is_active', true);
+        }
+
+        $competencies = $compQuery->orderBy('name')->get();
+
 
         // Completed nominations
         $completedNoms = $participant->nominations->where('status', 'completed');
@@ -482,7 +678,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             $entry = [
                 'id'                 => $comp->id,
                 'name'               => $comp->name,
-                'category'           => $comp->category,
+                'category'           => $comp->name,
                 'description'        => $comp->description,
                 'self_score'         => $selfAvg,
                 'manager_score'      => $mgrAvg,
@@ -526,18 +722,30 @@ class Feedback360Repository implements Feedback360RepositoryInterface
 
         // Rank top strengths and growth areas by others' scores
         $sortedByOthers = collect($competencyScores)->filter(fn($c) => $c['others_avg'] !== null)->sortByDesc('others_avg')->values();
-        $topStrengths = $sortedByOthers->take(3)->all();
-        $growthAreas = $sortedByOthers->reverse()->take(3)->values()->all();
+        $sortedCount = $sortedByOthers->count();
+
+        if ($sortedCount >= 4) {
+            $topStrengths = $sortedByOthers->take(3)->all();
+            $growthAreas = $sortedByOthers->reverse()->take(3)->values()->all();
+        } elseif ($sortedCount > 1) {
+            $topStrengths = [$sortedByOthers->first()];
+            $growthAreas = [$sortedByOthers->last()];
+        } else {
+            $topStrengths = $sortedByOthers->all();
+            $growthAreas = [];
+        }
 
         // Anonymized Qualitative Feedback Responses
         $qualitativeFeedback = [];
-        $textQuestions = Feedback360Question::where('tenant_id', $tenantId)
-            ->where('question_type', 'text')
-            ->where(function ($q) use ($cycle) {
-                $q->whereNull('cycle_id')->orWhere('cycle_id', $cycle->id);
-            })
-            ->orderBy('sort_order')
-            ->get();
+        $textQuestionQuery = Feedback360Question::where('tenant_id', $tenantId)
+            ->where('question_type', 'text');
+
+        if (!empty($selectedCompIds)) {
+            $textQuestionQuery->whereIn('competency_id', $selectedCompIds);
+        }
+
+        $textQuestions = $textQuestionQuery->orderBy('sort_order')->get();
+
 
         foreach ($textQuestions as $tq) {
             $responsesList = [];
@@ -575,7 +783,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
         ];
 
         $isPublished = ($participant->status === 'published');
-        $canPublish = in_array($cycle?->status, ['review', 'completed']);
+        $canPublish = ($isHrAdmin || $isDirectManager) && in_array($cycle?->status, ['review', 'completed']);
 
         return compact(
             'participant',
@@ -600,8 +808,14 @@ class Feedback360Repository implements Feedback360RepositoryInterface
      */
     public function storeCycle(array $data, int $tenantId, ?User $user = null): Feedback360Cycle
     {
+        $this->ensureCycleCompetenciesColumn();
+
         return DB::transaction(function () use ($data, $tenantId, $user) {
             $code = !empty($data['code']) ? strtoupper(trim($data['code'])) : 'F360-' . date('Y') . '-' . strtoupper(Str::random(4));
+
+            $competencyIds = !empty($data['competency_ids']) && is_array($data['competency_ids'])
+                ? array_values(array_filter(array_map('intval', $data['competency_ids'])))
+                : null;
 
             $cycle = Feedback360Cycle::create([
                 'tenant_id'                  => $tenantId,
@@ -620,6 +834,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                 'max_peer_nominations'       => (int) ($data['max_peer_nominations'] ?? 5),
                 'allow_self_nomination'      => isset($data['allow_self_nomination']) ? (bool) $data['allow_self_nomination'] : true,
                 'require_manager_approval'   => isset($data['require_manager_approval']) ? (bool) $data['require_manager_approval'] : true,
+                'competency_ids'              => $competencyIds,
                 'created_by'                 => $user?->id,
             ]);
 
@@ -637,9 +852,11 @@ class Feedback360Repository implements Feedback360RepositoryInterface
      */
     public function updateCycle(int $id, array $data, int $tenantId, ?User $user = null): Feedback360Cycle
     {
+        $this->ensureCycleCompetenciesColumn();
+
         $cycle = Feedback360Cycle::where('tenant_id', $tenantId)->findOrFail($id);
 
-        $cycle->update([
+        $updateFields = [
             'name'                       => trim($data['name'] ?? $cycle->name),
             'company_id'                 => array_key_exists('company_id', $data) ? $data['company_id'] : $cycle->company_id,
             'description'                => $data['description'] ?? $cycle->description,
@@ -654,7 +871,15 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             'max_peer_nominations'       => (int) ($data['max_peer_nominations'] ?? $cycle->max_peer_nominations),
             'allow_self_nomination'      => isset($data['allow_self_nomination']) ? (bool) $data['allow_self_nomination'] : $cycle->allow_self_nomination,
             'require_manager_approval'   => isset($data['require_manager_approval']) ? (bool) $data['require_manager_approval'] : $cycle->require_manager_approval,
-        ]);
+        ];
+
+        if (array_key_exists('competency_ids', $data)) {
+            $updateFields['competency_ids'] = !empty($data['competency_ids']) && is_array($data['competency_ids'])
+                ? array_values(array_filter(array_map('intval', $data['competency_ids'])))
+                : null;
+        }
+
+        $cycle->update($updateFields);
 
         return $cycle;
     }
@@ -690,12 +915,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                 ->where('cycle_id', $cycle->id)
                 ->delete();
 
-            // 3. Delete cycle-specific custom questions if any
-            Feedback360Question::where('tenant_id', $tenantId)
-                ->where('cycle_id', $cycle->id)
-                ->delete();
-
-            // 4. Delete the cycle itself
+            // 3. Delete the cycle itself
             return (bool) $cycle->delete();
         });
     }
@@ -713,7 +933,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
         if ($status === 'in_progress') {
             Feedback360Nomination::where('tenant_id', $tenantId)
                 ->where('cycle_id', $cycle->id)
-                ->where('status', 'approved')
+                ->where('status', 'pending_approval')
                 ->update(['status' => 'approved']);
         }
 
@@ -775,24 +995,34 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             }
 
             // 3. Auto-assign Direct Reports (Upward Feedback)
+            // If the manager has a small direct-reports team (<= threshold), auto-assign them.
+            // If the team is larger, the manager and HR nominate key direct reports
+            // during the nomination window to avoid overwhelming the manager with dozens of evaluations.
             $directReports = Employee::where('tenant_id', $tenantId)
                 ->where('reporting_manager_id', $employee->id)
                 ->where('status', true)
                 ->get();
 
-            foreach ($directReports as $dr) {
-                Feedback360Nomination::firstOrCreate([
-                    'tenant_id'      => $tenantId,
-                    'cycle_id'       => $cycle->id,
-                    'participant_id' => $participant->id,
-                    'employee_id'    => $employee->id,
-                    'reviewer_id'    => $dr->id,
-                    'reviewer_type'  => 'direct_report',
-                ], [
-                    'status'        => 'approved',
-                    'is_anonymous'  => $cycle->is_direct_report_anonymous,
-                    'nominated_by'  => $dr->id,
-                ]);
+            $maxUpwardThreshold = (int) ($cycle->max_peer_nominations ?? 5);
+            if ($maxUpwardThreshold <= 0) {
+                $maxUpwardThreshold = 5;
+            }
+
+            if ($directReports->count() <= $maxUpwardThreshold) {
+                foreach ($directReports as $dr) {
+                    Feedback360Nomination::firstOrCreate([
+                        'tenant_id'      => $tenantId,
+                        'cycle_id'       => $cycle->id,
+                        'participant_id' => $participant->id,
+                        'employee_id'    => $employee->id,
+                        'reviewer_id'    => $dr->id,
+                        'reviewer_type'  => 'direct_report',
+                    ], [
+                        'status'        => 'approved',
+                        'is_anonymous'  => $cycle->is_direct_report_anonymous,
+                        'nominated_by'  => $dr->id,
+                    ]);
+                }
             }
 
             $count++;
@@ -802,15 +1032,36 @@ class Feedback360Repository implements Feedback360RepositoryInterface
     }
 
     /**
-     * Nominate peer reviewers for a participant.
+     * Nominate peer and direct report reviewers for a participant.
      */
-    public function nominatePeers(int $participantId, array $peerIds, int $tenantId, ?User $user = null): array
+    public function nominatePeers(int $participantId, array $peerIds, int $tenantId, ?User $user = null, array $directReportIds = []): array
     {
         $participant = Feedback360Participant::where('tenant_id', $tenantId)->findOrFail($participantId);
         $cycle = $participant->cycle;
 
         if (!$cycle) {
             throw new Exception("Feedback cycle not found for this participant.");
+        }
+
+        $currentEmployee = $this->resolveEmployee($user, $tenantId);
+        $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
+        $isDirectManager = $currentEmployee && (
+            $participant->manager_id === $currentEmployee->id ||
+            $participant->employee?->reporting_manager_id === $currentEmployee->id
+        );
+        $isScopedManager = false;
+        if ($currentEmployee && $participant->employee_id && (int) $participant->employee_id !== (int) $currentEmployee->id) {
+            $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $participant->employee_id);
+        }
+        $isManager = $isDirectManager || $isScopedManager;
+        $isSelf = $currentEmployee && ($participant->employee_id === $currentEmployee->id);
+
+        if (!$isHrAdmin && !$isManager && !$isSelf) {
+            throw new Exception("Unauthorized to nominate reviewers for this employee.");
+        }
+
+        if ($isSelf && !$cycle->allow_self_nomination && !$isHrAdmin && !$isManager) {
+            throw new Exception("Self-nomination is disabled for this feedback cycle.");
         }
 
         if ($cycle->nomination_deadline && now()->startOfDay()->gt(Carbon::parse($cycle->nomination_deadline)->endOfDay())) {
@@ -826,11 +1077,23 @@ class Feedback360Repository implements Feedback360RepositoryInterface
         }
 
         $created = [];
-        $initialStatus = $cycle->require_manager_approval ? 'pending_approval' : 'approved';
+        $initialStatus = ($isHrAdmin || $isDirectManager || !$cycle->require_manager_approval) ? 'approved' : 'pending_approval';
+        $nominatorId = $currentEmployee?->id ?? $participant->employee_id;
 
+        // 1. Process Peer Nominations
         foreach ($peerIds as $peerId) {
-            if ($peerId == $participant->employee_id) {
-                continue; // Can't peer review self
+            if ($peerId == $participant->employee_id || $peerId == $participant->manager_id) {
+                continue; // Can't peer review self or direct manager (manager already has separate evaluation)
+            }
+
+            // Prevent duplicate nomination if reviewer is already assigned to this participant
+            $alreadyAssigned = Feedback360Nomination::where('tenant_id', $tenantId)
+                ->where('participant_id', $participant->id)
+                ->where('reviewer_id', $peerId)
+                ->exists();
+
+            if ($alreadyAssigned) {
+                continue;
             }
 
             $nom = Feedback360Nomination::firstOrCreate([
@@ -843,7 +1106,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             ], [
                 'status'        => $initialStatus,
                 'is_anonymous'  => (bool) $cycle->is_peer_anonymous,
-                'nominated_by'  => $participant->employee_id,
+                'nominated_by'  => $nominatorId,
             ]);
 
             // Notify Peer Reviewer of nomination
@@ -862,7 +1125,158 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             $created[] = $nom;
         }
 
+        // 2. Process Direct Report Nominations (Upward Feedback)
+        if (!empty($directReportIds) && is_array($directReportIds)) {
+            foreach ($directReportIds as $drId) {
+                if ($drId == $participant->employee_id || $drId == $participant->manager_id) {
+                    continue;
+                }
+
+                $alreadyAssigned = Feedback360Nomination::where('tenant_id', $tenantId)
+                    ->where('participant_id', $participant->id)
+                    ->where('reviewer_id', $drId)
+                    ->exists();
+
+                if ($alreadyAssigned) {
+                    continue;
+                }
+
+                $nom = Feedback360Nomination::firstOrCreate([
+                    'tenant_id'      => $tenantId,
+                    'cycle_id'       => $cycle->id,
+                    'participant_id' => $participant->id,
+                    'employee_id'    => $participant->employee_id,
+                    'reviewer_id'    => $drId,
+                    'reviewer_type'  => 'direct_report',
+                ], [
+                    'status'        => $initialStatus,
+                    'is_anonymous'  => (bool) $cycle->is_direct_report_anonymous,
+                    'nominated_by'  => $nominatorId,
+                ]);
+
+                // Notify Direct Report Reviewer
+                if ($nom->reviewer_id) {
+                    NotificationService::sendToEmployee(
+                        employee: $nom->reviewer_id,
+                        title: 'Nominated for 360° Upward Feedback',
+                        message: "You have been nominated to provide 360° upward feedback for {$participant->employee?->full_name} ({$cycle->name}).",
+                        actionUrl: route('hrms.feedback360.review', $nom->id),
+                        module: 'hrms',
+                        type: 'feedback360',
+                        iconClass: 'feather-user-check'
+                    );
+                }
+
+                $created[] = $nom;
+            }
+        }
+
         return $created;
+    }
+
+    /**
+     * Delete a rater nomination from a participant's feedback roster.
+     */
+    public function deleteNomination(int $nominationId, int $tenantId, ?User $user = null): bool
+    {
+        $nomination = Feedback360Nomination::where('tenant_id', $tenantId)->findOrFail($nominationId);
+        $participant = $nomination->participant;
+
+        if ($user) {
+            $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
+            $currentEmployee = $this->resolveEmployee($user, $tenantId);
+            $isDirectManager = $currentEmployee && $participant && (
+                $participant->manager_id === $currentEmployee->id ||
+                $participant->employee?->reporting_manager_id === $currentEmployee->id
+            );
+            $isScopedManager = false;
+            if ($currentEmployee && $participant && $participant->employee_id && (int) $participant->employee_id !== (int) $currentEmployee->id) {
+                $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $participant->employee_id);
+            }
+            $isManager = $isDirectManager || $isScopedManager;
+
+            if (!$isHrAdmin && !$isManager) {
+                throw new Exception("Unauthorized. Only the direct manager, department head, or HR can remove raters from the roster.");
+            }
+        }
+
+        // Remove associated responses
+        Feedback360Response::where('tenant_id', $tenantId)
+            ->where('nomination_id', $nomination->id)
+            ->delete();
+
+        $deleted = (bool) $nomination->delete();
+
+        if ($participant) {
+            $participant->recalculateScores();
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * Manually add an individual rater (peer, direct report, or manager) to a participant.
+     */
+    public function addRaterToParticipant(int $participantId, int $reviewerId, string $reviewerType, int $tenantId, ?User $user = null): Feedback360Nomination
+    {
+        $participant = Feedback360Participant::where('tenant_id', $tenantId)->findOrFail($participantId);
+        $cycle = $participant->cycle;
+
+        if (!$cycle) {
+            throw new Exception("Feedback cycle not found for this participant.");
+        }
+
+        if ($user) {
+            $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
+            $currentEmployee = $this->resolveEmployee($user, $tenantId);
+            $isDirectManager = $currentEmployee && (
+                $participant->manager_id === $currentEmployee->id ||
+                $participant->employee?->reporting_manager_id === $currentEmployee->id
+            );
+            $isScopedManager = false;
+            if ($currentEmployee && $participant->employee_id && (int) $participant->employee_id !== (int) $currentEmployee->id) {
+                $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $participant->employee_id);
+            }
+            $isManager = $isDirectManager || $isScopedManager;
+
+            if (!$isHrAdmin && !$isManager) {
+                throw new Exception("Unauthorized. Only the direct manager, department head, or HR can add raters to the roster.");
+            }
+        }
+
+        $reviewer = Employee::where('tenant_id', $tenantId)->findOrFail($reviewerId);
+
+        $isAnonymous = match($reviewerType) {
+            'peer'          => (bool) $cycle->is_peer_anonymous,
+            'direct_report' => (bool) $cycle->is_direct_report_anonymous,
+            default         => false,
+        };
+
+        $nom = Feedback360Nomination::firstOrCreate([
+            'tenant_id'      => $tenantId,
+            'cycle_id'       => $cycle->id,
+            'participant_id' => $participant->id,
+            'employee_id'    => $participant->employee_id,
+            'reviewer_id'    => $reviewer->id,
+            'reviewer_type'  => $reviewerType,
+        ], [
+            'status'        => 'approved',
+            'is_anonymous'  => $isAnonymous,
+            'nominated_by'  => $user?->id ?? $participant->employee_id,
+            'approved_by'   => $user?->id,
+        ]);
+
+        NotificationService::sendToEmployee(
+            employee: $reviewer->id,
+            title: 'Assigned 360° Evaluation',
+            message: "You have been assigned to provide 360° feedback for {$participant->employee?->full_name} ({$cycle->name}).",
+            actionUrl: route('hrms.feedback360.review', $nom->id),
+            module: 'hrms',
+            type: 'feedback360',
+            iconClass: 'feather-user-check'
+        );
+
+        return $nom;
     }
 
     /**
@@ -871,6 +1285,24 @@ class Feedback360Repository implements Feedback360RepositoryInterface
     public function approveNomination(int $nominationId, bool $approved, ?string $reason, int $tenantId, ?User $user = null): Feedback360Nomination
     {
         $nomination = Feedback360Nomination::where('tenant_id', $tenantId)->findOrFail($nominationId);
+
+        if ($user) {
+            $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
+            $currentEmployee = $this->resolveEmployee($user, $tenantId);
+            $isDirectManager = $currentEmployee && (
+                $nomination->participant?->manager_id === $currentEmployee->id ||
+                $nomination->employee?->reporting_manager_id === $currentEmployee->id
+            );
+            $isScopedManager = false;
+            if ($currentEmployee && $nomination->employee_id && (int) $nomination->employee_id !== (int) $currentEmployee->id) {
+                $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $nomination->employee_id);
+            }
+            $isManager = $isDirectManager || $isScopedManager;
+
+            if (!$isHrAdmin && !$isManager) {
+                throw new Exception("Unauthorized. Only the direct manager, department head, or HR Admin can approve peer nominations.");
+            }
+        }
 
         $nomination->status = $approved ? 'approved' : 'rejected';
         $nomination->approved_by = $user?->id;
@@ -891,6 +1323,25 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             return 0;
         }
 
+        $query = Feedback360Nomination::where('tenant_id', $tenantId)
+            ->whereIn('id', $nominationIds)
+            ->where('status', 'pending_approval');
+
+        if ($user) {
+            $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
+            if (!$isHrAdmin) {
+                $currentEmployee = $this->resolveEmployee($user, $tenantId);
+                if (!$currentEmployee) {
+                    throw new Exception("Unauthorized to approve nominations.");
+                }
+                // Only allow nominations for subordinates within the manager's organizational scope
+                $accessibleIds = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->getAccessibleEmployeeIds($user ?? $currentEmployee);
+                if ($accessibleIds !== null) {
+                    $query->whereIn('employee_id', $accessibleIds);
+                }
+            }
+        }
+
         $updateData = [
             'status' => $approved ? 'approved' : 'rejected',
             'approved_by' => $user?->id,
@@ -901,10 +1352,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             $updateData['rejection_reason'] = $reason;
         }
 
-        return Feedback360Nomination::where('tenant_id', $tenantId)
-            ->whereIn('id', $nominationIds)
-            ->where('status', 'pending_approval')
-            ->update($updateData);
+        return $query->update($updateData);
     }
 
     /**
@@ -912,9 +1360,18 @@ class Feedback360Repository implements Feedback360RepositoryInterface
      */
     public function submitReview(int $nominationId, array $data, int $tenantId, ?User $user = null): Feedback360Nomination
     {
-        return DB::transaction(function () use ($nominationId, $data, $tenantId) {
+        return DB::transaction(function () use ($nominationId, $data, $tenantId, $user) {
             $nomination = Feedback360Nomination::where('tenant_id', $tenantId)->findOrFail($nominationId);
             $cycle = $nomination->cycle;
+
+            if ($user) {
+                $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
+                $currentEmployee = $this->resolveEmployee($user, $tenantId);
+
+                if (!$isHrAdmin && (!$currentEmployee || $nomination->reviewer_id !== $currentEmployee->id)) {
+                    throw new Exception("Unauthorized. Only the designated reviewer can submit this feedback evaluation.");
+                }
+            }
 
             if ($cycle && in_array($cycle->status, ['draft', 'nomination'])) {
                 $phaseLabel = $cycle->status === 'draft' ? 'Draft' : 'Nomination';
@@ -928,12 +1385,15 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             // Save rating & text responses
             if (!empty($data['responses']) && is_array($data['responses'])) {
                 foreach ($data['responses'] as $qId => $resp) {
-                    $question = Feedback360Question::find($qId);
+                    $question = Feedback360Question::where('tenant_id', $tenantId)->find($qId);
                     if (!$question) {
                         continue;
                     }
 
                     $ratingVal = isset($resp['rating']) && is_numeric($resp['rating']) ? (float) $resp['rating'] : null;
+                    if ($ratingVal !== null) {
+                        $ratingVal = max(1.0, min(5.0, $ratingVal));
+                    }
                     $textVal   = isset($resp['text']) ? trim($resp['text']) : null;
 
                     Feedback360Response::updateOrCreate([
@@ -970,10 +1430,15 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                     NotificationService::sendToHrAdmins(
                         title: '360° Review Submitted',
                         message: "A 360° evaluation was completed for {$participant->employee?->full_name} ({$cycle?->name}).",
-                        actionUrl: route('hrms.feedback360.cycles.show', $cycle->id),
+                        actionUrl: $cycle ? route('hrms.feedback360.cycles.show', $cycle->id) : route('hrms.feedback360.index'),
                         type: 'feedback360',
                         iconClass: 'feather-check-circle'
                     );
+                }
+
+                // Auto-advance lifecycle stage if all reviews completed
+                if ($cycle) {
+                    $this->autoAdvanceCycleStage($cycle);
                 }
             }
 
@@ -988,6 +1453,19 @@ class Feedback360Repository implements Feedback360RepositoryInterface
     {
         $participant = Feedback360Participant::where('tenant_id', $tenantId)->findOrFail($participantId);
 
+        if ($user) {
+            $isHrAdmin = $this->isHrAdminUser($user, $tenantId);
+            $currentEmployee = $this->resolveEmployee($user, $tenantId);
+            $isDirectManager = $currentEmployee && (
+                $participant->manager_id === $currentEmployee->id ||
+                $participant->employee?->reporting_manager_id === $currentEmployee->id
+            );
+
+            if (!$isHrAdmin && !$isDirectManager) {
+                throw new Exception("Unauthorized. Only the direct manager or HR Admin can calibrate and publish this report.");
+            }
+        }
+
         if (!in_array($participant->cycle?->status, ['review', 'completed'])) {
             throw new Exception("360 Assessment Reports can only be published once the cycle reaches the Manager Review stage.");
         }
@@ -998,6 +1476,11 @@ class Feedback360Repository implements Feedback360RepositoryInterface
         $participant->published_at     = Carbon::now();
         $participant->published_by     = $user?->id;
         $participant->save();
+
+        // Auto-advance cycle to completed if all participant reports are published
+        if ($participant->cycle) {
+            $this->autoAdvanceCycleStage($participant->cycle);
+        }
 
         // Notify Employee of published 360 Feedback Report
         if ($participant->employee_id) {
@@ -1020,8 +1503,13 @@ class Feedback360Repository implements Feedback360RepositoryInterface
      */
     public function bulkRemind(int $cycleId, int $tenantId, ?User $user = null): int
     {
+        $cycle = Feedback360Cycle::where('tenant_id', $tenantId)->findOrFail($cycleId);
+        if (in_array($cycle->status, ['draft', 'completed', 'closed'])) {
+            throw new Exception("Reminders can only be sent while reviews are actively being collected (In Progress or Manager Review).");
+        }
+
         $pending = Feedback360Nomination::where('tenant_id', $tenantId)
-            ->where('cycle_id', $cycleId)
+            ->where('cycle_id', $cycle->id)
             ->whereIn('status', ['approved', 'in_progress'])
             ->get();
 
@@ -1047,17 +1535,26 @@ class Feedback360Repository implements Feedback360RepositoryInterface
      */
     public function storeCompetency(array $data, int $tenantId, ?User $user = null): Feedback360Competency
     {
-        $comp = Feedback360Competency::create([
+        $compData = [
             'tenant_id'   => $tenantId,
             'company_id'  => $data['company_id'] ?? null,
-            'cycle_id'    => !empty($data['cycle_id']) ? (int) $data['cycle_id'] : null,
             'name'        => trim($data['name']),
-            'code'        => !empty($data['code']) ? strtoupper(trim($data['code'])) : 'COMP-' . strtoupper(Str::random(4)),
-            'category'    => trim($data['category'] ?? 'Core Competencies'),
             'description' => $data['description'] ?? null,
-            'weightage'   => (float) ($data['weightage'] ?? 100.00),
             'is_active'   => true,
-        ]);
+        ];
+
+        // Safe graceful defaults if old columns still exist before running migration
+        if (Schema::hasColumn('feedback_360_competencies', 'category')) {
+            $compData['category'] = trim($data['name']);
+        }
+        if (Schema::hasColumn('feedback_360_competencies', 'code')) {
+            $compData['code'] = 'COMP-' . strtoupper(Str::random(4));
+        }
+        if (Schema::hasColumn('feedback_360_competencies', 'weightage')) {
+            $compData['weightage'] = 100.00;
+        }
+
+        $comp = Feedback360Competency::create($compData);
 
         // Automatically store child questions if provided in the unified form
         if (!empty($data['questions']) && is_array($data['questions'])) {
@@ -1068,7 +1565,6 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                     Feedback360Question::create([
                         'tenant_id'            => $tenantId,
                         'competency_id'        => $comp->id,
-                        'cycle_id'             => $comp->cycle_id,
                         'question_text'        => trim($qData['question_text']),
                         'description'          => $qData['description'] ?? null,
                         'question_type'        => $qData['question_type'] ?? 'rating_scale',
@@ -1103,7 +1599,6 @@ class Feedback360Repository implements Feedback360RepositoryInterface
         return Feedback360Question::create([
             'tenant_id'            => $tenantId,
             'competency_id'        => $data['competency_id'] ?? null,
-            'cycle_id'             => $data['cycle_id'] ?? null,
             'question_text'        => trim($data['question_text']),
             'description'          => $data['description'] ?? null,
             'question_type'        => $data['question_type'] ?? 'rating_scale',

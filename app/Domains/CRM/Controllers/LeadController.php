@@ -23,6 +23,7 @@ use App\Exports\LeadSampleExport;
 use App\Exports\LeadExport;
 use App\Imports\LeadImport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Services\TaxIdentityService;
 
 class LeadController extends Controller
 {
@@ -46,49 +47,35 @@ class LeadController extends Controller
             'search', 'duplicates_only', 'priority', 'segment', 'status', 'lead_owner_id', 'quotation_status', 'start_date', 'end_date', 'date_from', 'date_to', 'sort_by', 'sort_order'
         ]);
 
-        $leads = $this->leadRepo->getPaginatedLeads($filters, 10);
-        $this->duplicateService->annotateDuplicates($leads->items(), $tenantId);
-
         if ($request->input('duplicates_only') === '1') {
-            $filtered = array_values(array_filter($leads->items(), function ($lead) {
-                return !empty($lead->is_duplicate) || !empty($lead->is_original);
-            }));
-
-            usort($filtered, function ($a, $b) {
-                $groupA = $a->is_duplicate ? $a->duplicate_of_id : $a->id;
-                $groupB = $b->is_duplicate ? $b->duplicate_of_id : $b->id;
-                if ($groupA === $groupB) {
-                    return $a->id <=> $b->id;
-                }
-                return $groupA <=> $groupB;
-            });
-
-            $leads->setCollection(collect($filtered));
+            $graph = $this->duplicateService->getDuplicateGraph($tenantId);
+            $filters['duplicate_lead_ids'] = $graph['allDuplicateAndOriginalIds'];
         }
 
-        $quotations = $this->quotationService->latest();
-        $users = \App\Models\User::orderBy('name')->get();
+        $leads = $this->leadRepo->getPaginatedLeads($filters, 10);
+        $duplicatesCount = $this->duplicateService->annotateDuplicates($leads->items(), $tenantId);
 
+        $users = \App\Models\User::select(['id', 'name', 'email'])->orderBy('name')->get();
         $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses($tenantId);
 
-        $statusCounts = Lead::query()
-            ->where('tenant_id', $tenantId)
-            ->select('status', \DB::raw('count(*) as aggregate'))
-            ->groupBy('status')
-            ->pluck('aggregate', 'status')
-            ->toArray();
+        $authUser = auth()->user();
+        $cacheKey = "tenant_{$tenantId}_user_" . ($authUser ? $authUser->id : 'guest') . "_lead_status_counts";
 
-        $totalLeadsCount = Lead::query()->where('tenant_id', $tenantId)->whereNull('deleted_at')->count();
+        $statusCounts = \Illuminate\Support\Facades\Cache::remember(
+            $cacheKey,
+            30,
+            function () use ($tenantId) {
+                return Lead::query()->where('tenant_id', $tenantId)
+                    ->select('status', \DB::raw('count(*) as aggregate'))
+                    ->groupBy('status')
+                    ->pluck('aggregate', 'status')
+                    ->toArray();
+            }
+        );
 
-        $allTenantLeads = Lead::query()
-            ->where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
-            ->select(['id', 'lead_number', 'gstin', 'email', 'company_email', 'phone', 'company_phone'])
-            ->get();
-        $this->duplicateService->annotateDuplicates($allTenantLeads, $tenantId);
-        $duplicatesCount = $allTenantLeads->filter(fn($l) => $l->is_duplicate || $l->is_original)->count();
+        $totalLeadsCount = array_sum($statusCounts);
 
-        return view('modules.crm.leads.index', compact('leads', 'quotations', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users', 'leadStatuses'));
+        return view('modules.crm.leads.index', compact('leads', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users', 'leadStatuses'));
     }
 
     public function kanban(Request $request)
@@ -159,7 +146,7 @@ class LeadController extends Controller
     public function checkDuplicate(Request $request): JsonResponse
     {
         $tenantId  = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
-        $rawGstin  = trim((string)$request->input('gstin', ''));
+        $rawGstin  = TaxIdentityService::normalizeGstin($request->input('gstin')) ?? '';
         $rawPhone  = trim((string)$request->input('phone', ''));
         $rawEmail  = strtolower(trim((string)$request->input('email', '')));
         $company   = trim((string)$request->input('company_name', ''));
@@ -600,7 +587,7 @@ class LeadController extends Controller
             return redirect()->back()->withErrors(['status' => "Lead status in '{$lead->status}' stage is locked."]);
         }
         $dbStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses()->pluck('name')->toArray();
-        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost'], $dbStatuses)));
+        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost', 'Converted'], $dbStatuses)));
         $validated = $request->validate(['status' => 'required|string|in:' . $allowedStatuses]);
 
         $res = $this->leadService->updateLeadStatus($lead, $validated['status']);
@@ -827,7 +814,7 @@ class LeadController extends Controller
             'company_name' => $isB2B ? 'required|string|max:255' : 'nullable|string|max:255',
             'company_email' => $isB2B ? 'required|email|max:255' : 'nullable|email|max:255',
             'company_phone' => 'nullable|string|regex:/^[0-9]+$/',
-            'gstin' => 'nullable|string|max:100',
+            'gstin' => TaxIdentityService::gstinRules(false),
             'lead_type' => 'nullable|string|in:b2b,b2c',
             'contact_person' => $isB2B ? 'nullable|string|max:255' : 'required|string|max:255',
             'designation' => 'nullable|string|max:255',
@@ -872,6 +859,7 @@ class LeadController extends Controller
     {
         return [
             'company_name.required' => 'Company Name is required for B2B (Business Client) leads.',
+            'gstin.*' => 'Please enter a valid 15-character Indian GSTIN (e.g. 27AAAAA0000A1Z5).',
             'company_email.required' => 'Company Email is required for B2B (Business Client) leads.',
             'company_email.email' => 'Please enter a valid email address for Company Email.',
             'contact_person.required' => 'Contact Person is required for B2C (Individual Customer) leads.',

@@ -49,18 +49,18 @@
         </x-slot:title>
 
         <x-ui.table hoverable>
-            <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+            <thead class="fs-11 text-uppercase fw-semibold">
                 <tr>
                     <th class="ps-4">Bill</th>
                     <th>Vendor</th>
                     <th>Date</th>
                     <th>Problems</th>
-                    <th class="text-end">Amount</th>
+                    <th class="text-end">Amount ({{ active_currency_symbol() }})</th>
                     <th>Status</th>
                     <th class="text-end pe-4">Actions</th>
                 </tr>
             </thead>
-            <tbody class="fs-13 text-dark">
+            <tbody class="fs-13">
                 @forelse ($bills as $bill)
                     @php
                         $problems = collect($bill->match_details['lines'] ?? [])->flatMap(fn ($line) => $line['messages'] ?? []);
@@ -77,7 +77,7 @@
                                 <div class="text-muted">+{{ $problems->count() - 2 }} more</div>
                             @endif
                         </td>
-                        <td class="text-end fw-semibold">{{ number_format((float) $bill->grand_total, 2) }}</td>
+                        <td class="text-end fw-semibold">{{ format_currency($bill->grand_total) }}</td>
                         <td>
                             @if ($bill->isOnHold())
                                 <x-ui.badge variant="primary" soft>On hold</x-ui.badge>
@@ -128,6 +128,40 @@
 
         .bill-match-settings .mb-3 {
             margin-bottom: 0 !important;
+        }
+
+        /* Scoped Dark / Light Theme Harmonization for Bill Matching */
+        html:not(.app-skin-dark) .accounting-dense thead th {
+            background-color: #f8fafc !important;
+            color: #475569 !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+        html:not(.app-skin-dark) .accounting-dense td {
+            color: #1e293b !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+        }
+        html:not(.app-skin-dark) .accounting-dense tr:hover td {
+            background-color: #f8fafc !important;
+        }
+
+        html.app-skin-dark .accounting-dense thead th {
+            background-color: #162038 !important;
+            color: #94a3b8 !important;
+            border-color: #1e293b !important;
+        }
+        html.app-skin-dark .accounting-dense td {
+            color: #e2e8f0 !important;
+            border-bottom-color: #1e293b !important;
+        }
+        html.app-skin-dark .accounting-dense tr:hover td {
+            background-color: #1c2844 !important;
+            color: #ffffff !important;
+        }
+        html.app-skin-dark .text-dark {
+            color: #e2e8f0 !important;
+        }
+        html.app-skin-dark .border-top {
+            border-color: #1e293b !important;
         }
     </style>
 @endpush

@@ -162,6 +162,10 @@ class PostSalesReturnJournal
                 'memo'                   => "Sales Return / Credit Note {$salesReturn->return_number}",
                 'voucher_type'           => VoucherType::CREDIT_NOTE,
                 'journal_number_prefix'  => VoucherType::prefix(VoucherType::CREDIT_NOTE),
+                // Reduces the returned invoice's bill; unlinked returns stay On Account.
+                'bill_allocations'       => $salesReturn->invoice_id
+                    ? [\App\Domains\Accounting\Services\BillWise\BillAllocationService::againstRef('receivable', 'Invoice', (int) $salesReturn->invoice_id)]
+                    : [],
             ]);
 
             VoucherDetail::create([

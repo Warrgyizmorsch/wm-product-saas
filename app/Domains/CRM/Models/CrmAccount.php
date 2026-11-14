@@ -15,10 +15,14 @@ use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
+use App\Models\Concerns\NormalizesTaxIdentity;
 
 class CrmAccount extends BaseModel
 {
-    use HasFactory, SoftDeletes, BelongsToCompany, BelongsToBranch;
+    use HasFactory, SoftDeletes, BelongsToCompany, BelongsToBranch, NormalizesTaxIdentity;
+
+    protected ?string $rbacPermission = 'crm.customers.view';
+    protected ?string $rbacOwnerColumn = 'owner_id';
 
     protected $table = 'crm_accounts';
 
@@ -61,6 +65,11 @@ class CrmAccount extends BaseModel
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id');
+    }
+
+    public function getOpeningBalanceAttribute(): float
+    {
+        return (float) ($this->customer?->signedOpeningBalance() ?? 0.00);
     }
 
     public function owner(): BelongsTo

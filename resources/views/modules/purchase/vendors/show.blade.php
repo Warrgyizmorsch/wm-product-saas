@@ -87,8 +87,10 @@
 
                 <div class="text-end">
                     <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.payable_health_status') }}</span>
-                    @if(($vendorAdvanceCredit ?? 0) > 0)
-                        <span class="badge bg-soft-info text-info fs-12 px-3 py-1.5 fw-bold border"><i class="feather-arrow-down-left me-1"></i>{{ __('purchase.advance_paid_kpi') }} ({!! format_currency($vendorAdvanceCredit) !!})</span>
+                    @if(($availableAdvance ?? 0) > 0 || ($vendorAdvanceCredit ?? 0) > 0)
+                        <span class="badge bg-soft-info text-info fs-12 px-3 py-1.5 fw-bold border">
+                            <i class="feather-arrow-down-left me-1"></i>Advance Paid ({!! format_currency($availableAdvance ?: $vendorAdvanceCredit) !!} Available)
+                        </span>
                     @elseif($outstandingPayable <= 0)
                         <span class="badge bg-soft-success text-success fs-12 px-3 py-1.5 fw-bold border"><i class="feather-check-circle me-1"></i>{{ __('purchase.all_settled_zero_dues') }}</span>
                     @elseif($overdueAmount > 0)
@@ -101,29 +103,38 @@
 
             {{-- 2. Finance KPI Stat Cards --}}
             <div class="row g-3 mb-4">
-                <div class="col-md-3">
-                    <div class="p-3 rounded-3 border bg-light shadow-2xs">
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="p-3 rounded-3 border bg-light shadow-2xs h-100">
                         <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.total_bills_amount') }}</span>
                         <h4 class="fw-bold text-dark mb-0 fs-18 font-monospace">{!! format_currency($totalBilled) !!}</h4>
-                        <span class="fs-11 text-muted">{{ __('purchase.vendor_bills_count', ['count' => $bills->count()]) }}</span>
+                        <span class="fs-11 text-muted">{{ __('purchase.vendor_bills_count', ['count' => $billCount ?? $bills->count()]) }}</span>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="p-3 rounded-3 border bg-soft-success shadow-2xs">
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="p-3 rounded-3 border bg-soft-success shadow-2xs h-100">
                         <span class="text-success fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.total_paid_amount') }}</span>
                         <h4 class="fw-bold text-success mb-0 fs-18 font-monospace">{!! format_currency($totalPaid) !!}</h4>
                         <span class="fs-11 text-success">{{ __('purchase.payment_records_count', ['count' => $payments->count()]) }}</span>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="p-3 rounded-3 border bg-soft-danger shadow-2xs">
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="p-3 rounded-3 border {{ ($availableAdvance ?? 0) > 0 ? 'bg-soft-info border-info' : 'bg-light' }} shadow-2xs h-100">
+                        <span class="text-info fs-11 fw-bold text-uppercase d-block mb-1">
+                            <i class="feather-shield me-1"></i>Available Advance
+                        </span>
+                        <h4 class="fw-bold text-info mb-0 fs-18 font-monospace">{!! format_currency($availableAdvance ?? $vendorAdvanceCredit ?? 0) !!}</h4>
+                        <span class="fs-11 text-muted">{{ $advances->count() }} advance records</span>
+                    </div>
+                </div>
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="p-3 rounded-3 border bg-soft-danger shadow-2xs h-100">
                         <span class="text-danger fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.net_outstanding_dues') }}</span>
                         <h4 class="fw-bold text-danger mb-0 fs-18 font-monospace">{!! format_currency($outstandingPayable) !!}</h4>
                         <span class="fs-11 text-danger">{{ __('purchase.net_payable_balance') }}</span>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="p-3 rounded-3 border bg-soft-warning shadow-2xs">
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="p-3 rounded-3 border bg-soft-warning shadow-2xs h-100">
                         <span class="text-warning fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.overdue_amount') }}</span>
                         <h4 class="fw-bold text-warning mb-0 fs-18 font-monospace">{!! format_currency($overdueAmount) !!}</h4>
                         <span class="fs-11 text-warning">{{ __('purchase.passed_due_date') }}</span>
@@ -141,6 +152,9 @@
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link fw-bold fs-13" id="payments-tab" data-bs-toggle="tab" data-bs-target="#payments-pane" type="button" role="tab"><i class="feather-credit-card me-1.5"></i>{{ __('purchase.payments_paid_tab') }} ({{ $payments->count() }})</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold fs-13 text-info" id="advances-tab" data-bs-toggle="tab" data-bs-target="#advances-pane" type="button" role="tab"><i class="feather-shield me-1.5"></i>{{ __('purchase.advance_payments') }} ({{ $advances->count() }})</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link fw-bold fs-13" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-pane" type="button" role="tab"><i class="feather-truck me-1.5"></i>{{ __('purchase.purchase_orders_tab') }} ({{ $purchaseOrders->count() }})</button>
@@ -328,6 +342,9 @@
                                             <a href="{{ route('purchase.payments.show', $pmt->id) }}">
                                                 #{{ $pmt->payment_number ?: $pmt->id }}
                                             </a>
+                                            @if($pmt->payment_type === 'Advance')
+                                                <span class="badge bg-soft-info text-info border ms-1 fs-11">Advance</span>
+                                            @endif
                                         </td>
                                         <td>{{ \Carbon\Carbon::parse($pmt->payment_date)->format('d-M-Y') }}</td>
                                         <td><span class="badge bg-light text-dark border">{{ ucfirst($pmt->payment_method ?: 'Bank') }}</span></td>
@@ -343,6 +360,78 @@
                                 @empty
                                     <tr>
                                         <td colspan="7" class="text-center py-4 text-muted">{{ __('purchase.no_payments_for_supplier') }}</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </x-ui.odoo-form-ui>
+                    </div>
+                </div>
+
+                {{-- TAB: ADVANCE PAYMENTS --}}
+                <div class="tab-pane fade" id="advances-pane" role="tabpanel">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div>
+                            <h6 class="fw-bold text-info mb-0"><i class="feather-shield me-1"></i>{{ __('purchase.advance_payments') }}</h6>
+                            <span class="fs-12 text-muted">Advance payments recorded for {{ $vendor->name }}</span>
+                        </div>
+                        @if(Route::has('purchase.advances.create'))
+                            <a href="{{ route('purchase.advances.create', ['vendor_id' => $vendor->id]) }}" class="btn btn-sm btn-info text-white">
+                                <i class="feather-plus me-1"></i>New Advance Payment
+                            </a>
+                        @endif
+                    </div>
+                    <div class="table-responsive">
+                        <x-ui.odoo-form-ui type="table" class="mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>{{ __('purchase.advance_number') }}</th>
+                                    <th>{{ __('purchase.payment_date') }}</th>
+                                    <th>{{ __('purchase.linked_po') }}</th>
+                                    <th>{{ __('purchase.payment_method') }}</th>
+                                    <th>{{ __('purchase.ref_txn_no') }}</th>
+                                    <th class="text-end">{{ __('purchase.total_amount') }}</th>
+                                    <th class="text-center">{{ __('purchase.status') }}</th>
+                                    <th class="text-end pe-3">{{ __('purchase.action') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($advances as $adv)
+                                    <tr>
+                                        <td class="font-monospace fw-bold text-info">
+                                            <a href="{{ route('purchase.advances.show', $adv->id) }}" class="text-info">
+                                                #{{ $adv->advance_number ?: $adv->payment_number }}
+                                            </a>
+                                        </td>
+                                        <td>{{ \Carbon\Carbon::parse($adv->payment_date)->format('d-M-Y') }}</td>
+                                        <td>
+                                            @if($adv->purchaseOrder)
+                                                <a href="{{ route('purchase.orders.show', $adv->purchase_order_id) }}" class="fw-bold text-primary font-monospace">
+                                                    {{ $adv->purchaseOrder->purchase_order_number }}
+                                                </a>
+                                            @else
+                                                <span class="badge bg-light text-muted border">General / On Account</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border">{{ ucfirst($adv->payment_method ?: 'Bank') }}</span>
+                                            @if($adv->bankAccount)
+                                                <span class="text-muted fs-11 ms-1 font-monospace">({{ $adv->bankAccount->name }})</span>
+                                            @endif
+                                        </td>
+                                        <td class="font-monospace text-muted">{{ $adv->reference_number ?: '—' }}</td>
+                                        <td class="text-end font-monospace fw-bold text-info">{!! format_currency($adv->amount) !!}</td>
+                                        <td class="text-center">
+                                            <x-ui.status-badge :status="$adv->status" size="sm" />
+                                        </td>
+                                        <td class="text-end pe-3">
+                                            <a href="{{ route('purchase.advances.show', $adv->id) }}" class="btn btn-sm btn-light border py-1 px-2.5 fs-12" title="View Advance Voucher">
+                                                <i class="feather-eye me-1"></i>View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="8" class="text-center py-4 text-muted">{{ __('purchase.no_advances_recorded') }}</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -408,6 +497,57 @@
                         </div>
                     </div>
 
+                    @if($statement)
+                    {{-- From the books: the same lines and balance as Accounting's Party Ledger. --}}
+                    <div class="d-flex justify-content-between align-items-center fs-12 text-muted mb-2">
+                        <span>{{ $statement['from']->format('d M Y') }} – {{ $statement['to']->format('d M Y') }}</span>
+                        @if(\Illuminate\Support\Facades\Route::has('accounting.reports.party-ledger'))
+                            <a href="{{ route('accounting.reports.party-ledger', ['party_type' => 'vendor', 'party_id' => $vendor->id]) }}">Open in Party Ledger →</a>
+                        @endif
+                    </div>
+                    <div class="table-responsive">
+                        <x-ui.odoo-form-ui type="table" class="mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>{{ __('purchase.date') }}</th>
+                                    <th>{{ __('purchase.voucher_ref_no') }}</th>
+                                    <th>{{ __('purchase.description') }}</th>
+                                    <th>Bill-wise</th>
+                                    <th class="text-end">{{ __('purchase.debit_settlement') }}</th>
+                                    <th class="text-end">{{ __('purchase.credit_bill_payable') }}</th>
+                                    <th class="text-end">{{ __('purchase.running_payable_balance') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="table-warning">
+                                    <td class="fw-bold" colspan="6">{{ __('purchase.opening_balance') }}</td>
+                                    <td class="text-end font-monospace fw-bold text-primary">{!! format_currency($statement['opening']) !!}</td>
+                                </tr>
+                                @forelse($statement['rows'] as $row)
+                                    <tr>
+                                        <td>{{ \Carbon\Carbon::parse($row['date'])->format('d-M-Y') }}</td>
+                                        <td class="font-monospace fw-bold"><a href="{{ $row['url'] }}" class="text-primary">{{ $row['journal_number'] }}</a></td>
+                                        <td class="fs-12 text-muted">{{ $row['description'] ?: '—' }}</td>
+                                        <td class="fs-12">{{ implode(', ', $row['bill_refs']) ?: '—' }}</td>
+                                        <td class="text-end font-monospace fw-bold text-success">{!! $row['debit'] > 0 ? format_currency($row['debit']) : '—' !!}</td>
+                                        <td class="text-end font-monospace fw-bold text-danger">{!! $row['credit'] > 0 ? format_currency($row['credit']) : '—' !!}</td>
+                                        <td class="text-end font-monospace fw-bold text-primary">{!! format_currency($row['running_balance']) !!}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">{{ __('purchase.no_ledger_transactions') }}</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-bold bg-light">
+                                    <td colspan="6">Closing Balance</td>
+                                    <td class="text-end font-monospace text-primary">{!! format_currency($statement['closing']) !!}</td>
+                                </tr>
+                            </tfoot>
+                        </x-ui.odoo-form-ui>
+                    </div>
+                    @else
                     <div class="table-responsive">
                         <x-ui.odoo-form-ui type="table" class="mb-0">
                             <thead class="table-light">
@@ -423,14 +563,16 @@
                             </thead>
                             <tbody>
                                 @if($vendor->opening_balance > 0)
+                                    @php $openingSigned = $vendor->signedOpeningBalance(); @endphp
                                     <tr class="table-warning">
                                         <td class="fw-bold">—</td>
                                         <td class="font-monospace fw-bold">OPENING-BAL</td>
                                         <td><span class="badge bg-warning text-dark">{{ __('purchase.opening_balance') }}</span></td>
-                                        <td>{{ __('purchase.initial_supplier_opening_dues') }}</td>
-                                        <td class="text-end font-monospace">0.00</td>
-                                        <td class="text-end font-monospace fw-bold text-dark">{!! format_currency($vendor->opening_balance) !!}</td>
-                                        <td class="text-end font-monospace fw-bold text-primary">{!! format_currency($vendor->opening_balance) !!}</td>
+                                        {{-- A debit opening is an advance paid to the supplier, not a due. --}}
+                                        <td>{{ $openingSigned < 0 ? __('purchase.opening_advance_paid') : __('purchase.initial_supplier_opening_dues') }}</td>
+                                        <td class="text-end font-monospace fw-bold text-success">{!! $openingSigned < 0 ? format_currency(abs($openingSigned)) : '0.00' !!}</td>
+                                        <td class="text-end font-monospace fw-bold text-dark">{!! $openingSigned > 0 ? format_currency($openingSigned) : '0.00' !!}</td>
+                                        <td class="text-end font-monospace fw-bold text-primary">{!! format_currency($openingSigned) !!}</td>
                                     </tr>
                                 @endif
 
@@ -472,6 +614,7 @@
                             </tbody>
                         </x-ui.odoo-form-ui>
                     </div>
+                    @endif
                 </div>
 
             </div>

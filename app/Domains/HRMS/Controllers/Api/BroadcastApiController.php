@@ -42,6 +42,11 @@ class BroadcastApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function getTenantId(): int
+    {
+        return tenant_id() ?? auth()->user()?->tenant_id ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+    }
+
     private function isHrAdmin(): bool
     {
         $user = auth()->user();
@@ -51,7 +56,8 @@ class BroadcastApiController extends Controller
 
         return $user->hasHrPermission('hrms.broadcasts.manage')
             || $user->hasHrPermission('hrms.communications.manage')
-            || $user->hasHrPermission('hr.settings.manage');
+            || $user->hasHrPermission('hr.settings.manage')
+            || in_array($user->role, ['admin', 'super_admin', 'company_admin', 'hr_manager']);
     }
 
     private function getAuthenticatedEmployee(): ?Employee
@@ -61,10 +67,18 @@ class BroadcastApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)->first()
-            ?? Employee::where(function ($q) use ($user) {
-                $q->where('office_email', $user->email)
-                  ->orWhere('personal_email', $user->email);
+        $tenantId = $this->getTenantId();
+
+        return Employee::where('tenant_id', $tenantId)
+            ->where(function ($q) use ($user) {
+                if ($user->employee_id) {
+                    $q->where('id', $user->employee_id);
+                }
+                $q->orWhere('user_id', $user->id);
+                if ($user->email) {
+                    $q->orWhere('office_email', $user->email)
+                      ->orWhere('personal_email', $user->email);
+                }
             })->first();
     }
 
@@ -74,12 +88,16 @@ class BroadcastApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $tenantId = $this->getTenantId();
         $this->broadcastService->processScheduledBroadcasts($tenantId);
         $employee = $this->getAuthenticatedEmployee();
 
         $query = Broadcast::where('tenant_id', $tenantId)
             ->where('status', 'published')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            })
             ->with(['creator', 'comments']);
 
         if ($employee) {
@@ -89,6 +107,8 @@ class BroadcastApiController extends Controller
                       $rq->where('employee_id', $employee->id);
                   });
             });
+        } elseif (!$this->isHrAdmin()) {
+            $query->where('target_type', 'all');
         }
 
         $broadcasts = $query->latest('published_at')->paginate($request->integer('per_page', 10));
@@ -130,7 +150,7 @@ class BroadcastApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to manage broadcasts.', 403);
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $tenantId = $this->getTenantId();
 
         $broadcasts = Broadcast::where('tenant_id', $tenantId)
             ->with(['creator', 'receipts'])
@@ -164,12 +184,12 @@ class BroadcastApiController extends Controller
         }
 
         $validated = $request->validate([
-            'title'                        => 'required|string|max:255',
-            'category'                     => 'required|in:announcement,policy_update,event,emergency,news',
-            'priority'                     => 'required|in:normal,important,urgent',
-            'content'                      => 'required|string',
-            'target_type'                  => 'required|in:all,department,branch,designation,specific_employees',
-            'target_ids'                   => 'nullable|array',
+            'title'                       => 'required|string|max:255',
+            'category'                    => 'required|in:announcement,policy_update,event,emergency,news',
+            'priority'                    => 'required|in:normal,important,urgent',
+            'content'                     => 'required|string',
+            'target_type'                 => 'required|in:all,department,branch,designation,specific_employees',
+            'target_ids'                  => 'nullable|array',
             'is_acknowledgement_required' => 'nullable|boolean',
             'allow_comments'              => 'nullable|boolean',
             'send_email'                  => 'nullable|boolean',
@@ -177,12 +197,24 @@ class BroadcastApiController extends Controller
             'show_banner'                 => 'nullable|boolean',
             'scheduled_at'                => 'nullable|date',
             'expires_at'                  => 'nullable|date|after_or_equal:scheduled_at',
+            'status'                      => 'nullable|in:draft,scheduled,published',
+            'attachment'                  => 'nullable|file|max:10240',
+            'banner_image'                => 'nullable|image|max:5120',
         ]);
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        if ($validated['target_type'] !== 'all') {
+            $request->validate([
+                'target_ids' => 'required|array|min:1',
+            ]);
+        }
+
+        $tenantId = $this->getTenantId();
         $validated['tenant_id'] = $tenantId;
 
-        $broadcast = $this->broadcastService->createBroadcast($validated);
+        $attachment = $request->file('attachment');
+        $bannerImage = $request->file('banner_image');
+
+        $broadcast = $this->broadcastService->createBroadcast($validated, $attachment, $bannerImage);
 
         return $this->sendSuccess($broadcast->load('receipts'), 'Broadcast announcement created successfully.', 201);
     }
@@ -193,19 +225,32 @@ class BroadcastApiController extends Controller
      */
     public function show($id): JsonResponse
     {
-        $broadcast = Broadcast::with(['creator', 'receipts', 'comments.employee', 'comments.replies'])->find($id);
+        $tenantId = $this->getTenantId();
+        $broadcast = Broadcast::where('tenant_id', $tenantId)
+            ->with(['creator', 'receipts', 'comments.employee', 'comments.replies'])
+            ->find($id);
 
         if (!$broadcast) {
             return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);
         }
 
+        $isHrAdmin = $this->isHrAdmin();
         $employee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin) {
+            $hasAccess = $broadcast->target_type === 'all'
+                || ($employee && $broadcast->receipts()->where('employee_id', $employee->id)->exists());
+            if (!$hasAccess) {
+                return $this->sendError('Unauthorized action. You are not an intended recipient of this announcement.', 403);
+            }
+            // Protect internal recipient audit & delivery telemetry from non-admin viewers
+            $broadcast->makeHidden(['receipts']);
+        }
 
         if ($employee) {
             $this->broadcastService->markRead($broadcast, $employee->id);
         }
 
-        $isHrAdmin = $this->isHrAdmin();
         $broadcast->capabilities = [
             'can_view'        => true,
             'can_comment'     => (bool) ($broadcast->allow_comments ?? true),
@@ -228,25 +273,42 @@ class BroadcastApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to update broadcast.', 403);
         }
 
-        $broadcast = Broadcast::find($id);
+        $tenantId = $this->getTenantId();
+        $broadcast = Broadcast::where('tenant_id', $tenantId)->find($id);
         if (!$broadcast) {
             return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
-            'title'                        => 'required|string|max:255',
-            'category'                     => 'required|in:announcement,policy_update,event,emergency,news',
-            'priority'                     => 'required|in:normal,important,urgent',
-            'content'                      => 'required|string',
+            'title'                       => 'required|string|max:255',
+            'category'                    => 'required|in:announcement,policy_update,event,emergency,news',
+            'priority'                    => 'required|in:normal,important,urgent',
+            'content'                     => 'required|string',
+            'target_type'                 => 'nullable|in:all,department,branch,designation,specific_employees',
+            'target_ids'                  => 'nullable|array',
             'is_acknowledgement_required' => 'nullable|boolean',
             'allow_comments'              => 'nullable|boolean',
+            'send_email'                  => 'nullable|boolean',
+            'send_push'                   => 'nullable|boolean',
+            'show_banner'                 => 'nullable|boolean',
             'expires_at'                  => 'nullable|date',
-            'status'                       => 'required|in:draft,scheduled,published,expired,archived',
+            'status'                      => 'nullable|in:draft,scheduled,published,expired,archived',
+            'attachment'                  => 'nullable|file|max:10240',
+            'banner_image'                => 'nullable|image|max:5120',
         ]);
 
-        $broadcast->update($validated);
+        if (isset($validated['target_type']) && $validated['target_type'] !== 'all') {
+            $request->validate([
+                'target_ids' => 'required|array|min:1',
+            ]);
+        }
 
-        return $this->sendSuccess($broadcast->fresh(), 'Broadcast updated successfully.');
+        $attachment = $request->file('attachment');
+        $bannerImage = $request->file('banner_image');
+
+        $updated = $this->broadcastService->updateBroadcast($broadcast, $validated, $attachment, $bannerImage);
+
+        return $this->sendSuccess($updated->load('receipts'), 'Broadcast updated successfully.');
     }
 
     /**
@@ -259,14 +321,13 @@ class BroadcastApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to delete broadcast.', 403);
         }
 
-        $broadcast = Broadcast::find($id);
+        $tenantId = $this->getTenantId();
+        $broadcast = Broadcast::where('tenant_id', $tenantId)->find($id);
         if (!$broadcast) {
             return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);
         }
 
-        $broadcast->receipts()->delete();
-        $broadcast->comments()->delete();
-        $broadcast->delete();
+        $this->broadcastService->deleteBroadcast($broadcast);
 
         return $this->sendSuccess(['id' => (int) $id], 'Broadcast deleted successfully.');
     }
@@ -277,7 +338,8 @@ class BroadcastApiController extends Controller
      */
     public function acknowledge(Request $request, $id): JsonResponse
     {
-        $broadcast = Broadcast::find($id);
+        $tenantId = $this->getTenantId();
+        $broadcast = Broadcast::where('tenant_id', $tenantId)->find($id);
         if (!$broadcast) {
             return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);
         }
@@ -336,10 +398,22 @@ class BroadcastApiController extends Controller
      */
     public function getComments(Request $request, $id): JsonResponse
     {
-        $broadcast = Broadcast::find($id);
+        $tenantId = $this->getTenantId();
+        $broadcast = Broadcast::where('tenant_id', $tenantId)->find($id);
 
         if (!$broadcast) {
             return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin) {
+            $hasAccess = $broadcast->target_type === 'all'
+                || ($employee && $broadcast->receipts()->where('employee_id', $employee->id)->exists());
+            if (!$hasAccess) {
+                return $this->sendError('Unauthorized action. You are not an intended recipient of this announcement.', 403);
+            }
         }
 
         $comments = BroadcastComment::where('broadcast_id', $broadcast->id)
@@ -358,9 +432,21 @@ class BroadcastApiController extends Controller
      */
     public function storeComment(Request $request, $id): JsonResponse
     {
-        $broadcast = Broadcast::find($id);
+        $tenantId = $this->getTenantId();
+        $broadcast = Broadcast::where('tenant_id', $tenantId)->find($id);
         if (!$broadcast) {
             return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin) {
+            $hasAccess = $broadcast->target_type === 'all'
+                || ($employee && $broadcast->receipts()->where('employee_id', $employee->id)->exists());
+            if (!$hasAccess) {
+                return $this->sendError('Unauthorized action. You are not an intended recipient of this announcement.', 403);
+            }
         }
 
         if (!$broadcast->allow_comments) {
@@ -372,7 +458,15 @@ class BroadcastApiController extends Controller
             'parent_id'    => 'nullable|exists:broadcast_comments,id',
         ]);
 
-        $employee = $this->getAuthenticatedEmployee();
+        if (!empty($validated['parent_id'])) {
+            $parentValid = BroadcastComment::where('id', $validated['parent_id'])
+                ->where('broadcast_id', $broadcast->id)
+                ->where('tenant_id', $tenantId)
+                ->exists();
+            if (!$parentValid) {
+                return $this->sendError('Invalid parent comment reference for this announcement.', 422);
+            }
+        }
 
         if (!$employee) {
             return $this->sendError('Employee record not found for authenticated user.', 404);
@@ -400,7 +494,8 @@ class BroadcastApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to view broadcast analytics.', 403);
         }
 
-        $broadcast = Broadcast::find($id);
+        $tenantId = $this->getTenantId();
+        $broadcast = Broadcast::where('tenant_id', $tenantId)->find($id);
         if (!$broadcast) {
             return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);
         }

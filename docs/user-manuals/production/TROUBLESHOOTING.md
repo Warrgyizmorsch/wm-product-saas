@@ -187,3 +187,118 @@ ORDER BY id DESC LIMIT 10;
 ```
 2. Check if the scanned string matches the expected regex pattern in `CodeService.php`.
 3. Configure the hardware barcode scanner to send standard USB HID keyboard emulation without custom preambles.
+
+---
+
+### Issue 7: Linked Project Task Remains In-Progress After Production Order Completion
+
+#### Symptom
+A production order associated with a project task was completed (`status: completed`), but the linked Project Task remains `IN_PROGRESS` and its milestone progress was not updated.
+
+#### Root Cause
+The `SyncProductionTaskCompletionListener` runs automatically when `ProductionOrderCompleted` is dispatched, but intentionally leaves the parent task in `IN_PROGRESS` if:
+1. **Open Sibling Orders:** One or more sibling production orders linked to the same `project_task_id` remain in `draft`, `released`, or `in_progress`. All linked orders must reach `completed` before task completion is evaluated.
+2. **Aggregate Output Shortfall:** The combined good finished goods received across all linked orders is less than the total planned quantity:
+   $$\sum \text{produced\_quantity} < \left( \sum \text{quantity} - 0.0001 \right)$$
+   A shortfall warning (`production.shortfall_warning`) is recorded in the task's activity log.
+3. **Bypassed Order Completion Service:** The order's status was modified directly in the database or via an unhandled script rather than calling `ProductionOrderService::completeOrder()`, meaning the `ProductionOrderCompleted` event was never fired.
+
+#### Diagnostic Steps (Read-Only SQL)
+```sql
+-- 1. Check all production orders linked to the project task
+SELECT
+    id,
+    order_number,
+    status,
+    quantity_ordered,
+    quantity_produced,
+    project_id,
+    project_milestone_id,
+    project_task_id
+FROM production_orders
+WHERE tenant_id = :tenant_id
+  AND project_task_id = :task_id;
+
+-- 2. Evaluate aggregate completion count and yield variance
+SELECT
+    COUNT(*) AS total_orders,
+    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_orders,
+    SUM(quantity_ordered) AS total_ordered_qty,
+    SUM(quantity_produced) AS total_produced_qty,
+    (SUM(quantity_produced) - SUM(quantity_ordered)) AS yield_variance
+FROM production_orders
+WHERE tenant_id = :tenant_id
+  AND project_task_id = :task_id;
+
+-- 3. Check for shortfall warnings logged on the project task
+SELECT id, event_type, title, description, metadata, created_at
+FROM project_activity_logs
+WHERE tenant_id = :tenant_id
+  AND subject_type LIKE '%Task%'
+  AND subject_id = :task_id
+ORDER BY id DESC LIMIT 5;
+```
+
+#### Safe Resolution Steps
+1. **If open sibling orders exist:** Inspect the remaining linked production orders in `/production/orders`. Progress each order through its operations and execute finished goods receipt until all sibling orders reach `completed`.
+2. **If an aggregate yield shortfall exists:**
+   * **Authorized Supplementary Order (Standard Path):** If authorized by production planning and verified against inventory demand, an authorized planner may create a supplementary production order linked to the same task for the remaining shortage balance (`POST /projects/{project}/tasks/{task}/link-production-order` or `/production/orders/create?project_id={id}&project_task_id={id}`). Always confirm requirements to avoid duplicate production.
+   * **Safeguard Bypass Caution on Manual Completion:** In Project Management, a user with `projects.tasks.update` can technically transition the task status to `Completed` (`PATCH /projects/{project}/tasks/{task}/status`) because task-level status transitions evaluate dependency blockers rather than manufacturing yield. However, doing so **bypasses the production completion safeguards** and leaves the physical output deficit unverified. Manual completion must never be used as a routine workaround for incomplete manufacturing orders without formal administrative and commercial signoff.
+   * **Do Not Direct-Update Database:** Never attempt direct SQL `UPDATE` queries to force task or order status flags.
+3. **If event was bypassed:** Trigger `ProductionOrderService::completeOrder()` through the standard UI by opening the order and clicking **Complete Order**.
+
+---
+
+### Issue 8: Unexpected Zero or Distorted Rework Labor and Overhead Costs
+
+#### Symptom
+A completed rework order (`RWK-XXXXX`) shows `$0.00` actual labor or overhead cost, or actual costs roll up unexpectedly lower than anticipated.
+
+#### Root Cause
+`ReworkService` partitions rework costing across three distinct lifecycle stages:
+1. **Initial Planned Estimate (`cost_estimate`):** Stored in `production_rework_orders.cost_estimate`. If not explicitly supplied in the creation payload, `ReworkService::createReworkOrder()` computes this estimate dynamically via `calculateDynamicCostEstimate()` based on planned operation minutes (default 30 minutes per stage) multiplied by assigned resource rates.
+2. **Actual Incurred Cost (`actual_cost`):** When operations are completed via `completeOperation()`, actual costs accumulate dynamically into `production_rework_orders.actual_cost`:
+   * **Labor Rate:** Derived from the assigned Work Center (`$workCenter->cost_per_hour / 60.0`).
+   * **Overhead Rate:** Derived from the assigned Work Center (`$workCenter->overhead_rate / 60.0`).
+   * **Machine Rate:** Derived from the linked Routing Operation (`$routingOperation->machine_cost_rate`).
+3. **Parent Order Cost Adjustments:** When all rework operations finish, non-material expenses (labor, machine, overhead) roll up into `production_cost_adjustments` records on the parent production order under category `rework_expense`. Materials are excluded from this adjustment to prevent double-counting against store outflow records (`ProductionOrderIssue`).
+
+If a rework operation is created without an assigned `work_center_id`, or if the assigned Work Center has its `cost_per_hour` and `overhead_rate` set to `0.00` or `null`, the calculated rates evaluate to `0.00` per minute in `calculateDynamicCostEstimate` and `completeOperation`. (Note: Legacy development seeds and test fixtures historically referenced internal figures of `$35.00/hr` for labor and `$50.00/hr` for machines, while earlier drafts referenced a `$150.00` nominal estimate. However, live execution paths strictly resolve `cost_estimate` dynamically and accumulate actual rates from active master data tables).
+
+#### Diagnostic Steps (Read-Only SQL)
+```sql
+-- 1. Inspect operations on the rework order and their assigned work centers
+SELECT
+    ro.id,
+    ro.rework_order_id,
+    ro.name,
+    ro.work_center_id,
+    wc.name AS work_center_name,
+    wc.cost_per_hour,
+    wc.overhead_rate,
+    ro.machine_id,
+    ro.status,
+    ro.processing_time_actual
+FROM production_rework_operations ro
+LEFT JOIN production_work_centers wc ON wc.id = ro.work_center_id
+WHERE ro.tenant_id = :tenant_id
+  AND ro.rework_order_id = :rework_order_id;
+
+-- 2. Inspect recorded cost adjustments on the parent production order
+SELECT
+    id,
+    production_order_id,
+    cost_component,
+    category,
+    amount,
+    description,
+    created_at
+FROM production_cost_adjustments
+WHERE tenant_id = :tenant_id
+  AND production_order_id = :parent_production_order_id;
+```
+
+#### Safe Resolution Steps
+1. **Ensure Master Data Configuration:** Before executing rework operations, ensure the target Work Center in `/production/work-centers` has non-zero `cost_per_hour` and `overhead_rate` values configured.
+2. **Assign Work Centers to Operations:** When creating rework orders, ensure each rework stage specifies an active `work_center_id`.
+3. **Retroactive Reconciliation:** If rework operations were already finalized with `$0.00` labor cost, post a corrective adjustment on the parent production order via `/production/orders/{id}` → **Add Cost Adjustment** (`POST /production/orders/{order}/cost-adjustments`) selecting category `rework_expense` and component `labor` or `machine`. Never attempt manual `UPDATE` queries on closed rework tables.

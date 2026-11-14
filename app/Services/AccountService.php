@@ -40,7 +40,7 @@ class AccountService
                     }
                 }
 
-                $path = $avatarFile->store('avatars', 'public');
+                $path = $avatarFile->storeTenantFile('avatars', 'public');
                 $user->avatar = $path;
 
                 // Mirror into public/storage/avatars for web servers that serve public directly without symlinks

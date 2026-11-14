@@ -41,14 +41,14 @@ class ExitClearancePolicyController extends Controller
             'items.*.item_name'         => 'nullable|string|max:255',
             'items.*.description'       => 'nullable|string|max:1000',
             'items.*.sort_order'        => 'nullable|integer|min:0',
-            'items.*.is_mandatory'      => 'nullable',
-            'items.*.status'            => 'nullable',
+            'items.*.is_mandatory'      => 'nullable|boolean',
+            'items.*.status'            => 'nullable|in:0,1',
             // Fallback for single direct item
             'item_name'                 => 'nullable|string|max:255',
             'description'               => 'nullable|string|max:1000',
-            'is_mandatory'              => 'nullable',
+            'is_mandatory'              => 'nullable|boolean',
             'sort_order'                => 'nullable|integer|min:0',
-            'status'                    => 'nullable',
+            'status'                    => 'nullable|in:0,1',
         ]);
 
         $companyId = !empty($validated['company_id']) ? (int) $validated['company_id'] : null;
@@ -77,9 +77,9 @@ class ExitClearancePolicyController extends Controller
             'category_name'             => 'nullable|string|max:150',
             'item_name'                 => 'required|string|max:255',
             'description'               => 'nullable|string|max:1000',
-            'is_mandatory'              => 'nullable',
+            'is_mandatory'              => 'nullable|boolean',
             'sort_order'                => 'nullable|integer|min:0',
-            'status'                    => 'nullable',
+            'status'                    => 'nullable|in:0,1',
         ]);
 
         $this->policyRepository->updateTemplate($template, $validated, $request);

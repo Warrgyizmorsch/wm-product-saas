@@ -131,4 +131,13 @@
             }
         </style>
     @endpush
+    @push('scripts')
+        <script>
+            window.confirmAction = window.confirmAction || function (message, callback) {
+                if (confirm(message)) {
+                    if (typeof callback === 'function') callback();
+                }
+            };
+        </script>
+    @endpush
 @endonce

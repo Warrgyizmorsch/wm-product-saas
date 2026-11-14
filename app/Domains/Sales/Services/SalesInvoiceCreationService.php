@@ -60,6 +60,13 @@ class SalesInvoiceCreationService
             $gstType = $invoiceData['gst_type'] ?? $this->resolveGstType($customer, $companyId, $tenantId);
             $taxType = $invoiceData['tax_type'] ?? 'item_wise_tax';
             $discountType = $invoiceData['discount_type'] ?? 'without_discount';
+            $taxMode = $invoiceData['tax_mode'] ?? 'exclusive';
+            if (empty($invoiceData['tax_mode']) && !empty($invoiceData['sales_order_id'])) {
+                $so = \App\Domains\Sales\Models\SalesOrder::find($invoiceData['sales_order_id']);
+                if ($so && !empty($so->effective_tax_mode)) {
+                    $taxMode = $so->effective_tax_mode;
+                }
+            }
 
             // 2. Sequential Invoice Numbering
             $invoiceNumber = $invoiceData['invoice_number'] ?? $this->generateNextInvoiceNumber($tenantId);
@@ -83,9 +90,18 @@ class SalesInvoiceCreationService
                     $taxRate = 0.0;
                 }
 
-                $lineSubtotal = round($qty * $price, 2);
-                $lineTaxable = max(0, $lineSubtotal - $disc);
-                $lineTax = round($lineTaxable * ($taxRate / 100), 2);
+                $lineSubtotal = round($qty * $price, 4);
+                $lineNet = max(0, $lineSubtotal - $disc);
+
+                if ($taxMode === 'inclusive') {
+                    $lineBase = ($taxRate > 0 && $taxType === 'item_wise_tax') ? round($lineNet / (1 + ($taxRate / 100)), 4) : $lineNet;
+                    $lineTax = ($taxType === 'item_wise_tax') ? round($lineNet - $lineBase, 4) : 0.0;
+                    $lineTotal = $lineNet;
+                } else {
+                    $lineBase = $lineNet;
+                    $lineTax = round($lineBase * ($taxRate / 100), 4);
+                    $lineTotal = $lineBase + $lineTax;
+                }
 
                 $lineCgstPercent = 0.0;
                 $lineSgstPercent = 0.0;
@@ -101,8 +117,8 @@ class SalesInvoiceCreationService
                     } else {
                         $lineCgstPercent = round($taxRate / 2, 2);
                         $lineSgstPercent = round($taxRate / 2, 2);
-                        $lineCgstAmt = round($lineTax / 2, 2);
-                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 2);
+                        $lineCgstAmt = round($lineTax / 2, 4);
+                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 4);
                     }
                 }
 
@@ -129,7 +145,7 @@ class SalesInvoiceCreationService
                     'sgst_amount'                  => $lineSgstAmt,
                     'igst_amount'                  => $lineIgstAmt,
                     'subtotal'                     => $lineSubtotal,
-                    'total_amount'                 => $lineTaxable + $lineTax,
+                    'total_amount'                 => $lineTotal,
                 ];
             }
 
@@ -141,12 +157,16 @@ class SalesInvoiceCreationService
                 if ($gstType === 'igst') {
                     $igstAmount = $totalTaxAmount;
                 } else {
-                    $cgstAmount = round($totalTaxAmount / 2, 2);
-                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 2);
+                    $cgstAmount = round($totalTaxAmount / 2, 4);
+                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 4);
                 }
             }
 
-            $grandTotal = max(0, $subtotal - $totalDiscountAmount + $totalTaxAmount);
+            if ($taxMode === 'inclusive') {
+                $grandTotal = max(0, $subtotal - $totalDiscountAmount);
+            } else {
+                $grandTotal = max(0, $subtotal - $totalDiscountAmount + $totalTaxAmount);
+            }
 
             // 4. Persist Draft Invoice
             $invoice = Invoice::create([
@@ -163,6 +183,7 @@ class SalesInvoiceCreationService
                 'status'          => 'Draft',
                 'discount_type'   => $discountType,
                 'tax_type'        => $taxType,
+                'tax_mode'        => $taxMode,
                 'order_tax_rate'  => 0,
                 'adjustment'      => 0,
                 'subtotal'        => $subtotal,
@@ -223,19 +244,27 @@ class SalesInvoiceCreationService
         $company = $companyId
             ? DB::table('companies')->where('id', $companyId)->first()
             : DB::table('companies')->where('tenant_id', $tenantId)->first();
+
+        // 1. Primary rule: Check GSTIN state code prefix (first 2 digits)
+        $companyGstin = strtoupper(trim((string) ($company?->gst_number ?? $company?->tax_number ?? $company?->gstin ?? '')));
+        $customerGstin = strtoupper(trim((string) ($customer->gstin ?? $customer->tax_number ?? '')));
+
+        $cleanCompany = preg_replace('/[^0-9A-Za-z]/', '', $companyGstin);
+        $cleanCustomer = preg_replace('/[^0-9A-Za-z]/', '', $customerGstin);
+
+        $companyPrefix = substr($cleanCompany, 0, 2);
+        $customerPrefix = substr($cleanCustomer, 0, 2);
+
+        if (!empty($companyPrefix) && !empty($customerPrefix)) {
+            return ($companyPrefix === $customerPrefix) ? 'cgst_sgst' : 'igst';
+        }
+
+        // 2. Fallback rule: State names comparison
         $companyState = strtolower(trim((string) ($company?->state ?? '')));
         $customerState = strtolower(trim((string) ($customer->billing_state ?? $customer->state ?? '')));
 
         if (!empty($companyState) && !empty($customerState)) {
             return ($companyState === $customerState) ? 'cgst_sgst' : 'igst';
-        }
-
-        // Check GSTIN state code prefix (first 2 digits)
-        $companyGstin = substr(trim((string) ($company?->tax_number ?? $company?->gstin ?? '')), 0, 2);
-        $customerGstin = substr(trim((string) ($customer->gstin ?? $customer->tax_number ?? '')), 0, 2);
-
-        if (!empty($companyGstin) && !empty($customerGstin) && ctype_digit($companyGstin) && ctype_digit($customerGstin)) {
-            return ($companyGstin === $customerGstin) ? 'cgst_sgst' : 'igst';
         }
 
         return 'cgst_sgst';

@@ -19,7 +19,7 @@ class EmployeeProfileRequestController extends Controller
 
     public function index(Request $request): View
     {
-        $this->authorizeHrms('hrms.employees.view');
+        $this->authorizeHrms(['hrms.profile_requests.view', 'hrms.employees.view']);
 
         $data = $this->profileRequestRepository->getIndexData($request->all());
 
@@ -28,7 +28,7 @@ class EmployeeProfileRequestController extends Controller
 
     public function approve(Request $request, EmployeeProfileUpdateRequest $profileRequest): RedirectResponse
     {
-        $this->authorizeHrms('hrms.employees.update');
+        $this->authorizeHrms(['hrms.profile_requests.approve', 'hrms.employees.update']);
 
         if ($profileRequest->status !== 'pending') {
             return redirect()->back()->with('error', 'This request has already been processed.');
@@ -45,12 +45,28 @@ class EmployeeProfileRequestController extends Controller
             return redirect()->back()->with('error', 'Failed to process employee profile update.');
         }
 
+        try {
+            $actionUrl = \Illuminate\Support\Facades\Route::has('hrms.employees.show')
+                ? route('hrms.employees.show', $employee->id)
+                : url("/hrms/employees/{$employee->id}");
+            \App\Services\Notification\NotificationService::sendToEmployee(
+                employee: $employee,
+                title: 'Profile Update Approved',
+                message: 'Your personal profile change request has been reviewed and approved by HR.',
+                actionUrl: $actionUrl,
+                type: 'profile_update_approved',
+                iconClass: 'feather-check-circle'
+            );
+        } catch (\Throwable $notifEx) {
+            \Illuminate\Support\Facades\Log::warning('Profile update approval notification failed: ' . $notifEx->getMessage());
+        }
+
         return redirect()->back()->with('success', "Profile edit request for {$employee->full_name} has been approved.");
     }
 
     public function reject(Request $request, EmployeeProfileUpdateRequest $profileRequest): RedirectResponse
     {
-        $this->authorizeHrms('hrms.employees.update');
+        $this->authorizeHrms(['hrms.profile_requests.reject', 'hrms.profile_requests.approve', 'hrms.employees.update']);
 
         if ($profileRequest->status !== 'pending') {
             return redirect()->back()->with('error', 'This request has already been processed.');
@@ -61,23 +77,57 @@ class EmployeeProfileRequestController extends Controller
 
         $this->profileRequestRepository->rejectRequest($profileRequest, $reason);
 
+        try {
+            if ($employee) {
+                $actionUrl = \Illuminate\Support\Facades\Route::has('hrms.employees.show')
+                    ? route('hrms.employees.show', $employee->id)
+                    : url("/hrms/employees/{$employee->id}");
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $employee,
+                    title: 'Profile Update Rejected',
+                    message: "Your profile change request was rejected by HR. Reason: {$reason}",
+                    actionUrl: $actionUrl,
+                    type: 'profile_update_rejected',
+                    iconClass: 'feather-x-circle'
+                );
+            }
+        } catch (\Throwable $notifEx) {
+            \Illuminate\Support\Facades\Log::warning('Profile update rejection notification failed: ' . $notifEx->getMessage());
+        }
+
         return redirect()->back()->with('success', "Profile edit request for {$employee?->full_name} has been rejected.");
     }
 
-    private function authorizeHrms(string $permission): void
+    private function authorizeHrms(string|array $permission): void
     {
         $user = auth()->user();
         if (!$user) {
             abort(401);
         }
 
-        $context = ['tenant_id' => $user->tenant_id];
+        $context = [
+            'tenant_id' => $user->tenant_id,
+            'company_id' => $user->company_id,
+            'branch_id' => $user->branch_id,
+            'department_id' => $user->department_id,
+            'owner_id' => $user->id,
+        ];
         $access = app(AccessService::class);
+        $permissions = is_array($permission) ? $permission : [$permission];
 
-        $allowed = $access->allows($user, $permission, $context)
+        $allowed = false;
+        foreach ($permissions as $perm) {
+            if ($access->allows($user, $perm, $context)) {
+                $allowed = true;
+                break;
+            }
+        }
+
+        $allowed = $allowed
             || $access->allows($user, 'hrms.profile_requests.manage', $context)
             || $access->allows($user, 'hr.settings.manage', $context)
-            || $access->allows($user, 'hrms.employees.manage', $context);
+            || $access->allows($user, 'hrms.employees.manage', $context)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user);
 
         abort_unless($allowed, 403, 'Unauthorized action in Employee Profile Requests.');
     }

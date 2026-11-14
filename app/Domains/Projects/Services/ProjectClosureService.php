@@ -44,11 +44,9 @@ class ProjectClosureService
             ->count();
 
         $gate1Passed = ($openTasksCount === 0) && ($incompleteSubtasksCount === 0);
-        if ($openTasksCount > 0) {
-            $blockers[] = __('projects.closure_blocked_by_open_tasks', ['count' => $openTasksCount]);
-        }
-        if ($incompleteSubtasksCount > 0) {
-            $blockers[] = __('projects.closure_blocked_by_open_tasks', ['count' => $incompleteSubtasksCount]);
+        $totalIncompleteWork = $openTasksCount + $incompleteSubtasksCount;
+        if ($totalIncompleteWork > 0) {
+            $blockers[] = __('projects.closure_blocked_by_open_tasks', ['count' => $totalIncompleteWork]);
         }
 
         // Gate 2: Issues

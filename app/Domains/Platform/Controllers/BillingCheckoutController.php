@@ -52,11 +52,12 @@ class BillingCheckoutController extends Controller
 
         $plans = $this->checkout->plans();
         $lifetime = $this->checkout->lifetimeModules($tenant);
-        $minimumSeats = $this->checkout->minimumSeats($tenant);
+        $minimumSeats = $this->checkout->workspaceSeats($tenant);
         $currentPlan = $plans->firstWhere('id', $tenant->plan_id);
         $live = $this->subscriptions->live($tenant);
         $live?->load('plan');
         $scheduled = $live?->scheduledChange();
+        $selectedPlan = $plans->firstWhere('id', (int) $request->query('plan')) ?? $currentPlan ?? $plans->first();
 
         return view('modules.platform.subscription.checkout', [
             'tenant' => $tenant,
@@ -65,6 +66,7 @@ class BillingCheckoutController extends Controller
                 'name' => $plan->name,
                 'description' => $plan->description,
                 'features' => $plan->features,
+                'min_users' => $plan->min_users,
                 'prices' => [
                     'monthly' => $this->pricing->planPricePerUser($plan, 'monthly'),
                     'yearly' => $this->pricing->planPricePerUser($plan, 'yearly'),
@@ -81,9 +83,9 @@ class BillingCheckoutController extends Controller
             ] + config("navigation.apps.$module", ['label' => ucfirst($module), 'icon' => 'feather-grid', 'description' => '', 'color' => '#3B82F6']))->values(),
             'cycles' => collect(config('billing.cycles'))->map(fn (array $cycle, string $key) => ['key' => $key, 'label' => $cycle['label']])->values(),
             'selection' => [
-                'plan_id' => $plans->firstWhere('id', (int) $request->query('plan'))?->id ?? $currentPlan?->id ?? $plans->first()?->id,
+                'plan_id' => $selectedPlan?->id,
                 'cycle' => in_array($request->query('cycle'), $this->pricing->cycles(), true) ? $request->query('cycle') : ($live?->cycle ?? 'yearly'),
-                'seats' => max($minimumSeats, $live?->seats ?? 0),
+                'seats' => max($this->checkout->minimumSeats($tenant, $selectedPlan), $live?->seats ?? 0),
                 'modules' => array_values(array_unique([
                     ...$this->checkout->recurringModules($tenant),
                     ...array_intersect((array) $request->query('modules', []), EnsureTenantModuleAccess::GATED_MODULES),

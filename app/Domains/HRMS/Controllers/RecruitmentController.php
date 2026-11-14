@@ -29,6 +29,10 @@ class RecruitmentController extends Controller
             abort(401);
         }
 
+        if (app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)) {
+            return;
+        }
+
         $access = app(AccessService::class);
         $context = ['tenant_id' => $user->tenant_id];
 
@@ -85,7 +89,7 @@ class RecruitmentController extends Controller
 
         $req = $this->recruitmentRepository->storeRequisition($validated, $tenantId, $employeeId, $userId);
 
-        return redirect()->back()->with('success', "Job Requisition #{$req->requisition_code} created successfully!");
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_req_created', ['code' => $req->requisition_code]));
     }
 
     // Toggle/Approve Requisition Status
@@ -97,7 +101,7 @@ class RecruitmentController extends Controller
         
         $this->recruitmentRepository->updateRequisitionStatus($requisition, $request->status, auth()->id());
 
-        return redirect()->back()->with('success', "Requisition #{$requisition->requisition_code} status updated to " . strtoupper($request->status));
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_req_status_updated', ['code' => $requisition->requisition_code, 'status' => strtoupper($request->status)]));
     }
 
     // Candidates Directory with Search, Sort & Filter
@@ -120,7 +124,7 @@ class RecruitmentController extends Controller
             'first_name'            => 'required|string|max:100',
             'last_name'             => 'nullable|string|max:100',
             'email'                 => 'required|email|max:255',
-            'phone'                 => 'nullable|string|max:20',
+            'phone'                 => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'current_location'      => 'nullable|string|max:100',
             'current_company'       => 'nullable|string|max:150',
             'current_designation'   => 'nullable|string|max:150',
@@ -134,7 +138,7 @@ class RecruitmentController extends Controller
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
         $candidate = $this->recruitmentRepository->storeCandidate($validated, $request, $tenantId);
 
-        return redirect()->back()->with('success', "Candidate {$candidate->full_name} added successfully!");
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_candidate_added', ['name' => $candidate->full_name]));
     }
 
     // Pipeline Kanban View
@@ -185,7 +189,7 @@ class RecruitmentController extends Controller
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
         $this->recruitmentRepository->scheduleInterview($application, $validated, $tenantId);
 
-        return redirect()->back()->with('success', "Interview Round #{$request->round_number} ({$request->round_name}) scheduled successfully!");
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_interview_scheduled', ['round' => $request->round_number, 'name' => $request->round_name]));
     }
 
     // Submit Scorecard
@@ -205,7 +209,7 @@ class RecruitmentController extends Controller
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
         $this->recruitmentRepository->submitScorecard($interview, $validated, auth()->id(), $tenantId);
 
-        return redirect()->back()->with('success', "Scorecard submitted for {$interview->round_name}!");
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_scorecard_submitted', ['name' => $interview->round_name]));
     }
 
     // Create Job Offer
@@ -229,7 +233,7 @@ class RecruitmentController extends Controller
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
         $offer = $this->recruitmentRepository->createOffer($application, $validated, $request, $tenantId);
 
-        return redirect()->back()->with('success', "Job Offer #{$offer->offer_code} generated and sent successfully!");
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_offer_generated', ['code' => $offer->offer_code]));
     }
 
     // Send Job Offer Email to Candidate
@@ -253,13 +257,37 @@ class RecruitmentController extends Controller
         return redirect()->back()->with('success', $result['message']);
     }
 
+    // Update Offer Status (Accepted / Declined)
+    public function updateOfferStatus(Request $request, JobOffer $offer): RedirectResponse
+    {
+        $this->authorizeHrms('hrms.recruitment.update');
+
+        $validated = $request->validate([
+            'status' => 'required|in:accepted,declined',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $tenantId = function_exists('tenant_id') ? tenant_id() : null;
+        $result = $this->recruitmentRepository->updateOfferStatus($offer, $validated['status'], $validated['reason'] ?? null, $tenantId);
+
+        if (!$result['success']) {
+            return redirect()->back()->with('error', $result['message']);
+        }
+
+        return redirect()->back()->with('success', $result['message']);
+    }
+
     // Convert Candidate to HRMS Employee: Create User & Redirect to Pre-filled Employee Form
     public function convertToEmployee(Request $request, JobOffer $offer): RedirectResponse
     {
         $this->authorizeHrms('hrms.recruitment.manage');
 
+        $request->validate([
+            'initial_password' => 'nullable|string|min:8|max:64',
+        ]);
+
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
-        $result = $this->recruitmentRepository->convertToEmployee($offer, $tenantId);
+        $result = $this->recruitmentRepository->convertToEmployee($offer, $tenantId, $request->input('initial_password'));
 
         if (!$result['success']) {
             return redirect()->back()->with('error', $result['message']);
@@ -267,12 +295,26 @@ class RecruitmentController extends Controller
 
         $user = $result['user'];
         $candidate = $result['candidate'];
+        $initialPassword = $result['initial_password'] ?? null;
+
+        $msg = "🎉 User account created for {$candidate->full_name}!";
+        if ($initialPassword && !$request->filled('initial_password')) {
+            $msg .= " Initial password: {$initialPassword} (Please share securely with employee).";
+        }
+        $msg .= " Candidate moved to Hired stage. Please complete the Employee Profile below.";
 
         return redirect()->route('hrms.employees.index', array_filter([
             'convert_offer_id' => $offer->id,
             'user_id'          => $user->id,
             'account_id'       => $request->account_id,
-        ]))->with('success', "🎉 User account created for {$candidate->full_name}! Candidate moved to Hired stage. Please complete the Employee Profile below.");
+        ]))->with('success', $msg);
+    }
+
+    public function downloadOfferPdf(JobOffer $offer)
+    {
+        $this->authorizeHrms('hrms.recruitment.view');
+
+        return $this->recruitmentRepository->downloadOfferPdf($offer);
     }
 
     public function downloadResume(Candidate $candidate)

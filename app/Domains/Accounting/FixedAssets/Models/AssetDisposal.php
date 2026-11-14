@@ -35,6 +35,7 @@ class AssetDisposal extends BaseModel
         'net_book_value',
         'sale_proceeds',
         'tax_amount',
+        'gst_type',
         'gain_loss_amount',
         'status',
         'requested_by',

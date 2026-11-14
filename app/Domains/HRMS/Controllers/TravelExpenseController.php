@@ -124,14 +124,15 @@ class TravelExpenseController extends Controller
         $reportQuery->orderBy('created_at', $reportSort === 'oldest' ? 'asc' : 'desc');
         $expenseReports = $reportQuery->paginate(10, ['*'], $reportPageName)->withQueryString();
 
-        // Load approved travel requests and open cash advances to show all options
+        // Load approved travel requests and open unclaimed cash advances
         $myApprovedTravelRequestsQuery = TravelRequest::where('status', 'approved')
             ->where('tenant_id', $tenantId)
-            ->with(['expenseReports', 'cashAdvances'])
+            ->with(['expenseReports.claims', 'cashAdvances'])
             ->orderBy('created_at', 'desc');
 
         $myOpenCashAdvancesQuery = CashAdvance::whereIn('status', ['approved', 'disbursed'])
             ->where('tenant_id', $tenantId)
+            ->whereNull('expense_report_id')
             ->orderBy('created_at', 'desc');
 
         if (!$isHrAdmin) {
@@ -142,6 +143,18 @@ class TravelExpenseController extends Controller
 
         $myApprovedTravelRequests = $myApprovedTravelRequestsQuery->get();
         $myOpenCashAdvances = $myOpenCashAdvancesQuery->get();
+
+        $payingLedgers = collect();
+        $ledgerBalances = collect();
+        $defaultPayingLedger = null;
+        try {
+            $payrollBooks = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
+            $payingLedgers = $payrollBooks->payingLedgers();
+            $ledgerBalances = $payingLedgers->mapWithKeys(fn ($ledger) => [$ledger->id => $payrollBooks->balance($ledger)]);
+            $defaultPayingLedger = $payingLedgers->firstWhere('system_key', \App\Domains\Accounting\Support\SystemAccount::BANK) ?? $payingLedgers->first();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Could not load paying ledgers for travel expense: " . $e->getMessage());
+        }
 
         return view('modules.hrms.travel-expense.index', compact(
             'employee',
@@ -164,7 +177,10 @@ class TravelExpenseController extends Controller
             'reportStatus',
             'reportSort',
             'currencySymbol',
-            'currencyCode'
+            'currencyCode',
+            'payingLedgers',
+            'ledgerBalances',
+            'defaultPayingLedger'
         ));
     }
 
@@ -262,10 +278,7 @@ class TravelExpenseController extends Controller
             iconClass: 'feather-map-pin'
         );
 
-        $message = 'Travel request submitted successfully.';
-        if ($request->boolean('request_advance')) {
-            $message .= ' Linked cash advance request submitted.';
-        }
+        $message = __('hrms.travel_expense.msg_travel_submitted');
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'travel'])
             ->with('success', $message);
@@ -273,13 +286,15 @@ class TravelExpenseController extends Controller
 
     public function approveTravelRequest(Request $request, TravelRequest $travelRequest): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $travelRequest);
 
         $user = $request->user();
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
         $actorEmpId = $workflowService->getEmployeeIdForActor($user);
         if ($actorEmpId && (int) $actorEmpId === (int) $travelRequest->employee_id) {
-            abort(403, 'Self-approval is prohibited. You cannot approve your own travel request.');
+            if (!$workflowService->allowsSelfApproval($user, $travelRequest, 'hrms.travel_expenses.approve')) {
+                abort(403, 'Self-approval is prohibited. You cannot approve your own travel request.');
+            }
         }
 
         $approvedBudget = $request->input('approved_budget', $travelRequest->estimated_budget);
@@ -305,7 +320,7 @@ class TravelExpenseController extends Controller
                 iconClass: 'feather-check-circle'
             );
 
-            return redirect()->back()->with('success', 'Travel request approved at Level 1. Moved to Level 2 (Final) approval.');
+            return redirect()->back()->with('success', __('hrms.travel_expense.msg_travel_approved_l1'));
         }
 
         // Level 2 (Final) Approval
@@ -344,12 +359,12 @@ class TravelExpenseController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', "Travel request{$advanceMsg} approved successfully.");
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_travel_approved', ['advanceMsg' => $advanceMsg]));
     }
 
     public function rejectTravelRequest(TravelRequest $travelRequest): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $travelRequest);
 
         $travelRequest->update(['status' => 'rejected']);
         $travelRequest->cashAdvances()->where('status', 'pending')->update(['status' => 'rejected']);
@@ -365,7 +380,30 @@ class TravelExpenseController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', 'Travel request and linked cash advance rejected.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_travel_rejected'));
+    }
+
+    public function destroyTravelRequest(Request $request, TravelRequest $travelRequest): RedirectResponse
+    {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve'));
+        $currentEmp = Employee::resolveForUser($user);
+        $isOwner = $currentEmp && (int)$travelRequest->employee_id === (int)$currentEmp->id;
+
+        if (!$isHrAdmin && !$isOwner) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        if (!in_array($travelRequest->status, ['pending', 'rejected'])) {
+            return redirect()->back()->with('error', __('hrms.travel_expense.msg_travel_cancel_invalid'));
+        }
+
+        // Delete or cancel linked pending cash advances
+        $travelRequest->cashAdvances()->where('status', 'pending')->delete();
+        $travelRequest->delete();
+
+        return redirect()->route('hrms.travel-expense.index', ['tab' => 'travel'])
+            ->with('success', __('hrms.travel_expense.msg_travel_cancelled'));
     }
 
     // ── CASH ADVANCES ─────────────────────────────────────────────────────────
@@ -390,6 +428,17 @@ class TravelExpenseController extends Controller
             }
         }
 
+        if (!empty($validated['travel_request_id'])) {
+            $existingActiveAdv = CashAdvance::where('travel_request_id', $validated['travel_request_id'])
+                ->whereIn('status', ['pending', 'l1_approved', 'approved', 'disbursed'])
+                ->first();
+            if ($existingActiveAdv) {
+                return redirect()->back()->withInput()->withErrors([
+                    'travel_request_id' => 'An active cash advance (' . ucfirst(str_replace('_', ' ', $existingActiveAdv->status)) . ') already exists for this travel request. Duplicate advances for the same trip are not allowed.'
+                ]);
+            }
+        }
+
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
 
@@ -409,18 +458,20 @@ class TravelExpenseController extends Controller
         );
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'advance'])
-            ->with('success', 'Cash advance request submitted.');
+            ->with('success', __('hrms.travel_expense.msg_advance_submitted'));
     }
 
     public function approveCashAdvance(Request $request, CashAdvance $cashAdvance): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $cashAdvance);
 
         $user = $request->user();
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
         $actorEmpId = $workflowService->getEmployeeIdForActor($user);
         if ($actorEmpId && (int) $actorEmpId === (int) $cashAdvance->employee_id) {
-            abort(403, 'Self-approval is prohibited. You cannot approve your own cash advance request.');
+            if (!$workflowService->allowsSelfApproval($user, $cashAdvance, 'hrms.travel_expenses.approve')) {
+                abort(403, 'Self-approval is prohibited. You cannot approve your own cash advance request.');
+            }
         }
 
         $approvedAmount = $request->input('approved_amount', $cashAdvance->amount);
@@ -446,7 +497,7 @@ class TravelExpenseController extends Controller
                 iconClass: 'feather-check-circle'
             );
 
-            return redirect()->back()->with('success', 'Cash advance approved at Level 1. Moved to Level 2 (Final) approval.');
+            return redirect()->back()->with('success', __('hrms.travel_expense.msg_advance_approved_l1'));
         }
 
         // Level 2 (Final) Approval
@@ -469,29 +520,42 @@ class TravelExpenseController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', 'Cash advance request approved with amount: $' . number_format($approvedAmount, 2));
+        $company = \App\Domains\HRMS\Models\Company::first();
+        $currencySymbol = self::currencySymbol($company?->currency ?? 'USD');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_advance_approved', ['amount' => $currencySymbol . number_format($approvedAmount, 2)]));
     }
 
-    public function disburseCashAdvance(CashAdvance $cashAdvance): RedirectResponse
+    public function disburseCashAdvance(Request $request, CashAdvance $cashAdvance): RedirectResponse
     {
         $this->authorizeHrms('hrms.travel_expenses.approve');
 
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $cashAdvance->update(['status' => 'disbursed']);
+        $validated = $request->validate([
+            'bank_account_id' => ['nullable', 'integer'],
+            'payment_date'    => ['nullable', 'date'],
+        ]);
+
+        $bankAccountId = !empty($validated['bank_account_id']) ? (int) $validated['bank_account_id'] : null;
+        $paymentDate = !empty($validated['payment_date']) ? (string) $validated['payment_date'] : null;
 
         try {
-            $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
-            $travelAccountingService->postCashAdvanceDisbursementJournal($cashAdvance);
+            DB::transaction(function () use ($cashAdvance, $bankAccountId, $paymentDate) {
+                $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
+                $travelAccountingService->postCashAdvanceDisbursementJournal($cashAdvance, $bankAccountId, $paymentDate);
+                $cashAdvance->update(['status' => 'disbursed']);
+            });
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error("Disbursement Journal Posting Failed: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Disbursement failed: ' . $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Cash advance disbursed successfully.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_advance_disbursed'));
     }
 
     public function rejectCashAdvance(CashAdvance $cashAdvance): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $cashAdvance);
 
         $cashAdvance->update(['status' => 'rejected']);
 
@@ -506,7 +570,28 @@ class TravelExpenseController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', 'Cash advance request rejected.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_advance_rejected'));
+    }
+
+    public function destroyCashAdvance(Request $request, CashAdvance $cashAdvance): RedirectResponse
+    {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve'));
+        $currentEmp = Employee::resolveForUser($user);
+        $isOwner = $currentEmp && (int)$cashAdvance->employee_id === (int)$currentEmp->id;
+
+        if (!$isHrAdmin && !$isOwner) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        if (!in_array($cashAdvance->status, ['pending', 'rejected'])) {
+            return redirect()->back()->with('error', __('hrms.travel_expense.msg_advance_cancel_invalid'));
+        }
+
+        $cashAdvance->delete();
+
+        return redirect()->route('hrms.travel-expense.index', ['tab' => 'advance'])
+            ->with('success', __('hrms.travel_expense.msg_advance_cancelled'));
     }
 
     // ── EXPENSE REPORTS ───────────────────────────────────────────────────────
@@ -598,6 +683,44 @@ class TravelExpenseController extends Controller
             }
         }
 
+        if (!empty($validated['cash_advance_id'])) {
+            $alreadyClaimedAdvance = CashAdvance::where('id', $validated['cash_advance_id'])
+                ->where(function($q) {
+                    $q->whereNotNull('expense_report_id')
+                      ->orWhere('status', 'settled');
+                })
+                ->first();
+            if ($alreadyClaimedAdvance) {
+                return redirect()->back()->withInput()->withErrors([
+                    'cash_advance_id' => 'This cash advance has already been claimed in an expense report and cannot be reused.'
+                ]);
+            }
+        }
+
+        if (!empty($validated['travel_request_id'])) {
+            $inProgressReport = ExpenseReport::where('travel_request_id', $validated['travel_request_id'])
+                ->whereIn('status', ['draft', 'submitted', 'l1_approved', 'approved', 'partially_approved'])
+                ->first();
+            if ($inProgressReport) {
+                return redirect()->back()->withInput()->withErrors([
+                    'travel_request_id' => 'An active expense claim (#' . $inProgressReport->id . ' - ' . $inProgressReport->title . ') is already in progress for this travel trip.'
+                ]);
+            }
+
+            $paidReport = ExpenseReport::where('travel_request_id', $validated['travel_request_id'])
+                ->where('status', 'paid')
+                ->first();
+            if ($paidReport) {
+                $hasRejectedClaims = $paidReport->claims()->where('status', 'rejected')->exists();
+                $isSupplementary = str_contains(strtolower($validated['title']), 'supplementary');
+                if (!$hasRejectedClaims || !$isSupplementary) {
+                    return redirect()->back()->withInput()->withErrors([
+                        'travel_request_id' => 'Expenses for this travel trip have already been claimed and settled. Supplementary claims are only permitted if previous items were rejected.'
+                    ]);
+                }
+            }
+        }
+
         DB::transaction(function () use ($validated, $request, $tenantId) {
             // 1. Calculate totals
             $totalAmount = 0.00;
@@ -675,7 +798,7 @@ class TravelExpenseController extends Controller
         });
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'report'])
-            ->with('success', 'Expense report saved to drafts.');
+            ->with('success', __('hrms.travel_expense.msg_report_draft_saved'));
     }
 
     public function updateExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
@@ -693,7 +816,7 @@ class TravelExpenseController extends Controller
 
         // Enforce update only in editable states (draft, partially_approved, rejected)
         if (!in_array($expenseReport->status, ['draft', 'partially_approved', 'rejected'])) {
-            return redirect()->back()->with('error', 'Only draft, partially approved, or rejected expense reports can be edited.');
+            return redirect()->back()->with('error', __('hrms.travel_expense.msg_report_edit_invalid'));
         }
 
         $validated = $request->validate([
@@ -771,6 +894,34 @@ class TravelExpenseController extends Controller
                 if (!empty($errorMessages)) {
                     return redirect()->back()->withInput()->withErrors($errorMessages);
                 }
+            }
+        }
+
+        if (!empty($validated['cash_advance_id'])) {
+            $alreadyClaimedAdvance = CashAdvance::where('id', $validated['cash_advance_id'])
+                ->where(function($q) use ($expenseReport) {
+                    $q->where(function($sq) use ($expenseReport) {
+                        $sq->whereNotNull('expense_report_id')
+                           ->where('expense_report_id', '!=', $expenseReport->id);
+                    })->orWhere('status', 'settled');
+                })
+                ->first();
+            if ($alreadyClaimedAdvance) {
+                return redirect()->back()->withInput()->withErrors([
+                    'cash_advance_id' => 'This cash advance has already been claimed in another expense report and cannot be reused.'
+                ]);
+            }
+        }
+
+        if (!empty($validated['travel_request_id'])) {
+            $inProgressReport = ExpenseReport::where('travel_request_id', $validated['travel_request_id'])
+                ->where('id', '!=', $expenseReport->id)
+                ->whereIn('status', ['draft', 'submitted', 'l1_approved', 'approved', 'partially_approved'])
+                ->first();
+            if ($inProgressReport) {
+                return redirect()->back()->withInput()->withErrors([
+                    'travel_request_id' => 'An active expense claim (#' . $inProgressReport->id . ') is already in progress for this travel trip.'
+                ]);
             }
         }
 
@@ -896,7 +1047,7 @@ class TravelExpenseController extends Controller
         });
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'report'])
-            ->with('success', 'Expense report updated successfully.');
+            ->with('success', __('hrms.travel_expense.msg_report_updated'));
     }
 
     public function submitExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
@@ -936,23 +1087,27 @@ class TravelExpenseController extends Controller
                 'amount'        => number_format((float) $expenseReport->total_amount, 2),
                 'purpose'       => $expenseReport->title,
                 'action_url'    => route('hrms.travel-expense.index', ['tab' => 'report']),
-            ]);
+                'employee_id'   => $emp?->id,
+                'user_id'       => $emp?->user_id,
+            ], $expenseReport);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Expense report submitted for approval.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_report_submitted'));
     }
 
     public function approveExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $expenseReport);
 
         $user = $request->user();
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
         $actorEmpId = $workflowService->getEmployeeIdForActor($user);
         if ($actorEmpId && (int) $actorEmpId === (int) $expenseReport->employee_id) {
-            abort(403, 'Self-approval is prohibited. You cannot approve your own expense report.');
+            if (!$workflowService->allowsSelfApproval($user, $expenseReport, 'hrms.travel_expenses.approve')) {
+                abort(403, 'Self-approval is prohibited. You cannot approve your own expense report.');
+            }
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
@@ -979,7 +1134,7 @@ class TravelExpenseController extends Controller
                 iconClass: 'feather-check-circle'
             );
 
-            return redirect()->back()->with('success', 'Expense report approved at Level 1. Moved to Level 2 (Final) approval.');
+            return redirect()->back()->with('success', __('hrms.travel_expense.msg_report_approved_l1'));
         }
 
         // Check for itemized claim line decisions
@@ -1213,18 +1368,22 @@ class TravelExpenseController extends Controller
                     'amount'        => number_format((float) $approvedAmount, 2),
                     'approved_by'   => auth()->user()?->name ?? 'HR Manager',
                     'action_url'    => route('hrms.travel-expense.index', ['tab' => 'report']),
-                ]);
+                    'employee_id'   => $expenseReport->employee_id,
+                    'user_id'       => $expenseReport->employee?->user_id,
+                ], $expenseReport);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
             }
         }
 
-        return redirect()->back()->with('success', 'Expense report approved with approved budget: $' . number_format($approvedAmount, 2));
+        $company = \App\Domains\HRMS\Models\Company::first();
+        $currencySymbol = self::currencySymbol($company?->currency ?? 'USD');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_report_approved', ['amount' => $currencySymbol . number_format($approvedAmount, 2)]));
     }
 
     public function rejectExpenseReport(ExpenseReport $expenseReport): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $expenseReport);
 
         $expenseReport->update(['status' => 'rejected']);
 
@@ -1239,71 +1398,82 @@ class TravelExpenseController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', 'Expense report rejected.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_report_rejected'));
     }
 
-    public function payExpenseReport(ExpenseReport $expenseReport): RedirectResponse
+    public function payExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
     {
         $this->authorizeHrms('hrms.travel_expenses.approve');
 
+        $validated = $request->validate([
+            'bank_account_id' => ['nullable', 'integer'],
+            'payment_date'    => ['nullable', 'date'],
+        ]);
+
+        $bankAccountId = !empty($validated['bank_account_id']) ? (int) $validated['bank_account_id'] : null;
+        $paymentDate = !empty($validated['payment_date']) ? (string) $validated['payment_date'] : null;
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
-        DB::transaction(function () use ($expenseReport, $tenantId) {
-            // Find newly approved claims that have not been paid yet
-            $approvedClaims = $expenseReport->claims()->where('status', 'approved')->get();
-            $unpaidApprovedAmount = $approvedClaims->sum(function($c) {
-                return floatval($c->approved_amount ?? $c->amount);
-            });
+        try {
+            DB::transaction(function () use ($expenseReport, $tenantId, $bankAccountId, $paymentDate) {
+                // Find newly approved claims that have not been paid yet
+                $approvedClaims = $expenseReport->claims()->where('status', 'approved')->get();
+                $unpaidApprovedAmount = $approvedClaims->sum(function($c) {
+                    return floatval($c->approved_amount ?? $c->amount);
+                });
 
-            // If no explicit claim lines are marked 'approved', fall back to report approved amount
-            if ($unpaidApprovedAmount <= 0 && in_array($expenseReport->status, ['approved', 'partially_approved'])) {
-                $unpaidApprovedAmount = floatval($expenseReport->approved_amount ?? $expenseReport->total_amount);
-            }
-
-            // Mark approved claim lines as paid
-            $expenseReport->claims()->where('status', 'approved')->update(['status' => 'paid']);
-
-            // Determine if all claim lines are now paid
-            $unpaidCount = $expenseReport->claims()->whereIn('status', ['pending', 'approved'])->count();
-            if ($unpaidCount === 0) {
-                $expenseReport->update(['status' => 'paid']);
-            } else {
-                $expenseReport->update(['status' => 'partially_approved']);
-            }
-
-            $advance = $expenseReport->cashAdvance;
-            $isAccountingChannel = ($expenseReport->payout_channel ?? 'accounting') === 'accounting';
-
-            if ($isAccountingChannel && $unpaidApprovedAmount > 0) {
-                $adjData = $this->calculateAdvanceAdjustment(
-                    $expenseReport->travel_request_id,
-                    $expenseReport->cash_advance_id ?? $expenseReport->cashAdvance?->id,
-                    $expenseReport->id,
-                    $unpaidApprovedAmount
-                );
-                $remainingAdvance = $adjData['remaining_advance'];
-                $offsetAmount = min($remainingAdvance, $unpaidApprovedAmount);
-                $approvedNet = max($unpaidApprovedAmount - $remainingAdvance, 0.00);
-                $surplus = max($remainingAdvance - $unpaidApprovedAmount, 0.00);
-
-                $expenseReport->update([
-                    'advance_adjusted'          => $adjData['advance_adjusted'],
-                    'approved_net_reimbursement' => $approvedNet,
-                ]);
-
-                try {
-                    $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
-                    $travelAccountingService->postExpenseReportPayoutJournal($expenseReport);
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::error("Payout Journal Posting Failed: " . $e->getMessage());
+                // If no explicit claim lines are marked 'approved', fall back to report approved amount
+                if ($unpaidApprovedAmount <= 0 && in_array($expenseReport->status, ['approved', 'partially_approved'])) {
+                    $unpaidApprovedAmount = floatval($expenseReport->approved_amount ?? $expenseReport->total_amount);
                 }
-            }
 
-            // Settle cash advance
-            if ($advance) {
-                $advance->update(['status' => 'settled']);
-            }
-        });
+                // Mark approved claim lines as paid
+                $expenseReport->claims()->where('status', 'approved')->update(['status' => 'paid']);
+
+                // Determine if all claim lines are now paid
+                $unpaidCount = $expenseReport->claims()->whereIn('status', ['pending', 'approved'])->count();
+                if ($unpaidCount === 0) {
+                    $expenseReport->update(['status' => 'paid']);
+                } else {
+                    $expenseReport->update(['status' => 'partially_approved']);
+                }
+
+                $advance = $expenseReport->cashAdvance;
+                $isAccountingChannel = ($expenseReport->payout_channel ?? 'accounting') === 'accounting';
+
+                if ($isAccountingChannel && $unpaidApprovedAmount > 0) {
+                    $adjData = $this->calculateAdvanceAdjustment(
+                        $expenseReport->travel_request_id,
+                        $expenseReport->cash_advance_id ?? $expenseReport->cashAdvance?->id,
+                        $expenseReport->id,
+                        $unpaidApprovedAmount
+                    );
+                    $remainingAdvance = $adjData['remaining_advance'];
+                    $offsetAmount = min($remainingAdvance, $unpaidApprovedAmount);
+                    $approvedNet = max($unpaidApprovedAmount - $remainingAdvance, 0.00);
+                    $surplus = max($remainingAdvance - $unpaidApprovedAmount, 0.00);
+
+                    $expenseReport->update([
+                        'advance_adjusted'          => $adjData['advance_adjusted'],
+                        'approved_net_reimbursement' => $approvedNet,
+                    ]);
+
+                    $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
+                    $travelAccountingService->postExpenseReportPayoutJournal($expenseReport, $bankAccountId, $paymentDate);
+                }
+
+                // Settle cash advance
+                if ($advance) {
+                    $advance->update(['status' => 'settled']);
+                }
+            });
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Payout Journal Posting Failed: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Payment processing failed: ' . $e->getMessage());
+        }
 
         try {
             \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.expense.settled', [
@@ -1313,12 +1483,48 @@ class TravelExpenseController extends Controller
                 'amount'        => number_format((float) ($expenseReport->approved_net_reimbursement ?? $expenseReport->approved_amount ?? $expenseReport->total_amount), 2),
                 'payment_mode'  => ucfirst($expenseReport->payout_channel ?? 'Bank Transfer / Payroll'),
                 'action_url'    => route('hrms.travel-expense.index', ['tab' => 'report']),
-            ]);
+                'employee_id'   => $expenseReport->employee_id,
+                'user_id'       => $expenseReport->employee?->user_id,
+            ], $expenseReport);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Expense payout processed successfully and accounting entries updated.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_report_paid'));
+    }
+
+    public function destroyExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
+    {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve'));
+        $currentEmp = Employee::resolveForUser($user);
+        $isOwner = $currentEmp && (int)$expenseReport->employee_id === (int)$currentEmp->id;
+
+        if (!$isHrAdmin && !$isOwner) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        if (!in_array($expenseReport->status, ['draft', 'rejected'])) {
+            return redirect()->back()->with('error', __('hrms.travel_expense.msg_report_delete_invalid'));
+        }
+
+        // Unlink any cash advance tied to this report
+        CashAdvance::where('expense_report_id', $expenseReport->id)->update(['expense_report_id' => null]);
+
+        // Remove receipt files from storage
+        foreach ($expenseReport->claims as $claim) {
+            foreach ($claim->receipt_paths as $p) {
+                if ($p && \Illuminate\Support\Facades\Storage::disk('public')->exists($p)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($p);
+                }
+            }
+        }
+
+        $expenseReport->claims()->delete();
+        $expenseReport->delete();
+
+        return redirect()->route('hrms.travel-expense.index', ['tab' => 'report'])
+            ->with('success', __('hrms.travel_expense.msg_report_deleted'));
     }
 
     // ── EXPENSE POLICIES (MANAGED INSIDE PENALIZATION POLICY) ──────────────────
@@ -1338,7 +1544,7 @@ class TravelExpenseController extends Controller
         $expensePolicy->rules()->delete();
         $expensePolicy->delete();
         return redirect()->route('hrms.expense-policy.index')
-            ->with('success', 'Expense policy deleted successfully.');
+            ->with('success', __('hrms.travel_expense.msg_policy_deleted'));
     }
 
     public function getEmployeePolicy(Employee $employee): \Illuminate\Http\JsonResponse
@@ -1420,10 +1626,24 @@ class TravelExpenseController extends Controller
         }
 
         // Ultimate fallback: return the first account available for this tenant (excluding headers)
-        return \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+        $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->whereNotIn('id', $groupAccountIds)
             ->first();
+
+        if ($account) {
+            return $account;
+        }
+
+        return \App\Domains\Accounting\Models\ChartOfAccount::create([
+            'tenant_id'      => $tenantId,
+            'code'           => $code,
+            'name'           => $name,
+            'type'           => $type,
+            'subtype'        => $subtype ?? \App\Domains\Accounting\Models\ChartOfAccount::SUBTYPE_CURRENT_ASSET,
+            'normal_balance' => $normalBalance,
+            'is_active'      => true,
+        ]);
     }
 
     /**
@@ -1477,7 +1697,7 @@ class TravelExpenseController extends Controller
 
         // If not an image or GD library not available, fallback to standard file storage
         if (!in_array($extension, $imageExtensions) || !extension_loaded('gd')) {
-            return $uploadedFile->store('expense_receipts', 'public');
+            return $uploadedFile->storeTenantFile('expense_receipts', 'public');
         }
 
         try {
@@ -1508,7 +1728,7 @@ class TravelExpenseController extends Controller
             }
 
             if (!$image) {
-                return $uploadedFile->store('expense_receipts', 'public');
+                return $uploadedFile->storeTenantFile('expense_receipts', 'public');
             }
 
             // Get dimensions
@@ -1560,7 +1780,7 @@ class TravelExpenseController extends Controller
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning("Receipt compression fallback: " . $e->getMessage());
-            return $uploadedFile->store('expense_receipts', 'public');
+            return $uploadedFile->storeTenantFile('expense_receipts', 'public');
         }
     }
 
@@ -1704,13 +1924,39 @@ class TravelExpenseController extends Controller
         return ['approval_levels' => 1, 'workflow' => null, 'policy' => null];
     }
 
-    private function authorizeHrms(string $permission): void
+    private function authorizeHrms(string $permission, mixed $model = null): void
     {
-        abort_unless(
-            app(AccessService::class)->allows(auth()->user(), $permission, [
-                'tenant_id' => auth()->user()?->tenant_id,
-            ]),
-            403
-        );
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+
+        $isAuthorized = false;
+
+        // Scoped Line Manager / Department Head / Branch Manager check
+        if ($model && $model->employee) {
+            $isAuthorized = $workflowService->canApprove($user, $model->employee, $model, $permission);
+        }
+
+        if (!$isAuthorized) {
+            $context = [
+                'tenant_id'     => $user->tenant_id,
+                'company_id'    => $user->company_id,
+                'branch_id'     => $user->branch_id,
+                'department_id' => $user->department_id,
+                'owner_id'      => $model?->employee_id,
+            ];
+
+            $access = app(AccessService::class);
+            $isAuthorized = $scopeService->isCompanyAdmin($user)
+                || $workflowService->isHrOrAdminActor($user)
+                || $user->hasHrPermission('hr.settings.manage')
+                || $access->allows($user, $permission, $context);
+        }
+
+        abort_unless($isAuthorized, 403, 'Unauthorized to approve or process this expense request.');
     }
 }

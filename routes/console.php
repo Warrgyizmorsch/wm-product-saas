@@ -36,6 +36,31 @@ Schedule::command('production:process-calculation-countdowns')
     ->everyMinute()
     ->withoutOverlapping();
 
+// Tenant storage usage: drop deleted files, record untracked ones.
+Schedule::command('tenant:storage-sync')
+    ->dailyAt('02:30')
+    ->withoutOverlapping();
+
+// Daily cleanup of stale raw location logs for completed shifts (uses dynamic config buffer)
+Schedule::command('attendance:prune-location-logs')
+    ->dailyAt('02:00')
+    ->withoutOverlapping();
+
+// Daily check for expiring and expired statutory employee documents
+Schedule::command('hrms:check-document-expiry')
+    ->dailyAt('06:00')
+    ->withoutOverlapping();
+
+// CRM Lead and Deal Follow-up / Meeting Due Reminders (every minute)
+Schedule::command('crm:send-followup-reminders')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+// Inventory FEFO Expiring Batches Alert (daily morning scan)
+Schedule::command('inventory:check-expiring-batches')
+    ->dailyAt('08:00')
+    ->withoutOverlapping();
+
 Artisan::command('fcm:test {target : User ID, Email, or FCM registration token} {--title=MossiERP Push Notification Test} {--message=Firebase Cloud Messaging is active and working! 🚀}', function ($target) {
     $this->info("Checking Firebase configuration...");
 

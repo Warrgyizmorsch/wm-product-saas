@@ -40,23 +40,26 @@ class CustomerPaymentService
      *     tenant_id: int, company_id?: ?int, branch_id?: ?int, customer_id: int,
      *     payment_date: string, payment_method: string, amount: float,
      *     reference_no?: ?string, notes?: ?string, bank_account_id?: ?int,
+     *     tds_amount?: float, tds_section_code?: ?string,
      *     allocations?: array<int, float>
      * } $data allocations: invoice id => amount; anything left over stays on account
      */
     public function receive(array $data): CustomerPayment
     {
         $amount = round((float) $data['amount'], 2);
+        $tds = round(max(0, (float) ($data['tds_amount'] ?? 0)), 2);
         $allocations = array_filter(array_map(fn ($value) => round((float) $value, 2), $data['allocations'] ?? []), fn ($value) => $value > 0);
 
         if ($amount <= 0) {
             throw new InvalidArgumentException('A receipt must be for a positive amount.');
         }
 
-        if ((int) round(array_sum($allocations) * 100) > (int) round($amount * 100)) {
+        // Invoices are settled by the money received plus any TDS the customer withheld.
+        if ((int) round(array_sum($allocations) * 100) > (int) round(($amount + $tds) * 100)) {
             throw new InvalidArgumentException('Amounts applied to invoices are more than the amount received.');
         }
 
-        return DB::transaction(function () use ($data, $amount, $allocations) {
+        return DB::transaction(function () use ($data, $amount, $tds, $allocations) {
             $invoices = Invoice::query()->whereIn('id', array_keys($allocations))->lockForUpdate()->get()->keyBy('id');
 
             foreach ($allocations as $invoiceId => $apply) {
@@ -81,6 +84,8 @@ class CustomerPaymentService
                 'payment_method' => $data['payment_method'],
                 'bank_account_id' => $data['bank_account_id'] ?? null,
                 'amount' => $amount,
+                'tds_amount' => $tds,
+                'tds_section_code' => $tds > 0 ? ($data['tds_section_code'] ?? null) : null,
                 'reference_no' => $data['reference_no'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'status' => 'Posted',

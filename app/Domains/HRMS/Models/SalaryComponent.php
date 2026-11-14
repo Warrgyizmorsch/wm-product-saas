@@ -49,4 +49,12 @@ class SalaryComponent extends BaseModel
     {
         return $this->belongsTo(PayGroup::class, 'pay_group_id');
     }
+
+    /**
+     * Get the salary structure items using this component.
+     */
+    public function structureItems()
+    {
+        return $this->hasMany(SalaryStructureItem::class, 'salary_component_id');
+    }
 }

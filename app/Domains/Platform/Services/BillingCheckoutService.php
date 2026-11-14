@@ -42,9 +42,16 @@ class BillingCheckoutService
     }
 
     /** Fewest users the tenant can buy: everyone who can already log in. */
-    public function minimumSeats(Tenant $tenant): int
+    /** Users the workspace already has — seats can never go below this. */
+    public function workspaceSeats(Tenant $tenant): int
     {
         return max(1, $this->usage->currentUserCount($tenant));
+    }
+
+    /** Fewest seats $plan can be bought for: its own minimum, or the workspace's users if more. */
+    public function minimumSeats(Tenant $tenant, ?Plan $plan = null): int
+    {
+        return max($this->workspaceSeats($tenant), (int) ($plan?->min_users ?? 1));
     }
 
     /** @return list<string> add-ons bought with the old one-time fee — never billed */
@@ -87,10 +94,13 @@ class BillingCheckoutService
             throw ValidationException::withMessages(['cycle' => 'Choose monthly or yearly billing.']);
         }
 
-        $minimum = $this->minimumSeats($tenant);
+        $workspace = $this->workspaceSeats($tenant);
+        $minimum = $this->minimumSeats($tenant, $plan);
         if ($seats < $minimum) {
             throw ValidationException::withMessages([
-                'seats' => "Your workspace already has {$minimum} users — buy at least {$minimum}.",
+                'seats' => $minimum > $workspace
+                    ? "{$plan->name} is sold for at least {$minimum} users."
+                    : "Your workspace already has {$minimum} users — buy at least {$minimum}.",
             ]);
         }
 

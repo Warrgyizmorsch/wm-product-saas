@@ -34,13 +34,14 @@ class BroadcastController extends Controller
     /**
      * View Broadcast Details, Receipts, Comments & Attachments.
      */
-    public function show(int $id): View
+    public function show(mixed $id): View
     {
+        $broadcastId = $id instanceof Broadcast ? $id->id : (int) $id;
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $isHrAdmin = $this->isHrAdmin();
         $employee = $this->getAuthenticatedEmployee();
 
-        $data = $this->broadcastRepository->getShowData($id, $isHrAdmin, $employee, $tenantId);
+        $data = $this->broadcastRepository->getShowData($broadcastId, $isHrAdmin, $employee, $tenantId);
 
         return view('modules.hrms.broadcasts.show', $data);
     }
@@ -56,97 +57,197 @@ class BroadcastController extends Controller
 
         $validated = $request->validate([
             'title'                       => 'required|string|max:255',
-            'category'                    => 'required|in:general,policy,event,leadership,celebration,urgent',
-            'priority'                    => 'required|in:general,important,urgent',
-            'message'                     => 'required|string',
-            'target_type'                 => 'required|in:all,department,branch,designation,individual',
-            'target_ids'                  => 'nullable|array',
-            'status'                      => 'required|in:draft,published,scheduled',
-            'scheduled_at'                => 'nullable|required_if:status,scheduled|date|after:now',
-            'expires_at'                  => 'nullable|date|after:today',
-            'is_pinned'                   => 'nullable|boolean',
+            'category'                    => 'required|in:announcement,policy_update,event,emergency,news',
+            'priority'                    => 'required|in:normal,important,urgent',
+            'content'                     => 'nullable|string',
+            'message'                     => 'nullable|string',
+            'target_type'                 => 'required|in:all,department,branch,designation,specific_employees',
+            'target_ids'                  => 'nullable|required_unless:target_type,all|array',
+            'status'                      => 'nullable|in:draft,published,scheduled',
+            'scheduled_at'                => 'nullable|date',
+            'expires_at'                  => 'nullable|date',
             'is_acknowledgement_required' => 'nullable|boolean',
             'allow_comments'              => 'nullable|boolean',
-            'attachments.*'               => 'nullable|file|max:10240',
+            'send_email'                  => 'nullable|boolean',
+            'send_push'                   => 'nullable|boolean',
+            'show_banner'                 => 'nullable|boolean',
+            'attachment'                  => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
+            'banner_image'                => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
+
+        $validated['content'] = $validated['content'] ?? $validated['message'] ?? '';
+        if (empty(trim($validated['content']))) {
+            return redirect()->back()->withInput()->with('error', __('hrms.broadcasts.err_content_required'));
+        }
+
+        $validated['is_acknowledgement_required'] = $request->boolean('is_acknowledgement_required');
+        $validated['allow_comments'] = $request->has('allow_comments') ? $request->boolean('allow_comments') : true;
+        $validated['send_email'] = $request->boolean('send_email');
+        $validated['send_push'] = $request->boolean('send_push');
+        $validated['show_banner'] = $request->has('show_banner') ? $request->boolean('show_banner') : true;
+
+        if ($request->input('status') === 'draft') {
+            $validated['status'] = 'draft';
+        } elseif (empty($validated['status'])) {
+            if (!empty($validated['scheduled_at']) && \Carbon\Carbon::parse($validated['scheduled_at'])->isFuture()) {
+                $validated['status'] = 'scheduled';
+            } else {
+                $validated['status'] = 'published';
+            }
+        }
 
         $broadcast = $this->broadcastRepository->storeBroadcast($validated, $request, $tenantId);
 
-        return redirect()->route('hrms.broadcasts.index', ['tab' => $broadcast->status === 'published' ? 'published' : 'scheduled'])
-            ->with('success', 'Announcement ' . ($broadcast->status === 'published' ? 'published successfully.' : 'saved successfully.'));
+        $targetTab = match($broadcast->status) {
+            'published' => 'published',
+            default     => 'scheduled',
+        };
+
+        $msg = match($broadcast->status) {
+            'published' => __('hrms.broadcasts.flash_published_success'),
+            'draft'     => __('hrms.broadcasts.flash_draft_success'),
+            default     => __('hrms.broadcasts.flash_scheduled_success'),
+        };
+
+        return redirect()->route('hrms.broadcasts.index', ['active_tab' => $targetTab])
+            ->with('success', $msg);
     }
 
     /**
      * Update Broadcast.
      */
-    public function update(Request $request, int $id): RedirectResponse
+    public function update(Request $request, mixed $id): RedirectResponse
     {
         $this->authorizeAdmin();
 
+        $broadcastId = $id instanceof Broadcast ? $id->id : (int) $id;
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
             'title'                       => 'required|string|max:255',
-            'category'                    => 'required|in:general,policy,event,leadership,celebration,urgent',
-            'priority'                    => 'required|in:general,important,urgent',
-            'message'                     => 'required|string',
-            'target_type'                 => 'required|in:all,department,branch,designation,individual',
-            'target_ids'                  => 'nullable|array',
-            'status'                      => 'required|in:draft,published,scheduled',
-            'scheduled_at'                => 'nullable|required_if:status,scheduled|date',
-            'expires_at'                  => 'nullable|date|after:today',
-            'is_pinned'                   => 'nullable|boolean',
+            'category'                    => 'required|in:announcement,policy_update,event,emergency,news',
+            'priority'                    => 'required|in:normal,important,urgent',
+            'content'                     => 'nullable|string',
+            'message'                     => 'nullable|string',
+            'target_type'                 => 'required|in:all,department,branch,designation,specific_employees',
+            'target_ids'                  => 'nullable|required_unless:target_type,all|array',
+            'status'                      => 'nullable|in:draft,published,scheduled',
+            'scheduled_at'                => 'nullable|date',
+            'expires_at'                  => 'nullable|date',
             'is_acknowledgement_required' => 'nullable|boolean',
             'allow_comments'              => 'nullable|boolean',
-            'attachments.*'               => 'nullable|file|max:10240',
+            'send_email'                  => 'nullable|boolean',
+            'send_push'                   => 'nullable|boolean',
+            'show_banner'                 => 'nullable|boolean',
+            'attachment'                  => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
+            'banner_image'                => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
-        $this->broadcastRepository->updateBroadcast($id, $validated, $request, $tenantId);
+        $validated['content'] = $validated['content'] ?? $validated['message'] ?? '';
+        if (empty(trim($validated['content']))) {
+            return redirect()->back()->withInput()->with('error', __('hrms.broadcasts.err_content_required'));
+        }
 
-        return redirect()->back()->with('success', 'Announcement updated successfully.');
+        $validated['is_acknowledgement_required'] = $request->boolean('is_acknowledgement_required');
+        $validated['allow_comments'] = $request->has('allow_comments') ? $request->boolean('allow_comments') : true;
+        $validated['send_email'] = $request->boolean('send_email');
+        $validated['send_push'] = $request->boolean('send_push');
+        $validated['show_banner'] = $request->has('show_banner') ? $request->boolean('show_banner') : true;
+
+        if (empty($validated['status'])) {
+            if (!empty($validated['scheduled_at']) && \Carbon\Carbon::parse($validated['scheduled_at'])->isFuture()) {
+                $validated['status'] = 'scheduled';
+            } else {
+                $validated['status'] = 'published';
+            }
+        }
+
+        $this->broadcastRepository->updateBroadcast($broadcastId, $validated, $request, $tenantId);
+
+        return redirect()->back()->with('success', __('hrms.broadcasts.flash_updated_success'));
     }
 
     /**
      * Delete Broadcast.
      */
-    public function destroy(int $id): RedirectResponse
+    public function destroy(mixed $id): RedirectResponse
     {
         $this->authorizeAdmin();
 
+        $broadcastId = $id instanceof Broadcast ? $id->id : (int) $id;
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $this->broadcastRepository->deleteBroadcast($id, $tenantId);
+        $this->broadcastRepository->deleteBroadcast($broadcastId, $tenantId);
 
-        return redirect()->route('hrms.broadcasts.index')->with('success', 'Announcement deleted successfully.');
+        return redirect()->route('hrms.broadcasts.index')->with('success', __('hrms.broadcasts.flash_deleted_success'));
     }
 
     /**
      * Employee Acknowledges Broadcast.
      */
-    public function acknowledge(Request $request, int $id): RedirectResponse
+    public function acknowledge(Request $request, mixed $id): RedirectResponse
     {
+        $broadcastId = $id instanceof Broadcast ? $id->id : (int) $id;
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $employee = $this->getAuthenticatedEmployee();
 
-        $this->broadcastRepository->acknowledge($id, $employee, $request->input('signature_data'), $tenantId);
+        $this->broadcastRepository->acknowledge($broadcastId, $employee, $request->input('signature_data'), $tenantId);
 
-        return redirect()->back()->with('success', 'Thank you. Your acknowledgement has been recorded.');
+        return redirect()->back()->with('success', __('hrms.broadcasts.flash_acknowledged_success'));
     }
 
     /**
      * Post a Comment on a Broadcast.
      */
-    public function storeComment(Request $request, int $id): RedirectResponse
+    public function storeComment(Request $request, mixed $id): RedirectResponse
     {
+        $broadcastId = $id instanceof Broadcast ? $id->id : (int) $id;
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
-            'comment' => 'required|string|max:1000',
+            'comment_text' => 'nullable|string|max:2000',
+            'comment'      => 'nullable|string|max:2000',
+            'parent_id'    => 'nullable|integer|exists:broadcast_comments,id',
         ]);
 
-        $employee = $this->getAuthenticatedEmployee();
-        $this->broadcastRepository->storeComment($id, $validated, auth()->user(), $employee, $tenantId);
+        if (!empty($validated['parent_id'])) {
+            $parentValid = BroadcastComment::where('id', $validated['parent_id'])
+                ->where('broadcast_id', $broadcastId)
+                ->where('tenant_id', $tenantId)
+                ->exists();
+            if (!$parentValid) {
+                return redirect()->back()->with('error', __('hrms.broadcasts.err_invalid_parent_comment'));
+            }
+        }
 
-        return redirect()->back()->with('success', 'Comment posted.');
+        $commentText = trim($validated['comment_text'] ?? $validated['comment'] ?? '');
+        if ($commentText === '') {
+            return redirect()->back()->with('error', __('hrms.broadcasts.err_comment_empty'));
+        }
+
+        $broadcast = Broadcast::where('tenant_id', $tenantId)->findOrFail($broadcastId);
+
+        if (!$broadcast->allow_comments) {
+            return redirect()->back()->with('error', __('hrms.broadcasts.err_comments_disabled'));
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin) {
+            $hasAccess = $broadcast->target_type === 'all'
+                || ($employee && $broadcast->receipts()->where('employee_id', $employee->id)->exists());
+            if (!$hasAccess) {
+                abort(403, __('hrms.broadcasts.unauthorized_comment'));
+            }
+        }
+
+        if (!$employee && !$isHrAdmin) {
+            return redirect()->back()->with('error', __('hrms.broadcasts.err_employee_required_to_comment'));
+        }
+
+        $this->broadcastRepository->storeComment($broadcastId, $validated, auth()->user(), $employee, $tenantId);
+
+        return redirect()->back()->with('success', __('hrms.broadcasts.flash_comment_posted'));
     }
 
     /**
@@ -158,7 +259,7 @@ class BroadcastController extends Controller
 
         $comment->update(['is_pinned' => !$comment->is_pinned]);
 
-        return redirect()->back()->with('success', $comment->is_pinned ? 'Comment pinned.' : 'Comment unpinned.');
+        return redirect()->back()->with('success', $comment->is_pinned ? __('hrms.broadcasts.flash_comment_pinned') : __('hrms.broadcasts.flash_comment_unpinned'));
     }
 
     /**
@@ -172,10 +273,10 @@ class BroadcastController extends Controller
         $deleted = $this->broadcastRepository->deleteComment($comment->id, auth()->user(), $isHrAdmin, $tenantId);
 
         if (!$deleted) {
-            abort(403, 'Unauthorized to delete this comment.');
+            abort(403, __('hrms.broadcasts.unauthorized_delete_comment'));
         }
 
-        return redirect()->back()->with('success', 'Comment removed.');
+        return redirect()->back()->with('success', __('hrms.broadcasts.flash_comment_removed'));
     }
 
     /**
@@ -189,10 +290,10 @@ class BroadcastController extends Controller
         $deleted = $this->broadcastRepository->deleteComment($commentId, auth()->user(), $isHrAdmin, $tenantId);
 
         if (!$deleted) {
-            abort(403, 'Unauthorized to delete this comment.');
+            abort(403, __('hrms.broadcasts.unauthorized_delete_comment'));
         }
 
-        return redirect()->back()->with('success', 'Comment removed.');
+        return redirect()->back()->with('success', __('hrms.broadcasts.flash_comment_removed'));
     }
 
     /**
@@ -218,7 +319,7 @@ class BroadcastController extends Controller
     private function authorizeAdmin(): void
     {
         if (!$this->isHrAdmin()) {
-            abort(403, 'Only HR Administrators can manage announcements.');
+            abort(403, __('hrms.broadcasts.unauthorized_admin'));
         }
     }
 
@@ -237,6 +338,7 @@ class BroadcastController extends Controller
                 if ($user->employee_id) {
                     $q->where('id', $user->employee_id);
                 }
+                $q->orWhere('user_id', $user->id);
                 if ($user->email) {
                     $q->orWhere('office_email', $user->email)
                       ->orWhere('personal_email', $user->email);

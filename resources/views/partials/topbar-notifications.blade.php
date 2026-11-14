@@ -155,8 +155,8 @@
 (function() {
     @php
         $pusherConfig = \App\Services\Pusher\PusherBroadcastService::getClientConfig();
-        $currentUserId = auth()->id() ?? 0;
-        $currentTenantId = function_exists('tenant_id') ? tenant_id() : (auth()->user()->tenant_id ?? 0);
+        $currentUserId = (int) (auth()->id() ?? 0);
+        $currentTenantId = (int) ((function_exists('tenant_id') ? tenant_id() : null) ?? auth()->user()?->tenant_id ?? 0);
     @endphp
 
     const pusherKey = "{{ $pusherConfig['key'] }}";
@@ -264,18 +264,72 @@
         if (!toastContainer) {
             toastContainer = document.createElement('div');
             toastContainer.id = 'floatingPushToastContainer';
-            toastContainer.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 99999; display: flex; flex-direction: column; gap: 10px; max-width: 380px; width: calc(100% - 40px); pointer-events: none;';
+            toastContainer.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 99999; display: flex; flex-direction: column; gap: 10px; max-width: 390px; width: calc(100% - 40px); pointer-events: none;';
             document.body.appendChild(toastContainer);
         }
 
-        const isSuccess = data.type === 'approved';
-        const isDanger = data.type === 'rejected';
-        const isRequest = data.type === 'approval_request';
+        const rawType = (data.type || '').toLowerCase();
+        const rawModule = (data.module || '').toLowerCase();
 
-        const borderColor = isSuccess ? '#10b981' : (isDanger ? '#ef4444' : '#3b82f6');
-        const badgeBg = isSuccess ? '#d1fae5' : (isDanger ? '#fee2e2' : '#dbeafe');
-        const badgeColor = isSuccess ? '#065f46' : (isDanger ? '#991b1b' : '#1e40af');
-        const iconClass = isSuccess ? 'feather-check-circle' : (isDanger ? 'feather-x-circle' : 'feather-user-check');
+        // Categorize notification styling
+        const isWon = rawType === 'deal_won' || rawType === 'quotation_accepted';
+        const isSuccess = rawType.includes('approve') || rawType.includes('confirm') || rawType.includes('settled') || rawType.includes('cleared') || rawType === 'paid';
+        const isDanger = rawType.includes('reject') || rawType.includes('cancel') || rawType.includes('lost') || rawType.includes('terminate');
+        const isRequest = rawType.includes('request') || rawType.includes('applied') || rawType.includes('submitted');
+        const isDue = rawType.includes('due') || rawType.includes('upcoming');
+        const isBroadcast = rawType.includes('broadcast') || rawType.includes('announcement') || rawType.includes('notice');
+        const isPayroll = rawType.includes('payroll') || rawType.includes('payslip') || rawType.includes('salary');
+        const isHelpdesk = rawType.includes('ticket') || rawType.includes('helpdesk');
+        const isLead = rawType.includes('lead') || rawType.includes('deal');
+
+        let borderColor = '#3b82f6';
+        let badgeBg = '#dbeafe';
+        let badgeColor = '#1e40af';
+        let iconClass = data.icon_class || 'feather-bell';
+
+        if (isWon || isSuccess) {
+            borderColor = '#10b981';
+            badgeBg = '#d1fae5';
+            badgeColor = '#065f46';
+            iconClass = isWon ? 'feather-award' : (data.icon_class || 'feather-check-circle');
+        } else if (isDanger) {
+            borderColor = '#ef4444';
+            badgeBg = '#fee2e2';
+            badgeColor = '#991b1b';
+            iconClass = data.icon_class || 'feather-x-circle';
+        } else if (isDue) {
+            borderColor = '#f59e0b';
+            badgeBg = '#fef3c7';
+            badgeColor = '#92400e';
+            iconClass = data.icon_class || 'feather-clock';
+        } else if (isBroadcast) {
+            borderColor = '#8b5cf6';
+            badgeBg = '#ede9fe';
+            badgeColor = '#5b21b6';
+            iconClass = data.icon_class || 'feather-volume-2';
+        } else if (isPayroll) {
+            borderColor = '#059669';
+            badgeBg = '#d1fae5';
+            badgeColor = '#065f46';
+            iconClass = data.icon_class || 'feather-dollar-sign';
+        } else if (isHelpdesk) {
+            borderColor = '#0ea5e9';
+            badgeBg = '#e0f2fe';
+            badgeColor = '#0369a1';
+            iconClass = data.icon_class || 'feather-help-circle';
+        } else if (isRequest) {
+            borderColor = '#6366f1';
+            badgeBg = '#e0e7ff';
+            badgeColor = '#4338ca';
+            iconClass = data.icon_class || 'feather-file-text';
+        } else if (isLead) {
+            borderColor = '#6366f1';
+            badgeBg = '#e0e7ff';
+            badgeColor = '#4338ca';
+            iconClass = data.icon_class || 'feather-user-check';
+        }
+
+        const moduleLabel = rawModule ? rawModule.toUpperCase() : (rawType.startsWith('crm') ? 'CRM' : (rawType.startsWith('hrms') ? 'HRMS' : 'ERP'));
 
         const toast = document.createElement('div');
         toast.style.cssText = `
@@ -292,17 +346,17 @@
 
         toast.innerHTML = `
             <div style="display: flex; align-items: flex-start; gap: 12px;">
-                <div style="width: 36px; height: 36px; border-radius: 50%; background: ${badgeBg}; color: ${badgeColor}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">
+                <div style="width: 38px; height: 38px; border-radius: 50%; background: ${badgeBg}; color: ${badgeColor}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;">
                     <i class="${iconClass}"></i>
                 </div>
                 <div style="flex: 1; min-width: 0;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-                        <span style="font-size: 13px; font-weight: 700; color: #1e293b;">${data.title || 'Visitor Update'}</span>
-                        <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; background: ${badgeBg}; color: ${badgeColor}; padding: 2px 6px; border-radius: 4px;">Real-Time</span>
+                        <span style="font-size: 13px; font-weight: 700; color: #1e293b; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 210px;">${data.title || 'Notification'}</span>
+                        <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; background: ${badgeBg}; color: ${badgeColor}; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.3px;">${moduleLabel} • LIVE</span>
                     </div>
                     <div style="font-size: 12px; color: #475569; line-height: 1.4; margin-bottom: 8px;">${data.message || ''}</div>
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                        ${data.action_url ? `<a href="${data.action_url}" style="font-size: 11px; font-weight: 600; color: ${borderColor}; text-decoration: underline;">View Pass Details &rarr;</a>` : '<span></span>'}
+                        ${data.action_url ? `<a href="${data.action_url}" style="font-size: 11px; font-weight: 600; color: ${borderColor}; text-decoration: underline;">View Details &rarr;</a>` : '<span></span>'}
                         <button type="button" class="btn-close-toast" style="background: none; border: none; font-size: 11px; color: #94a3b8; cursor: pointer; padding: 2px 6px;">Dismiss</button>
                     </div>
                 </div>
@@ -329,52 +383,61 @@
 
     // Handle Incoming Live Event
     function handleLiveNotificationEvent(eventName, payload) {
+        if (!payload) return;
         console.log('[Pusher Live Event]', eventName, payload);
 
-        const notifUniqueId = payload.pass_id || payload.pass_number || 'default';
-        const notifTag = 'visitor_pass_' + notifUniqueId;
+        const notifUniqueId = payload.id || payload.notification_id || payload.pass_id || payload.pass_number || payload.ticket_id || payload.ticket_number || payload.ticket_no || ('notif_' + Math.random().toString(36).substring(2, 9));
+        const notifTag = 'erp_notif_' + notifUniqueId;
         const dedupKey = 'notif_dedup_' + eventName + '_' + notifUniqueId;
         
         // Multi-Tab Shared Deduplication using localStorage
         const lastHandled = window.localStorage.getItem(dedupKey);
         const now = Date.now();
-        const isDuplicateAcrossTabs = lastHandled && (now - parseInt(lastHandled)) < 4000;
+        const isDuplicateAcrossTabs = lastHandled && (now - parseInt(lastHandled)) < 3500;
 
         // Update header bell counter on all tabs
         if (typeof fetchSystemNotifications === 'function') {
             fetchSystemNotifications();
         }
 
-        // If another tab already showed the desktop alert and audio chime within 4s, stop here
+        // If another tab already showed the desktop alert and audio chime within 3.5s, stop here
         if (isDuplicateAcrossTabs) {
-            console.log('[Pusher] Cross-tab duplicate debounced:', eventName);
+            console.log('[Pusher] Cross-tab duplicate debounced:', eventName, notifUniqueId);
             return;
         }
         try { window.localStorage.setItem(dedupKey, now.toString()); } catch (e) {}
 
-        let type = 'general';
-        if (eventName === 'visitor.approval_request') type = 'approval_request';
-        if (eventName === 'visitor.approved') type = 'approved';
-        if (eventName === 'visitor.rejected') type = 'rejected';
+        const rawType = (payload.type || eventName || '').toLowerCase();
+        let soundType = 'general';
+
+        if (rawType.includes('approve') || rawType.includes('confirm') || rawType.includes('settled') || rawType.includes('won') || rawType.includes('paid')) {
+            soundType = 'approved';
+        } else if (rawType.includes('reject') || rawType.includes('cancel') || rawType.includes('lost') || rawType.includes('terminate')) {
+            soundType = 'rejected';
+        } else if (rawType.includes('request') || rawType.includes('applied') || rawType.includes('submitted')) {
+            soundType = 'approval_request';
+        }
 
         // 1. Play Audio Chime (Only once across all tabs)
-        playNotificationSound(type);
+        playNotificationSound(soundType);
 
         // 2. Flash Tab Title when outside the tab
-        flashTabTitle(payload.title || 'Visitor Alert');
+        flashTabTitle(payload.title || 'Notification Alert');
 
         // 3. Show Floating On-Screen Toast
         showFloatingPushToast({
-            type: type,
-            title: payload.title || 'Visitor Management Alert',
-            message: payload.message || 'You have a new visitor update.',
-            action_url: payload.action_url || payload.url || null
+            module: payload.module || (rawType.startsWith('hrms') ? 'hrms' : (rawType.startsWith('crm') ? 'crm' : '')),
+            type: payload.type || eventName,
+            title: payload.title || 'System Notification',
+            message: payload.message || 'You have a new update.',
+            action_url: payload.action_url || payload.url || null,
+            icon_class: payload.icon_class || 'feather-bell'
         });
 
         // 4. Trigger Native OS / Desktop Notification (Coalesced via unique tag)
         showBrowserDesktopNotification(
-            payload.title || 'Visitor Management',
-            payload.message || 'You have a new visitor notification.',
+            payload.title || 'System Notification',
+            payload.message || 'You have a new update.',
             payload.action_url || payload.url || null,
             null,
             notifTag
@@ -410,16 +473,96 @@
                 'visitor.host_ping'
             ];
 
-            // 1. User Channel (Host specific alerts)
+            const systemUserEvents = [
+                'notification',
+                // CRM Events
+                'crm.lead.assigned',
+                'crm.lead.created',
+                'crm.lead.followup_due',
+                'crm.deal.followup_due',
+                'crm.lead.followup_upcoming',
+                'crm.deal.followup_upcoming',
+                // HRMS Events
+                'hrms.leave.applied',
+                'hrms.leave.approved',
+                'hrms.leave.rejected',
+                'hrms.leave.cancellation_requested',
+                'hrms.leave.cancellation_approved',
+                'hrms.leave.cancellation_denied',
+                'hrms.wfh.applied',
+                'hrms.wfh.approved',
+                'hrms.wfh.rejected',
+                'hrms.attendance.regularization_applied',
+                'hrms.attendance.regularization_approved',
+                'hrms.attendance.regularization_rejected',
+                'hrms.overtime.applied',
+                'hrms.overtime.approved',
+                'hrms.overtime.rejected',
+                'hrms.shift_change.applied',
+                'hrms.shift_change.approved',
+                'hrms.shift_change.rejected',
+                'hrms.travel.applied',
+                'hrms.travel.approved',
+                'hrms.travel.rejected',
+                'hrms.expense.submitted',
+                'hrms.expense.approved',
+                'hrms.expense.rejected',
+                'hrms.expense.settled',
+                'hrms.payroll.processed',
+                'hrms.payslip.published',
+                'hrms.ticket.created',
+                'hrms.ticket.reply',
+                'hrms.ticket.resolved',
+                'hrms.ticket.closed',
+                'hrms.broadcast.published',
+                'hrms.employee.onboarded',
+                'hrms.probation.confirmed',
+                'hrms.probation.extended',
+                'hrms.probation.terminated',
+                'hrms.resignation.submitted',
+                'hrms.resignation.approved',
+                'hrms.resignation.rejected',
+                'hrms.kra_kpi.submitted',
+                'hrms.kra_kpi.approved',
+                'hrms.goal.approved',
+                // Projects Events
+                'project.task.assigned',
+                'project.task.completed',
+                'project.issue.assigned',
+                'project.issue.logged',
+                'project.issue.resolved',
+                'project.milestone.completed',
+                'project.timesheet.submitted',
+                'project.timesheet.approved',
+                'project.timesheet.rejected',
+                'project.review.requested',
+                'project.review.signed_off',
+                'project.change_request.created',
+                'project.closed',
+                // Visitor Events
+                ...visitorEvents
+            ];
+
+            // 1. User Channel (User-specific real-time alerts for HRMS, CRM, System)
             if (currentUserId > 0) {
                 const userChannelName = 'user-' + currentUserId;
                 const userChannel = pusher.subscribe(userChannelName);
 
-                visitorEvents.forEach(ev => {
+                // Bind all designated events
+                systemUserEvents.forEach(ev => {
                     userChannel.bind(ev, function(data) {
                         handleLiveNotificationEvent(ev, data);
                     });
                 });
+
+                // Global fallback listener on user channel for any dynamic events
+                if (typeof userChannel.bind_global === 'function') {
+                    userChannel.bind_global(function(ev, data) {
+                        if (!ev.startsWith('pusher:') && !systemUserEvents.includes(ev)) {
+                            handleLiveNotificationEvent(ev, data);
+                        }
+                    });
+                }
             }
 
             // 2. Tenant Visitor Channel (Gate desk & general security alerts)

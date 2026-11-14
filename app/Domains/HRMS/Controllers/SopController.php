@@ -9,10 +9,12 @@ use App\Domains\HRMS\Services\HrmsScopeService;
 use App\Domains\HRMS\Services\SopService;
 use App\Domains\HRMS\Repositories\SopRepositoryInterface;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class SopController extends Controller
@@ -24,19 +26,79 @@ class SopController extends Controller
     ) {}
 
     /**
+     * RBAC helper: check if user has full SOP management privileges.
+     */
+    private function canManageSop(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->scopeService->isCompanyAdmin($user) ||
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.sop.manage');
+    }
+
+    /**
+     * RBAC helper: check if user can create SOPs.
+     */
+    private function canCreateSop(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->canManageSop($user) || $user->hasHrPermission('hrms.sop.create');
+    }
+
+    /**
+     * RBAC helper: check if user can update SOPs.
+     */
+    private function canUpdateSop(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->canManageSop($user) || $user->hasHrPermission('hrms.sop.update');
+    }
+
+    /**
+     * RBAC helper: check if user can delete SOPs.
+     */
+    private function canDeleteSop(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->canManageSop($user) || $user->hasHrPermission('hrms.sop.delete');
+    }
+
+    /**
+     * Check if user is an HR Manager, Admin, or has operational SOP visibility.
+     */
+    private function isHrOrAdmin(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->scopeService->isCompanyAdmin($user) ||
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.sop.manage') ||
+            $user->hasHrPermission('hrms.sop.create') ||
+            $user->hasHrPermission('hrms.sop.update') ||
+            $user->hasHrPermission('hrms.sop.delete') ||
+            $user->hasHrPermission('hrms.employees.view');
+    }
+
+    /**
      * Display the Enterprise SOP Hub (Admin Management, Directory, My SOPs, Compliance).
      */
     public function index(Request $request): View
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
         $user = auth()->user();
         $currentEmployee = $this->scopeService->resolveEmployee($user, $tenantId);
-        $isHrOrAdmin = $user && (
-            $this->scopeService->isCompanyAdmin($user) ||
-            $user->hasHrPermission('hr.settings.manage') ||
-            $user->hasHrPermission('hrms.sop.manage') ||
-            $user->hasHrPermission('hrms.employees.view')
-        );
+        $isHrOrAdmin = $this->isHrOrAdmin($user);
 
         $data = $this->sopService->getIndexData(
             $request->all(),
@@ -49,23 +111,34 @@ class SopController extends Controller
     }
 
     /**
+     * Display the employee-focused workspace for My Assigned SOPs.
+     */
+    public function mySops(Request $request): View
+    {
+        $request->merge(['active_tab' => 'my_sops']);
+        return $this->index($request);
+    }
+
+    /**
      * Display detailed SOP Document Reader, Version History, and Sign-off records.
      */
     public function show(int $id): View
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
         $user = auth()->user();
         $currentEmployee = $this->scopeService->resolveEmployee($user, $tenantId);
-        $isHrOrAdmin = $user && (
-            $this->scopeService->isCompanyAdmin($user) ||
-            $user->hasHrPermission('hr.settings.manage') ||
-            $user->hasHrPermission('hrms.sop.manage') ||
-            $user->hasHrPermission('hrms.employees.view')
-        );
+        $isHrOrAdmin = $this->isHrOrAdmin($user);
 
         $sop = SopDocument::with(['category', 'department', 'creator', 'approver', 'sections', 'versionHistories.creator'])
             ->where('tenant_id', $tenantId)
             ->findOrFail($id);
+
+        // Security Guard: Draft SOPs can only be previewed by Admins and HR Managers
+        if ($sop->status !== 'published' && !$isHrOrAdmin) {
+            abort(403, __('hrms.sop.draft_access_denied'));
+        }
 
         $myAssignment = null;
         if ($currentEmployee) {
@@ -76,7 +149,7 @@ class SopController extends Controller
 
         $assignments = collect();
         if ($isHrOrAdmin) {
-            if (SopAssignment::where('sop_document_id', $sop->id)->count() === 0) {
+            if ($sop->status === 'published' && SopAssignment::where('sop_document_id', $sop->id)->count() === 0) {
                 $this->sopService->dispatchAssignments($sop);
             }
             $assignments = SopAssignment::with(['employee.department', 'employee.designation'])
@@ -100,18 +173,24 @@ class SopController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
         $user = auth()->user();
+        abort_unless($this->canCreateSop($user), 403, __('hrms.sop.unauthorized_create'));
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'code' => 'nullable|string|max:50',
-            'sop_category_id' => 'nullable|integer',
-            'department_id' => 'nullable|integer',
+            'sop_category_id' => ['nullable', 'integer', Rule::exists('sop_categories', 'id')->where('tenant_id', $tenantId)],
+            'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
             'criticality' => 'nullable|in:low,medium,high,critical',
             'target_audience_type' => 'nullable|in:all,department,designation,custom',
             'target_department_ids' => 'nullable|array',
+            'target_department_ids.*' => [Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
             'target_designation_ids' => 'nullable|array',
+            'target_designation_ids.*' => [Rule::exists('designations', 'id')->where('tenant_id', $tenantId)],
             'target_employee_ids' => 'nullable|array',
+            'target_employee_ids.*' => [Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'is_mandatory' => 'nullable|boolean',
             'auto_assign_new_hires' => 'nullable|boolean',
             'acknowledgment_days_limit' => 'nullable|integer|min:1|max:365',
@@ -125,16 +204,20 @@ class SopController extends Controller
             'sections' => 'nullable|array',
         ]);
 
+        if (($validated['target_audience_type'] ?? '') === 'department' && !empty($validated['department_id']) && empty($validated['target_department_ids'])) {
+            $validated['target_department_ids'] = [(int) $validated['department_id']];
+        }
+
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
-            $path = $file->store('hrms/sops', 'public');
+            $path = $file->storeTenantFile('hrms/sops', 'public');
             $validated['attachment_path'] = $path;
         }
 
         $this->sopService->createSop($validated, (int) $tenantId, $user);
 
         return redirect()->route('hrms.sop.index', ['active_tab' => 'directory'])
-            ->with('success', 'Standard Operating Procedure created successfully.');
+            ->with('success', __('hrms.sop.sop_created_success'));
     }
 
     /**
@@ -143,20 +226,26 @@ class SopController extends Controller
     public function update(Request $request, int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
         $user = auth()->user();
+        abort_unless($this->canUpdateSop($user), 403, __('hrms.sop.unauthorized_update'));
 
         $sop = SopDocument::where('tenant_id', $tenantId)->findOrFail($id);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'code' => 'nullable|string|max:50',
-            'sop_category_id' => 'nullable|integer',
-            'department_id' => 'nullable|integer',
+            'sop_category_id' => ['nullable', 'integer', Rule::exists('sop_categories', 'id')->where('tenant_id', $tenantId)],
+            'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
             'criticality' => 'nullable|in:low,medium,high,critical',
             'target_audience_type' => 'nullable|in:all,department,designation,custom',
             'target_department_ids' => 'nullable|array',
+            'target_department_ids.*' => [Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
             'target_designation_ids' => 'nullable|array',
+            'target_designation_ids.*' => [Rule::exists('designations', 'id')->where('tenant_id', $tenantId)],
             'target_employee_ids' => 'nullable|array',
+            'target_employee_ids.*' => [Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'is_mandatory' => 'nullable|boolean',
             'auto_assign_new_hires' => 'nullable|boolean',
             'acknowledgment_days_limit' => 'nullable|integer|min:1|max:365',
@@ -172,16 +261,20 @@ class SopController extends Controller
             'sections' => 'nullable|array',
         ]);
 
+        if (($validated['target_audience_type'] ?? '') === 'department' && !empty($validated['department_id']) && empty($validated['target_department_ids'])) {
+            $validated['target_department_ids'] = [(int) $validated['department_id']];
+        }
+
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
-            $path = $file->store('hrms/sops', 'public');
+            $path = $file->storeTenantFile('hrms/sops', 'public');
             $validated['attachment_path'] = $path;
         }
 
         $this->sopService->updateSop($sop, $validated, $user);
 
         return redirect()->route('hrms.sop.show', $sop->id)
-            ->with('success', 'SOP updated successfully.');
+            ->with('success', __('hrms.sop.sop_updated_success'));
     }
 
     /**
@@ -190,11 +283,16 @@ class SopController extends Controller
     public function destroy(int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
+        $user = auth()->user();
+        abort_unless($this->canDeleteSop($user), 403, __('hrms.sop.unauthorized_delete'));
+
         $sop = SopDocument::where('tenant_id', $tenantId)->findOrFail($id);
         $sop->delete();
 
         return redirect()->route('hrms.sop.index', ['active_tab' => 'directory'])
-            ->with('success', 'SOP deleted successfully.');
+            ->with('success', __('hrms.sop.sop_deleted_success'));
     }
 
     /**
@@ -203,7 +301,10 @@ class SopController extends Controller
     public function publish(int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
         $user = auth()->user();
+        abort_unless($this->canManageSop($user), 403, __('hrms.sop.unauthorized_publish'));
 
         $sop = SopDocument::where('tenant_id', $tenantId)->findOrFail($id);
         $sop->update([
@@ -215,7 +316,7 @@ class SopController extends Controller
 
         $assignedCount = $this->sopService->dispatchAssignments($sop);
 
-        return back()->with('success', "SOP published successfully. Dispatched to {$assignedCount} target employees.");
+        return back()->with('success', __('hrms.sop.sop_published_success', ['count' => $assignedCount]));
     }
 
     /**
@@ -224,10 +325,15 @@ class SopController extends Controller
     public function archive(int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
+        $user = auth()->user();
+        abort_unless($this->canManageSop($user), 403, __('hrms.sop.unauthorized_manage'));
+
         $sop = SopDocument::where('tenant_id', $tenantId)->findOrFail($id);
         $sop->update(['status' => 'archived']);
 
-        return back()->with('success', 'SOP archived.');
+        return back()->with('success', __('hrms.sop.sop_archived_success'));
     }
 
     /**
@@ -236,6 +342,11 @@ class SopController extends Controller
     public function assign(Request $request, int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
+        $user = auth()->user();
+        abort_unless($this->canManageSop($user), 403, __('hrms.sop.unauthorized_dispatch'));
+
         $sop = SopDocument::where('tenant_id', $tenantId)->findOrFail($id);
 
         if ($sop->status !== 'published') {
@@ -248,7 +359,7 @@ class SopController extends Controller
 
         $assignedCount = $this->sopService->dispatchAssignments($sop);
 
-        return back()->with('success', "Assignments synchronized. Dispatched to {$assignedCount} target employees.");
+        return back()->with('success', __('hrms.sop.assignments_synced_success', ['count' => $assignedCount]));
     }
 
     /**
@@ -257,7 +368,18 @@ class SopController extends Controller
     public function acknowledge(Request $request, int $assignmentId): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
+        $user = auth()->user();
+        $currentEmployee = $this->scopeService->resolveEmployee($user, $tenantId);
+        $isHrOrAdmin = $this->canManageSop($user);
+
         $assignment = SopAssignment::where('tenant_id', $tenantId)->findOrFail($assignmentId);
+
+        // Security Guard: Only the assigned employee or an authorized HR Admin can acknowledge
+        if (!$isHrOrAdmin && (!$currentEmployee || $assignment->employee_id !== $currentEmployee->id)) {
+            abort(403, __('hrms.sop.unauthorized_acknowledge'));
+        }
 
         $request->validate([
             'checklist_responses' => 'nullable|array',
@@ -268,11 +390,11 @@ class SopController extends Controller
         $this->sopService->acknowledgeAssignment(
             $assignment,
             $request->all(),
-            $request->ip() ?? '127.0.0.1',
-            $request->userAgent() ?? 'Web Browser'
+            $request->ip() ?: '0.0.0.0',
+            $request->userAgent() ?: 'Web Client'
         );
 
-        return back()->with('success', 'Thank you! You have successfully acknowledged and signed off on this SOP.');
+        return back()->with('success', __('hrms.sop.signoff_success'));
     }
 
     /**
@@ -281,12 +403,17 @@ class SopController extends Controller
     public function remind(int $assignmentId): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
+        $user = auth()->user();
+        abort_unless($this->canManageSop($user), 403, __('hrms.sop.unauthorized_manage'));
+
         $assignment = SopAssignment::with(['document', 'employee'])->where('tenant_id', $tenantId)->findOrFail($assignmentId);
 
         $this->sopService->sendReminder($assignment);
 
-        $empName = $assignment->employee->full_name ?? ($assignment->employee->first_name ?? 'Employee');
-        return back()->with('success', "Reminder sent to {$empName}.");
+        $empName = $assignment->employee->full_name ?? ($assignment->employee->first_name ?? __('hrms.common.employee'));
+        return back()->with('success', __('hrms.sop.reminder_sent_success', ['name' => $empName]));
     }
 
     /**
@@ -295,6 +422,11 @@ class SopController extends Controller
     public function bulkRemind(int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
+        $user = auth()->user();
+        abort_unless($this->canManageSop($user), 403, __('hrms.sop.unauthorized_manage'));
+
         $sop = SopDocument::where('tenant_id', $tenantId)->findOrFail($id);
 
         $pendingAssignments = SopAssignment::with(['document', 'employee'])
@@ -308,7 +440,7 @@ class SopController extends Controller
             $count++;
         }
 
-        return back()->with('success', "Reminders sent to {$count} pending employees.");
+        return back()->with('success', __('hrms.sop.bulk_reminders_sent_success', ['count' => $count]));
     }
 
     /**
@@ -317,6 +449,11 @@ class SopController extends Controller
     public function exportAudit(int $id): mixed
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
+        $user = auth()->user();
+        abort_unless($this->isHrOrAdmin($user), 403, __('hrms.sop.unauthorized_manage'));
+
         return $this->sopRepository->exportAudit($id, $tenantId);
     }
 
@@ -326,6 +463,10 @@ class SopController extends Controller
     public function storeCategory(Request $request): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
+        $user = auth()->user();
+        abort_unless($this->canManageSop($user), 403, __('hrms.sop.unauthorized_cat_create'));
 
         $validated = $request->validate([
             'name' => 'required|string|max:100',
@@ -336,13 +477,13 @@ class SopController extends Controller
         ]);
 
         $validated['tenant_id'] = $tenantId;
-        $validated['company_id'] = auth()->user()?->company_id;
+        $validated['company_id'] = $user?->company_id;
         $validated['color'] = $validated['color'] ?? '#3b82f6';
 
         SopCategory::create($validated);
 
         return redirect()->route('hrms.sop.index', ['active_tab' => 'categories'])
-            ->with('success', 'SOP Category created successfully.');
+            ->with('success', __('hrms.sop.category_created_success'));
     }
 
     /**
@@ -351,6 +492,11 @@ class SopController extends Controller
     public function updateCategory(Request $request, int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
+        $user = auth()->user();
+        abort_unless($this->canManageSop($user), 403, __('hrms.sop.unauthorized_cat_update'));
+
         $cat = SopCategory::where('tenant_id', $tenantId)->findOrFail($id);
 
         $validated = $request->validate([
@@ -365,7 +511,7 @@ class SopController extends Controller
         $cat->update($validated);
 
         return redirect()->route('hrms.sop.index', ['active_tab' => 'categories'])
-            ->with('success', 'SOP Category updated successfully.');
+            ->with('success', __('hrms.sop.category_updated_success'));
     }
 
     /**
@@ -374,10 +520,22 @@ class SopController extends Controller
     public function destroyCategory(int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        abort_unless($tenantId, 400, __('hrms.sop.unauthorized_tenant'));
+
+        $user = auth()->user();
+        abort_unless($this->canManageSop($user), 403, __('hrms.sop.unauthorized_cat_delete'));
+
         $cat = SopCategory::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $linkedDocsCount = $cat->documents()->count();
+        if ($linkedDocsCount > 0) {
+            return redirect()->route('hrms.sop.index', ['active_tab' => 'categories'])
+                ->with('error', __('hrms.sop.category_has_docs_error', ['name' => $cat->name, 'count' => $linkedDocsCount]));
+        }
+
         $cat->delete();
 
         return redirect()->route('hrms.sop.index', ['active_tab' => 'categories'])
-            ->with('success', 'SOP Category deleted successfully.');
+            ->with('success', __('hrms.sop.category_deleted_success'));
     }
 }

@@ -20,6 +20,10 @@ class ProjectDocumentPolicy
 
     public function create(User $user, Project $project): bool
     {
+        if ($project->isClosed()) {
+            return false;
+        }
+
         return $this->authorizeOnProject($user, $project, 'projects.documents.upload');
     }
 
@@ -37,6 +41,10 @@ class ProjectDocumentPolicy
 
     public function delete(User $user, ProjectDocument $document): bool
     {
+        if ($document->project?->isClosed()) {
+            return false;
+        }
+
         if ($this->access->allows($user, 'projects.documents.delete', [
             'tenant_id' => $document->tenant_id,
             'owner_id' => $document->uploaded_by,

@@ -54,14 +54,14 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="paymentTermsTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 40px; background-color: #e8ecf1 !important;" class="text-center">#</th>
-                        <th style="background-color: #e8ecf1 !important;">Payment Term Name</th>
-                        <th style="background-color: #e8ecf1 !important;">Code</th>
-                        <th style="background-color: #e8ecf1 !important;" class="text-center">Due Days</th>
-                        <th style="background-color: #e8ecf1 !important;">Description</th>
-                        <th style="background-color: #e8ecf1 !important;" class="text-center">Status</th>
-                        <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">Action</th>
+                    <tr>
+                        <th style="width: 40px;" class="text-center">#</th>
+                        <th>Payment Term Name</th>
+                        <th>Code</th>
+                        <th class="text-center">Due Days</th>
+                        <th>Description</th>
+                        <th class="text-center">Status</th>
+                        <th style="width: 5%;" class="text-end pe-3">Action</th>
                     </tr>
                 </thead>
                 <tbody>

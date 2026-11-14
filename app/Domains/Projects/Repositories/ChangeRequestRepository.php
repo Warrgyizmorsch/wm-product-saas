@@ -10,7 +10,7 @@ class ChangeRequestRepository implements ChangeRequestRepositoryInterface
 {
     public function getForProject(int $projectId, array $filters = []): Collection
     {
-        $query = ChangeRequest::with(['requester', 'approver', 'creator', 'review'])
+        $query = ChangeRequest::with(['requester', 'approver', 'creator', 'review', 'project'])
             ->where('project_id', $projectId);
 
         if (!empty($filters['status'])) {

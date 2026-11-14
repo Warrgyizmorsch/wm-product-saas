@@ -13,6 +13,50 @@
     </div>
 @endsection
 
+@push('styles')
+    <style>
+        /* Scoped Dark / Light Theme Harmonization for Warehouse Directory */
+        .erp-thin-table th {
+            font-size: 11px !important;
+            letter-spacing: 0.5px;
+        }
+
+        html:not(.app-skin-dark) .erp-thin-table th {
+            background-color: #f8fafc !important;
+            color: #475569 !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+        html:not(.app-skin-dark) .erp-thin-table td {
+            color: #1e293b !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+        }
+        html:not(.app-skin-dark) .erp-thin-table tr:hover td {
+            background-color: #f8fafc !important;
+        }
+
+        html.app-skin-dark .erp-thin-table th {
+            background-color: #162038 !important;
+            color: #94a3b8 !important;
+            border-top-color: #1e293b !important;
+            border-bottom-color: #1e293b !important;
+        }
+        html.app-skin-dark .erp-thin-table td {
+            color: #e2e8f0 !important;
+            border-bottom-color: #1e293b !important;
+        }
+        html.app-skin-dark .erp-thin-table tr:hover td {
+            background-color: #1c2844 !important;
+            color: #ffffff !important;
+        }
+        html.app-skin-dark .font-monospace {
+            color: #93c5fd !important;
+        }
+        html.app-skin-dark .form-check-label {
+            color: #cbd5e1 !important;
+        }
+    </style>
+@endpush
+
 @section('content')
     <div class="row">
         <!-- Left: Warehouse List Table -->
@@ -20,7 +64,7 @@
             <x-ui.card :title="__('inventory.warehouse_directory')">
                 <div class="table-responsive">
                     <table class="erp-thin-table">
-                        <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                        <thead class="fs-11 text-uppercase fw-semibold text-muted">
                             <tr>
                                 <th class="ps-4">{{ __('inventory.code') }}</th>
                                 <th>{{ __('inventory.name') }}</th>
@@ -30,7 +74,7 @@
                                 <th class="text-end pe-4">{{ __('inventory.actions') }}</th>
                             </tr>
                         </thead>
-                        <tbody class="fs-13 text-dark">
+                        <tbody class="fs-13">
                             @forelse ($warehouses as $warehouse)
                                 <tr>
                                     <td class="ps-4 fw-bold font-monospace">
@@ -112,7 +156,7 @@
                         <div class="col-md-8">
                             <div class="form-check">
                                 <input type="checkbox" name="is_default" value="1" id="whDefault" class="form-check-input">
-                                <label class="form-check-label fs-12 text-dark" for="whDefault">
+                                <label class="form-check-label fs-12 text-secondary" for="whDefault">
                                     {{ __('inventory.set_as_default_warehouse') }}
                                 </label>
                             </div>
@@ -120,7 +164,7 @@
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <button type="button" class="btn btn-sm btn-light border" id="resetWhForm" style="display: none;">{{ __('inventory.cancel') }}</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="resetWhForm" style="display: none;">{{ __('inventory.cancel') }}</button>
                         <button type="submit" class="btn btn-sm btn-primary" id="whSubmitBtn">{{ __('inventory.create_warehouse') }}</button>
                     </div>
                 </form>

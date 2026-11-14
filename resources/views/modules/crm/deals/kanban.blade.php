@@ -235,19 +235,24 @@
                         @php
                             $dealValue = (float)($deal->actual_value ?: $deal->estimated_value);
                             $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists() ? '1' : '0';
+                            $hasCustomer = !empty($deal->account?->customer_id) ? '1' : '0';
+                            $isWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
                             $isWonOrLost = in_array($deal->stage, ['Won', 'Closed Won', 'Lost', 'Closed Lost']);
                         @endphp
-                        <div class="kanban-card" 
-                             draggable="true" 
+                        <div class="kanban-card {{ $isWon ? 'kanban-card-locked' : '' }}" 
+                             draggable="{{ $isWon ? 'false' : 'true' }}" 
                              data-deal-id="{{ $deal->id }}" 
                              data-deal-title="{{ addslashes($deal->title) }}" 
                              data-has-accepted-quote="{{ $hasAcceptedQuote }}" 
-                             data-amount="{{ $dealValue }}">
+                             data-has-customer="{{ $hasCustomer }}"
+                             data-is-won="{{ $isWon ? '1' : '0' }}"
+                             data-amount="{{ $dealValue }}"
+                             @if($isWon) style="cursor: default; border-left: 3.5px solid #22c55e;" @endif>
                             
                             <!-- Deal Title & Amount -->
                             <div class="d-flex align-items-start justify-content-between mb-1.5">
                                 <a href="{{ route('crm.deals.show', $deal->id) }}" class="fw-bold text-dark fs-13 hover-underline text-truncate me-2" style="max-width: 180px;" title="{{ $deal->title }}">
-                                    {{ $deal->title }}
+                                    @if($isWon) <i class="feather-lock text-success me-1 fs-11" title="Won - Locked"></i> @endif{{ $deal->title }}
                                 </a>
                                 <span class="badge bg-soft-success text-success fs-10 font-monospace fw-bold">
                                     {{ format_currency($dealValue) }}
@@ -339,6 +344,10 @@
         // Attach HTML5 Drag & Drop Listeners
         document.querySelectorAll('.kanban-card').forEach(card => {
             card.addEventListener('dragstart', function (e) {
+                if (this.getAttribute('data-is-won') === '1') {
+                    e.preventDefault();
+                    return false;
+                }
                 draggedCard = this;
                 originalParent = this.parentNode;
                 originalNextSibling = this.nextSibling;
@@ -376,21 +385,52 @@
                 const dealTitle = draggedCard.getAttribute('data-deal-title') || ('Deal #' + dealId);
                 const hasAcceptedQuote = draggedCard.getAttribute('data-has-accepted-quote') === '1';
 
-                // Guard 1: Client-Side Instant Guard for Won Stage
-                if (newStage === 'Won' && !hasAcceptedQuote) {
+                // Guard: If dragged card is already Won, prevent moving it to another stage
+                if (draggedCard.getAttribute('data-is-won') === '1' && newStage !== 'Won') {
+                    const msg = 'This deal is already Won and finalized. Its stage cannot be changed.';
                     if (typeof confirmAction === 'function') {
-                        confirmAction({
-                            title: 'Action Blocked: Quotation Required',
-                            message: 'Deal "' + dealTitle + '" cannot be marked as "Won" directly because no Quotation has been Accepted yet! A Quotation must be created and Accepted first.',
-                            variant: 'warning',
-                            confirmText: 'Got It'
-                        });
-                    } else if (typeof Swal !== 'undefined') {
-                        Swal.fire('Action Blocked', 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.', 'warning');
+                        confirmAction({ title: 'Stage Locked', message: msg, variant: 'warning', confirmText: 'Got It' });
                     } else {
-                        alert('Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.');
+                        alert(msg);
                     }
                     return;
+                }
+
+                // Guard 1: Client-Side Instant Guard for Won Stage
+                if (newStage === 'Won') {
+                    if (!hasAcceptedQuote) {
+                        const msg = 'Deal "' + dealTitle + '" cannot be marked as "Won" directly because no Quotation has been Accepted yet! A Quotation must be created and Accepted first.';
+                        if (typeof confirmAction === 'function') {
+                            confirmAction({
+                                title: 'Action Blocked: Quotation Required',
+                                message: msg,
+                                variant: 'warning',
+                                confirmText: 'Got It'
+                            });
+                        } else if (typeof Swal !== 'undefined') {
+                            Swal.fire('Action Blocked', msg, 'warning');
+                        } else {
+                            alert(msg);
+                        }
+                        return;
+                    }
+
+                    if (draggedCard.getAttribute('data-has-customer') !== '1') {
+                        const msg = 'Customer conversion required! Please click "Convert to Customer" button on the deal first before marking it as Won.';
+                        if (typeof confirmAction === 'function') {
+                            confirmAction({
+                                title: 'Action Blocked: Customer Required',
+                                message: msg,
+                                variant: 'warning',
+                                confirmText: 'Got It'
+                            });
+                        } else if (typeof Swal !== 'undefined') {
+                            Swal.fire('Action Blocked', msg, 'warning');
+                        } else {
+                            alert(msg);
+                        }
+                        return;
+                    }
                 }
 
                 // Modal Check for Lost Stage

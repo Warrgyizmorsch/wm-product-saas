@@ -1,6 +1,6 @@
 @extends('layouts.duralux')
 
-@@section('title', __('hrms.assets.assets_custody_requests') . ' | SaaS ERP')
+@section('title', __('hrms.assets.assets_custody_requests') . ' | SaaS ERP')
 @section('page-title', __('hrms.assets.assets_custody_requests'))
 @section('breadcrumb', __('hrms.common.hrms') . ' / ' . __('hrms.assets.title'))
 
@@ -169,7 +169,7 @@
                                         <div class="mb-3" style="min-width: 250px;">
                                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.org_entity') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="request_company_id">
-                                                <option value="">{{ __('hrms.assets.all_companies') }}</option>
+                                                <option value="">{{ __('hrms.common.all_companies') }}</option>
                                                 @foreach($companies as $company)
                                                     <option value="{{ $company->id }}" {{ request('request_company_id') == $company->id ? 'selected' : '' }}>
                                                         {{ $company->company_name }}
@@ -278,8 +278,12 @@
                                                     <span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11 text-capitalize">{{ __('hrms.assets.status_allocated') }}</span>
                                                 @elseif($req->status === 'rejected')
                                                     <span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11 text-capitalize" title="{{ $req->admin_notes }}">{{ __('hrms.assets.status_rejected') }}</span>
+                                                @elseif($req->status === 'approved')
+                                                    <span class="badge bg-soft-info text-info px-2.5 py-1 rounded-pill fs-11 text-capitalize">{{ __('hrms.assets.status_approved') }}</span>
+                                                @elseif($req->status === 'withdrawn')
+                                                    <span class="badge bg-light text-secondary px-2.5 py-1 rounded-pill fs-11 text-capitalize">{{ __('hrms.assets.status_withdrawn') }}</span>
                                                 @else
-                                                    <span class="badge bg-light text-secondary px-2.5 py-1 rounded-pill fs-11 text-capitalize">{{ $req->status }}</span>
+                                                    <span class="badge bg-light text-secondary px-2.5 py-1 rounded-pill fs-11 text-capitalize">{{ __('hrms.assets.status_' . $req->status) !== 'hrms.assets.status_' . $req->status ? __('hrms.assets.status_' . $req->status) : $req->status }}</span>
                                                 @endif
                                             </div>
                                         </td>
@@ -295,7 +299,7 @@
                                                         foreach ($unitsList as $aUnit) {
                                                             $allocatedUnitsData[] = [
                                                                 'code' => $aUnit->asset_code,
-                                                                'serial' => $aUnit->serial_number ?: 'N/A',
+                                                                'serial' => $aUnit->serial_number ?: __('hrms.common.na'),
                                                                 'name' => $aUnit->name ?: ($req->item->name ?? $req->category->name),
                                                                 'date' => $aUnit->allocated_at ? $aUnit->allocated_at->format('d M, Y') : ($req->updated_at ? $req->updated_at->format('d M, Y') : '-')
                                                             ];
@@ -303,7 +307,7 @@
                                                     } elseif ($req->allocatedAsset) {
                                                         $allocatedUnitsData[] = [
                                                             'code' => $req->allocatedAsset->asset_code,
-                                                            'serial' => $req->allocatedAsset->serial_number ?: 'N/A',
+                                                            'serial' => $req->allocatedAsset->serial_number ?: __('hrms.common.na'),
                                                             'name' => $req->allocatedAsset->name ?: ($req->item->name ?? $req->category->name),
                                                             'date' => $req->allocatedAsset->allocated_at ? $req->allocatedAsset->allocated_at->format('d M, Y') : ($req->updated_at ? $req->updated_at->format('d M, Y') : '-')
                                                         ];
@@ -311,27 +315,6 @@
                                                 }
                                             @endphp
                                             <x-ui.action-dropdown align="end">
-                                                <x-slot:extraActions>
-                                                    <button type="button" class="action-dropdown-btn view-req-details-btn" title="{{ __('hrms.assets.view_details') }}"
-                                                        data-emp-name="{{ $req->employee->display_name }}"
-                                                        data-emp-id="{{ $req->employee->employee_id }}"
-                                                        data-company="{{ $req->company->company_name ?? '' }}"
-                                                        data-asset-name="{{ $req->item->name ?? $req->category->name }}"
-                                                        data-category="{{ $req->category->name }}"
-                                                        data-req-qty="{{ $req->quantity }}"
-                                                        data-alloc-qty="{{ $allocatedCount }}"
-                                                        data-rem-qty="{{ $remainingQty }}"
-                                                        data-status-raw="{{ $req->status }}"
-                                                        data-status="{{ $req->status === 'partially_allocated' ? __('hrms.assets.status_partially_allocated') : ($req->status === 'allocated' ? __('hrms.assets.status_allocated') : ($req->status === 'rejected' ? __('hrms.assets.status_rejected') : __('hrms.assets.status_pending'))) }}"
-                                                        data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
-                                                        data-action-date="{{ $req->updated_at ? $req->updated_at->format('d M, Y') : '-' }}"
-                                                        data-reason="{{ $req->reason ?: __('hrms.assets.no_reason_provided') }}"
-                                                        data-admin-notes="{{ $req->formatted_admin_notes ?: ($req->admin_notes ?: '') }}"
-                                                        data-allocated-units="{{ base64_encode(json_encode($allocatedUnitsData)) }}">
-                                                        <i class="feather feather-eye"></i>
-                                                    </button>
-                                                </x-slot:extraActions>
-
                                                 <li>
                                                     <a class="dropdown-item view-req-details-btn d-flex align-items-center" href="javascript:void(0)"
                                                         data-emp-name="{{ $req->employee->display_name }}"
@@ -343,7 +326,7 @@
                                                         data-alloc-qty="{{ $allocatedCount }}"
                                                         data-rem-qty="{{ $remainingQty }}"
                                                         data-status-raw="{{ $req->status }}"
-                                                        data-status="{{ $req->status === 'partially_allocated' ? __('hrms.assets.status_partially_allocated') : ($req->status === 'allocated' ? __('hrms.assets.status_allocated') : ($req->status === 'rejected' ? __('hrms.assets.status_rejected') : __('hrms.assets.status_pending'))) }}"
+                                                        data-status="{{ $req->status === 'partially_allocated' ? __('hrms.assets.status_partially_allocated') : ($req->status === 'allocated' ? __('hrms.assets.status_allocated') : ($req->status === 'rejected' ? __('hrms.assets.status_rejected') : ($req->status === 'approved' ? __('hrms.assets.status_approved') : ($req->status === 'withdrawn' ? __('hrms.assets.status_withdrawn') : __('hrms.assets.status_pending'))))) }}"
                                                         data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
                                                         data-action-date="{{ $req->updated_at ? $req->updated_at->format('d M, Y') : '-' }}"
                                                         data-reason="{{ $req->reason ?: __('hrms.assets.no_reason_provided') }}"
@@ -362,6 +345,7 @@
                                                             data-employee-id="{{ $req->employee_id }}"
                                                             data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})"
                                                             data-asset-item-id="{{ $req->asset_item_id }}"
+                                                            data-category-id="{{ $req->asset_category_id }}"
                                                             data-item-name="{{ $req->item->name ?? __('hrms.common.na') }}"
                                                             data-quantity="{{ $req->quantity }}"
                                                             data-allocated-count="{{ $allocatedCount }}"
@@ -392,7 +376,7 @@
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>v>
+                    </div>
 
                     @if($requests->hasPages())
                         <div class="bg-white border-top px-4 py-3 mt-3">
@@ -445,7 +429,7 @@
                                         <div class="mb-3" style="min-width: 250px;">
                                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.org_entity') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="history_company_id">
-                                                <option value="">{{ __('hrms.assets.all_companies') }}</option>
+                                                <option value="">{{ __('hrms.common.all_companies') }}</option>
                                                 @foreach($companies as $company)
                                                     <option value="{{ $company->id }}" {{ request('history_company_id') == $company->id ? 'selected' : '' }}>
                                                         {{ $company->company_name }}
@@ -491,7 +475,7 @@
                                             return [
                                                 'id' => $alloc->asset->id,
                                                 'asset_code' => $alloc->asset->asset_code,
-                                                'serial_number' => $alloc->asset->serial_number ?: 'N/A',
+                                                'serial_number' => $alloc->asset->serial_number ?: __('hrms.common.na'),
                                                 'asset_name' => $alloc->asset->item->name ?? $alloc->asset->name
                                             ];
                                         })->values()->all()));
@@ -805,7 +789,7 @@
                             <div>
                                 <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-0.5">{{ __('hrms.assets.lbl_requested_by') }}</span>
                                 <h6 class="fw-bold text-dark mb-0 fs-14" id="req_detail_emp_name">{{ __('hrms.assets.employee') }}</h6>
-                                <div class="fs-11 text-muted fw-medium" id="req_detail_emp_id">EMP0000</div>
+                                <div class="fs-11 text-muted fw-medium" id="req_detail_emp_id">-</div>
                             </div>
                             <div class="text-end">
                                 <span class="badge bg-white text-secondary border px-2.5 py-1 fs-11 fw-semibold mb-1 d-inline-block" id="req_detail_company">{{ __('hrms.assets.company') }}</span>
@@ -991,6 +975,8 @@
         statusPartiallyAllocated: "{{ __('hrms.assets.status_partially_allocated') }}",
         statusAllocated: "{{ __('hrms.assets.status_allocated') }}",
         statusRejected: "{{ __('hrms.assets.status_rejected') }}",
+        statusApproved: "{{ __('hrms.assets.status_approved') }}",
+        statusWithdrawn: "{{ __('hrms.assets.status_withdrawn') }}",
         na: "{{ __('hrms.common.na') }}"
     };
 
@@ -1167,6 +1153,7 @@
             var employeeId = button.attr('data-employee-id');
             var employeeName = button.attr('data-employee-name');
             var assetItemId = button.attr('data-asset-item-id');
+            var categoryId = button.attr('data-category-id');
             var itemName = button.attr('data-item-name');
 
             var actionUrl = "{{ route('hrms.assets.requests.allocate', ':id') }}".replace(':id', requestId);
@@ -1183,7 +1170,10 @@
             checklist.empty();
 
             var filteredAssets = allAvailableAssets.filter(function(a) {
-                return a.asset_item_id == assetItemId;
+                if (assetItemId) {
+                    return a.asset_item_id == assetItemId;
+                }
+                return a.category_id == categoryId;
             });
 
             if (filteredAssets.length === 0) {
@@ -1194,7 +1184,7 @@
                 filteredAssets.forEach(function(a, idx) {
                     var cbId = 'alloc_unit_check_' + a.id;
                     var label = '<strong>' + a.asset_code + '</strong>';
-                    if (a.serial_number) label += ' <span class="text-muted">(S/N: ' + a.serial_number + ')</span>';
+                    if (a.serial_number) label += ' <span class="text-muted fs-11">(' + langAssets.serial + ': ' + a.serial_number + ')</span>';
                     var row = $('<div class="form-check py-1.5 d-flex align-items-center" style="border-bottom: 1px dashed #e9ecef;"></div>');
                     if (idx === filteredAssets.length - 1) row.css('border-bottom', 'none');
                     row.html(
@@ -1253,6 +1243,10 @@
                 badgeClass = 'bg-soft-info text-info';
             } else if (statusRaw === 'rejected') {
                 badgeClass = 'bg-soft-danger text-danger';
+            } else if (statusRaw === 'approved') {
+                badgeClass = 'bg-soft-info text-info';
+            } else if (statusRaw === 'withdrawn') {
+                badgeClass = 'bg-light text-secondary';
             }
             statusContainer.append('<span class="badge ' + badgeClass + ' px-2.5 py-1 rounded-pill fs-11">' + statusLabel + '</span>');
 
@@ -1363,6 +1357,7 @@
                 var empName = cb.attr('data-employee-name');
                 var itemName = cb.attr('data-item-name');
                 var catName = cb.attr('data-category-name');
+                var catId = cb.attr('data-category-id');
                 var assetItemId = cb.attr('data-item-id');
                 var compId = cb.attr('data-company-id');
                 var reqQty = cb.attr('data-quantity');
@@ -1372,7 +1367,10 @@
                 // Filter available units for this item and build a checkbox checklist
                 // Only show up to remainingQty units (what the requester still needs)
                 var itemAssets = allAvailableAssets.filter(function(a) {
-                    return a.asset_item_id == assetItemId;
+                    if (assetItemId) {
+                        return a.asset_item_id == assetItemId;
+                    }
+                    return a.category_id == catId;
                 }).slice(0, parseInt(remainingQty, 10));
 
                 var checklistHtml = '';

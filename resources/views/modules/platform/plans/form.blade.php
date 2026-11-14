@@ -6,6 +6,10 @@
     <div class="{{ $isModal ? '' : 'col-xxl-8 col-xl-9 mx-auto' }}">
         <form action="{{ $action }}" method="POST" @isset($formId) id="{{ $formId }}" @endisset>
             @csrf
+            @isset($formId)
+                {{-- Tags the submission so only this form gets the old input/errors back. --}}
+                <input type="hidden" name="_form" value="{{ $formId }}">
+            @endisset
             @if ($method !== 'POST')
                 @method($method)
             @endif

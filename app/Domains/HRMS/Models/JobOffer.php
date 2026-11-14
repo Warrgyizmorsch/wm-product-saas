@@ -22,6 +22,7 @@ class JobOffer extends BaseModel
         'offer_letter_content',
         'status',
         'accepted_at',
+        'sent_at',
         'converted_employee_id',
     ];
 
@@ -29,6 +30,7 @@ class JobOffer extends BaseModel
         'offered_annual_ctc' => 'decimal:2',
         'joining_date' => 'date',
         'accepted_at' => 'datetime',
+        'sent_at' => 'datetime',
     ];
 
     public function application(): BelongsTo

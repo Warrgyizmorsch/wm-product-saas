@@ -17,7 +17,7 @@ class ProductImageService
     {
         $dir = "uploads/tenants/{$tenantId}/products/{$product->id}";
         $filename = 'main_' . time() . '_' . Str::random(8) . '.' . $file->getClientOriginalExtension();
-        $path = $file->storeAs($dir, $filename, 'public');
+        $path = $file->storeTenantFileAs($dir, $filename, 'public');
 
         // Unset previous primary image
         ProductImage::where('product_id', $product->id)->update(['is_primary' => false]);
@@ -58,7 +58,7 @@ class ProductImageService
             }
 
             $filename = 'detail_' . time() . '_' . Str::random(8) . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs($dir, $filename, 'public');
+            $path = $file->storeTenantFileAs($dir, $filename, 'public');
 
             $saved[] = ProductImage::create([
                 'tenant_id' => $tenantId,

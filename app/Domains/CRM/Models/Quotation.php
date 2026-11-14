@@ -14,10 +14,34 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Builder;
 
 class Quotation extends BaseModel
 {
     use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+
+    protected ?string $rbacPermission = 'crm.quotations.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->where(function (Builder $sub) use ($user) {
+            $sub->where('quotations.sales_person_id', $user->id)
+                ->orWhereHas('crmDeal', fn($dq) => $dq->where('owner_id', $user->id)->orWhereHas('account', fn($aq) => $aq->where('owner_id', $user->id)))
+                ->orWhereHas('crmAccount', fn($aq) => $aq->where('owner_id', $user->id))
+                ->orWhereHas('lead', fn($lq) => $lq->where('lead_owner_id', $user->id));
+        });
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($quotation) {
+            if (empty($quotation->sales_person_id) && auth()->check()) {
+                $quotation->sales_person_id = auth()->id();
+            }
+        });
+    }
 
     protected function quotationNumber(): Attribute
     {
@@ -42,8 +66,14 @@ class Quotation extends BaseModel
         'quotation_date',
         'expiry_date',
         'status',
+        'tax_mode',       // exclusive, inclusive
+        'tax_type',       // intra_state, inter_state, exempt
+        'discount_type',  // without_discount, item_wise, order_wise
         'subtotal',
         'tax',
+        'cgst',
+        'sgst',
+        'igst',
         'discount',
         'total_amount',
         'terms_conditions',
@@ -57,11 +87,75 @@ class Quotation extends BaseModel
         'expiry_date'     => 'date',
         'subtotal'        => 'decimal:2',
         'tax'             => 'decimal:2',
+        'cgst'            => 'decimal:2',
+        'sgst'            => 'decimal:2',
+        'igst'            => 'decimal:2',
         'discount'        => 'decimal:2',
         'total_amount'    => 'decimal:2',
         'is_current'      => 'boolean',
         'revision_number' => 'integer',
     ];
+
+    public function getEffectiveTaxModeAttribute(): string
+    {
+        return !empty($this->tax_mode) ? $this->tax_mode : 'exclusive';
+    }
+
+    public function getEffectiveTaxTypeAttribute(): string
+    {
+        return !empty($this->tax_type) ? $this->tax_type : 'intra_state';
+    }
+
+    public function getEffectiveDiscountTypeAttribute(): string
+    {
+        return !empty($this->discount_type) ? $this->discount_type : 'order_wise';
+    }
+
+    public function getTaxableAmountAttribute(): float
+    {
+        $subtotal = (float) ($this->subtotal ?? 0);
+        $discount = (float) ($this->discount ?? 0);
+        $tax = (float) ($this->tax ?? 0);
+
+        if ($this->effective_tax_mode === 'inclusive') {
+            return round(max(0, ($subtotal - $discount) - $tax), 2);
+        }
+
+        return round(max(0, $subtotal - $discount), 2);
+    }
+
+    public function getComputedCgstAttribute(): float
+    {
+        if ($this->cgst !== null && $this->cgst !== '') {
+            return (float) $this->cgst;
+        }
+        if ($this->effective_tax_type === 'intra_state') {
+            return round(((float) ($this->tax ?? 0)) / 2, 2);
+        }
+        return 0.0;
+    }
+
+    public function getComputedSgstAttribute(): float
+    {
+        if ($this->sgst !== null && $this->sgst !== '') {
+            return (float) $this->sgst;
+        }
+        if ($this->effective_tax_type === 'intra_state') {
+            return round(((float) ($this->tax ?? 0)) / 2, 2);
+        }
+        return 0.0;
+    }
+
+    public function getComputedIgstAttribute(): float
+    {
+        if ($this->igst !== null && $this->igst !== '') {
+            return (float) $this->igst;
+        }
+        if ($this->effective_tax_type === 'inter_state') {
+            return (float) ($this->tax ?? 0);
+        }
+        return 0.0;
+    }
 
     public function getCustomerAttribute(): ?Customer
     {

@@ -44,7 +44,7 @@ class LeadApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
+        $companyId = company_id() ?? $user?->company_id;
         $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
@@ -55,6 +55,8 @@ class LeadApiController extends Controller
      */
     public function meta(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $statuses = LeadStatus::where(function ($q) use ($tenantId) {
@@ -85,6 +87,8 @@ class LeadApiController extends Controller
      */
     public function checkDuplicate(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $email = trim((string)$request->input('email'));
@@ -128,6 +132,8 @@ class LeadApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $query = Lead::query()
@@ -160,7 +166,7 @@ class LeadApiController extends Controller
             $query->where('priority', $priority);
         }
 
-        // Owner Filter
+        // Owner Filter / Scope
         if ($ownerId = $request->input('owner_id')) {
             $query->where('lead_owner_id', $ownerId);
         }
@@ -481,13 +487,13 @@ class LeadApiController extends Controller
             'company_name'       => $isB2B ? 'required|string|max:255' : 'nullable|string|max:255',
             'gstin'              => 'nullable|string|max:100',
             'company_email'      => $isB2B ? 'required|email|max:255' : 'nullable|email|max:255',
-            'company_phone'      => 'nullable|string|max:50',
+            'company_phone'      => 'nullable|string|regex:/^[0-9]+$/|max:20',
 
             // Contact Person Details
             'contact_person'     => $isB2B ? 'nullable|string|max:255' : 'required|string|max:255',
             'designation'        => 'nullable|string|max:255',
             'email'              => $isB2B ? 'nullable|email|max:255' : 'required|email|max:255',
-            'phone'              => 'nullable|string|max:50',
+            'phone'              => 'nullable|string|regex:/^[0-9]+$/|max:20',
 
             // Sales Rep / Owner
             'lead_owner_id'      => 'nullable|integer',
@@ -520,7 +526,7 @@ class LeadApiController extends Controller
             'additional_contacts'               => 'nullable|array',
             'additional_contacts.*.name'        => 'nullable|string|max:255',
             'additional_contacts.*.designation' => 'nullable|string|max:255',
-            'additional_contacts.*.phone'       => 'nullable|string|max:50',
+            'additional_contacts.*.phone'       => 'nullable|string|regex:/^[0-9]+$/|max:20',
             'additional_contacts.*.email'       => 'nullable|email|max:255',
             'is_customer'                       => 'nullable|boolean',
         ];
@@ -532,10 +538,13 @@ class LeadApiController extends Controller
     private function leadValidationMessages(): array
     {
         return [
-            'company_name.required'   => 'company_name is required when company_email is provided.',
-            'company_email.required'  => 'company_email is required when company_name is provided.',
-            'contact_person.required' => 'contact_person is required for B2C leads (when company details are not provided).',
-            'email.required'          => 'email (contact email) is required for B2C leads (when company details are not provided).',
+            'company_name.required'             => 'company_name is required when company_email is provided.',
+            'company_email.required'            => 'company_email is required when company_name is provided.',
+            'contact_person.required'           => 'contact_person is required for B2C leads (when company details are not provided).',
+            'email.required'                    => 'email (contact email) is required for B2C leads (when company details are not provided).',
+            'phone.regex'                       => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'company_phone.regex'               => 'Company phone must contain digits/numbers only (no special characters or letters).',
+            'additional_contacts.*.phone.regex' => 'Additional contact phone must contain digits/numbers only (no special characters or letters).',
         ];
     }
 
@@ -810,6 +819,8 @@ class LeadApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $lead);
+
         return response()->json([
             'success' => true,
             'data'    => $lead,
@@ -830,6 +841,8 @@ class LeadApiController extends Controller
                 'message' => "Lead with ID {$id} not found.",
             ], 404);
         }
+
+        $this->authorize('update', $lead);
 
         $validator = Validator::make($request->all(), [
             'name'            => ['sometimes', 'required', 'string', 'max:255'],
@@ -895,6 +908,8 @@ class LeadApiController extends Controller
             return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
         }
 
+        $this->authorize('update', $lead);
+
         $validator = Validator::make($request->all(), [
             'status_id' => ['nullable', 'integer'],
             'status'    => ['nullable', 'string'],
@@ -922,6 +937,13 @@ class LeadApiController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Please provide status or status_id.',
+            ], 422);
+        }
+
+        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+            return response()->json([
+                'success' => false,
+                'message' => "Lead status in '{$lead->status}' stage is locked.",
             ], 422);
         }
 
@@ -960,6 +982,8 @@ class LeadApiController extends Controller
             return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
         }
 
+        $this->authorize('update', $lead);
+
         $validator = Validator::make($request->all(), [
             'priority' => ['required', 'string', 'in:low,medium,high,urgent,Low,Medium,High,Urgent'],
         ]);
@@ -996,6 +1020,8 @@ class LeadApiController extends Controller
                 'message' => 'Lead not found',
             ], 404);
         }
+
+        $this->authorize('update', $lead);
 
         $validator = Validator::make($request->all(), [
             'deal_title'          => ['nullable', 'string', 'max:255'],
@@ -1128,6 +1154,8 @@ class LeadApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $lead);
+
         $lead->delete();
 
         return response()->json([
@@ -1146,6 +1174,8 @@ class LeadApiController extends Controller
         if (!$lead) {
             return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
         }
+
+        $this->authorize('update', $lead);
 
         $validator = Validator::make($request->all(), [
             'lead_owner_id' => 'nullable|integer|exists:users,id',
@@ -1197,6 +1227,8 @@ class LeadApiController extends Controller
      */
     public function bulkAssign(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [
@@ -1265,6 +1297,8 @@ class LeadApiController extends Controller
             return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
         }
 
+        $this->authorize('update', $lead);
+
         $lead->requirement = $request->input('requirement');
         $lead->save();
 
@@ -1280,6 +1314,8 @@ class LeadApiController extends Controller
      */
     public function kanban(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $statuses = LeadStatus::where(function ($q) use ($tenantId) {
@@ -1317,6 +1353,8 @@ class LeadApiController extends Controller
         if (!$lead) {
             return response()->json(['success' => false, 'message' => "Deleted Lead with ID {$id} not found."], 404);
         }
+
+        $this->authorize('delete', $lead);
 
         $lead->restore();
 

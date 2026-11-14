@@ -106,7 +106,7 @@
                                     @csrf
                                     @method('DELETE')
                                      <div class="hstack gap-2 justify-content-end align-items-center">
-                                         <a href="javascript:void(0)" class="action-dropdown-btn btn-view-desig" data-bs-toggle="modal" data-bs-target="#viewDesigModal" data-desig="{{ base64_encode($ds->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
+                                         <a href="javascript:void(0)" class="action-dropdown-btn btn-view-desig" data-bs-toggle="modal" data-bs-target="#viewDesigModal" data-desig="{{ json_encode($ds) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
                                              <i class="feather feather-eye"></i>
                                          </a>
                                          <x-ui.action-dropdown>
@@ -157,6 +157,7 @@
     </div>
 </div>
 
+@push('scripts')
 <script>
     (function() {
         function getInitials(name, fallback) {
@@ -171,7 +172,7 @@
 
         // Delegated View Action Trigger
         $(document).on('click', '.btn-view-desig', function() {
-            let desig = JSON.parse(atob(this.dataset.desig));
+            let desig = JSON.parse(this.dataset.desig);
             
             let nameEl = document.getElementById('modal_view_desig_name');
             if (nameEl) nameEl.innerText = desig.name;
@@ -237,6 +238,7 @@
         });
     })();
 </script>
+@endpush
 
 <!-- View Desig Modal -->
 <div class="modal fade" id="viewDesigModal" tabindex="-1" aria-labelledby="viewDesigModalLabel" aria-hidden="true">

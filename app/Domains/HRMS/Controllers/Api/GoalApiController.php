@@ -12,9 +12,22 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class GoalApiController extends Controller
 {
+    private function goalReferenceRule(string $model, int $tenantId): array
+    {
+        return ['nullable', function ($attribute, $value, $fail) use ($model, $tenantId) {
+            if ($value === '__custom__') {
+                return;
+            }
+            if (!ctype_digit((string) $value) || !$model::where('tenant_id', $tenantId)->whereKey((int) $value)->exists()) {
+                $fail('The selected goal reference is invalid.');
+            }
+        }];
+    }
+
     public function __construct(
         private readonly GoalRepositoryInterface $goalRepository,
         private readonly HrmsScopeService $scopeService
@@ -48,22 +61,17 @@ class GoalApiController extends Controller
     }
 
     /**
-     * Resolve current user context, tenant ID, and HR/Admin permissions.
+     * Resolve current user context, tenant ID, and dynamic HR/Admin permissions without hardcoded roles.
      */
     private function resolveContext(): array
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id ?? 1;
         $user = auth()->user();
-        $currentEmployee = $this->scopeService->resolveEmployee($user, $tenantId);
-        $isHrAdmin = $user && (
-            $this->scopeService->isCompanyAdmin($user) ||
-            $user->hasHrPermission('hr.settings.manage') ||
-            $user->hasHrPermission('hrms.goals.manage') ||
-            $user->hasHrPermission('hrms.performance.manage') ||
-            $user->hasHrPermission('hrms.employees.view')
-        );
+        $currentEmployee = $this->scopeService->resolveEmployee($user, (int) $tenantId);
+        $isHrAdmin = $this->goalRepository->isHrAdmin($user);
+        $canManage = $this->goalRepository->canManageGoals($user);
 
-        return [$tenantId, $user, $currentEmployee, (bool) $isHrAdmin];
+        return [(int) $tenantId, $user, $currentEmployee, (bool) $isHrAdmin, (bool) $canManage];
     }
 
     // =========================================================================
@@ -120,13 +128,13 @@ class GoalApiController extends Controller
             $query = Goal::with([
                 'category:id,name,code,color,icon',
                 'cycle:id,name,code,status',
-                'department:id,name',
-                'employee:id,full_name,employee_id',
-                'employees:id,full_name,employee_id',
+                'department:id,name,code',
+                'employee:id,full_name,employee_id,job_title',
+                'employees:id,full_name,employee_id,job_title',
                 'keyResults:id,goal_id,title,progress_percentage,current_value,target_value,unit',
             ])->where('tenant_id', $tenantId);
 
-            // Tab filtering
+            // Tab / Role scoping
             $tab = $request->get('tab');
             if ($tab === 'company_goals') {
                 $query->where(function ($q) {
@@ -134,11 +142,12 @@ class GoalApiController extends Controller
                       ->orWhereNotNull('goal_category_id')
                       ->orWhereNull('parent_goal_id');
                 });
-            } elseif ($tab === 'my_team_goals' || $tab === 'my_goals') {
+            } elseif ($tab === 'my_team_goals' || $tab === 'my_goals' || (!$isHrAdmin && empty($tab))) {
                 if (!$isHrAdmin && $currentEmployee) {
-                    $query->where(function ($q) use ($currentEmployee) {
-                        $q->where('employee_id', $currentEmployee->id)
-                          ->orWhereHas('employees', fn($eq) => $eq->where('employees.id', $currentEmployee->id))
+                    $accessibleEmpIds = $this->scopeService->getAccessibleEmployeeIds($user) ?? [$currentEmployee->id];
+                    $query->where(function ($q) use ($currentEmployee, $accessibleEmpIds) {
+                        $q->whereIn('employee_id', $accessibleEmpIds)
+                          ->orWhereHas('employees', fn($eq) => $eq->whereIn('employees.id', $accessibleEmpIds))
                           ->orWhere('department_id', $currentEmployee->department_id)
                           ->orWhere('owner_type', 'company');
                     });
@@ -182,7 +191,8 @@ class GoalApiController extends Controller
                           $cyq->where('goal_cycles.name', 'like', "%{$s}%");
                       })
                       ->orWhereHas('department', function ($dq) use ($s) {
-                          $dq->where('departments.name', 'like', "%{$s}%");
+                          $dq->where('departments.name', 'like', "%{$s}%")
+                            ->orWhere('departments.code', 'like', "%{$s}%");
                       })
                       ->orWhereHas('employee', function ($eq) use ($s) {
                           $eq->where('employees.full_name', 'like', "%{$s}%")
@@ -197,6 +207,10 @@ class GoalApiController extends Controller
                       ->orWhereHas('keyResults', function ($kq) use ($s) {
                           $kq->where('goal_key_results.title', 'like', "%{$s}%")
                             ->orWhere('goal_key_results.unit', 'like', "%{$s}%");
+                      })
+                      ->orWhereHas('parentGoal', function ($pq) use ($s) {
+                          $pq->where('goals.title', 'like', "%{$s}%")
+                            ->orWhere('goals.code', 'like', "%{$s}%");
                       });
                 });
             }
@@ -214,7 +228,7 @@ class GoalApiController extends Controller
             $perPage = min((int) ($request->get('per_page', 15)), 100);
             $paginated = $query->paginate($perPage);
 
-            $items = $paginated->getCollection()->map(function ($g) use ($isHrAdmin, $currentEmployee) {
+            $items = $paginated->getCollection()->map(function ($g) use ($user) {
                 $assignedEmps = $g->employees->isNotEmpty() ? $g->employees : ($g->employee ? collect([$g->employee]) : collect());
 
                 return [
@@ -251,9 +265,9 @@ class GoalApiController extends Controller
                     'status'              => $g->status,
                     'capabilities'        => [
                         'can_view'     => true,
-                        'can_edit'     => $isHrAdmin || ($currentEmployee && ($g->employee_id === $currentEmployee->id || $assignedEmps->contains('id', $currentEmployee->id))),
-                        'can_delete'   => $isHrAdmin,
-                        'can_check_in' => $isHrAdmin || ($currentEmployee && ($g->employee_id === $currentEmployee->id || $assignedEmps->contains('id', $currentEmployee->id))),
+                        'can_edit'     => $this->goalRepository->canUpdateGoal($user, $g),
+                        'can_delete'   => $this->goalRepository->canDeleteGoal($user, $g),
+                        'can_check_in' => $this->goalRepository->canCheckInGoal($user, $g),
                     ],
                 ];
             });
@@ -277,7 +291,7 @@ class GoalApiController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        [$tenantId, $user, $currentEmployee, $isHrAdmin] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
 
         try {
             $data = $this->goalRepository->getShowData($id, $user, $tenantId);
@@ -288,6 +302,7 @@ class GoalApiController extends Controller
             $keyResults = $goal->keyResults->map(fn($kr) => [
                 'id'                  => $kr->id,
                 'title'               => $kr->title,
+                'description'         => $kr->description,
                 'metric_type'         => $kr->metric_type,
                 'unit'                => $kr->unit,
                 'start_value'         => (float) $kr->start_value,
@@ -354,9 +369,9 @@ class GoalApiController extends Controller
                 'cascaded_sub_goals'  => $subGoals,
                 'capabilities'        => [
                     'can_view'     => true,
-                    'can_edit'     => $isHrAdmin || ($currentEmployee && ($goal->employee_id === $currentEmployee->id || $assignedEmps->contains('id', $currentEmployee->id))),
-                    'can_delete'   => $isHrAdmin,
-                    'can_check_in' => $isHrAdmin || ($currentEmployee && ($goal->employee_id === $currentEmployee->id || $assignedEmps->contains('id', $currentEmployee->id))),
+                    'can_edit'     => $this->goalRepository->canUpdateGoal($user, $goal),
+                    'can_delete'   => $this->goalRepository->canDeleteGoal($user, $goal),
+                    'can_check_in' => $this->goalRepository->canCheckInGoal($user, $goal),
                 ],
             ];
 
@@ -373,28 +388,44 @@ class GoalApiController extends Controller
     {
         [$tenantId, $user] = $this->resolveContext();
 
+        // RBAC validation: only managers/admins can create company-wide objectives or custom cycles/pillars
+        if ($request->owner_type === 'company' && !$this->goalRepository->canManageGoals($user)) {
+            return $this->sendError('You are not authorized to create organization-wide goals.', 403);
+        }
+
+        if (($request->filled('custom_goal_cycle') || $request->filled('custom_goal_category')) && !$this->goalRepository->canManageGoals($user)) {
+            return $this->sendError('You are not authorized to create custom cycles or strategic pillars.', 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'title'                      => 'required|string|max:255',
             'code'                       => 'nullable|string|max:50',
-            'goal_cycle_id'              => 'nullable',
+            'goal_cycle_id'              => $this->goalReferenceRule(GoalCycle::class, $tenantId),
             'custom_goal_cycle'          => 'nullable|string|max:255',
-            'goal_category_id'           => 'nullable',
+            'goal_category_id'           => $this->goalReferenceRule(GoalCategory::class, $tenantId),
             'custom_goal_category'       => 'nullable|string|max:255',
             'owner_type'                 => 'required|in:company,department,employee',
-            'department_id'              => 'nullable|integer|exists:departments,id',
-            'employee_id'                => 'nullable|integer|exists:employees,id',
+            'department_id'              => ['nullable', 'integer', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
+            'employee_id'                => ['nullable', 'integer', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'employee_ids'               => 'nullable|array',
-            'employee_ids.*'             => 'integer|exists:employees,id',
-            'parent_goal_id'             => 'nullable|integer|exists:goals,id',
+            'employee_ids.*'             => ['integer', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
+            'parent_goal_id'             => ['nullable', 'integer', Rule::exists('goals', 'id')->where('tenant_id', $tenantId)],
             'priority'                   => 'nullable|in:low,medium,high,critical',
+            'start_date'                 => 'nullable|date',
             'due_date'                   => 'nullable|date',
             'description'                => 'nullable|string|max:2000',
+            'visibility'                 => 'nullable|in:public,department,private',
+            'weightage'                  => 'nullable|numeric|min:0|max:100',
             'key_results'                => 'nullable|array',
             'key_results.*.title'        => 'required_with:key_results|string|max:255',
             'key_results.*.metric_type'  => 'nullable|in:numeric,currency,percentage,boolean_milestone',
-            'key_results.*.target_value' => 'nullable|numeric',
             'key_results.*.unit'         => 'nullable|string|max:50',
+            'key_results.*.start_value'  => 'nullable|numeric',
+            'key_results.*.target_value' => 'nullable|numeric',
+            'key_results.*.current_value'=> 'nullable|numeric',
             'key_results.*.weightage'    => 'nullable|numeric|min:0|max:100',
+            'key_results.*.description'  => 'nullable|string|max:1000',
+            'key_results.*.due_date'     => 'nullable|date',
         ]);
 
         if ($validator->fails()) {
@@ -402,14 +433,43 @@ class GoalApiController extends Controller
         }
 
         try {
-            $goal = $this->goalRepository->storeGoal($validator->validated(), $tenantId, $user);
+            $data = $validator->validated();
+
+            // Structure key results from web form repeater if provided
+            if ($request->filled('kr_title') && is_array($request->kr_title)) {
+                $krs = [];
+                foreach ($request->kr_title as $idx => $title) {
+                    if (empty(trim($title))) {
+                        continue;
+                    }
+                    $krs[] = [
+                        'title'         => trim($title),
+                        'metric_type'   => $request->kr_metric_type[$idx] ?? 'percentage',
+                        'unit'          => $request->kr_unit[$idx] ?? '%',
+                        'start_value'   => (float) ($request->kr_start_value[$idx] ?? 0),
+                        'target_value'  => (float) ($request->kr_target_value[$idx] ?? 100),
+                        'current_value' => (float) ($request->kr_current_value[$idx] ?? 0),
+                        'weightage'     => (float) ($request->kr_weightage[$idx] ?? 100),
+                    ];
+                }
+                $data['key_results'] = $krs;
+            }
+
+            $goal = $this->goalRepository->storeGoal($data, $tenantId, $user);
 
             return $this->sendSuccess([
                 'id'                  => $goal->id,
                 'code'                => $goal->code,
                 'title'               => $goal->title,
                 'progress_percentage' => (float) $goal->progress_percentage,
+                'health_status'       => $goal->health_status,
                 'status'              => $goal->status,
+                'capabilities'        => [
+                    'can_view'     => true,
+                    'can_edit'     => $this->goalRepository->canUpdateGoal($user, $goal),
+                    'can_delete'   => $this->goalRepository->canDeleteGoal($user, $goal),
+                    'can_check_in' => $this->goalRepository->canCheckInGoal($user, $goal),
+                ],
             ], 'Objective / Goal created successfully.', 201);
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), 500);
@@ -423,23 +483,53 @@ class GoalApiController extends Controller
     {
         [$tenantId, $user] = $this->resolveContext();
 
+        try {
+            $goal = Goal::where('tenant_id', $tenantId)->findOrFail($id);
+        } catch (Exception $e) {
+            return $this->sendError('Goal not found.', 404);
+        }
+
+        // RBAC validation: check update capability
+        if (!$this->goalRepository->canUpdateGoal($user, $goal)) {
+            return $this->sendError('You are not authorized to update this goal.', 403);
+        }
+
+        if ($request->owner_type === 'company' && $goal->owner_type !== 'company' && !$this->goalRepository->canManageGoals($user)) {
+            return $this->sendError('You are not authorized to change this goal to an organization-wide objective.', 403);
+        }
+
+        if (($request->filled('custom_goal_cycle') || $request->filled('custom_goal_category')) && !$this->goalRepository->canManageGoals($user)) {
+            return $this->sendError('You are not authorized to create custom cycles or strategic pillars.', 403);
+        }
+
         $validator = Validator::make($request->all(), [
-            'title'                => 'sometimes|required|string|max:255',
-            'goal_cycle_id'        => 'nullable',
-            'custom_goal_cycle'    => 'nullable|string|max:255',
-            'goal_category_id'     => 'nullable',
-            'custom_goal_category' => 'nullable|string|max:255',
-            'owner_type'           => 'nullable|in:company,department,employee',
-            'department_id'        => 'nullable|integer|exists:departments,id',
-            'employee_id'          => 'nullable|integer|exists:employees,id',
-            'employee_ids'         => 'nullable|array',
-            'employee_ids.*'       => 'integer|exists:employees,id',
-            'parent_goal_id'       => 'nullable|integer|exists:goals,id',
-            'health_status'        => 'nullable|in:on_track,at_risk,behind,completed,cancelled',
-            'priority'             => 'nullable|in:low,medium,high,critical',
-            'due_date'             => 'nullable|date',
-            'description'          => 'nullable|string|max:2000',
-            'status'               => 'nullable|in:draft,active,closed,cancelled',
+            'title'                      => 'sometimes|required|string|max:255',
+            'goal_cycle_id'              => $this->goalReferenceRule(GoalCycle::class, $tenantId),
+            'custom_goal_cycle'          => 'nullable|string|max:255',
+            'goal_category_id'           => $this->goalReferenceRule(GoalCategory::class, $tenantId),
+            'custom_goal_category'       => 'nullable|string|max:255',
+            'owner_type'                 => 'nullable|in:company,department,employee',
+            'department_id'              => ['nullable', 'integer', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
+            'employee_id'                => ['nullable', 'integer', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
+            'employee_ids'               => 'nullable|array',
+            'employee_ids.*'             => ['integer', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
+            'parent_goal_id'             => ['nullable', 'integer', Rule::exists('goals', 'id')->where('tenant_id', $tenantId)->whereNot('id', $id)],
+            'health_status'              => 'nullable|in:on_track,at_risk,behind,completed,cancelled',
+            'priority'                   => 'nullable|in:low,medium,high,critical',
+            'start_date'                 => 'nullable|date',
+            'due_date'                   => 'nullable|date',
+            'description'                => 'nullable|string|max:2000',
+            'status'                     => 'nullable|in:draft,active,closed,cancelled',
+            'key_results'                => 'nullable|array',
+            'key_results.*.id'           => 'nullable|integer',
+            'key_results.*.title'        => 'required_with:key_results|string|max:255',
+            'key_results.*.metric_type'  => 'nullable|in:numeric,currency,percentage,boolean_milestone',
+            'key_results.*.unit'         => 'nullable|string|max:50',
+            'key_results.*.start_value'  => 'nullable|numeric',
+            'key_results.*.target_value' => 'nullable|numeric',
+            'key_results.*.current_value'=> 'nullable|numeric',
+            'key_results.*.weightage'    => 'nullable|numeric|min:0|max:100',
+            'key_results.*.due_date'     => 'nullable|date',
         ]);
 
         if ($validator->fails()) {
@@ -447,7 +537,30 @@ class GoalApiController extends Controller
         }
 
         try {
-            $updated = $this->goalRepository->updateGoal($id, $validator->validated(), $tenantId, $user);
+            $data = $validator->validated();
+
+            // Structure key results from web form repeater if submitted
+            if ($request->filled('kr_title') && is_array($request->kr_title)) {
+                $krs = [];
+                foreach ($request->kr_title as $idx => $title) {
+                    if (empty(trim($title))) {
+                        continue;
+                    }
+                    $krs[] = [
+                        'id'            => $request->kr_id[$idx] ?? null,
+                        'title'         => trim($title),
+                        'metric_type'   => $request->kr_metric_type[$idx] ?? 'percentage',
+                        'unit'          => $request->kr_unit[$idx] ?? '%',
+                        'start_value'   => (float) ($request->kr_start_value[$idx] ?? 0),
+                        'target_value'  => (float) ($request->kr_target_value[$idx] ?? 100),
+                        'current_value' => (float) ($request->kr_current_value[$idx] ?? 0),
+                        'weightage'     => (float) ($request->kr_weightage[$idx] ?? 100),
+                    ];
+                }
+                $data['key_results'] = $krs;
+            }
+
+            $updated = $this->goalRepository->updateGoal($id, $data, $tenantId, $user);
 
             return $this->sendSuccess([
                 'id'                  => $updated->id,
@@ -456,6 +569,12 @@ class GoalApiController extends Controller
                 'progress_percentage' => (float) $updated->progress_percentage,
                 'health_status'       => $updated->health_status,
                 'status'              => $updated->status,
+                'capabilities'        => [
+                    'can_view'     => true,
+                    'can_edit'     => $this->goalRepository->canUpdateGoal($user, $updated),
+                    'can_delete'   => $this->goalRepository->canDeleteGoal($user, $updated),
+                    'can_check_in' => $this->goalRepository->canCheckInGoal($user, $updated),
+                ],
             ], 'Goal updated successfully.');
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), 500);
@@ -467,7 +586,18 @@ class GoalApiController extends Controller
      */
     public function destroy(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+
+        try {
+            $goal = Goal::where('tenant_id', $tenantId)->findOrFail($id);
+        } catch (Exception $e) {
+            return $this->sendError('Goal not found.', 404);
+        }
+
+        // RBAC validation: delete permission
+        if (!$this->goalRepository->canDeleteGoal($user, $goal)) {
+            return $this->sendError('You are not authorized to delete this goal.', 403);
+        }
 
         try {
             $this->goalRepository->deleteGoal($id, $tenantId);
@@ -484,10 +614,22 @@ class GoalApiController extends Controller
     {
         [$tenantId, $user] = $this->resolveContext();
 
+        try {
+            $goal = Goal::where('tenant_id', $tenantId)->findOrFail($id);
+        } catch (Exception $e) {
+            return $this->sendError('Goal not found.', 404);
+        }
+
+        // RBAC validation: check-in permission
+        if (!$this->goalRepository->canCheckInGoal($user, $goal)) {
+            return $this->sendError('You are not authorized to log check-ins for this goal.', 403);
+        }
+
         $validator = Validator::make($request->all(), [
-            'goal_key_result_id' => 'nullable|integer|exists:goal_key_results,id',
+            'goal_key_result_id' => ['nullable', 'integer', Rule::exists('goal_key_results', 'id')->where('tenant_id', $tenantId)->where('goal_id', $id)],
             'new_value'          => 'nullable|numeric',
-            'health_status'      => 'required|in:on_track,at_risk,behind',
+            'new_progress'       => 'nullable|numeric|min:0|max:100',
+            'health_status'      => 'required|in:on_track,at_risk,behind,completed',
             'comment'            => 'required|string|max:1000',
             'blockers'           => 'nullable|string|max:1000',
         ]);
@@ -505,6 +647,37 @@ class GoalApiController extends Controller
                 'health_status' => $ci->health_status,
                 'check_in_date' => $ci->check_in_date?->format('Y-m-d H:i:s'),
             ], 'Progress check-in recorded successfully.');
+        } catch (Exception $e) {
+            return $this->sendError($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/hrms/goals/{id}/approve
+     */
+    public function approve(int $id): JsonResponse
+    {
+        [$tenantId, $user] = $this->resolveContext();
+
+        try {
+            $goal = Goal::where('tenant_id', $tenantId)->findOrFail($id);
+        } catch (Exception $e) {
+            return $this->sendError('Goal not found.', 404);
+        }
+
+        if (!$this->goalRepository->canUpdateGoal($user, $goal)) {
+            return $this->sendError('You are not authorized to approve this goal.', 403);
+        }
+
+        try {
+            $approved = $this->goalRepository->approveGoal($id, $tenantId, $user);
+
+            return $this->sendSuccess([
+                'id'     => $approved->id,
+                'code'   => $approved->code,
+                'title'  => $approved->title,
+                'status' => $approved->status,
+            ], 'Goal approved and activated successfully.');
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), 500);
         }
@@ -556,6 +729,12 @@ class GoalApiController extends Controller
                     'health_status'       => $g->health_status,
                     'due_date'            => $g->due_date?->format('Y-m-d'),
                     'key_results_count'   => $g->keyResults->count(),
+                    'capabilities'        => [
+                        'can_view'     => true,
+                        'can_edit'     => $this->goalRepository->canUpdateGoal($user, $g),
+                        'can_delete'   => $this->goalRepository->canDeleteGoal($user, $g),
+                        'can_check_in' => $this->goalRepository->canCheckInGoal($user, $g),
+                    ],
                 ]);
 
             return $this->sendSuccess($goals, 'My goals retrieved successfully.');
@@ -582,12 +761,16 @@ class GoalApiController extends Controller
     {
         [$tenantId, $user] = $this->resolveContext();
 
+        if (!$this->goalRepository->canManageGoals($user)) {
+            return $this->sendError('You are not authorized to manage goal cycles.', 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'name'        => 'required|string|max:255',
             'code'        => 'nullable|string|max:50',
             'start_date'  => 'required|date',
             'end_date'    => 'required|date|after_or_equal:start_date',
-            'status'      => 'nullable|in:upcoming,active,review_period,closed',
+            'status'      => 'nullable|in:planning,active,review,closed,upcoming,review_period',
             'description' => 'nullable|string|max:1000',
         ]);
 
@@ -596,7 +779,17 @@ class GoalApiController extends Controller
         }
 
         try {
-            $cycle = $this->goalRepository->storeCycle($validator->validated(), $tenantId, $user);
+            $data = $validator->validated();
+            // Map legacy / alternative status strings
+            if (!empty($data['status'])) {
+                if ($data['status'] === 'upcoming') {
+                    $data['status'] = 'planning';
+                } elseif ($data['status'] === 'review_period') {
+                    $data['status'] = 'review';
+                }
+            }
+
+            $cycle = $this->goalRepository->storeCycle($data, $tenantId, $user);
             return $this->sendSuccess([
                 'id'         => $cycle->id,
                 'name'       => $cycle->name,
@@ -610,9 +803,58 @@ class GoalApiController extends Controller
         }
     }
 
+    public function updateCycle(Request $request, int $id): JsonResponse
+    {
+        [$tenantId, $user] = $this->resolveContext();
+
+        if (!$this->goalRepository->canManageGoals($user)) {
+            return $this->sendError('You are not authorized to manage goal cycles.', 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name'        => 'sometimes|required|string|max:255',
+            'code'        => 'nullable|string|max:50',
+            'start_date'  => 'sometimes|required|date',
+            'end_date'    => 'sometimes|required|date|after_or_equal:start_date',
+            'status'      => 'nullable|in:planning,active,review,closed,upcoming,review_period',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Validation failed', 422, $validator->errors());
+        }
+
+        try {
+            $data = $validator->validated();
+            if (!empty($data['status'])) {
+                if ($data['status'] === 'upcoming') {
+                    $data['status'] = 'planning';
+                } elseif ($data['status'] === 'review_period') {
+                    $data['status'] = 'review';
+                }
+            }
+
+            $cycle = $this->goalRepository->updateCycle($id, $data, $tenantId, $user);
+            return $this->sendSuccess([
+                'id'         => $cycle->id,
+                'name'       => $cycle->name,
+                'code'       => $cycle->code,
+                'start_date' => $cycle->start_date?->format('Y-m-d'),
+                'end_date'   => $cycle->end_date?->format('Y-m-d'),
+                'status'     => $cycle->status,
+            ], 'Goal cycle updated successfully.');
+        } catch (Exception $e) {
+            return $this->sendError($e->getMessage(), 500);
+        }
+    }
+
     public function destroyCycle(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+
+        if (!$this->goalRepository->canManageGoals($user)) {
+            return $this->sendError('You are not authorized to manage goal cycles.', 403);
+        }
 
         try {
             $this->goalRepository->deleteCycle($id, $tenantId);
@@ -635,6 +877,10 @@ class GoalApiController extends Controller
     public function storeCategory(Request $request): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+
+        if (!$this->goalRepository->canManageGoals($user)) {
+            return $this->sendError('You are not authorized to manage strategic categories.', 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'name'        => 'required|string|max:255',
@@ -664,7 +910,11 @@ class GoalApiController extends Controller
 
     public function destroyCategory(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+
+        if (!$this->goalRepository->canManageGoals($user)) {
+            return $this->sendError('You are not authorized to manage strategic categories.', 403);
+        }
 
         try {
             $this->goalRepository->deleteCategory($id, $tenantId);

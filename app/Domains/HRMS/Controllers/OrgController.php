@@ -63,7 +63,7 @@ class OrgController extends Controller
             'company_name' => 'required|max:255',
             'legal_name' => 'required|max:255',
             'email' => 'required|email|max:255',
-            'phone' => 'nullable|max:50',
+            'phone' => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'website' => 'nullable|max:255',
             'gst_number' => 'nullable|max:255',
             'pan_number' => 'nullable|max:255',
@@ -76,11 +76,16 @@ class OrgController extends Controller
             'state' => 'nullable|max:100',
             'country' => 'nullable|max:100',
             'postal_code' => 'nullable|max:20',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
+            'logo' => 'nullable|image|max:2048',
         ]);
 
         $validated['timezone'] = $validated['time_zone'];
         unset($validated['time_zone']);
+
+        if ($request->hasFile('logo')) {
+            $validated['logo'] = $request->file('logo')->store('companies', 'public');
+        }
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
         $this->orgRepository->storeCompany($validated);
@@ -96,7 +101,7 @@ class OrgController extends Controller
             'company_name' => 'required|max:255',
             'legal_name' => 'required|max:255',
             'email' => 'required|email|max:255',
-            'phone' => 'nullable|max:50',
+            'phone' => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'website' => 'nullable|max:255',
             'gst_number' => 'nullable|max:255',
             'pan_number' => 'nullable|max:255',
@@ -109,11 +114,19 @@ class OrgController extends Controller
             'state' => 'nullable|max:100',
             'country' => 'nullable|max:100',
             'postal_code' => 'nullable|max:20',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
+            'logo' => 'nullable|image|max:2048',
         ]);
 
         $validated['timezone'] = $validated['time_zone'];
         unset($validated['time_zone']);
+
+        if ($request->hasFile('logo')) {
+            if ($company->logo) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($company->logo);
+            }
+            $validated['logo'] = $request->file('logo')->store('companies', 'public');
+        }
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
         $this->orgRepository->updateCompany($company, $validated);
@@ -155,7 +168,7 @@ class OrgController extends Controller
             'code' => 'required|max:50',
             'head_employee_id' => 'nullable|exists:employees,id',
             'description' => 'nullable',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -174,7 +187,7 @@ class OrgController extends Controller
             'code' => 'required|max:50',
             'head_employee_id' => 'nullable|exists:employees,id',
             'description' => 'nullable',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -205,11 +218,11 @@ class OrgController extends Controller
             'state' => 'nullable|max:100',
             'country' => 'nullable|max:100',
             'manager_employee_id' => 'nullable|exists:employees,id',
-            'phone' => 'nullable|max:20',
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|max:500',
             'postal_code' => 'nullable|max:20',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         if ($request->filled('business_unit_id')) {
@@ -238,11 +251,11 @@ class OrgController extends Controller
             'state' => 'nullable|max:100',
             'country' => 'nullable|max:100',
             'manager_employee_id' => 'nullable|exists:employees,id',
-            'phone' => 'nullable|max:20',
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|max:500',
             'postal_code' => 'nullable|max:20',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         if ($request->filled('business_unit_id')) {
@@ -280,7 +293,7 @@ class OrgController extends Controller
             'head_employee_id' => 'nullable|exists:employees,id',
             'parent_department_id' => 'nullable|exists:departments,id',
             'description' => 'nullable',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         if ($request->filled('branch_id')) {
@@ -316,7 +329,7 @@ class OrgController extends Controller
             'head_employee_id' => 'nullable|exists:employees,id',
             'parent_department_id' => 'nullable|exists:departments,id',
             'description' => 'nullable',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         if ($request->filled('branch_id')) {
@@ -356,7 +369,7 @@ class OrgController extends Controller
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|max:255',
             'level' => 'nullable|max:50',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -373,7 +386,7 @@ class OrgController extends Controller
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|max:255',
             'level' => 'nullable|max:50',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);

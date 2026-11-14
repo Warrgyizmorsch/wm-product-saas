@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Edit Tenant | SaaS ERP')
+@section('title', 'Edit Tenant | Platform Console')
 @section('page-title', 'Edit Tenant')
-@section('breadcrumb', 'Platform / Tenants / Edit')
+@section('breadcrumb', 'Tenants / Edit')
 
 @section('page-actions')
     <x-ui.button href="{{ route('platform.tenants.index') }}" variant="light" icon="feather-arrow-left">

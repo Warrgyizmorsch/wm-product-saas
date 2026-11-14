@@ -16,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Services\TaxIdentityService;
 
 class VendorController extends Controller
 {
@@ -43,10 +44,21 @@ class VendorController extends Controller
         $activeCount = Vendor::where('tenant_id', $tenantId)->whereIn('status', ['active', 'Active'])->count();
         $inactiveCount = Vendor::where('tenant_id', $tenantId)->whereIn('status', ['inactive', 'Inactive'])->count();
 
-        // Calculate total outstanding payable across all vendors
-        $totalOutstandingPayable = (float) VendorBill::where('tenant_id', $tenantId)
+        // Calculate total outstanding payable across all vendors (normalized in base USD in DB, convert to active currency at fetch time)
+        $rawOutstandingPayableUSD = (float) VendorBill::where('tenant_id', $tenantId)
             ->whereIn('status', ['posted', 'unpaid', 'partially_paid', 'approved'])
             ->sum('due_amount');
+
+        // With Accounting, the books' figure: opening dues, credit purchases and
+        // vouchers count too, so it adds up to the suppliers' own pages.
+        $partyAccount = app(\App\Domains\Accounting\Services\PartyAccountService::class);
+        if ($partyAccount->available()) {
+            $rawOutstandingPayableUSD = $partyAccount->totalOutstanding('vendor');
+        }
+
+        $totalOutstandingPayable = function_exists('convert_from_base')
+            ? convert_from_base($rawOutstandingPayableUSD)
+            : $rawOutstandingPayableUSD;
 
         $query = Vendor::query()->where('tenant_id', $tenantId);
 
@@ -121,18 +133,26 @@ class VendorController extends Controller
                 'max:255',
                 Rule::unique('vendors', 'email')->where($uniqueScope),
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'address' => ['nullable', 'string'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
-            'gstin' => ['nullable', 'string', 'max:30'],
-            'pan' => ['nullable', 'string', 'max:20'],
+            'gstin' => TaxIdentityService::gstinRules(false),
+            'pan' => TaxIdentityService::panRules(false),
             'bank_name' => ['nullable', 'string', 'max:150'],
-            'account_number' => ['nullable', 'string', 'max:50'],
+            'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code' => ['nullable', 'string', 'max:30'],
             'payment_terms' => ['nullable', 'string', 'max:100'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
+            ...\App\Domains\Purchase\Services\VendorBillTdsService::vendorRules(),
+        ], [
+            'email.email'          => 'The email field must be a valid email address.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'            => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
+            'tds_section_id.required_if' => 'Pick the TDS section to deduct under.',
         ]);
 
         if (empty($validated['code'])) {
@@ -151,13 +171,18 @@ class VendorController extends Controller
         $validated['company_id'] = $companyId;
         $validated['branch_id'] = $branchId;
         $validated['status'] = strtolower($validated['status']);
-        $validated['opening_balance'] = $validated['opening_balance'] ?? 0.00;
+        $validated['opening_balance'] = isset($validated['opening_balance'])
+            ? convert_to_base((float) $validated['opening_balance'])
+            : 0.00;
 
         $vendor = Vendor::create($validated);
 
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
+
         return redirect()
             ->route('purchase.vendors.show', $vendor->id)
-            ->with('success', "Vendor '{$vendor->name}' created successfully.");
+            ->with('success', "Vendor '{$vendor->name}' created successfully.")
+            ->with('warning', $openingWarning);
     }
 
     public function quickCreate(Request $request): JsonResponse
@@ -181,9 +206,13 @@ class VendorController extends Controller
                 'max:255',
                 Rule::unique('vendors', 'email')->where($uniqueScope),
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'gstin' => ['nullable', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'gstin' => TaxIdentityService::gstinRules(false),
             'address' => ['nullable', 'string'],
+        ], [
+            'email.email' => 'The email field must be a valid email address.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         $counter = Vendor::where('tenant_id', $tenantId)->count() + 1;
@@ -237,13 +266,17 @@ class VendorController extends Controller
             ->latest()
             ->get();
 
-        $totalBilled = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->total_amount);
-        $totalPaid = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->amount_paid);
-        if ($totalPaid == 0 && $payments->isNotEmpty()) {
-            $totalPaid = (float) $payments->where('status', 'completed')->sum('amount');
-        }
+        $openingBalance = $vendor->signedOpeningBalance();
 
-        $netOutstanding = $totalBilled - $totalPaid;
+        $totalBilled = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->total_amount);
+        // Every payment made, not just what was applied to bills: a payment
+        // against the opening balance or on account has no bill to sit on.
+        $totalPaid = (float) $payments
+            ->reject(fn ($p) => in_array(strtolower((string) $p->status), ['cancelled', 'void', 'draft', 'rejected'], true))
+            ->sum('amount');
+
+        // Net outstanding includes Opening Balance (historical dues owed to supplier)
+        $netOutstanding = $openingBalance + $totalBilled - $totalPaid;
         $outstandingPayable = max(0, $netOutstanding);
         $vendorAdvanceCredit = $netOutstanding < 0 ? abs($netOutstanding) : 0;
 
@@ -263,6 +296,7 @@ class VendorController extends Controller
                 'credit' => (float)$bill->total_amount, // Credit increases liability/payable
                 'debit' => 0.00,
                 'status' => $bill->status,
+                'entered_at' => $bill->created_at,
                 'url' => route('purchase.bills.show', $bill->id),
             ]);
         }
@@ -276,27 +310,65 @@ class VendorController extends Controller
                 'credit' => 0.00,
                 'debit' => (float)$pmt->amount, // Debit decreases liability/payable
                 'status' => $pmt->status,
+                'entered_at' => $pmt->created_at,
                 'url' => route('purchase.payments.show', $pmt->id),
             ]);
         }
 
-        $ledgerEntries = $ledgerEntries->sortBy('date')->values();
+        // Same-day entries in the order they happened, not bills-then-payments.
+        $ledgerEntries = $ledgerEntries->sortBy([
+            fn ($a, $b) => \Carbon\Carbon::parse($a['date'])->startOfDay() <=> \Carbon\Carbon::parse($b['date'])->startOfDay(),
+            fn ($a, $b) => $a['entered_at'] <=> $b['entered_at'],
+        ])->values();
 
         // Compute Running Payable Balance
-        $runningBalance = (float)($vendor->opening_balance ?? 0.00);
+        $runningBalance = $vendor->signedOpeningBalance();
         $ledgerWithBalance = $ledgerEntries->map(function ($entry) use (&$runningBalance) {
             $runningBalance += ($entry['credit'] - $entry['debit']);
             $entry['running_balance'] = $runningBalance;
             return $entry;
         });
 
+        $advances = \App\Domains\Purchase\Models\PurchaseAdvancePayment::where('tenant_id', $tenantId)
+            ->where('vendor_id', $vendor->id)
+            ->with(['purchaseOrder', 'bankAccount'])
+            ->latest()
+            ->get();
+
+        $totalAdvancePaid = (float) $advances->where('status', '!=', 'cancelled')->sum('amount');
+        $availableAdvance = app(\App\Domains\Purchase\Services\VendorBillService::class)->getAvailableVendorAdvance($vendor->id, $tenantId);
+
+        // With Accounting, the figures come from the books, so this page agrees
+        // with Party Ledger and Bill Settlement: assets bought on credit,
+        // vouchers and settlements count, not only Purchase's own documents.
+        $billCount = $bills->count();
+        $statement = null;
+        $partyAccount = app(\App\Domains\Accounting\Services\PartyAccountService::class);
+        if ($partyAccount->available()) {
+            $summary = $partyAccount->summary('vendor', (int) $vendor->id);
+            $totalBilled = $summary['billed'];
+            $totalPaid = max($totalPaid, (float) $summary['paid']);
+            $billCount = $summary['bills'] ?: $bills->count();
+            $outstandingPayable = $summary['outstanding'];
+            $vendorAdvanceCredit = max((float) $summary['advance'], $availableAdvance);
+            $overdueAmount = $summary['overdue'];
+            $statement = $partyAccount->statement('vendor', (int) $vendor->id);
+        } else {
+            $vendorAdvanceCredit = max($vendorAdvanceCredit, $availableAdvance);
+        }
+
         return view('modules.purchase.vendors.show', compact(
+            'billCount',
+            'statement',
             'vendor',
             'bills',
             'payments',
+            'advances',
             'purchaseOrders',
             'totalBilled',
             'totalPaid',
+            'totalAdvancePaid',
+            'availableAdvance',
             'outstandingPayable',
             'vendorAdvanceCredit',
             'overdueAmount',
@@ -342,26 +414,42 @@ class VendorController extends Controller
                 'max:255',
                 Rule::unique('vendors', 'email')->ignore($vendor->id)->where($uniqueScope),
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'address' => ['nullable', 'string'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
-            'gstin' => ['nullable', 'string', 'max:30'],
-            'pan' => ['nullable', 'string', 'max:20'],
+            'gstin' => TaxIdentityService::gstinRules(false),
+            'pan' => TaxIdentityService::panRules(false),
             'bank_name' => ['nullable', 'string', 'max:150'],
-            'account_number' => ['nullable', 'string', 'max:50'],
+            'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code' => ['nullable', 'string', 'max:30'],
             'payment_terms' => ['nullable', 'string', 'max:100'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
+            ...\App\Domains\Purchase\Services\VendorBillTdsService::vendorRules(),
+        ], [
+            'email.email'          => 'The email field must be a valid email address.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'            => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
+            'tds_section_id.required_if' => 'Pick the TDS section to deduct under.',
         ]);
 
         $validated['status'] = strtolower($validated['status']);
+        if (array_key_exists('opening_balance', $validated)) {
+            $validated['opening_balance'] = $validated['opening_balance'] !== null
+                ? convert_to_base((float) $validated['opening_balance'])
+                : 0.00;
+        }
         $vendor->update($validated);
+
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return redirect()
             ->route('purchase.vendors.show', $vendor->id)
-            ->with('success', "Vendor '{$vendor->name}' updated successfully.");
+            ->with('success', "Vendor '{$vendor->name}' updated successfully.")
+            ->with('warning', $openingWarning);
     }
 
     public function toggleStatus(Request $request, Vendor $vendor): RedirectResponse

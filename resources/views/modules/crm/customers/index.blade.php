@@ -154,6 +154,12 @@
                                         </a>
                                     </x-slot:extraActions>
 
+                                    @can('update', $customer)
+                                    <li>
+                                        <a href="{{ route('crm.customers.edit', $customer) }}" class="dropdown-item py-1.5 text-primary">
+                                            <i class="feather-edit me-2 text-primary"></i>{{ __('crm.edit') ?? 'Edit Customer' }}
+                                        </a>
+                                    </li>
                                     @if (strtolower($customer->status) === 'active')
                                         <li>
                                             <a href="{{ route('crm.customers.toggleStatus', [$customer, 'status' => 'inactive']) }}" class="dropdown-item py-1.5 text-danger">
@@ -167,6 +173,7 @@
                                             </a>
                                         </li>
                                     @endif
+                                    @endcan
                                 </x-ui.action-dropdown>
                             </td>
                         </tr>

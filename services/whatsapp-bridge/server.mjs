@@ -45,10 +45,36 @@ const authMiddleware = (req, res, next) => {
   if (!token || token.trim().length === 0) {
     return res.status(403).json({ status: 'forbidden', message: 'Invalid or empty Authorization Token' });
   }
+  req.bridgeToken = token;
   next();
 };
 
 const getSessionPath = (key) => path.join(SESSION_BASE_PATH, key);
+
+// The ERP's per-session bridge token, echoed back on webhooks (X-Bridge-Token)
+// so the ERP can tell genuine bridge calls from forged ones. Persisted in the
+// session folder so it survives a bridge restart.
+const sessionTokens = new Map();
+
+function rememberToken(key, token) {
+  if (!key || !token || sessionTokens.get(key) === token) return;
+  sessionTokens.set(key, token);
+  try {
+    fs.mkdirSync(getSessionPath(key), { recursive: true });
+    fs.writeFileSync(path.join(getSessionPath(key), 'bridge-token'), token);
+  } catch (e) { }
+}
+
+function tokenFor(key) {
+  if (sessionTokens.has(key)) return sessionTokens.get(key);
+  try {
+    const token = fs.readFileSync(path.join(getSessionPath(key), 'bridge-token'), 'utf-8').trim();
+    if (token) sessionTokens.set(key, token);
+    return token;
+  } catch (e) {
+    return '';
+  }
+}
 
 function loadLidMap(key) {
   try {
@@ -284,7 +310,7 @@ async function initSession(key, force = false) {
           try {
             const resp = await fetch('http://127.0.0.1:8000/platform/whatsapp/webhook', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'X-Bridge-Token': tokenFor(key) },
               body: JSON.stringify(payload)
             });
             const resData = await resp.json();
@@ -369,6 +395,10 @@ app.get('/health', (req, res) => {
 
 // Protected API Routes
 app.use(authMiddleware);
+app.use('/sessions/:key', (req, res, next) => {
+  rememberToken(req.params.key, req.bridgeToken);
+  next();
+});
 
 app.get('/sessions/:key', async (req, res) => {
   const { key } = req.params;

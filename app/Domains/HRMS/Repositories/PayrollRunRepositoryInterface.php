@@ -17,11 +17,13 @@ interface PayrollRunRepositoryInterface
 
     public function resolvePending(PayrollRun $run, string $resolution, Request $request): array;
 
-    public function releasePayouts(PayrollRun $run): void;
+    public function releasePayouts(PayrollRun $run, ?int $bankAccountId = null, ?string $payoutDate = null): void;
 
     public function toggleHold(Employee $employee, string $month, ?string $targetMonth): string;
 
-    public function getMySalaryData(Employee $employee): array;
+    public function getMySalaryData(Employee $employee, array $inputs = []): array;
+
+    public function getRangePayslipsData(Employee $employee, string $fromMonth, string $toMonth): array;
 
     public function storeBulkAdhoc(array $validated): array;
 

@@ -37,10 +37,22 @@ class Feedback360ApiController extends Controller
 
     private function resolveContext(): array
     {
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
         $user = auth()->user();
 
+        if (!$tenantId) {
+            abort(response()->json(['success' => false, 'message' => 'Unauthorized tenant context.'], 403));
+        }
+
         return [(int) $tenantId, $user];
+    }
+
+    private function checkAdmin(?\App\Models\User $user, int $tenantId): ?JsonResponse
+    {
+        if (!$this->feedbackRepository->isHrAdminUser($user, $tenantId)) {
+            return $this->sendError('Access denied. Administrative privileges required.', 403);
+        }
+        return null;
     }
 
     /**
@@ -193,11 +205,19 @@ class Feedback360ApiController extends Controller
     public function store(Request $request): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
-            'name'       => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date'   => 'required|date|after_or_equal:start_date',
+            'name'             => 'required|string|max:255',
+            'start_date'       => 'required|date',
+            'end_date'         => 'required|date|after_or_equal:start_date',
+            'competency_ids'   => 'required|array|min:1',
+            'competency_ids.*' => 'exists:feedback_360_competencies,id',
+        ], [
+            'competency_ids.required' => 'Please select at least one competency to evaluate in this review cycle.',
+            'competency_ids.min'      => 'Please select at least one competency to evaluate in this review cycle.',
         ]);
 
         try {
@@ -221,6 +241,9 @@ class Feedback360ApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'name'                       => 'required|string|max:255',
@@ -230,12 +253,14 @@ class Feedback360ApiController extends Controller
             'nomination_deadline'        => 'nullable|date',
             'submission_deadline'        => 'nullable|date',
             'status'                     => 'nullable|in:draft,nomination,in_progress,review,completed,closed',
-            'is_peer_anonymous'          => 'nullable',
-            'is_direct_report_anonymous' => 'nullable',
-            'allow_self_nomination'      => 'nullable',
-            'require_manager_approval'   => 'nullable',
+            'is_peer_anonymous'          => 'nullable|boolean',
+            'is_direct_report_anonymous' => 'nullable|boolean',
+            'allow_self_nomination'      => 'nullable|boolean',
+            'require_manager_approval'   => 'nullable|boolean',
             'min_peer_nominations'       => 'nullable|integer|min:0|max:20',
             'max_peer_nominations'       => 'nullable|integer|min:1|max:30',
+            'competency_ids'             => 'nullable|array',
+            'competency_ids.*'           => 'exists:feedback_360_competencies,id',
         ]);
 
         try {
@@ -267,7 +292,10 @@ class Feedback360ApiController extends Controller
      */
     public function destroy(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         try {
             $this->feedbackRepository->deleteCycle($id, $tenantId);
@@ -284,6 +312,9 @@ class Feedback360ApiController extends Controller
     public function launch(Request $request, int $id): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'status' => 'required|in:draft,nomination,in_progress,review,completed,closed',
@@ -308,6 +339,9 @@ class Feedback360ApiController extends Controller
     public function addParticipants(Request $request, int $id): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'employee_ids'   => 'required|array',
@@ -331,6 +365,9 @@ class Feedback360ApiController extends Controller
     public function bulkRemind(int $id): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         try {
             $count = $this->feedbackRepository->bulkRemind($id, $tenantId, $user);
@@ -344,23 +381,80 @@ class Feedback360ApiController extends Controller
     }
 
     /**
-     * Nominate peer reviewers for a participant.
+     * Nominate peer and direct report reviewers for a participant.
      */
     public function nominatePeers(Request $request, int $participantId): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
 
         $request->validate([
-            'peer_ids'   => 'required|array',
-            'peer_ids.*' => 'exists:employees,id',
+            'peer_ids'            => 'nullable|array',
+            'peer_ids.*'          => 'exists:employees,id',
+            'direct_report_ids'   => 'nullable|array',
+            'direct_report_ids.*' => 'exists:employees,id',
         ]);
 
+        $peerIds = (array) $request->input('peer_ids', []);
+        $directReportIds = (array) $request->input('direct_report_ids', []);
+
+        if (empty($peerIds) && empty($directReportIds)) {
+            return $this->sendError('Please provide at least one peer or direct report to nominate.', 422);
+        }
+
         try {
-            $nominations = $this->feedbackRepository->nominatePeers($participantId, $request->input('peer_ids'), $tenantId, $user);
+            $nominations = $this->feedbackRepository->nominatePeers($participantId, $peerIds, $tenantId, $user, $directReportIds);
 
             return $this->sendSuccess([
                 'nominated_count' => count($nominations),
-            ], 'Peer reviewers nominated successfully.');
+            ], 'Reviewers nominated successfully.');
+        } catch (Exception $e) {
+            return $this->sendError($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * Delete an assigned rater from a participant's feedback roster.
+     */
+    public function destroyNomination(int $nominationId): JsonResponse
+    {
+        [$tenantId, $user] = $this->resolveContext();
+
+        try {
+            $this->feedbackRepository->deleteNomination($nominationId, $tenantId, $user);
+
+            return $this->sendSuccess(null, 'Rater successfully removed from feedback roster.');
+        } catch (Exception $e) {
+            return $this->sendError($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * Manually add an individual rater to a participant.
+     */
+    public function addRater(Request $request, int $participantId): JsonResponse
+    {
+        [$tenantId, $user] = $this->resolveContext();
+
+        $request->validate([
+            'reviewer_id'   => 'required|exists:employees,id',
+            'reviewer_type' => 'required|in:peer,direct_report,manager',
+        ]);
+
+        try {
+            $nom = $this->feedbackRepository->addRaterToParticipant(
+                $participantId,
+                (int) $request->input('reviewer_id'),
+                $request->input('reviewer_type'),
+                $tenantId,
+                $user
+            );
+
+            return $this->sendSuccess([
+                'id'            => $nom->id,
+                'reviewer_id'   => $nom->reviewer_id,
+                'reviewer_type' => $nom->reviewer_type,
+                'status'        => $nom->status,
+            ], 'Reviewer added to evaluation roster.');
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), 422);
         }
@@ -574,14 +668,13 @@ class Feedback360ApiController extends Controller
     public function storeCompetency(Request $request): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'name'                      => 'required|string|max:150',
-            'code'                      => 'nullable|string|max:50',
-            'category'                  => 'required|string|max:100',
-            'cycle_id'                  => 'nullable|exists:feedback_360_cycles,id',
             'description'               => 'nullable|string|max:1000',
-            'weightage'                 => 'nullable|numeric|min:1|max:100',
             'questions'                 => 'nullable|array',
             'questions.*.question_text' => 'nullable|string|max:500',
         ]);
@@ -590,9 +683,8 @@ class Feedback360ApiController extends Controller
             $comp = $this->feedbackRepository->storeCompetency($request->all(), $tenantId, $user);
 
             return $this->sendSuccess([
-                'id'       => $comp->id,
-                'name'     => $comp->name,
-                'category' => $comp->category,
+                'id'   => $comp->id,
+                'name' => $comp->name,
             ], 'Competency created successfully.', 201);
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), 422);
@@ -601,7 +693,10 @@ class Feedback360ApiController extends Controller
 
     public function destroyCompetency(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         try {
             $this->feedbackRepository->deleteCompetency($id, $tenantId);
@@ -615,6 +710,9 @@ class Feedback360ApiController extends Controller
     public function storeQuestion(Request $request): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'question_text'        => 'required|string|max:500',
@@ -638,7 +736,10 @@ class Feedback360ApiController extends Controller
 
     public function destroyQuestion(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         try {
             $this->feedbackRepository->deleteQuestion($id, $tenantId);

@@ -39,6 +39,10 @@ return [
         'key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
+    'openstreetmap' => [
+        'key' => env('OPENSTREETMAP_API_KEY'),
+    ],
+
     'razorpay' => [
         'key' => env('RAZORPAY_KEY_ID'),
         'secret' => env('RAZORPAY_KEY_SECRET'),
@@ -65,6 +69,15 @@ return [
         'app_key'    => env('PUSHER_APP_KEY'),
         'app_secret' => env('PUSHER_APP_SECRET'),
         'cluster'    => env('PUSHER_APP_CLUSTER', 'ap2'),
+    ],
+
+    // Mossie chat assistant, loaded on every ERP page by
+    // partials/mossie-widget. Leave MOSSIE_WIDGET_URL unset to hide it.
+    'mossie' => [
+        'url'   => env('MOSSIE_WIDGET_URL'),
+        'key'   => env('MOSSIE_WIDGET_KEY'),
+        'title' => env('MOSSIE_WIDGET_TITLE', 'Mossie Assistant'),
+        'open'  => env('MOSSIE_WIDGET_OPEN', false),
     ],
 
 ];

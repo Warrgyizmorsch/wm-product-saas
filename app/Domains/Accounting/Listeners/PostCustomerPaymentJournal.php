@@ -34,21 +34,18 @@ class PostCustomerPaymentJournal
         $isInvoiceAllocation = $allocations->contains(fn ($a) => $a->invoice_id !== null);
         $isAdvanceAllocation = $allocations->contains(fn ($a) => $a->invoice_id === null && $a->sales_order_id !== null);
 
-        if (!$isInvoiceAllocation && !$isAdvanceAllocation) {
-            Log::warning('PostCustomerPaymentJournal: payment has no invoice/sales-order allocation, skipping auto-post', [
-                'payment_id' => $payment->id,
-            ]);
-
-            return;
-        }
-
         try {
             // The bank/cash ledger the money actually went to (e.g. HDFC); older
             // payments without one fall back to 1020 Bank Account as before.
             $bank = $payment->bank_account_id
                 ? \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScope('tenant')->where('tenant_id', $payment->tenant_id)->whereKey($payment->bank_account_id)->first()
                 : $this->systemAccounts->get(SystemAccount::BANK, $payment->tenant_id);
-            $creditKey = $isInvoiceAllocation ? SystemAccount::AR : SystemAccount::ADVANCE_FROM_CUSTOMERS;
+            // A sales-order advance is a liability until invoiced. Anything else
+            // (invoice receipts, and on-account money such as a customer paying
+            // old/opening dues) reduces what the customer owes.
+            $creditKey = $isAdvanceAllocation && !$isInvoiceAllocation
+                ? SystemAccount::ADVANCE_FROM_CUSTOMERS
+                : SystemAccount::AR;
             $creditAccount = $this->systemAccounts->get($creditKey, $payment->tenant_id);
 
             if (!$bank || !$creditAccount) {
@@ -62,20 +59,45 @@ class PostCustomerPaymentJournal
                 return;
             }
 
-            $this->journals->postOnce([
-                [
-                    'chart_of_account_id' => $bank->id,
-                    'debit' => (float) $payment->amount,
-                    'description' => "Payment {$payment->payment_number}",
-                ],
-                [
-                    'chart_of_account_id' => $creditAccount->id,
-                    'credit' => (float) $payment->amount,
-                    'description' => "Payment {$payment->payment_number}",
+            // TDS the customer withheld is tax paid on our behalf: an asset
+            // (TDS Receivable, claimed against our income tax), and it settles
+            // the customer's invoice just like the money does.
+            $tds = round((float) ($payment->tds_amount ?? 0), 2);
+            $tdsReceivable = $tds > 0 ? $this->systemAccounts->get(SystemAccount::TDS_RECEIVABLE, $payment->tenant_id) : null;
+
+            if ($tds > 0 && $tdsReceivable === null) {
+                $message = 'Missing TDS Receivable (1640) account, skipping auto-post';
+                Log::warning("PostCustomerPaymentJournal: {$message}", ['payment_id' => $payment->id]);
+                $this->failures->record($payment->tenant_id, CustomerPaymentReceived::class, $payment, $message);
+
+                return;
+            }
+
+            $lines = [[
+                'chart_of_account_id' => $bank->id,
+                'debit' => (float) $payment->amount,
+                'description' => "Payment {$payment->payment_number}",
+            ]];
+
+            if ($tds > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $tdsReceivable->id,
+                    'debit' => $tds,
+                    'description' => trim("TDS {$payment->tds_section_code} deducted by customer - {$payment->payment_number}"),
                     'party_type' => JournalEntry::PARTY_CUSTOMER,
                     'party_id' => $payment->customer_id,
-                ],
-            ], [
+                ];
+            }
+
+            $lines[] = [
+                'chart_of_account_id' => $creditAccount->id,
+                'credit' => round((float) $payment->amount + $tds, 2),
+                'description' => "Payment {$payment->payment_number}",
+                'party_type' => JournalEntry::PARTY_CUSTOMER,
+                'party_id' => $payment->customer_id,
+            ];
+
+            $this->journals->postOnce($lines, [
                 'tenant_id' => $payment->tenant_id,
                 'company_id' => $payment->company_id,
                 'branch_id' => $payment->branch_id,
@@ -84,6 +106,13 @@ class PostCustomerPaymentJournal
                 'reference_type' => 'customer_payment',
                 'reference_id' => $payment->id,
                 'memo' => "Customer payment {$payment->payment_number}",
+                // Agst Ref each invoice it pays (or the opening due, for a receipt
+                // taken "against opening balance"); the rest stays On Account.
+                'bill_allocations' => str_starts_with((string) $payment->notes, 'Against opening balance')
+                    ? [\App\Domains\Accounting\Services\BillWise\BillAllocationService::againstRef('receivable', 'customer_opening_balance', (int) $payment->customer_id)]
+                    : $allocations->filter(fn ($a) => $a->invoice_id !== null)
+                        ->map(fn ($a) => \App\Domains\Accounting\Services\BillWise\BillAllocationService::againstRef('receivable', 'Invoice', (int) $a->invoice_id, (float) $a->allocated_amount))
+                        ->values()->all(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('PostCustomerPaymentJournal: failed to auto-post journal', [

@@ -21,6 +21,11 @@ class AccountExport implements FromCollection, WithHeadings, WithMapping, Should
             ->with(['owner', 'primaryContact', 'contacts'])
             ->withCount('deals');
 
+        $authUser = auth()->user();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'crm.customers.view', ['tenant_id' => $this->tenantId])) {
+            $query->where('owner_id', $authUser->id);
+        }
+
         // 1. Status filter
         if (!empty($this->filters['status'])) {
             $query->where('status', $this->filters['status']);

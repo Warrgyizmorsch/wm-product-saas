@@ -14,6 +14,8 @@ class JournalEntry extends BaseModel
 
     public const PARTY_CUSTOMER = 'customer';
     public const PARTY_VENDOR = 'vendor';
+    public const PARTY_EMPLOYEE = 'employee';
+    public const PARTY_TRANSPORTER = 'transporter';
 
     protected $table = 'journal_entries';
 

@@ -149,6 +149,8 @@
                             <x-ui.odoo-form-ui type="input" inputType="date" :label="__('purchase.due_date')" name="due_date" :value="old('due_date', date('Y-m-d', strtotime('+30 days')))" :required="true" />
                         </div>
                     </div>
+
+                    @include('modules.purchase.bills._tds-summary', ['vendorId' => null])
                 </div>
             </div>
 
@@ -187,6 +189,20 @@ function toggleFreightSource() {
 }
 document.addEventListener('DOMContentLoaded', function() {
     toggleFreightSource();
+
+    // TDS block: base is the service amount; RCM bills don't owe the vendor the GST.
+    function refreshTds() {
+        if (!window.refreshBillTds) return;
+        const amount = parseFloat(document.getElementById('serviceAmountInput').value) || 0;
+        const rate = parseFloat(document.getElementById('taxRateSelect').value) || 0;
+        const isRcm = (document.getElementById('gstTypeSelect').value || '').startsWith('rcm');
+        window.refreshBillTds(amount, isRcm ? amount : amount * (1 + rate / 100));
+    }
+    ['serviceAmountInput', 'taxRateSelect', 'gstTypeSelect'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) { el.addEventListener('input', refreshTds); el.addEventListener('change', refreshTds); }
+    });
+    refreshTds();
 });
 </script>
 @endsection

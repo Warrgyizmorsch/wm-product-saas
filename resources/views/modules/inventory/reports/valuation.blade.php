@@ -13,18 +13,33 @@
         padding: 9px 22px;
         font-size: 13px;
         font-weight: 600;
-        color: #475569;
-        background-color: #ffffff;
-        border: 1.5px solid #cbd5e1;
         border-radius: 8px;
         transition: all 0.2s ease-in-out;
         text-decoration: none !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
-    .ledger-tab-link:hover {
+    /* Light Mode Tabs */
+    html:not(.app-skin-dark) .ledger-tab-link {
+        color: #475569;
+        background-color: #ffffff;
+        border: 1.5px solid #cbd5e1;
+    }
+    html:not(.app-skin-dark) .ledger-tab-link:hover {
         background-color: #f8fafc;
         border-color: var(--bs-primary);
         color: var(--bs-primary);
+        transform: translateY(-1px);
+    }
+    /* Dark Mode Tabs */
+    html.app-skin-dark .ledger-tab-link {
+        color: #94a3b8;
+        background-color: #162038;
+        border: 1.5px solid #28334e;
+    }
+    html.app-skin-dark .ledger-tab-link:hover {
+        background-color: #1e293b;
+        border-color: var(--bs-primary);
+        color: #ffffff;
         transform: translateY(-1px);
     }
     .ledger-tab-link.active {
@@ -33,14 +48,63 @@
         color: #ffffff !important;
         box-shadow: 0 4px 12px color-mix(in srgb, var(--bs-primary) 25%, transparent);
     }
-    .ledger-tab-link.active i {
+    .ledger-tab-link.active i,
+    .ledger-tab-link.active span {
         color: #ffffff !important;
+    }
+
+    /* KPI Cards Dark / Light */
+    .erp-kpi-card {
+        border-radius: 12px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    html:not(.app-skin-dark) .erp-kpi-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+    }
+    html.app-skin-dark .erp-kpi-card {
+        background-color: #162038;
+        border: 1px solid #28334e;
+    }
+    html.app-skin-dark .erp-kpi-card .text-dark,
+    html.app-skin-dark .erp-single-panel .text-dark {
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .border-bottom {
+        border-color: #28334e !important;
+    }
+
+    /* Search Box Dark / Light */
+    html:not(.app-skin-dark) .erp-search-box {
+        background-color: #f8fafc;
+        border-color: #e2e8f0;
+    }
+    html.app-skin-dark .erp-search-box {
+        background-color: #162038;
+        border-color: #28334e !important;
+    }
+    html.app-skin-dark .erp-search-box input {
+        color: #e2e8f0 !important;
+    }
+
+    /* Table Dark / Light */
+    html.app-skin-dark #stockValuationTable thead th {
+        background-color: #162038 !important;
+        color: #94a3b8 !important;
+        border-color: #28334e !important;
+    }
+    html.app-skin-dark #stockValuationTable td {
+        border-color: #28334e !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark #stockValuationTable tbody tr:hover td {
+        background-color: #1c2844 !important;
     }
 </style>
 @endpush
 
 @section('content')
-<div class="erp-single-panel text-dark">
+<div class="erp-single-panel">
     <!-- Top Tabs for Category Valuation Breakdown -->
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4 pb-3 border-bottom">
         <div class="d-flex align-items-center flex-wrap gap-2">
@@ -65,7 +129,7 @@
     <!-- Top Real ERP Valuation KPI Stat Widgets -->
     <div class="row g-3 mb-4">
         <div class="col-lg-3 col-md-6 col-12 d-flex">
-            <div class="card h-100 w-100 border-0 shadow-sm rounded-3 p-3 bg-white d-flex align-items-center flex-row">
+            <div class="card erp-kpi-card h-100 w-100 shadow-sm p-3 d-flex align-items-center flex-row">
                 <div class="avatar-text bg-soft-primary text-primary rounded-3 flex-shrink-0 me-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
                     <i class="feather-dollar-sign fs-5"></i>
                 </div>
@@ -78,7 +142,7 @@
         </div>
 
         <div class="col-lg-3 col-md-6 col-12 d-flex">
-            <div class="card h-100 w-100 border-0 shadow-sm rounded-3 p-3 bg-white d-flex align-items-center flex-row">
+            <div class="card erp-kpi-card h-100 w-100 shadow-sm p-3 d-flex align-items-center flex-row">
                 <div class="avatar-text bg-soft-success text-success rounded-3 flex-shrink-0 me-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
                     <i class="feather-package fs-5"></i>
                 </div>
@@ -91,7 +155,7 @@
         </div>
 
         <div class="col-lg-3 col-md-6 col-12 d-flex">
-            <div class="card h-100 w-100 border-0 shadow-sm rounded-3 p-3 bg-white d-flex align-items-center flex-row">
+            <div class="card erp-kpi-card h-100 w-100 shadow-sm p-3 d-flex align-items-center flex-row">
                 <div class="avatar-text bg-soft-info text-info rounded-3 flex-shrink-0 me-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
                     <i class="feather-layers fs-5"></i>
                 </div>
@@ -104,7 +168,7 @@
         </div>
 
         <div class="col-lg-3 col-md-6 col-12 d-flex">
-            <div class="card h-100 w-100 border-0 shadow-sm rounded-3 p-3 bg-white d-flex align-items-center flex-row">
+            <div class="card erp-kpi-card h-100 w-100 shadow-sm p-3 d-flex align-items-center flex-row">
                 <div class="avatar-text bg-soft-warning text-warning rounded-3 flex-shrink-0 me-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
                     <i class="feather-box fs-5"></i>
                 </div>
@@ -128,7 +192,7 @@
 
             <div class="d-flex align-items-center flex-wrap gap-2">
                 <!-- Quick Search -->
-                <form method="GET" action="{{ route('inventory.reports.valuation') }}" class="d-flex align-items-center bg-light border rounded px-3 py-1">
+                <form method="GET" action="{{ route('inventory.reports.valuation') }}" class="d-flex align-items-center erp-search-box border rounded px-3 py-1">
                     @if(request('item_category')) <input type="hidden" name="item_category" value="{{ request('item_category') }}"> @endif
                     @if(request('warehouse_id')) <input type="hidden" name="warehouse_id" value="{{ request('warehouse_id') }}"> @endif
                     
@@ -188,7 +252,7 @@
                         <th class="text-end pe-3">{{ __('inventory.total_asset_value') }}</th>
                     </tr>
                 </thead>
-                <tbody class="text-dark">
+                <tbody>
                     @forelse($stocks as $stock)
                         @php
                             $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));

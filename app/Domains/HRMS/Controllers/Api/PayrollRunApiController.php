@@ -16,11 +16,13 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\OvertimeRequest;
+use App\Domains\HRMS\Repositories\PayrollRunRepositoryInterface;
 
 class PayrollRunApiController extends Controller
 {
     public function __construct(
-        private readonly PayrollCalculationService $payrollCalculationService
+        private readonly PayrollCalculationService $payrollCalculationService,
+        private readonly PayrollRunRepositoryInterface $payrollRunRepository
     ) {}
 
     /**
@@ -59,7 +61,11 @@ class PayrollRunApiController extends Controller
 
         return $user->hasHrPermission('hr.settings.manage')
             || $user->hasHrPermission('hr.payroll.manage')
-            || $user->hasHrPermission('hrms.payroll.manage');
+            || $user->hasHrPermission('hrms.payroll.manage')
+            || $user->hasHrPermission('hrms.payroll_runs.manage')
+            || $user->hasHrPermission('hrms.payroll_runs.view')
+            || $user->hasHrPermission('hrms.payroll.view')
+            || (method_exists($user, 'can') && $user->can('viewAny', PayrollRun::class));
     }
 
     private function getAuthenticatedEmployee(): ?Employee
@@ -69,12 +75,33 @@ class PayrollRunApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
-            ->first()
-            ?? Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
+        $tenantId = tenant_id() ?? $user->tenant_id ?? 1;
+
+        if ($user->relationLoaded('employee') && $user->employee) {
+            return $user->employee;
+        }
+
+        $emp = Employee::where('user_id', $user->id)
+            ->where('tenant_id', $tenantId)
+            ->first();
+
+        if ($emp) {
+            return $emp;
+        }
+
+        if (!empty($user->email)) {
+            $emp = Employee::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($user) {
+                    $q->where('office_email', $user->email)
+                      ->orWhere('personal_email', $user->email);
+                })
                 ->first();
+            if ($emp) {
+                return $emp;
+            }
+        }
+
+        return Employee::where('user_id', $user->id)->first();
     }
 
     /**
@@ -154,7 +181,7 @@ class PayrollRunApiController extends Controller
             $formattedItem = [
                 'code'   => $item['code'] ?? null,
                 'name'   => $item['name'] ?? null,
-                'amount' => floatval($item['amount'] ?? 0.00),
+                'amount' => floatval($item['amount'] ?? $item['calculated_value'] ?? 0.00),
                 'type'   => $item['type'] ?? 'earning',
             ];
             if (($item['type'] ?? 'earning') === 'earning') {
@@ -245,15 +272,20 @@ class PayrollRunApiController extends Controller
             }
 
             if ($selectedRun->employee_ids && count($selectedRun->employee_ids) > 0) {
-                $employees = Employee::whereIn('id', $selectedRun->employee_ids)
+                $employees = Employee::with(['department', 'designation'])
+                    ->whereIn('id', $selectedRun->employee_ids)
                     ->whereNotIn('id', $excludeEmployeeIds)
                     ->where('status', true)
-                    ->whereNotNull('salary_structure_id')
+                    ->where(function($q) {
+                        $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                    })
                     ->get();
             } else {
-                $employeesQuery = Employee::where('status', true)
-                    ->whereNotNull('pay_group_id')
-                    ->whereNotNull('salary_structure_id')
+                $employeesQuery = Employee::with(['department', 'designation'])
+                    ->where('status', true)
+                    ->where(function($q) {
+                        $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                    })
                     ->whereNotIn('id', $excludeEmployeeIds);
 
                 if ($selectedRun->pay_group_id) {
@@ -266,7 +298,10 @@ class PayrollRunApiController extends Controller
                         ->toArray();
 
                     if (!empty($otherProcessedPayGroupIds)) {
-                        $employeesQuery->whereNotIn('pay_group_id', $otherProcessedPayGroupIds);
+                        $employeesQuery->where(function($sub) use ($otherProcessedPayGroupIds) {
+                            $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
+                                ->orWhereNull('pay_group_id');
+                        });
                     }
                 }
 
@@ -274,7 +309,7 @@ class PayrollRunApiController extends Controller
             }
 
             foreach ($employees as $employee) {
-                $calc = $this->payrollCalculationService->calculateSalary($employee, $selectedRun->payroll_month);
+                $calc = $this->payrollCalculationService->calculateSalary($employee, $selectedRun->payroll_month, $selectedRun);
                 
                 $holdRecord = PayrollHold::where('employee_id', $employee->id)
                     ->where('payroll_month', $selectedRun->payroll_month)
@@ -306,7 +341,8 @@ class PayrollRunApiController extends Controller
 
             foreach ($priorHolds as $hold) {
                 if ($hold->employee) {
-                    $calc = $this->payrollCalculationService->calculateSalary($hold->employee, $hold->payroll_month);
+                    $priorRun = PayrollRun::where('payroll_month', $hold->payroll_month)->first();
+                    $calc = $this->payrollCalculationService->calculateSalary($hold->employee, $hold->payroll_month, $priorRun);
                     $pendingPriorHolds[] = [
                         'id'            => $hold->id,
                         'employee_id'   => $hold->employee->id,
@@ -459,10 +495,12 @@ class PayrollRunApiController extends Controller
                 if ($or->employee_ids && count($or->employee_ids) > 0) {
                     $alreadyProcessed = array_merge($alreadyProcessed, $or->employee_ids);
                 } elseif ($or->pay_group_id) {
-                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->whereNotNull('salary_structure_id')->pluck('id')->toArray();
+                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
                     $alreadyProcessed = array_merge($alreadyProcessed, $pgEmpIds);
                 } else {
-                    $genEmpIds = Employee::where('status', true)->whereNotNull('pay_group_id')->whereNotNull('salary_structure_id')->pluck('id')->toArray();
+                    $genEmpIds = Employee::where('status', true)->where(function($q) {
+                        $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                    })->pluck('id')->toArray();
                     $alreadyProcessed = array_merge($alreadyProcessed, $genEmpIds);
                 }
             }
@@ -506,8 +544,13 @@ class PayrollRunApiController extends Controller
             );
         }
 
-        $run->update(['status' => 'locked']);
-        return $this->sendSuccess($this->transformPayrollRun($run), 'Payroll run locked successfully.');
+        $result = $this->payrollRunRepository->lockRun($run);
+
+        if (!$result['success']) {
+            return $this->sendError($result['message'] ?? 'Failed to lock payroll run.', 422);
+        }
+
+        return $this->sendSuccess($this->transformPayrollRun($run->fresh()), 'Payroll run locked successfully.');
     }
 
     /**
@@ -554,10 +597,9 @@ class PayrollRunApiController extends Controller
                 }
 
                 $corrections = $correctionsQuery->get();
-
-                $correctionController = app(\App\Domains\HRMS\Controllers\AttendanceCorrectionController::class);
+                $correctionRepo = app(\App\Domains\HRMS\Repositories\AttendanceCorrectionRepositoryInterface::class);
                 foreach ($corrections as $correction) {
-                    $correctionController->approve($request, $correction);
+                    $correctionRepo->approve($correction, auth()->user());
                 }
 
                 $overtimes = $overtimesQuery->get();
@@ -583,12 +625,9 @@ class PayrollRunApiController extends Controller
                 }
 
                 $corrections = $correctionsQuery->get();
-
-                $correctionController = app(\App\Domains\HRMS\Controllers\AttendanceCorrectionController::class);
+                $correctionRepo = app(\App\Domains\HRMS\Repositories\AttendanceCorrectionRepositoryInterface::class);
                 foreach ($corrections as $correction) {
-                    $fakeRequest = clone $request;
-                    $fakeRequest->merge(['rejected_reason' => 'Auto-rejected during payroll run execution.']);
-                    $correctionController->reject($fakeRequest, $correction);
+                    $correctionRepo->reject($correction, 'Auto-rejected during payroll run execution.', auth()->user());
                 }
 
                 $overtimes = $overtimesQuery->get();
@@ -620,105 +659,24 @@ class PayrollRunApiController extends Controller
     /**
      * POST /api/hrms/payroll/{run}/release
      */
-    public function releasePayouts(PayrollRun $run): JsonResponse
+    public function releasePayouts(Request $request, PayrollRun $run): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        $run->update(['status' => 'paid']);
-        
-        DB::table('payroll_retroactive_adjustments')
-            ->where('target_payroll_month', $run->payroll_month)
-            ->where('status', 'pending')
-            ->update(['status' => 'processed']);
+        $validated = $request->validate([
+            'bank_account_id' => ['nullable', 'integer'],
+            'payout_date' => ['nullable', 'date'],
+        ]);
 
-        DB::table('employee_adhoc_components')
-            ->where('payroll_month', $run->payroll_month)
-            ->where('status', 'pending')
-            ->update(['status' => 'processed']);
-
-        $excludeEmployeeIds = [];
-        if (empty($run->employee_ids)) {
-            $otherRuns = PayrollRun::where('payroll_month', $run->payroll_month)
-                ->where('id', '!=', $run->id)
-                ->get();
-
-            foreach ($otherRuns as $or) {
-                if ($or->employee_ids && count($or->employee_ids) > 0) {
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
-                } elseif ($or->pay_group_id) {
-                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
-                } else {
-                    $allEmpIds = Employee::pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $allEmpIds);
-                }
-            }
-            $excludeEmployeeIds = array_unique($excludeEmployeeIds);
-        }
-
-        if ($run->employee_ids && count($run->employee_ids) > 0) {
-            $employees = Employee::whereIn('id', $run->employee_ids)
-                ->whereNotIn('id', $excludeEmployeeIds)
-                ->where('status', true)
-                ->whereNotNull('salary_structure_id')
-                ->get();
-        } else {
-            $employeesQuery = Employee::where('status', true)
-                ->whereNotNull('pay_group_id')
-                ->whereNotNull('salary_structure_id')
-                ->whereNotIn('id', $excludeEmployeeIds);
-
-            if ($run->pay_group_id) {
-                $employeesQuery->where('pay_group_id', $run->pay_group_id);
-            } else {
-                $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
-                    ->where('id', '!=', $run->id)
-                    ->whereNotNull('pay_group_id')
-                    ->pluck('pay_group_id')
-                    ->toArray();
-                if (!empty($otherProcessedPayGroupIds)) {
-                    $employeesQuery->whereNotIn('pay_group_id', $otherProcessedPayGroupIds);
-                }
-            }
-            $employees = $employeesQuery->get();
-        }
-
-        $allOtIds = [];
-        $allEncashIds = [];
-        foreach ($employees as $employee) {
-            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
-            if (!empty($calc['summary']['processed_ot_ids'])) {
-                $allOtIds = array_merge($allOtIds, $calc['summary']['processed_ot_ids']);
-            }
-            if (!empty($calc['summary']['processed_encash_ids'])) {
-                $allEncashIds = array_merge($allEncashIds, $calc['summary']['processed_encash_ids']);
-            }
-        }
-
-        if (!empty($allOtIds)) {
-            DB::table('overtime_requests')
-                ->whereIn('id', $allOtIds)
-                ->update(['status' => 'processed']);
-        }
-
-        if (!empty($allEncashIds)) {
-            DB::table('leave_encashments')
-                ->whereIn('id', $allEncashIds)
-                ->update(['status' => 'processed']);
-        }
-
-        // Integrate with Accounting (Dynamic Double-Entry Journal Posting via Domain Service)
+        // Same path as the web screen: books first, then marked paid; a refusal
+        // (no open period, not enough cash) changes nothing and is reported.
         try {
-            $payrollAccountingService = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
-            $payrollAccountingService->postPayrollRunJournal($run);
-            $payrollAccountingService->postPayrollPayoutJournal($run);
-        } catch (\Throwable $e) {
-            Log::error("Failed to post payroll journal entry in API: " . $e->getMessage(), [
-                'run_id' => $run->id,
-                'trace' => $e->getTraceAsString()
-            ]);
+            $this->payrollRunRepository
+                ->releasePayouts($run, $validated['bank_account_id'] ?? null, $validated['payout_date'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => 'Payouts not released — ' . $e->getMessage()], 422);
         }
 
         return $this->sendSuccess($this->transformPayrollRun($run->fresh()), 'Payroll payouts released successfully.');
@@ -753,7 +711,7 @@ class PayrollRunApiController extends Controller
 
                 $run = PayrollRun::where('payroll_month', $month)->first();
                 if ($run && in_array($run->status, ['locked', 'paid'])) {
-                    $calc = $this->payrollCalculationService->calculateSalary($employee, $month);
+                    $calc = $this->payrollCalculationService->calculateSalary($employee, $month, $run);
                     $netPayout = $calc['summary']['net_payout'] ?? 0.00;
 
                     if ($netPayout > 0) {
@@ -781,7 +739,8 @@ class PayrollRunApiController extends Controller
                 $hold->update(['status' => 'on_hold']);
                 $msg = 'Payout put on hold for ' . $employee->full_name;
 
-                $calc = $this->payrollCalculationService->calculateSalary($employee, $month);
+                $run = PayrollRun::where('payroll_month', $month)->first();
+                $calc = $this->payrollCalculationService->calculateSalary($employee, $month, $run);
                 $netPayout = $calc['summary']['net_payout'] ?? 0.00;
 
                 \App\Domains\HRMS\Models\PayrollRetroactiveAdjustment::where('employee_id', $employee->id)
@@ -809,7 +768,7 @@ class PayrollRunApiController extends Controller
     /**
      * GET /api/hrms/payroll/my-salary
      */
-    public function mySalary(): JsonResponse
+    public function mySalary(Request $request): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
@@ -820,12 +779,40 @@ class PayrollRunApiController extends Controller
             return $this->sendError('No employee profile linked to your user account.', 404);
         }
 
-        $paidRuns = PayrollRun::where('status', 'paid')
+        $paidRuns = PayrollRun::whereIn('status', ['paid', 'locked'])
             ->orderBy('payroll_month', 'desc')
             ->get();
 
-        $salaryHistory = [];
+        $allHistory = [];
         foreach ($paidRuns as $run) {
+            if ($run->company_id && $run->company_id != $employee->company_id) {
+                continue;
+            }
+
+            if (!empty($run->employee_ids) && is_array($run->employee_ids) && !in_array($employee->id, $run->employee_ids)) {
+                continue;
+            }
+
+            if ($run->pay_group_id && $run->pay_group_id != $employee->pay_group_id) {
+                continue;
+            }
+
+            if ($employee->date_of_joining && $run->end_date) {
+                if (\Carbon\Carbon::parse($employee->date_of_joining)->gt(\Carbon\Carbon::parse($run->end_date))) {
+                    continue;
+                }
+            }
+
+            if (empty($run->pay_group_id) && empty($run->employee_ids) && $employee->pay_group_id) {
+                $specificRunExists = PayrollRun::where('payroll_month', $run->payroll_month)
+                    ->whereIn('status', ['paid', 'locked'])
+                    ->where('pay_group_id', $employee->pay_group_id)
+                    ->exists();
+                if ($specificRunExists) {
+                    continue;
+                }
+            }
+
             $isHeld = PayrollHold::where('employee_id', $employee->id)
                 ->where('payroll_month', $run->payroll_month)
                 ->where('status', 'on_hold')
@@ -835,7 +822,7 @@ class PayrollRunApiController extends Controller
                 continue;
             }
 
-            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
+            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
 
             $earnings = [];
             $deductions = [];
@@ -843,7 +830,7 @@ class PayrollRunApiController extends Controller
                 $formattedItem = [
                     'code'   => $item['code'] ?? null,
                     'name'   => $item['name'] ?? null,
-                    'amount' => floatval($item['amount'] ?? 0.00),
+                    'amount' => floatval($item['amount'] ?? $item['calculated_value'] ?? 0.00),
                 ];
                 if (($item['type'] ?? 'earning') === 'earning') {
                     $earnings[] = $formattedItem;
@@ -853,26 +840,75 @@ class PayrollRunApiController extends Controller
             }
 
             $summary = $calc['summary'] ?? [];
+            $monthObj = Carbon::parse($run->payroll_month . '-01');
+            $netPayout = floatval($summary['net_payout'] ?? 0.00);
 
-            $salaryHistory[] = [
+            $allHistory[] = [
                 'payroll_run_id'=> $run->id,
                 'payroll_month' => $run->payroll_month,
+                'month_name'    => $monthObj->format('F Y'),
+                'year'          => $monthObj->format('Y'),
+                'month_num'     => $monthObj->format('m'),
+                'status'        => $run->status,
                 'start_date'    => $run->start_date ? Carbon::parse($run->start_date)->format('Y-m-d') : null,
                 'end_date'      => $run->end_date ? Carbon::parse($run->end_date)->format('Y-m-d') : null,
+                'net_payout'    => $netPayout,
                 'summary'       => [
                     'gross_earnings'    => floatval($summary['total_earnings'] ?? 0.00),
                     'total_deductions'  => floatval($summary['total_deductions'] ?? 0.00),
-                    'net_payout'        => floatval($summary['net_payout'] ?? 0.00),
+                    'net_payout'        => $netPayout,
                     'lop_days'          => floatval($summary['lop_days'] ?? 0),
                     'penalty_days'      => floatval($summary['attendance_penalty_days'] ?? 0),
                     'penalty_deduction' => floatval($summary['attendance_penalties'] ?? 0.00),
                 ],
                 'earnings'      => $earnings,
                 'deductions'    => $deductions,
+                'download_url'  => url("/api/hrms/payroll/{$run->id}/employees/{$employee->id}/download-payslip"),
             ];
         }
 
-        return $this->sendSuccess([
+        $collection = collect($allHistory);
+        $availableYears = $collection->pluck('year')->unique()->sortDesc()->values()->all();
+        $availableMonths = $collection->pluck('payroll_month')->unique()->sort()->values()->all();
+
+        // 1. Search filter
+        if ($request->filled('search')) {
+            $search = mb_strtolower(trim($request->input('search')), 'UTF-8');
+            $collection = $collection->filter(function ($item) use ($search) {
+                $monthMatch  = str_contains(mb_strtolower($item['month_name'], 'UTF-8'), $search);
+                $codeMatch   = str_contains(mb_strtolower($item['payroll_month'], 'UTF-8'), $search);
+                $payoutMatch = str_contains((string)$item['net_payout'], $search);
+                return $monthMatch || $codeMatch || $payoutMatch;
+            });
+        }
+
+        // 2. Year filter
+        if ($request->filled('year')) {
+            $year = trim($request->input('year'));
+            $collection = $collection->filter(fn($item) => $item['year'] === $year);
+        }
+
+        // 3. Month filter
+        if ($request->filled('month')) {
+            $month = str_pad(trim($request->input('month')), 2, '0', STR_PAD_LEFT);
+            $collection = $collection->filter(fn($item) => $item['month_num'] === $month);
+        }
+
+        // 4. Sorting
+        $sort = $request->input('sort', 'newest');
+        if ($sort === 'oldest') {
+            $collection = $collection->sortBy('payroll_month')->values();
+        } elseif ($sort === 'payout_high') {
+            $collection = $collection->sortByDesc('net_payout')->values();
+        } elseif ($sort === 'payout_low') {
+            $collection = $collection->sortBy('net_payout')->values();
+        } else {
+            $collection = $collection->sortByDesc('payroll_month')->values();
+        }
+
+        $salaryHistory = $collection->values()->all();
+
+        $responseData = [
             'employee' => [
                 'id'            => $employee->id,
                 'employee_code' => $employee->employee_id,
@@ -881,8 +917,28 @@ class PayrollRunApiController extends Controller
                 'designation'   => $employee->designation?->name,
                 'email'         => $employee->office_email ?? $employee->personal_email,
             ],
-            'salary_history' => $salaryHistory,
-        ], 'Salary history loaded successfully.');
+            'available_years'  => $availableYears,
+            'available_months' => $availableMonths,
+            'salary_history'   => $salaryHistory,
+        ];
+
+        if ($request->has('per_page') || $request->has('page')) {
+            $perPage = min(max($request->integer('per_page', 10), 1), 100);
+            $page = max($request->integer('page', 1), 1);
+            $total = count($salaryHistory);
+            $pagedItems = array_slice($salaryHistory, ($page - 1) * $perPage, $perPage);
+
+            $responseData['salary_history'] = array_values($pagedItems);
+            $responseData['pagination'] = [
+                'current_page' => $page,
+                'per_page'     => $perPage,
+                'total'        => $total,
+                'last_page'    => (int) ceil($total / $perPage),
+                'has_more'     => $page < (int) ceil($total / $perPage),
+            ];
+        }
+
+        return $this->sendSuccess($responseData, 'Salary history loaded successfully.');
     }
 
     /**
@@ -1036,7 +1092,14 @@ class PayrollRunApiController extends Controller
     public function downloadPayslip(PayrollRun $run, Employee $employee): mixed
     {
         $user = auth()->user();
-        if ($user && $user->employee && $user->employee->id !== $employee->id && !$this->isHrAdmin()) {
+        $isAuthorized = $user && (
+            $user->can('viewAny', PayrollRun::class)
+            || $user->can('process', $run)
+            || $user->can('approve', $run)
+            || $this->isHrAdmin()
+        );
+        $authEmployee = $this->getAuthenticatedEmployee();
+        if ($authEmployee && $authEmployee->id !== $employee->id && !$isAuthorized) {
             return $this->sendError('Unauthorized access to this payslip.', 403);
         }
 
@@ -1068,7 +1131,7 @@ class PayrollRunApiController extends Controller
             Log::warning('Dynamic payslip generation failed in API, falling back to default view: ' . $e->getMessage());
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.hrms.payroll.payslip-pdf', $data);
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.hrms.payroll.pdf_payslip', $data);
         return $pdf->download($fileName);
     }
 }

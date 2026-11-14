@@ -107,6 +107,7 @@
             <button type="button" class="btn btn-light-brand btn-sm mt-2" id="addItemRow">
                 <i class="feather-plus me-1"></i>Add Line
             </button>
+            @include('modules.accounting.bill-wise._line-panel', ['formKey' => 'journal', 'accounts' => $accounts])
         </div>
 
         <div class="row mt-4 pt-3 border-top text-dark fs-13">
@@ -190,6 +191,7 @@
                                 <select name="items[${index}][chart_of_account_id]" class="form-select odoo-table-select odoo-select2 account-select" required>
                                     ${buildAccountOptions(values.accountId)}
                                 </select>
+                                ${window.BillWiseBox ? BillWiseBox.rowFields() : ''}
                             </td>
                             <td>
                                 <select name="items[${index}][cost_center_id]" class="form-select odoo-table-select odoo-select2 cost-center-select">
@@ -237,6 +239,11 @@
                         newRow.find('.account-select').select2({ theme: "bootstrap-5", width: "100%", dropdownParent: newRow.closest('.offcanvas, body') });
                         newRow.find('.cost-center-select').select2({ theme: "bootstrap-5", width: "100%", dropdownParent: newRow.closest('.offcanvas, body') });
                         newRow.find('.project-select').select2({ theme: "bootstrap-5", width: "100%", dropdownParent: newRow.closest('.offcanvas, body') });
+                    }
+
+                    if (window.BillWiseBox) {
+                        BillWiseBox.rename(newRow, rowIndex);
+                        BillWiseBox.refresh(newRow);
                     }
 
                     rowIndex++;
@@ -312,6 +319,8 @@
                                  .addClass('bg-soft-danger text-danger').text('Out of balance by ' + diff);
                     }
                 }
+
+                if (window.BillWiseBox) BillWiseBox.attach('journal', $('#itemsTable'));
 
                 // Journals need at least 2 lines to be postable — start with 2 blank rows.
                 addRow();

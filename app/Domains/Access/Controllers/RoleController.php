@@ -42,6 +42,8 @@ class RoleController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'slug' => [
                 'nullable', 'string', 'max:255', 'alpha_dash',
+                // Reserved for the platform's system roles.
+                Rule::notIn(\App\Domains\Access\Services\RoleService::RESERVED_SLUGS),
                 Rule::unique('roles', 'slug')->where(fn ($q) => $q->where('tenant_id', tenant_id())),
             ],
             'level' => ['nullable', 'integer', 'min:1', 'max:65535'],

@@ -324,57 +324,58 @@
 </div>
 
 <!-- Modal: Split Remnant (Rendered via Common modal and odoo-form-ui Components) -->
-<x-ui.modal id="splitRemnantModal" title="<i class='feather-scissors me-2 text-primary'></i>Split Remnant #{{ $remnant->remnant_code }}" size="md" :centered="true" class="text-start">
+<x-ui.modal id="splitRemnantModal" title="<i class='feather-scissors me-2 text-primary'></i>{{ __('inventory.split_remnant') }} #{{ $remnant->remnant_code }}" size="md" :centered="true" class="text-start">
     <form method="POST" action="{{ route('inventory.remnants.split', $remnant->id) }}" id="splitRemnantForm">
         @csrf
         <div class="alert alert-info py-2 fs-12 mb-3">
-            Available: <strong>{{ number_format($remnant->available_length ?? $remnant->available_quantity, 1) }}</strong>
-            {{ $remnant->measurement_type === 'linear' ? 'mm' : 'units' }}.
-            Splitting divides physical stock into a new remnant asset without production consumption.
+            {!! __('inventory.split_remnant_help', [
+                'avail' => '<strong>' . number_format($remnant->available_length ?? $remnant->available_quantity, 1) . '</strong>',
+                'uom' => $remnant->measurement_type === 'linear' ? 'mm' : __('inventory.units')
+            ]) !!}
         </div>
 
         @if($remnant->measurement_type === 'linear')
             <div class="mb-3">
-                <x-ui.odoo-form-ui type="input" inputType="number" label="Cut Off Length (mm)" name="split_length" step="0.1" max="{{ (float)$remnant->available_length - 1 }}" :required="true" />
-                <span class="fs-11 text-muted d-block mt-1">Parent retains remainder; child receives cut length.</span>
+                <x-ui.odoo-form-ui type="input" inputType="number" :label="__('inventory.cut_off_length')" name="split_length" step="0.1" max="{{ (float)$remnant->available_length - 1 }}" :required="true" />
+                <span class="fs-11 text-muted d-block mt-1">{{ __('inventory.cut_off_help') }}</span>
             </div>
         @else
             <div class="mb-3">
-                <x-ui.odoo-form-ui type="input" inputType="number" label="Quantity to Split Off" name="split_quantity" step="any" max="{{ (float)$remnant->available_quantity - 0.001 }}" :required="true" />
+                <x-ui.odoo-form-ui type="input" inputType="number" :label="__('inventory.quantity_to_split')" name="split_quantity" step="any" max="{{ (float)$remnant->available_quantity - 0.001 }}" :required="true" />
             </div>
         @endif
 
         <div class="mb-3">
-            <x-ui.odoo-form-ui type="input" label="Child Remnant Rack / Location" name="warehouse_location" placeholder="e.g. Rack B-04" />
+            <x-ui.odoo-form-ui type="input" :label="__('inventory.child_remnant_rack')" name="warehouse_location" placeholder="e.g. Rack B-04" />
         </div>
 
         <div class="mb-3">
-            <x-ui.odoo-form-ui type="textarea" label="Notes / Reason" name="notes" rows="2" placeholder="Reason for physical offcut split..." />
+            <x-ui.odoo-form-ui type="textarea" :label="__('inventory.notes_reason')" name="notes" rows="2" placeholder="{{ __('inventory.reason_split_placeholder') }}" />
         </div>
     </form>
     <x-slot name="footer">
-        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
+        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('inventory.cancel') }}</x-ui.button>
         <x-ui.button type="button" variant="primary" onclick="document.getElementById('splitRemnantForm').submit();">
-            Execute Split
+            {{ __('inventory.execute_split') }}
         </x-ui.button>
     </x-slot>
 </x-ui.modal>
 
 <!-- Modal: Mark as Scrap (Rendered via Common modal and odoo-form-ui Components) -->
-<x-ui.modal id="scrapRemnantModal" title="<i class='feather-trash-2 me-2 text-danger'></i>Mark Remnant as Unusable Scrap" size="md" :centered="true" class="text-start">
+<x-ui.modal id="scrapRemnantModal" title="<i class='feather-trash-2 me-2 text-danger'></i>{{ __('inventory.mark_remnant_scrap') }}" size="md" :centered="true" class="text-start">
     <form method="POST" action="{{ route('inventory.remnants.scrap', $remnant->id) }}" id="scrapRemnantForm">
         @csrf
         <p class="fs-12 text-muted mb-3">
-            This will permanently mark remnant <strong>{{ $remnant->remnant_code }}</strong> as scrapped and zero out available inventory.
+            {!! __('inventory.scrap_remnant_help', ['code' => '<strong>' . e($remnant->remnant_code) . '</strong>']) !!}
         </p>
         <div class="mb-3">
-            <x-ui.odoo-form-ui type="input" label="Scrap Reason" name="reason" placeholder="e.g. Severe corrosion, bent, unusable" :required="true" />
+            <x-ui.odoo-form-ui type="input" :label="__('inventory.scrap_reason')" name="reason" placeholder="{{ __('inventory.scrap_reason_placeholder') }}" :required="true" />
         </div>
     </form>
     <x-slot name="footer">
-        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
+        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('inventory.cancel') }}</x-ui.button>
         <x-ui.button type="button" variant="danger" onclick="document.getElementById('scrapRemnantForm').submit();">
-            Confirm Scrap
+            {{ __('inventory.confirm_scrap') }}
         </x-ui.button>
     </x-slot>
 </x-ui.modal>

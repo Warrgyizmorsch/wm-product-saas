@@ -51,7 +51,7 @@ class LeadHistory extends Model
         }
 
         self::create([
-            'tenant_id' => $lead->tenant_id,
+            'tenant_id' => $lead->tenant_id ?: (function_exists('tenant_id') && tenant_id() ? tenant_id() : (auth()->user()?->tenant_id ?? 1)),
             'lead_id' => $lead->id,
             'user_id' => auth()->id(),
             'event_type' => $eventType,

@@ -4,7 +4,7 @@
     'active' => false,
 ])
 
-<a href="{{ $href }}" {{ $attributes->class(['dropdown-item', 'active' => $active]) }}>
+<a href="{!! $href !!}" {{ $attributes->class(['dropdown-item', 'active' => $active]) }}>
     @if($icon)
         <i class="{{ $icon }}"></i>
     @endif

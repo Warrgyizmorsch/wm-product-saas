@@ -94,6 +94,70 @@
         border-color: var(--bs-primary) !important;
         box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb, 59, 130, 246), 0.12) !important;
     }
+
+    /* ── Preset Select2 & Clear Cross Icon ── */
+    .preset-select-wrapper {
+        position: relative;
+    }
+    .preset-select-wrapper .select2-container {
+        width: 100% !important;
+    }
+    .preset-select-wrapper .select2-container--bootstrap-5 .select2-selection--single {
+        min-height: 34px !important;
+        padding-left: 10px !important;
+        padding-right: 56px !important;
+        background-color: #ffffff !important;
+        border-color: #cbd5e1 !important;
+        display: flex !important;
+        align-items: center !important;
+        position: relative !important;
+    }
+    .preset-select-wrapper .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        padding-right: 56px !important;
+        padding-left: 0 !important;
+        line-height: 32px !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        color: #1e293b !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+    /* Clearly visible cross (clear) button with dedicated spacing */
+    .preset-select-wrapper .select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear,
+    #addTemplateModal .select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear {
+        position: absolute !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        right: 28px !important;
+        width: 18px !important;
+        height: 18px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        font-family: Arial, sans-serif !important;
+        line-height: 1 !important;
+        color: #dc2626 !important;
+        background-color: #fee2e2 !important;
+        border: 1px solid #fca5a5 !important;
+        border-radius: 50% !important;
+        cursor: pointer !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        z-index: 5 !important;
+        box-shadow: 0 1px 2px rgba(220, 38, 38, 0.15) !important;
+        transition: all 0.15s ease-in-out !important;
+    }
+    .preset-select-wrapper .select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear:hover,
+    #addTemplateModal .select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear:hover {
+        color: #ffffff !important;
+        background-color: #dc2626 !important;
+        border-color: #b91c1c !important;
+        transform: translateY(-50%) scale(1.15) !important;
+        box-shadow: 0 2px 5px rgba(220, 38, 38, 0.25) !important;
+    }
 </style>
 
 <!-- DOCUMENT TEMPLATES TAB -->
@@ -238,7 +302,7 @@
                                             </a>
                                         </li>
                                         <li>
-                                            <textarea id="tmpl_raw_body_{{ $tmpl->id }}" class="d-none">{{ $tmpl->body_content }}</textarea>
+                                            <textarea id="tmpl_raw_body_{{ $tmpl->id }}" class="tmpl-raw-body d-none">{{ $tmpl->body_content }}</textarea>
                                             <a class="dropdown-item py-2 btn-edit-template" 
                                                href="javascript:void(0)"
                                                data-bs-toggle="modal" 
@@ -322,7 +386,7 @@
                                     <div class="fw-bold text-dark fs-12 mb-0"><i class="feather-zap text-primary me-1"></i> {{ __('hrms.document_master.preset_banner_title') }}</div>
                                     <p class="fs-11 text-muted mb-0">{{ __('hrms.document_master.preset_banner_desc') }}</p>
                                 </div>
-                                <div style="min-width: 280px;">
+                                <div class="preset-select-wrapper" style="min-width: 320px; max-width: 440px;">
                                     <select class="form-select form-select-sm fs-12" id="add_template_preset_select" onchange="applyTemplatePreset('add', this.value)">
                                         <option value="">{{ __('hrms.document_master.choose_preset') }}</option>
                                         <option value="payslip">{{ __('hrms.document_master.preset_payslip') }}</option>
@@ -903,6 +967,21 @@
 <script>
     var addQuillInstance = null;
     var editQuillInstance = null;
+    var currentEditBodyContent = '';
+
+    var ALL_DOCUMENT_TEMPLATES = {
+        @foreach($templates as $t)
+            "{{ $t->id }}": {
+                id: "{{ $t->id }}",
+                name: @json($t->name),
+                code: @json($t->code),
+                category_id: @json($t->document_category_id),
+                status: @json($t->status),
+                requires_signature: {{ $t->requires_signature ? 'true' : 'false' }},
+                body_content: @json($t->body_content ?? '')
+            },
+        @endforeach
+    };
 
     function initTemplateQuillEditors() {
         var toolbarOptions = [
@@ -1017,8 +1096,42 @@
 
         initTemplateQuillEditors();
 
-        $('#addTemplateModal, #editTemplateModal').on('shown.bs.modal', function () {
+        $('#addTemplateModal').on('shown.bs.modal', function () {
             initTemplateQuillEditors();
+        });
+
+        $('#editTemplateModal').on('shown.bs.modal', function () {
+            initTemplateQuillEditors();
+            var bodyVal = currentEditBodyContent || $('#edit_tmpl_body_input').val() || '';
+            if (editQuillInstance && bodyVal) {
+                try {
+                    editQuillInstance.clipboard.dangerouslyPasteHTML(0, bodyVal, 'silent');
+                } catch (e) {
+                    editQuillInstance.root.innerHTML = bodyVal;
+                }
+                if (!editQuillInstance.getText().trim() && bodyVal) {
+                    editQuillInstance.root.innerHTML = bodyVal;
+                }
+                editQuillInstance.update();
+                setTimeout(function() {
+                    if (editQuillInstance && bodyVal && !editQuillInstance.getText().trim()) {
+                        editQuillInstance.root.innerHTML = bodyVal;
+                        editQuillInstance.update();
+                    }
+                }, 80);
+            }
+        });
+
+        // Clear preset fields when preset is cleared, deselected, or cross icon clicked
+        $('#add_template_preset_select').on('change select2:clear select2:unselect', function() {
+            var val = $(this).val();
+            if (!val) {
+                applyTemplatePreset('add', '');
+            }
+        });
+
+        $(document).on('click', '#addTemplateModal .select2-selection__clear', function() {
+            applyTemplatePreset('add', '');
         });
 
         // Sync Quill editor to hidden body_content inputs on form submit
@@ -1089,27 +1202,49 @@
 
         // Edit Template Modal Populator
         $(document).on('click', '.btn-edit-template', function() {
-            var id = $(this).data('id');
+            var id = String($(this).data('id'));
             var form = $('#editTemplateForm');
             form.attr('action', '{{ url("hrms/documents-master/templates") }}/' + id);
 
-            $('#edit_tmpl_name').val($(this).data('name'));
-            $('#edit_tmpl_code').val($(this).data('code'));
-            $('#edit_tmpl_category_id').val($(this).data('category-id')).trigger('change');
-            $('#edit_tmpl_status').val($(this).data('status')).trigger('change');
+            var tmplData = (typeof ALL_DOCUMENT_TEMPLATES !== 'undefined' && ALL_DOCUMENT_TEMPLATES[id]) ? ALL_DOCUMENT_TEMPLATES[id] : {};
 
-            var reqSig = $(this).data('requires-signature');
+            $('#edit_tmpl_name').val(tmplData.name || $(this).data('name') || '');
+            $('#edit_tmpl_code').val(tmplData.code || $(this).data('code') || '');
+            $('#edit_tmpl_category_id').val(tmplData.category_id || $(this).data('category-id') || '').trigger('change');
+            $('#edit_tmpl_status').val(tmplData.status || $(this).data('status') || 'active').trigger('change');
+
+            var reqSig = tmplData.requires_signature !== undefined ? tmplData.requires_signature : $(this).data('requires-signature');
             $('#edit_tmpl_requires_signature').prop('checked', reqSig == 1 || reqSig === '1' || reqSig === true);
 
-            var bodyVal = $('#tmpl_raw_body_' + id).val() || $(this).data('body') || '';
+            var bodyVal = tmplData.body_content || $('#tmpl_raw_body_' + id).val() || $(this).siblings('textarea').val() || $(this).data('body') || '';
+
+            // If empty, check if it matches a preset template code as fallback
+            if (!bodyVal || bodyVal.trim() === '') {
+                var codeUpper = String(tmplData.code || $(this).data('code') || '').toUpperCase();
+                for (var key in TEMPLATE_PRESETS) {
+                    if (TEMPLATE_PRESETS[key].code.toUpperCase() === codeUpper) {
+                        bodyVal = TEMPLATE_PRESETS[key].content;
+                        break;
+                    }
+                }
+            }
+
+            currentEditBodyContent = bodyVal;
             $('#edit_tmpl_body_input').val(bodyVal);
 
+            initTemplateQuillEditors();
             if (editQuillInstance) {
-                editQuillInstance.root.innerHTML = bodyVal;
-            } else {
-                initTemplateQuillEditors();
-                if (editQuillInstance) {
-                    editQuillInstance.root.innerHTML = bodyVal;
+                if (bodyVal && bodyVal.trim() !== '') {
+                    try {
+                        editQuillInstance.clipboard.dangerouslyPasteHTML(0, bodyVal, 'silent');
+                    } catch (e) {
+                        editQuillInstance.root.innerHTML = bodyVal;
+                    }
+                    if (!editQuillInstance.getText().trim() && bodyVal) {
+                        editQuillInstance.root.innerHTML = bodyVal;
+                    }
+                } else {
+                    editQuillInstance.setText('');
                 }
             }
         });
@@ -1324,7 +1459,28 @@
     };
 
     function applyTemplatePreset(modalType, presetKey) {
-        if (!presetKey || presetKey === 'custom') return;
+        if (!presetKey || presetKey === '') {
+            if (modalType === 'add') {
+                $('#add_tmpl_name').val('');
+                $('#add_tmpl_code').val('');
+                $('#add_tmpl_category_id').val('').trigger('change');
+                if (addQuillInstance) {
+                    addQuillInstance.setText('');
+                    $('#add_tmpl_body_input').val('');
+                }
+            } else if (modalType === 'edit') {
+                $('#edit_tmpl_name').val('');
+                $('#edit_tmpl_code').val('');
+                $('#edit_tmpl_category_id').val('').trigger('change');
+                if (editQuillInstance) {
+                    editQuillInstance.setText('');
+                    $('#edit_tmpl_body_input').val('');
+                }
+            }
+            return;
+        }
+
+        if (presetKey === 'custom') return;
         var preset = TEMPLATE_PRESETS[presetKey];
         if (!preset) return;
 

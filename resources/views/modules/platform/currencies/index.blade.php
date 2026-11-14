@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Currencies | SaaS ERP')
+@section('title', 'Currencies | Platform Console')
 @section('page-title', 'Currencies')
-@section('breadcrumb', 'Tenant Console / Currencies')
+@section('breadcrumb', 'Currencies')
 
 @section('content')
 

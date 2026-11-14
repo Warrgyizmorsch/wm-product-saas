@@ -55,12 +55,17 @@ class HelpdeskKbRepository implements HelpdeskKbRepositoryInterface
             ->get();
     }
 
-    public function findArticleBySlug(string $slug): HelpdeskKbArticle
+    public function findArticleBySlug(string $slug, bool $canManage = false): HelpdeskKbArticle
     {
         $tenantId = tenant_id();
-        $article = HelpdeskKbArticle::where('tenant_id', $tenantId)
-            ->where('slug', $slug)
-            ->firstOrFail();
+        $query = HelpdeskKbArticle::where('tenant_id', $tenantId)
+            ->where('slug', $slug);
+
+        if (!$canManage) {
+            $query->where('is_published', true);
+        }
+
+        $article = $query->firstOrFail();
 
         $article->increment('view_count');
 
@@ -121,7 +126,7 @@ class HelpdeskKbRepository implements HelpdeskKbRepositoryInterface
                   ->orWhere('content', 'like', "%{$query}%");
             })
             ->limit(5)
-            ->get(['id', 'title', 'slug', 'content']);
+            ->get(['id', 'title', 'slug']);
     }
 
     public function createCategory(array $data): HelpdeskCategory
@@ -164,6 +169,10 @@ class HelpdeskKbRepository implements HelpdeskKbRepositoryInterface
     {
         $tenantId = tenant_id();
         $category = HelpdeskCategory::where('tenant_id', $tenantId)->findOrFail($id);
+
+        if ($category->tickets()->exists()) {
+            throw new \DomainException('Cannot delete category because it has associated tickets.');
+        }
 
         return (bool) $category->delete();
     }

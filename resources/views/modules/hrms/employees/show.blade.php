@@ -2090,6 +2090,7 @@
                     if (docId) {
                         modal.find('#upload_doc_modal_document_id').val(docId);
                         modal.find('#upload_template_select_group').hide();
+                        modal.find('#upload_document_master_id').prop('required', false);
                         modal.find('#upload_document_name_label_group').show();
                         modal.find('#upload_document_name_label').text(docName);
                         modal.find('.modal-title').html('<i class="feather-upload-cloud me-2 text-primary"></i>Upload ' + docName);
@@ -2099,8 +2100,9 @@
                     } else {
                         modal.find('#upload_doc_modal_document_id').val('');
                         modal.find('#upload_template_select_group').show();
+                        modal.find('#upload_document_master_id').prop('required', true);
                         modal.find('#upload_document_name_label_group').hide();
-                        modal.find('#upload_document_master_id').val('').trigger('change.select2');
+                        modal.find('#upload_document_master_id').val('').trigger('change');
                         window.setExpiryDateRequired(modal, false);
                         modal.find('.modal-title').html('<i class="feather-upload-cloud me-2 text-primary"></i>' + "{{ __('hrms.employees.mdl_upload_doc_title') }}");
                     }

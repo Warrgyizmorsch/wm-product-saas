@@ -7,39 +7,201 @@ use App\Domains\HRMS\Models\Attendance;
 use App\Domains\HRMS\Models\EmployeePenalty;
 use App\Domains\HRMS\Models\EmployeeAdhocComponent;
 use App\Domains\HRMS\Models\PayrollHold;
+use App\Domains\HRMS\Models\PayrollPayslip;
 use App\Domains\HRMS\Models\PayrollRetroactiveAdjustment;
+use App\Domains\HRMS\Models\PayrollRun;
 use App\Domains\HRMS\Models\SalaryRevision;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class PayrollCalculationService
 {
     /**
      * Compute final salary breakdown for an employee in a given month.
+     * If the payroll run is locked or paid, returns the immutable stored snapshot.
      *
      * @param Employee $employee
      * @param string $payrollMonth Format: YYYY-MM
+     * @param PayrollRun|null $run
      * @return array
      */
-    public function calculateSalary(Employee $employee, string $payrollMonth): array
+    public function calculateSalary(Employee $employee, string $payrollMonth, ?PayrollRun $run = null): array
+    {
+        // Try to fetch corresponding run if not explicitly passed
+        if (!$run) {
+            // Check if employee is in an individual payroll run first
+            $run = PayrollRun::where('payroll_month', $payrollMonth)
+                ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                ->whereJsonContains('employee_ids', $employee->id)
+                ->first();
+
+            if (!$run && $employee->pay_group_id) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->where('pay_group_id', $employee->pay_group_id)
+                    ->first();
+            }
+
+            if (!$run) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->whereNull('pay_group_id')
+                    ->first();
+            }
+
+            if (!$run) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->first();
+            }
+        }
+
+        // 1. If run is locked or paid, return the immutable stored snapshot
+        if ($run && in_array($run->status, ['locked', 'paid'])) {
+            try {
+                $payslip = PayrollPayslip::where('payroll_run_id', $run->id)
+                    ->where('employee_id', $employee->id)
+                    ->first();
+
+                if ($payslip && is_array($payslip->summary_data) && is_array($payslip->items_data)) {
+                    $isHeld = PayrollHold::where('employee_id', $employee->id)
+                        ->where('payroll_month', $payrollMonth)
+                        ->where('status', 'on_hold')
+                        ->exists();
+
+                    return [
+                        'success'       => true,
+                        'status'        => $isHeld ? 'on_hold' : $payslip->status,
+                        'summary'       => $payslip->summary_data,
+                        'items'         => $payslip->items_data,
+                        'from_snapshot' => true,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                Log::warning("Could not load payroll snapshot: " . $e->getMessage());
+            }
+        }
+
+        // 2. Fresh dynamic calculation
+        $calc = $this->calculateSalaryFresh($employee, $payrollMonth, $run);
+
+        // 3. If run is locked or paid, automatically persist snapshot so it stays permanently frozen
+        if ($run && in_array($run->status, ['locked', 'paid']) && !empty($calc['summary'])) {
+            try {
+                PayrollPayslip::updateOrCreate(
+                    [
+                        'payroll_run_id' => $run->id,
+                        'employee_id'    => $employee->id,
+                    ],
+                    [
+                        'tenant_id'        => $employee->tenant_id ?? $run->tenant_id ?? 1,
+                        'company_id'       => $employee->company_id ?? $run->company_id ?? 1,
+                        'payroll_month'    => $payrollMonth,
+                        'status'           => $run->status,
+                        'gross_earnings'   => $calc['summary']['total_earnings'] ?? 0.00,
+                        'total_deductions' => $calc['summary']['total_deductions'] ?? 0.00,
+                        'net_payout'       => $calc['summary']['net_payout'] ?? 0.00,
+                        'lop_days'         => $calc['summary']['lop_days'] ?? 0.00,
+                        'paid_days'        => $calc['summary']['paid_days'] ?? 0.00,
+                        'summary_data'     => $calc['summary'],
+                        'items_data'       => $calc['items'] ?? [],
+                    ]
+                );
+            } catch (\Throwable $e) {
+                Log::warning("Could not auto-persist payroll snapshot: " . $e->getMessage());
+            }
+        }
+
+        return $calc;
+    }
+
+    /**
+     * Compute live on-the-fly salary calculation from active employee profile, rules, and attendance.
+     *
+     * @param Employee $employee
+     * @param string $payrollMonth Format: YYYY-MM
+     * @param PayrollRun|null $run
+     * @return array
+     */
+    public function calculateSalaryFresh(Employee $employee, string $payrollMonth, ?PayrollRun $run = null): array
     {
         $carbonMonth = Carbon::parse($payrollMonth . '-01');
         $totalDaysInMonth = $carbonMonth->daysInMonth;
 
         // Try to fetch corresponding active run to get exact user-defined start and end dates
-        $run = \App\Domains\HRMS\Models\PayrollRun::where('payroll_month', $payrollMonth)
-            ->where(function($q) use ($employee) {
-                $q->whereNull('pay_group_id');
-                if ($employee->pay_group_id) {
-                    $q->orWhere('pay_group_id', $employee->pay_group_id);
-                }
-            })
-            ->first();
+        if (!$run) {
+            $run = PayrollRun::where('payroll_month', $payrollMonth)
+                ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                ->whereJsonContains('employee_ids', $employee->id)
+                ->first();
+
+            if (!$run && $employee->pay_group_id) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->where('pay_group_id', $employee->pay_group_id)
+                    ->first();
+            }
+
+            if (!$run) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->whereNull('pay_group_id')
+                    ->first();
+            }
+
+            if (!$run) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->first();
+            }
+        }
 
         $startDate = $run && $run->start_date ? Carbon::parse($run->start_date) : $carbonMonth->copy()->startOfMonth();
         $endDate = $run && $run->end_date ? Carbon::parse($run->end_date) : $carbonMonth->copy()->endOfMonth();
         
         if ($run && $run->start_date && $run->end_date) {
             $totalDaysInMonth = $startDate->diffInDays($endDate) + 1;
+        }
+
+        // Future hire check: If employee hasn't joined by end of calculation period, return zeroed payroll
+        if ($employee->date_of_joining) {
+            $doj = Carbon::parse($employee->date_of_joining);
+            if ($doj->gt($endDate)) {
+                return [
+                    'success' => true,
+                    'status'  => 'not_joined',
+                    'summary' => [
+                        'employee_name'           => $employee->full_name ?? $employee->display_name ?? ('Employee #' . $employee->id),
+                        'payroll_month'           => $payrollMonth,
+                        'total_days'              => $totalDaysInMonth,
+                        'lop_days'                => 0,
+                        'proration_days'          => (float) $totalDaysInMonth,
+                        'lop_deduction'           => 0.00,
+                        'paid_days'               => 0.0,
+                        'proration_rule'          => 'calendar_days',
+                        'base_gross_earnings'     => 0.00,
+                        'adhoc_earnings'          => 0.00,
+                        'retro_lop_reversals'     => 0.00,
+                        'overtime_payout'         => 0.00,
+                        'overtime_hours'          => 0.00,
+                        'processed_ot_ids'        => [],
+                        'leave_encashment_payout' => 0.00,
+                        'leave_encashment_days'   => 0.00,
+                        'processed_encash_ids'    => [],
+                        'total_earnings'          => 0.00,
+                        'base_deductions'         => 0.00,
+                        'adhoc_deductions'        => 0.00,
+                        'attendance_penalties'    => 0.00,
+                        'attendance_penalty_days' => 0.00,
+                        'total_deductions'        => 0.00,
+                        'net_payout'              => 0.00,
+                        'is_fnf'                  => false,
+                        'fnf_exit_id'             => null,
+                        'fnf_net_amount'          => null,
+                    ],
+                    'items' => [],
+                ];
+            }
         }
 
         // 2. Resolve Pay Group Rules
@@ -63,9 +225,65 @@ class PayrollCalculationService
             $divisor = max(1, $workingDays);
         }
 
-        // 4. Calculate LOP Days (Absences + Unpaid Leaves + Penalty Days combined in the run dates range)
+        // 4. Resolve mid-month joining and exit boundaries
+        $employedStartDate = $startDate->copy();
+        $isMidMonthHire = false;
+        if ($employee->date_of_joining) {
+            $doj = Carbon::parse($employee->date_of_joining)->startOfDay();
+            if ($doj->gt($startDate)) {
+                $employedStartDate = $doj;
+                $isMidMonthHire = true;
+            }
+        }
+
+        $activeExit = \App\Domains\HRMS\Models\EmployeeExit::where('employee_id', $employee->id)
+            ->where('tenant_id', $employee->tenant_id)
+            ->whereIn('status', ['approved', 'in_clearance', 'settled'])
+            ->where(function($q) use ($startDate, $endDate, $carbonMonth) {
+                $q->whereBetween('approved_lwd', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                  ->orWhereBetween('preferred_lwd', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                  ->orWhereHas('fnfSettlement', function($sq) use ($carbonMonth) {
+                      $sq->where(function($sub) use ($carbonMonth) {
+                          $sub->whereMonth('created_at', $carbonMonth->month)
+                              ->whereYear('created_at', $carbonMonth->year);
+                      })->orWhere(function($sub) {
+                          $sub->where('settlement_channel', 'monthly_payroll')
+                              ->whereIn('status', ['approved', 'paid']);
+                      });
+                  });
+            })
+            ->first();
+
+        $employedEndDate = $endDate->copy();
+        $isMidMonthExit = false;
+        if ($activeExit && ($activeExit->approved_lwd || $activeExit->preferred_lwd)) {
+            $lwd = Carbon::parse($activeExit->approved_lwd ?: $activeExit->preferred_lwd)->startOfDay();
+            if ($lwd->lt($endDate)) {
+                $employedEndDate = $lwd;
+                $isMidMonthExit = true;
+            }
+        }
+
+        // Count employed units within the payroll cycle based on proration rule
+        $employedDays = 0.0;
+        for ($d = $startDate->copy(); $d->lte($endDate); $d->addDay()) {
+            if ($d->gte($employedStartDate) && $d->lte($employedEndDate)) {
+                if ($prorationRule === 'working_days') {
+                    if ($d->dayOfWeek !== Carbon::SUNDAY) {
+                        $employedDays += 1.0;
+                    }
+                } else {
+                    $employedDays += 1.0;
+                }
+            }
+        }
+
+        // Non-employed days in the payroll cycle
+        $nonEmployedDays = max(0.0, (float) $divisor - $employedDays);
+
+        // Calculate LOP Days (Absences + Unpaid Leaves + Penalty Days combined in the employed range)
         $attendances = Attendance::where('employee_id', $employee->id)
-            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->whereBetween('date', [$employedStartDate->format('Y-m-d'), $employedEndDate->format('Y-m-d')])
             ->get()
             ->keyBy(fn($a) => $a->date instanceof Carbon ? $a->date->format('Y-m-d') : Carbon::parse($a->date)->format('Y-m-d'));
 
@@ -97,6 +315,18 @@ class PayrollCalculationService
             })
             ->get();
 
+        $wfhRequests = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->where(function($query) use ($startDate, $endDate) {
+                $query->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->orWhere(function($sub) use ($startDate, $endDate) {
+                        $sub->where('start_date', '<=', $startDate->format('Y-m-d'))
+                            ->where('end_date', '>=', $endDate->format('Y-m-d'));
+                    });
+            })
+            ->get();
+
         $absenceDays = 0.0;
         $unpaidLeaveDays = 0.0;
         $today = Carbon::today();
@@ -104,6 +334,11 @@ class PayrollCalculationService
         for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
             $dateStr = $date->format('Y-m-d');
             
+            // Skip days outside the employee's active employment tenure (pre-hire or post-exit)
+            if ($date->lt($employedStartDate) || $date->gt($employedEndDate)) {
+                continue;
+            }
+
             // Skip future dates to avoid counting upcoming days as absent
             if ($date->greaterThan($today)) {
                 continue;
@@ -180,7 +415,23 @@ class PayrollCalculationService
                 continue;
             }
 
-            // 5. It's a working day. Check attendance status
+            // 5. Check if it is an approved Work From Home (WFH) day
+            $activeWfh = $wfhRequests->first(function($w) use ($dateStr) {
+                $start = $w->start_date instanceof Carbon ? $w->start_date->format('Y-m-d') : Carbon::parse($w->start_date)->format('Y-m-d');
+                $end = $w->end_date instanceof Carbon ? $w->end_date->format('Y-m-d') : Carbon::parse($w->end_date)->format('Y-m-d');
+                return $dateStr >= $start && $dateStr <= $end;
+            });
+
+            if ($activeWfh) {
+                $att = $attendances->get($dateStr);
+                if ($att && $att->status === 'half_day') {
+                    $absenceDays += 0.5;
+                }
+                // Approved WFH covers this working day; skip marking as absent
+                continue;
+            }
+
+            // 6. It's an employed working day. Check attendance status
             $att = $attendances->get($dateStr);
             if (!$att || $att->status === 'absent') {
                 $absenceDays += 1.0;
@@ -189,12 +440,32 @@ class PayrollCalculationService
             }
         }
 
-        $penaltyDaysCount = EmployeePenalty::where('employee_id', $employee->id)
-            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+        $penalties = EmployeePenalty::where('employee_id', $employee->id)
+            ->whereBetween('date', [$employedStartDate->format('Y-m-d'), $employedEndDate->format('Y-m-d')])
             ->where('status', '!=', 'excused')
-            ->sum('penalty_amount');
+            ->get();
 
-        $lopDays = $absenceDays + $unpaidLeaveDays + $penaltyDaysCount;
+        $penaltyDaysCount = 0.0;
+        foreach ($penalties as $penalty) {
+            $pDate = $penalty->date instanceof Carbon ? $penalty->date->format('Y-m-d') : Carbon::parse($penalty->date)->format('Y-m-d');
+            $att = $attendances->get($pDate);
+            $alreadyCountedInAbsence = 0.0;
+            if ($att) {
+                if ($att->status === 'absent') {
+                    $alreadyCountedInAbsence = 1.0;
+                } elseif ($att->status === 'half_day') {
+                    $alreadyCountedInAbsence = 0.5;
+                }
+            }
+            // Only add excess penalty days beyond any absence already accounted for on the same date to avoid double counting
+            $netPenaltyDays = max(0.0, (float)$penalty->penalty_amount - $alreadyCountedInAbsence);
+            $penaltyDaysCount += $netPenaltyDays;
+        }
+
+        $actualLopDays = $absenceDays + $unpaidLeaveDays + $penaltyDaysCount;
+        $totalUnpaidDays = min((float)$divisor, $nonEmployedDays + $actualLopDays);
+        $paidDays = max(0.0, (float)$divisor - $totalUnpaidDays);
+        $lopDays = $actualLopDays;
 
         // 5. Check for mid-month CTC split/revision
         $revisions = SalaryRevision::where('employee_id', $employee->id)
@@ -216,10 +487,24 @@ class PayrollCalculationService
         if (!$baseStructure) {
             $baseStructure = $employee->salaryStructure;
         }
+        if (!$baseStructure && $employee->pay_group_id) {
+            $baseStructure = \App\Domains\HRMS\Models\SalaryStructure::where('pay_group_id', $employee->pay_group_id)
+                ->where('status', true)
+                ->first();
+        }
+        if (!$baseStructure && $employee->company_id) {
+            $baseStructure = \App\Domains\HRMS\Models\SalaryStructure::where('company_id', $employee->company_id)
+                ->where('status', true)
+                ->first();
+        }
 
-        if ($baseStructure && $baseStructure->items) {
-            // Pre-resolve: find the "basic" item in the structure (first fixed or % of CTC earning component)
+        if ($baseStructure && $baseStructure->items && $baseStructure->items->isNotEmpty()) {
+            // Pre-resolve: find the "basic" item in the structure
             $basicStructureItem = $baseStructure->items->first(function($i) {
+                return $i->component &&
+                       $i->component->type === 'earning' &&
+                       (strtoupper($i->component->code) === 'BASIC' || str_contains(strtolower($i->component->name), 'basic'));
+            }) ?? $baseStructure->items->first(function($i) {
                 return $i->component &&
                        $i->component->type === 'earning' &&
                        in_array($i->calculation_type, ['fixed', 'percentage_of_ctc']);
@@ -227,6 +512,10 @@ class PayrollCalculationService
 
             foreach ($baseStructure->items as $item) {
                 $component = $item->component;
+                if (!$component) {
+                    continue;
+                }
+
                 // Annual CTC / 12 = Base Monthly Value
                 $yearlyValue = 0.00;
 
@@ -237,7 +526,7 @@ class PayrollCalculationService
                     // Resolve basic yearly value from the identified basic item
                     if ($basicStructureItem) {
                         if ($basicStructureItem->calculation_type === 'fixed') {
-                            $basicYearly = (float) $basicStructureItem->value; // already yearly
+                            $basicYearly = (float) $basicStructureItem->value;
                         } else {
                             $basicYearly = ($employee->current_salary * $basicStructureItem->value) / 100;
                         }
@@ -245,7 +534,7 @@ class PayrollCalculationService
                     }
                 } elseif ($item->calculation_type === 'fixed') {
                     // value is stored as the YEARLY amount
-                    $yearlyValue = $item->value;
+                    $yearlyValue = (float) $item->value;
                 } elseif ($item->calculation_type === 'balancing') {
                     // Will calculate remainder below
                     $yearlyValue = 0.00;
@@ -254,8 +543,10 @@ class PayrollCalculationService
                 $monthlyValue = round($yearlyValue / 12, 2);
 
                 $computedSalaryItems[$component->code] = [
+                    'code'             => $component->code,
                     'name'             => $component->name,
                     'type'             => $component->type,
+                    'amount'           => $monthlyValue,
                     'base_monthly'     => $monthlyValue,
                     'calculated_value' => $monthlyValue,
                     'deduction'        => 0.00,
@@ -267,7 +558,7 @@ class PayrollCalculationService
             $balancingItem = $baseStructure->items->filter(fn($i) => $i->calculation_type === 'balancing')->first();
             $monthlyCTC = $employee->current_salary / 12;
 
-            if ($balancingItem) {
+            if ($balancingItem && $balancingItem->component) {
                 $compCode = $balancingItem->component->code;
                 $sumOthers = 0.00;
                 foreach ($computedSalaryItems as $code => $data) {
@@ -277,39 +568,124 @@ class PayrollCalculationService
                 }
                 $balancingMonthly = max(0, $monthlyCTC - $sumOthers);
                 if (isset($computedSalaryItems[$compCode])) {
+                    $computedSalaryItems[$compCode]['amount'] = round($balancingMonthly, 2);
                     $computedSalaryItems[$compCode]['base_monthly'] = round($balancingMonthly, 2);
                     $computedSalaryItems[$compCode]['calculated_value'] = round($balancingMonthly, 2);
                 }
             }
+        } elseif ($employee->current_salary > 0) {
+            // Intelligent fallback default breakdown if salary is set but no salary structure has been created
+            $monthlyCTC = round($employee->current_salary / 12, 2);
+            $basicVal = round($monthlyCTC * 0.50, 2);
+            $hraVal   = round($monthlyCTC * 0.30, 2);
+            $splVal   = max(0.0, round($monthlyCTC - $basicVal - $hraVal, 2));
+
+            $computedSalaryItems['BASIC'] = [
+                'code'             => 'BASIC',
+                'name'             => 'Basic Salary',
+                'type'             => 'earning',
+                'amount'           => $basicVal,
+                'base_monthly'     => $basicVal,
+                'calculated_value' => $basicVal,
+                'deduction'        => 0.00,
+                'reversal'         => 0.00,
+            ];
+            $computedSalaryItems['HRA'] = [
+                'code'             => 'HRA',
+                'name'             => 'House Rent Allowance',
+                'type'             => 'earning',
+                'amount'           => $hraVal,
+                'base_monthly'     => $hraVal,
+                'calculated_value' => $hraVal,
+                'deduction'        => 0.00,
+                'reversal'         => 0.00,
+            ];
+            if ($splVal > 0) {
+                $computedSalaryItems['SPL'] = [
+                    'code'             => 'SPL',
+                    'name'             => 'Special Allowance',
+                    'type'             => 'earning',
+                    'amount'           => $splVal,
+                    'base_monthly'     => $splVal,
+                    'calculated_value' => $splVal,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+            }
         }
 
-        // 6. Apply LOP deductions
-        $totalLopDeduction = 0.00;
-        $lopFactor = $divisor > 0 ? ($lopDays / $divisor) : 0;
+        // 6. Apply LOP and Proration deductions
+        $totalUnpaidFactor = $divisor > 0 ? ($totalUnpaidDays / $divisor) : 0;
+        $totalDeductionsFromEarnings = 0.00;
+
         foreach ($computedSalaryItems as $code => &$item) {
             $itemPaidDays = $divisor;
             if ($item['type'] === 'earning') {
-                if ($lopFactor > 0 && ($splicingRule === 'proportionate_gross' || in_array($code, ['BASIC', 'HRA']))) {
-                    $itemLopDeduction = round($item['base_monthly'] * $lopFactor, 2);
-                    $item['deduction'] = $itemLopDeduction;
-                    // LOP is added as a standard deduction under Deductions table instead of being spliced from earnings directly.
-                    $itemPaidDays = max(0.0, $divisor - $lopDays);
-                    $totalLopDeduction += $itemLopDeduction;
+                if ($totalUnpaidFactor > 0 && ($splicingRule === 'proportionate_gross' || in_array($code, ['BASIC', 'HRA']))) {
+                    $itemDeduction = round($item['base_monthly'] * $totalUnpaidFactor, 2);
+                    $item['deduction'] = $itemDeduction;
+                    $itemPaidDays = $paidDays;
+                    $totalDeductionsFromEarnings += $itemDeduction;
                 }
             }
             $item['paid_days'] = $itemPaidDays;
         }
         unset($item);
 
-        if ($totalLopDeduction > 0) {
-            $computedSalaryItems['LOP'] = [
-                'name'             => 'Loss of Pay (' . $lopDays . ' days)',
-                'type'             => 'deduction',
-                'base_monthly'     => $totalLopDeduction,
-                'calculated_value' => $totalLopDeduction,
-                'deduction'        => 0.00,
-                'reversal'         => 0.00,
-            ];
+        // Separate Joining/Exit Proration from Actual On-The-Job Loss of Pay (LOP)
+        if ($totalDeductionsFromEarnings > 0) {
+            if ($nonEmployedDays > 0 && $actualLopDays > 0) {
+                $actualLopShare = round($totalDeductionsFromEarnings * ($actualLopDays / $totalUnpaidDays), 2);
+                $prorationShare = max(0.0, round($totalDeductionsFromEarnings - $actualLopShare, 2));
+
+                $prorationLabel = $isMidMonthHire ? 'Joining Proration' : ($isMidMonthExit ? 'Exit Proration' : 'Tenure Proration');
+
+                $computedSalaryItems['PRORATION'] = [
+                    'code'             => 'PRORATION',
+                    'name'             => $prorationLabel . ' (' . $nonEmployedDays . ' days)',
+                    'type'             => 'deduction',
+                    'amount'           => $prorationShare,
+                    'base_monthly'     => $prorationShare,
+                    'calculated_value' => $prorationShare,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+
+                $computedSalaryItems['LOP'] = [
+                    'code'             => 'LOP',
+                    'name'             => 'Loss of Pay (' . $actualLopDays . ' days)',
+                    'type'             => 'deduction',
+                    'amount'           => $actualLopShare,
+                    'base_monthly'     => $actualLopShare,
+                    'calculated_value' => $actualLopShare,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+            } elseif ($nonEmployedDays > 0) {
+                $prorationLabel = $isMidMonthHire ? 'Joining Proration' : ($isMidMonthExit ? 'Exit Proration' : 'Tenure Proration');
+
+                $computedSalaryItems['PRORATION'] = [
+                    'code'             => 'PRORATION',
+                    'name'             => $prorationLabel . ' (' . $nonEmployedDays . ' days)',
+                    'type'             => 'deduction',
+                    'amount'           => $totalDeductionsFromEarnings,
+                    'base_monthly'     => $totalDeductionsFromEarnings,
+                    'calculated_value' => $totalDeductionsFromEarnings,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+            } else {
+                $computedSalaryItems['LOP'] = [
+                    'code'             => 'LOP',
+                    'name'             => 'Loss of Pay (' . $actualLopDays . ' days)',
+                    'type'             => 'deduction',
+                    'amount'           => $totalDeductionsFromEarnings,
+                    'base_monthly'     => $totalDeductionsFromEarnings,
+                    'calculated_value' => $totalDeductionsFromEarnings,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+            }
         }
 
         // 7. Inject Ad-hoc Variable Components
@@ -321,6 +697,9 @@ class PayrollCalculationService
         $adhocEarnings = 0.00;
         $adhocDeductions = 0.00;
         foreach ($adhocs as $adhoc) {
+            if (!$adhoc->component) {
+                continue;
+            }
             $code = $adhoc->component->code;
             $type = $adhoc->component->type;
             if ($type === 'earning') {
@@ -331,10 +710,7 @@ class PayrollCalculationService
         }
 
         // 8. Inject Unexcused Attendance Penalties (stored as number of days, e.g. 0.25 days, 0.5 days)
-        $penaltyDays = EmployeePenalty::where('employee_id', $employee->id)
-            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-            ->where('status', '!=', 'excused')
-            ->sum('penalty_amount');
+        $penaltyDays = $penaltyDaysCount;
 
         $dailyWage = ($employee->current_salary / 12) / $divisor;
         // Since penalty days are now added directly to LOP days above, we set penalty money deduction to 0.00 to avoid double-counting.
@@ -434,16 +810,35 @@ class PayrollCalculationService
             $accumulatedOtHours += $duration;
             $processedOtIds[] = $ot->id;
 
-            $dateStr = $ot->date->format('Y-m-d');
-            $isHoliday = \App\Domains\Production\Models\ProductionCalendarHoliday::whereDate('holiday_date', $dateStr)->exists();
+            $otCarbonDate = $ot->date instanceof Carbon ? $ot->date : Carbon::parse($ot->date);
+            $dateStr = $otCarbonDate->format('Y-m-d');
+            
+            // Check holiday from HRMS Holiday Calendar or Production Calendar
+            $isHoliday = $holidays->contains(function($h) use ($employee, $dateStr) {
+                $hDate = $h->holiday_date instanceof Carbon ? $h->holiday_date->format('Y-m-d') : Carbon::parse($h->holiday_date)->format('Y-m-d');
+                if ($hDate !== $dateStr) return false;
+                if (is_null($h->company_id) && is_null($h->business_unit_id) && is_null($h->branch_id)) return true;
+                if ($h->company_id == $employee->company_id) {
+                    if (is_null($h->business_unit_id) && is_null($h->branch_id)) return true;
+                    if ($h->business_unit_id == $employee->business_unit_id) {
+                        if (is_null($h->branch_id) || $h->branch_id == $employee->branch_id) return true;
+                    }
+                }
+                return false;
+            }) || \App\Domains\Production\Models\ProductionCalendarHoliday::where('tenant_id', $employee->tenant_id)->whereDate('holiday_date', $dateStr)->exists();
 
             if ($isHoliday) {
                 $payout = $duration * $hourlyWage * $holidayMultiplier;
             } else {
                 $isWeekend = false;
+                $dayOfWeek = $otCarbonDate->dayOfWeek;
                 $activeShift = $employee->resolveShiftForDate($dateStr);
-                if (!$activeShift) {
-                    $isWeekend = true;
+                if ($activeShift === null) {
+                    if ($dayOfWeek === Carbon::SUNDAY) {
+                        $isWeekend = true;
+                    } elseif (isset($employee->weekly_pattern) && is_array($employee->weekly_pattern) && isset($employee->weekly_pattern[$dayOfWeek]) && $employee->weekly_pattern[$dayOfWeek] === 'off') {
+                        $isWeekend = true;
+                    }
                 }
 
                 if ($isWeekend) {
@@ -534,15 +929,17 @@ class PayrollCalculationService
                 $pfBaseBasic = 0.00;
                 foreach ($computedSalaryItems as $code => $item) {
                     if ($item['type'] === 'earning' && (strtoupper($code) === 'BASIC' || strtoupper($code) === 'DA' || str_starts_with(strtoupper($code), 'BASIC'))) {
-                        $pfEarnedBasic += $item['calculated_value'] ?? 0.00;
+                        $earnedVal = max(0.00, ($item['base_monthly'] ?? 0.00) - ($item['deduction'] ?? 0.00));
+                        $pfEarnedBasic += $earnedVal;
                         $pfBaseBasic   += $item['base_monthly'] ?? 0.00;
                     }
                 }
                 // If no BASIC component found at all, fall back to first fixed earning
                 if ($pfEarnedBasic == 0.00) {
                     foreach ($computedSalaryItems as $code => $item) {
-                        if ($item['type'] === 'earning' && !in_array($code, ['SPL', 'HRA', 'LOP'])) {
-                            $pfEarnedBasic = $item['calculated_value'] ?? 0.00;
+                        if ($item['type'] === 'earning' && !in_array($code, ['SPL', 'HRA', 'LOP', 'PRORATION'])) {
+                            $earnedVal = max(0.00, ($item['base_monthly'] ?? 0.00) - ($item['deduction'] ?? 0.00));
+                            $pfEarnedBasic = $earnedVal;
                             $pfBaseBasic   = $item['base_monthly'] ?? 0.00;
                             break;
                         }
@@ -550,11 +947,21 @@ class PayrollCalculationService
                 }
                 $pfBasis = $restrictPfCeiling ? min($pfEarnedBasic, $pfCeiling) : $pfEarnedBasic;
                 $pfDeduction = round($pfBasis * $pfRate, 2);
+                $computedSalaryItems['PF']['code'] = 'PF';
+                $computedSalaryItems['PF']['amount'] = $pfDeduction;
                 $computedSalaryItems['PF']['calculated_value'] = $pfDeduction;
                 $computedSalaryItems['PF']['base_monthly'] = $restrictPfCeiling ? min($pfBaseBasic, $pfCeiling) * $pfRate : $pfBaseBasic * $pfRate;
+                // Wages PF was charged on (EPF wages in the ECR) and the earned
+                // Basic + DA before any ceiling (the ECR's EPS/EDLI wages cap it).
+                $computedSalaryItems['PF']['statutory_wages'] = round($pfBasis, 2);
+                $computedSalaryItems['PF']['uncapped_wages'] = round($pfEarnedBasic, 2);
             } else {
+                $computedSalaryItems['PF']['code'] = 'PF';
+                $computedSalaryItems['PF']['amount'] = 0.00;
                 $computedSalaryItems['PF']['calculated_value'] = 0.00;
                 $computedSalaryItems['PF']['base_monthly'] = 0.00;
+                $computedSalaryItems['PF']['statutory_wages'] = 0.00;
+                $computedSalaryItems['PF']['uncapped_wages'] = 0.00;
             }
         }
 
@@ -565,7 +972,8 @@ class PayrollCalculationService
                 $esiEligibleGross = 0.00;
                 foreach ($computedSalaryItems as $code => $item) {
                     if ($item['type'] === 'earning' && !in_array($code, ['OVERTIME', 'LEAVE_ENCASHMENT']) && !str_starts_with($code, 'RETRO_REFUND')) {
-                        $esiEligibleGross += $item['calculated_value'];
+                        $earnedVal = max(0.00, ($item['base_monthly'] ?? 0.00) - ($item['deduction'] ?? 0.00));
+                        $esiEligibleGross += $earnedVal;
                     }
                 }
                 $esiEligibleGross += $adhocEarnings;
@@ -579,7 +987,11 @@ class PayrollCalculationService
                 } else {
                     $esiDeduction = 0.00;
                 }
+                $computedSalaryItems['ESI']['code'] = 'ESI';
+                $computedSalaryItems['ESI']['amount'] = $esiDeduction;
                 $computedSalaryItems['ESI']['calculated_value'] = $esiDeduction;
+                // Wages ESI was charged on (the ESIC return's "total monthly wages"); 0 when not covered.
+                $computedSalaryItems['ESI']['statutory_wages'] = $esiDeduction > 0 ? round($esiContributionGross, 2) : 0.00;
 
                 $baseGross = 0.00;
                 foreach ($computedSalaryItems as $code => $item) {
@@ -589,8 +1001,11 @@ class PayrollCalculationService
                 }
                 $computedSalaryItems['ESI']['base_monthly'] = (!$restrictEsiThreshold || $baseGross <= $esiThreshold) ? ceil($baseGross * $esiRate) : 0.00;
             } else {
+                $computedSalaryItems['ESI']['code'] = 'ESI';
+                $computedSalaryItems['ESI']['amount'] = 0.00;
                 $computedSalaryItems['ESI']['calculated_value'] = 0.00;
                 $computedSalaryItems['ESI']['base_monthly'] = 0.00;
+                $computedSalaryItems['ESI']['statutory_wages'] = 0.00;
             }
         }
 
@@ -613,9 +1028,12 @@ class PayrollCalculationService
         // Inject adhoc components and retro adjustments into computedSalaryItems after sum calculations to prevent double-counting
         foreach ($adhocs as $adhoc) {
             if ($adhoc->component) {
-                $computedSalaryItems[$adhoc->component->code] = [
+                $compCode = $adhoc->component->code;
+                $computedSalaryItems[$compCode] = [
+                    'code'             => $compCode,
                     'name'             => $adhoc->component->name,
                     'type'             => $adhoc->component->type,
+                    'amount'           => $adhoc->amount,
                     'base_monthly'     => $adhoc->amount,
                     'calculated_value' => $adhoc->amount,
                     'deduction'        => 0.00,
@@ -625,9 +1043,16 @@ class PayrollCalculationService
         }
 
         foreach ($retroAdjustments as $adj) {
+            try {
+                $monthLabel = Carbon::parse($adj->target_payroll_month . '-01')->format('F Y');
+            } catch (\Throwable $e) {
+                $monthLabel = $adj->target_payroll_month ?? 'Arrears';
+            }
             $computedSalaryItems['RETRO_REFUND_' . $adj->id] = [
-                'name'             => 'Retroactive Backpay (' . Carbon::parse($adj->target_payroll_month . '-01')->format('F Y') . ')',
+                'code'             => 'RETRO_REFUND_' . $adj->id,
+                'name'             => 'Retroactive Backpay (' . $monthLabel . ')',
                 'type'             => 'earning',
+                'amount'           => $adj->amount_reversal,
                 'base_monthly'     => $adj->amount_reversal,
                 'calculated_value' => $adj->amount_reversal,
                 'deduction'        => 0.00,
@@ -637,8 +1062,10 @@ class PayrollCalculationService
 
         if ($totalOtPayout > 0) {
             $computedSalaryItems['OVERTIME'] = [
+                'code'             => 'OVERTIME',
                 'name'             => 'Overtime Pay (' . number_format($accumulatedOtHours, 1) . ' hrs)',
                 'type'             => 'earning',
+                'amount'           => $totalOtPayout,
                 'base_monthly'     => $totalOtPayout,
                 'calculated_value' => $totalOtPayout,
                 'deduction'        => 0.00,
@@ -648,8 +1075,10 @@ class PayrollCalculationService
 
         if ($totalEncashmentPayout > 0) {
             $computedSalaryItems['LEAVE_ENCASHMENT'] = [
+                'code'             => 'LEAVE_ENCASHMENT',
                 'name'             => 'Leave Encashment (' . number_format($totalEncashmentDays, 1) . ' days)',
                 'type'             => 'earning',
+                'amount'           => $totalEncashmentPayout,
                 'base_monthly'     => $totalEncashmentPayout,
                 'calculated_value' => $totalEncashmentPayout,
                 'deduction'        => 0.00,
@@ -662,22 +1091,134 @@ class PayrollCalculationService
             ->where('status', 'on_hold')
             ->exists();
 
-        // Check for active FnF exit settlement in this month
-        $activeExit = \App\Domains\HRMS\Models\EmployeeExit::where('employee_id', $employee->id)
-            ->whereIn('status', ['approved', 'in_clearance', 'settled'])
-            ->first();
+        // Active FnF exit settlement in this month (resolved earlier)
         $fnfSettlement = $activeExit ? $activeExit->fnfSettlement : null;
+
+        // If employee has an approved FnF settlement queued for regular monthly payroll, merge FnF items into payroll
+        if ($fnfSettlement && ($fnfSettlement->settlement_channel ?? 'monthly_payroll') === 'monthly_payroll' && in_array($fnfSettlement->status, ['approved', 'paid'])) {
+            if ((float) ($fnfSettlement->leave_encashment_amount ?? 0) > 0) {
+                $computedSalaryItems['LEAVE_ENCASHMENT'] = [
+                    'code'             => 'LEAVE_ENCASHMENT',
+                    'name'             => 'Leave Encashment (FnF - ' . number_format((float)($fnfSettlement->leave_encashment_days ?? 0), 1) . ' days)',
+                    'type'             => 'earning',
+                    'amount'           => (float) $fnfSettlement->leave_encashment_amount,
+                    'base_monthly'     => (float) $fnfSettlement->leave_encashment_amount,
+                    'calculated_value' => (float) $fnfSettlement->leave_encashment_amount,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+            }
+            if ((float) ($fnfSettlement->gratuity_amount ?? 0) > 0) {
+                $computedSalaryItems['GRATUITY'] = [
+                    'code'             => 'GRATUITY',
+                    'name'             => 'Gratuity (FnF)',
+                    'type'             => 'earning',
+                    'amount'           => (float) $fnfSettlement->gratuity_amount,
+                    'base_monthly'     => (float) $fnfSettlement->gratuity_amount,
+                    'calculated_value' => (float) $fnfSettlement->gratuity_amount,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+            }
+            if ((float) ($fnfSettlement->bonus_amount ?? 0) > 0) {
+                $computedSalaryItems['FNF_BONUS'] = [
+                    'code'             => 'FNF_BONUS',
+                    'name'             => 'Bonus / Ex-Gratia (FnF)',
+                    'type'             => 'earning',
+                    'amount'           => (float) $fnfSettlement->bonus_amount,
+                    'base_monthly'     => (float) $fnfSettlement->bonus_amount,
+                    'calculated_value' => (float) $fnfSettlement->bonus_amount,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+            }
+            if ((float) ($fnfSettlement->other_earnings ?? 0) > 0) {
+                $computedSalaryItems['FNF_OTHER_EARNINGS'] = [
+                    'code'             => 'FNF_OTHER_EARNINGS',
+                    'name'             => 'Other Earnings (FnF)',
+                    'type'             => 'earning',
+                    'amount'           => (float) $fnfSettlement->other_earnings,
+                    'base_monthly'     => (float) $fnfSettlement->other_earnings,
+                    'calculated_value' => (float) $fnfSettlement->other_earnings,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+            }
+            if ((float) ($fnfSettlement->notice_shortfall_recovery ?? 0) > 0) {
+                $computedSalaryItems['NOTICE_SHORTFALL'] = [
+                    'code'             => 'NOTICE_SHORTFALL',
+                    'name'             => 'Notice Period Shortfall Recovery (FnF)',
+                    'type'             => 'deduction',
+                    'amount'           => (float) $fnfSettlement->notice_shortfall_recovery,
+                    'base_monthly'     => (float) $fnfSettlement->notice_shortfall_recovery,
+                    'calculated_value' => (float) $fnfSettlement->notice_shortfall_recovery,
+                    'deduction'        => (float) $fnfSettlement->notice_shortfall_recovery,
+                    'reversal'         => 0.00,
+                ];
+            }
+            if ((float) ($fnfSettlement->asset_damage_recovery ?? 0) > 0) {
+                $computedSalaryItems['ASSET_DAMAGE_RECOVERY'] = [
+                    'code'             => 'ASSET_DAMAGE_RECOVERY',
+                    'name'             => 'Asset Clearance Dues & Damage Recovery (FnF)',
+                    'type'             => 'deduction',
+                    'amount'           => (float) $fnfSettlement->asset_damage_recovery,
+                    'base_monthly'     => (float) $fnfSettlement->asset_damage_recovery,
+                    'calculated_value' => (float) $fnfSettlement->asset_damage_recovery,
+                    'deduction'        => (float) $fnfSettlement->asset_damage_recovery,
+                    'reversal'         => 0.00,
+                ];
+            }
+            if ((float) ($fnfSettlement->unsettled_advances_recovery ?? 0) > 0) {
+                $computedSalaryItems['ADVANCE_RECOVERY'] = [
+                    'code'             => 'ADVANCE_RECOVERY',
+                    'name'             => 'Advance Recovery (FnF)',
+                    'type'             => 'deduction',
+                    'amount'           => (float) $fnfSettlement->unsettled_advances_recovery,
+                    'base_monthly'     => (float) $fnfSettlement->unsettled_advances_recovery,
+                    'calculated_value' => (float) $fnfSettlement->unsettled_advances_recovery,
+                    'deduction'        => (float) $fnfSettlement->unsettled_advances_recovery,
+                    'reversal'         => 0.00,
+                ];
+            }
+            if ((float) ($fnfSettlement->other_deductions ?? 0) > 0) {
+                $computedSalaryItems['FNF_OTHER_DEDUCTIONS'] = [
+                    'code'             => 'FNF_OTHER_DEDUCTIONS',
+                    'name'             => 'Other Deductions (FnF)',
+                    'type'             => 'deduction',
+                    'amount'           => (float) $fnfSettlement->other_deductions,
+                    'base_monthly'     => (float) $fnfSettlement->other_deductions,
+                    'calculated_value' => (float) $fnfSettlement->other_deductions,
+                    'deduction'        => (float) $fnfSettlement->other_deductions,
+                    'reversal'         => 0.00,
+                ];
+            }
+
+            // Sync total earnings & deductions with the FnF settlement
+            $mergedEarnings = 0.00;
+            $mergedDeductions = 0.00;
+            foreach ($computedSalaryItems as $code => $data) {
+                if (($data['type'] ?? 'earning') === 'earning') {
+                    $mergedEarnings += (float) ($data['calculated_value'] ?? 0);
+                } else {
+                    $mergedDeductions += (float) ($data['calculated_value'] ?? 0);
+                }
+            }
+            $finalEarnings = $mergedEarnings;
+            $finalDeductions = $mergedDeductions;
+            $netPayout = max(0.00, round((float) $fnfSettlement->net_payable_amount, 2));
+        }
 
         return [
             'success' => true,
             'status'  => $isHeld ? 'on_hold' : 'calculated',
             'summary' => [
-                'employee_name'        => $employee->display_name,
+                'employee_name'        => $employee->full_name ?? $employee->display_name ?? ('Employee #' . $employee->id),
                 'payroll_month'        => $payrollMonth,
                 'total_days'           => $totalDaysInMonth,
-                'lop_days'             => $lopDays,
-                'lop_deduction'        => round($totalLopDeduction, 2),
-                'paid_days'            => max(0.0, $divisor - $lopDays),
+                'lop_days'             => round($actualLopDays, 2),
+                'proration_days'       => round($nonEmployedDays, 2),
+                'lop_deduction'        => round($totalDeductionsFromEarnings, 2),
+                'paid_days'            => round($paidDays, 2),
                 'proration_rule'       => $prorationRule,
                 'base_gross_earnings'  => round($grossEarnings, 2),
                 'adhoc_earnings'       => round($adhocEarnings, 2),

@@ -69,12 +69,7 @@ class AttendanceApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
-            ->first()
-            ?? Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        return Employee::resolveForUser($user);
     }
 
     /**
@@ -137,6 +132,13 @@ class AttendanceApiController extends Controller
         $employee = $this->getAuthenticatedEmployee();
         $isOwner = $employee && (int)$att->employee_id === (int)$employee->id;
         $isToday = $att->date && $att->date->isToday();
+        $isActiveShift = !empty($att->check_in) && empty($att->check_out);
+        $activeBreak = $att->breaks ? $att->breaks->whereNull('break_out')->first() : null;
+        $isOnBreak = !empty($activeBreak);
+
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($att->employee ?? $employee);
+        $allowMultiple = (bool) ($rule?->allow_multiple_punches ?? false);
+        $canClockIn = $isOwner && $isToday && (empty($att->check_in) || (!empty($att->check_out) && $allowMultiple));
 
         return [
             'id'                  => $att->id,
@@ -153,12 +155,24 @@ class AttendanceApiController extends Controller
             'total_break_hours'   => (float) ($att->total_break_hours ?? 0),
             'formatted_work_time' => $att->formatted_work_hours,
             'formatted_break_time'=> $att->formatted_break_hours,
+            'is_on_break'         => $isOnBreak,
+            'active_break_id'     => $activeBreak?->id,
             'breaks_count'        => $att->breaks->count(),
+            'check_in_latitude'   => $att->check_in_latitude ? (float) $att->check_in_latitude : null,
+            'check_in_longitude'  => $att->check_in_longitude ? (float) $att->check_in_longitude : null,
+            'check_out_latitude'  => $att->check_out_latitude ? (float) $att->check_out_latitude : null,
+            'check_out_longitude' => $att->check_out_longitude ? (float) $att->check_out_longitude : null,
+            'check_in_selfie_url' => $att->check_in_selfie_path ? asset('storage/' . $att->check_in_selfie_path) : null,
+            'check_out_selfie_url'=> $att->check_out_selfie_path ? asset('storage/' . $att->check_out_selfie_path) : null,
+            'total_distance_km'   => (float) ($att->total_distance_km ?? 0),
+            'route_snapshot_url'  => $att->route_snapshot_url,
+            'route_polyline'      => $att->route_polyline,
             'capabilities'        => [
                 'can_view'          => true,
-                'can_clock_in'      => $isOwner && $isToday && empty($att->check_in),
-                'can_clock_out'     => $isOwner && $isToday && !empty($att->check_in) && empty($att->check_out),
-                'can_start_break'   => $isOwner && $isToday && !empty($att->check_in) && empty($att->check_out),
+                'can_clock_in'      => $canClockIn,
+                'can_clock_out'     => $isOwner && ($isToday || $isActiveShift) && $isActiveShift,
+                'can_start_break'   => $isOwner && ($isToday || $isActiveShift) && $isActiveShift && !$isOnBreak,
+                'can_end_break'     => $isOwner && ($isToday || $isActiveShift) && $isActiveShift && $isOnBreak,
                 'can_regularize'    => ($isOwner || $isHrAdmin) && !empty($att->id),
                 'can_edit'          => $isHrAdmin,
             ],
@@ -297,6 +311,47 @@ class AttendanceApiController extends Controller
 
         $paginated = $query->paginate($request->integer('per_page', 10));
 
+        $todayAttendance = Attendance::where('employee_id', $employee->id)
+            ->where('date', now()->format('Y-m-d'))
+            ->with(['employee.department', 'breaks'])
+            ->first();
+
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
+
+        // Overall check: 1. Approved WFH request for today -> 2. Employee profile default -> 3. Today's attendance
+        $todayStr = now()->format('Y-m-d');
+        $hasWfhToday = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->whereDate('start_date', '<=', $todayStr)
+            ->whereDate('end_date', '>=', $todayStr)
+            ->exists();
+
+        $empOffice = strtolower(trim((string) $employee->office));
+        $defaultLoc = $hasWfhToday ? 'wfh' : (in_array($empOffice, ['onsite', 'site', 'wfh']) ? (in_array($empOffice, ['onsite', 'site']) ? 'onsite' : 'wfh') : 'office');
+        $workLoc = $todayAttendance?->location_type ?? $defaultLoc;
+
+        $trackingSelected = $rule ? $rule->isTrackingEnabled($workLoc) : false;
+        $trackingMinutes = $trackingSelected ? $rule->getTrackingMinutes($workLoc) : null;
+        $selfieRequired = $workLoc === 'wfh'
+            ? (bool) ($rule?->wfh_selfie ?? false)
+            : ($workLoc === 'onsite' ? (bool) ($rule?->site_selfie ?? false) : false);
+
+        $trackingConfig = [
+            'enabled'                 => $trackingSelected && ($trackingMinutes ?? 0) >= 1,
+            'interval_seconds'        => $trackingMinutes ? $trackingMinutes * 60 : null,
+            'location_type'           => $workLoc,
+            'selfie_required'         => $selfieRequired,
+            'punch_allowed'           => $workLoc !== 'office' || !$rule || (bool) $rule->office_web,
+            'pause_tracking_on_break' => (bool) ($rule?->pause_tracking_on_break ?? false),
+            'office_break_geofence'   => (bool) ($rule?->office_break_geofence ?? false),
+            'allow_multiple_punches'  => (bool) ($rule?->allow_multiple_punches ?? false),
+            'location_required'       => $trackingSelected || ($workLoc === 'onsite'
+                ? (bool) ($rule?->site_location ?? false)
+                : ($workLoc === 'office'
+                    ? (bool) ($rule?->office_geofence ?? false)
+                    : (bool) (($rule?->wfh_location ?? false) || ($rule?->wfh_geofence ?? false)))),
+        ];
+
         $response = [
             'employee' => [
                 'id'            => $employee->id,
@@ -305,6 +360,8 @@ class AttendanceApiController extends Controller
                 'department'    => $employee->department?->name ?? '',
                 'designation'   => $employee->designation?->name ?? '',
             ],
+            'today_attendance' => $todayAttendance ? $this->transformAttendance($todayAttendance) : null,
+            'tracking_config'  => $trackingConfig,
             'items' => collect($paginated->items())->map(fn($att) => $this->transformAttendance($att))->values(),
             'pagination' => [
                 'current_page' => $paginated->currentPage(),
@@ -360,6 +417,8 @@ class AttendanceApiController extends Controller
             return $this->sendSuccess($attendance->load('breaks'), 'Clocked in successfully!');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->sendError($e->getMessage(), 422, $e->errors());
+        } catch (\Throwable $e) {
+            return $this->sendError('Failed to clock in: ' . $e->getMessage(), 500);
         }
     }
 
@@ -379,26 +438,79 @@ class AttendanceApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && $attendance->employee_id !== $authEmployee->id) {
+        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
             return $this->sendError('Unauthorized action. You can only clock out for yourself.', 403);
         }
 
         $validated = $request->validate([
-            'latitude'  => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'selfie'    => 'nullable|string',
+            'latitude'       => 'nullable|numeric|between:-90,90',
+            'longitude'      => 'nullable|numeric|between:-180,180',
+            'selfie'         => 'nullable|string',
+            'route_snapshot' => 'nullable', // supports file upload (image) or base64 string from app
         ]);
+
+        $routeSnapshot = $request->file('route_snapshot') ?? $request->input('route_snapshot');
 
         try {
             $updatedAttendance = $this->attendanceRepository->checkOut(
                 $attendance->id,
                 $validated['latitude'] ?? null,
                 $validated['longitude'] ?? null,
-                $request->input('selfie')
+                $request->input('selfie'),
+                $routeSnapshot
             );
-            return $this->sendSuccess($updatedAttendance->load('breaks'), 'Clocked out successfully!');
+            $fresh = $updatedAttendance->fresh(['breaks', 'employee.department']);
+            return $this->sendSuccess($this->transformAttendance($fresh), 'Clocked out successfully!');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->sendError($e->getMessage(), 422, $e->errors());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Clock-out failed for attendance #{$attendance->id}: " . $e->getMessage());
+            return $this->sendError('Failed to process clock-out: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/hrms/attendance/{attendance}/snapshot
+     * Upload or update route snapshot directly from mobile app.
+     */
+    public function uploadSnapshot(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $attendance = Attendance::find($id);
+        if (!$attendance) {
+            return $this->sendError("Attendance log with ID '{$id}' not found.", 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only upload route snapshot for your own attendance.', 403);
+        }
+
+        $request->validate([
+            'route_snapshot' => 'required',
+        ]);
+
+        try {
+            $snapshotInput = $request->file('route_snapshot') ?? $request->input('route_snapshot');
+            $url = $this->attendanceRepository->uploadRouteSnapshot($snapshotInput, $attendance->id);
+
+            if (!$url) {
+                return $this->sendError('Failed to process route snapshot image. Please provide a valid image file or Base64 string.', 422);
+            }
+
+            $attendance->update(['route_snapshot_url' => $url]);
+
+            return $this->sendSuccess([
+                'attendance_id'      => (int) $attendance->id,
+                'route_snapshot_url' => $attendance->fresh()->route_snapshot_url,
+            ], 'Route snapshot uploaded successfully');
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to upload route snapshot for attendance #{$attendance->id}: " . $e->getMessage());
+            return $this->sendError('Failed to process route snapshot: ' . $e->getMessage(), 500);
         }
     }
 
@@ -418,12 +530,21 @@ class AttendanceApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && $attendance->employee_id !== $authEmployee->id) {
+        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
             return $this->sendError('Unauthorized action. You can only manage break for yourself.', 403);
         }
 
-        $this->attendanceRepository->breakIn($attendance->id);
-        return $this->sendSuccess($attendance->fresh()->load('breaks'), 'Break started successfully.');
+        $latitude = $request->filled('latitude') ? (float) $request->input('latitude') : null;
+        $longitude = $request->filled('longitude') ? (float) $request->input('longitude') : null;
+
+        try {
+            $this->attendanceRepository->breakIn($attendance->id, $latitude, $longitude);
+            return $this->sendSuccess($attendance->fresh()->load('breaks'), 'Break started successfully.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->sendError($e->getMessage(), 422, $e->errors());
+        } catch (\Throwable $e) {
+            return $this->sendError('Failed to start break: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
@@ -442,12 +563,21 @@ class AttendanceApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && $attendance->employee_id !== $authEmployee->id) {
+        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
             return $this->sendError('Unauthorized action. You can only manage break for yourself.', 403);
         }
 
-        $this->attendanceRepository->breakOut($attendance->id);
-        return $this->sendSuccess($attendance->fresh()->load('breaks'), 'Break ended successfully.');
+        $latitude = $request->filled('latitude') ? (float) $request->input('latitude') : null;
+        $longitude = $request->filled('longitude') ? (float) $request->input('longitude') : null;
+
+        try {
+            $this->attendanceRepository->breakOut($attendance->id, $latitude, $longitude);
+            return $this->sendSuccess($attendance->fresh()->load('breaks'), 'Break ended successfully.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->sendError($e->getMessage(), 422, $e->errors());
+        } catch (\Throwable $e) {
+            return $this->sendError('Failed to end break: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
@@ -810,7 +940,13 @@ class AttendanceApiController extends Controller
             (float) $validated['longitude']
         );
 
-        return $this->sendSuccess($result, 'Location log recorded');
+        $message = match ($result['status'] ?? null) {
+            'below_movement_threshold' => 'Location update skipped because movement did not exceed the configured threshold.',
+            'invalid_tracking_configuration' => $result['message'] ?? 'Onsite tracking is not configured correctly.',
+            default => 'Location tracking processed successfully.',
+        };
+
+        return $this->sendSuccess($result, $message);
     }
 
     /**
@@ -860,14 +996,6 @@ class AttendanceApiController extends Controller
                 ->get();
 
             $history = $attendances->map(function ($attendance) {
-                $locationLogs = $attendance->locationLogs->map(function ($log) {
-                    return [
-                        'lat'  => (float) $log->latitude,
-                        'lng'  => (float) $log->longitude,
-                        'time' => $log->created_at ? $log->created_at->format('h:i A') : '',
-                    ];
-                })->values()->toArray();
-
                 return [
                     'date'                => $attendance->date ? $attendance->date->format('Y-m-d') : null,
                     'status'              => $attendance->status ?? 'present',
@@ -878,7 +1006,10 @@ class AttendanceApiController extends Controller
                     'check_out'           => $attendance->check_out ? $attendance->check_out->format('H:i:s') : null,
                     'check_out_latitude'  => $attendance->check_out_latitude ? (float)$attendance->check_out_latitude : null,
                     'check_out_longitude' => $attendance->check_out_longitude ? (float)$attendance->check_out_longitude : null,
-                    'location_logs'       => $locationLogs,
+                    'total_distance_km'   => (float) ($attendance->total_distance_km ?? 0),
+                    'route_snapshot_url'  => $attendance->route_snapshot_url,
+                    'route_polyline'      => $attendance->route_polyline,
+                    'location_logs'       => $attendance->formatted_location_logs,
                 ];
             })->values()->toArray();
 
@@ -913,17 +1044,12 @@ class AttendanceApiController extends Controller
                 'check_out'           => null,
                 'check_out_latitude'  => null,
                 'check_out_longitude' => null,
+                'total_distance_km'   => 0.0,
+                'route_snapshot_url'  => null,
+                'route_polyline'      => null,
                 'location_logs'       => [],
             ], 'Attendance log retrieved successfully');
         }
-
-        $locationLogs = $attendance->locationLogs->map(function ($log) {
-            return [
-                'lat'  => (float) $log->latitude,
-                'lng'  => (float) $log->longitude,
-                'time' => $log->created_at ? $log->created_at->format('h:i A') : '',
-            ];
-        })->values()->toArray();
 
         $data = [
             'employee_id'         => (int) $employee->id,
@@ -937,7 +1063,10 @@ class AttendanceApiController extends Controller
             'check_out'           => $attendance->check_out ? $attendance->check_out->format('H:i:s') : null,
             'check_out_latitude'  => $attendance->check_out_latitude ? (float) $attendance->check_out_latitude : null,
             'check_out_longitude' => $attendance->check_out_longitude ? (float) $attendance->check_out_longitude : null,
-            'location_logs'       => $locationLogs,
+            'total_distance_km'   => (float) ($attendance->total_distance_km ?? 0),
+            'route_snapshot_url'  => $attendance->route_snapshot_url,
+            'route_polyline'      => $attendance->route_polyline,
+            'location_logs'       => $attendance->formatted_location_logs,
         ];
 
         return $this->sendSuccess($data, 'Attendance and location logs retrieved successfully');
@@ -965,7 +1094,7 @@ class AttendanceApiController extends Controller
     public function import(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|max:10240',
+            'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240',
         ]);
 
         $result = $this->attendanceRepository->import($request->file('file'));
@@ -975,5 +1104,111 @@ class AttendanceApiController extends Controller
         }
 
         return $this->sendSuccess($result, $result['message'] ?? 'Attendance records processed successfully');
+    }
+
+    /**
+     * GET /api/hrms/attendance/{attendance}/route
+     * Get route history, live coordinates, polyline, and snapshot image.
+     */
+    public function getRoute(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $attendance = Attendance::with('employee')->find($id);
+        if (!$attendance) {
+            return $this->sendError("Attendance session #{$id} not found.", 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin && (!$authEmployee || (int) $attendance->employee_id !== (int) $authEmployee->id)) {
+            return $this->sendError('Unauthorized. You can only view route history for your own attendance.', 403);
+        }
+
+        $isActive = empty($attendance->check_out);
+
+        $response = [
+            'attendance_id'      => (int) $attendance->id,
+            'employee_id'        => (int) $attendance->employee_id,
+            'employee_name'      => $attendance->employee?->full_name ?? '',
+            'date'               => $attendance->date ? $attendance->date->format('Y-m-d') : null,
+            'status'             => $attendance->status ?? 'present',
+            'is_active'          => $isActive,
+            'check_in'           => $attendance->check_in ? $attendance->check_in->format('H:i:s') : null,
+            'check_out'          => $attendance->check_out ? $attendance->check_out->format('H:i:s') : null,
+            'total_distance_km'  => (float) ($attendance->total_distance_km ?? 0),
+            'route_snapshot_url' => $attendance->route_snapshot_url,
+            'route_polyline'     => $attendance->route_polyline,
+            'route_summary'      => $attendance->route_summary,
+            'tracking_config'    => $attendance->tracking_config,
+            'waypoints'          => $attendance->formatted_location_logs,
+        ];
+
+        return $this->sendSuccess($response, 'Attendance route details loaded successfully.');
+    }
+
+    /**
+     * POST /api/hrms/attendance/{attendance}/consolidate-route
+     * Manually trigger route consolidation, snapshot generation, and raw logs purging.
+     */
+    public function consolidateRoute(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $attendance = Attendance::find($id);
+        if (!$attendance) {
+            return $this->sendError("Attendance session #{$id} not found.", 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin && (!$authEmployee || (int) $attendance->employee_id !== (int) $authEmployee->id)) {
+            return $this->sendError('Unauthorized action.', 403);
+        }
+
+        $result = app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->consolidateShiftRoute($attendance);
+
+        if (!($result['success'] ?? false)) {
+            return $this->sendError($result['message'] ?? 'Unable to consolidate route.', 422, $result);
+        }
+
+        $message = ($result['already_consolidated'] ?? false)
+            ? 'Route was already consolidated; existing snapshot and distance preserved.'
+            : 'Route consolidated, snapshot generated, and raw logs purged successfully.';
+
+        return $this->sendSuccess($result, $message);
+    }
+
+    /**
+     * POST /api/hrms/attendance/prune-logs
+     * Purge raw location logs older than N hours for completed shifts.
+     */
+    public function pruneLocationLogs(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized. Only HR administrators can prune attendance logs.', 403);
+        }
+
+        $hours = $request->filled('hours') ? (int) $request->input('hours') : 24;
+        if ($hours < 1) {
+            $hours = 24;
+        }
+
+        $deletedCount = app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->pruneOldLogs(null, $hours);
+
+        return $this->sendSuccess([
+            'pruned_count'     => $deletedCount,
+            'older_than_hours' => $hours,
+        ], "Successfully pruned {$deletedCount} old raw location log entries.");
     }
 }

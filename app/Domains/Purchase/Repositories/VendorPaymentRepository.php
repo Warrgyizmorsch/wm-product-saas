@@ -12,7 +12,7 @@ class VendorPaymentRepository
         $tenantId = require_tenant_id();
 
         $query = VendorPayment::where('tenant_id', $tenantId)
-            ->with(['vendor', 'vendorBill']);
+            ->with(['vendor', 'vendorBill', 'bankAccount']);
 
         if (!empty($filters['search'])) {
             $search = '%' . trim($filters['search']) . '%';

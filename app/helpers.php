@@ -48,6 +48,26 @@ if (! function_exists('tenant_context')) {
     }
 }
 
+if (! function_exists('tenant_exists')) {
+    /**
+     * `exists` validation limited to the current tenant's rows. Use instead of a
+     * bare 'exists:table,id' for any tenant-owned table, so a request can't point
+     * at another tenant's record. Fails closed when no tenant is resolved.
+     */
+    function tenant_exists(string $table, string $column = 'id'): \Illuminate\Validation\Rules\Exists
+    {
+        return \Illuminate\Validation\Rule::exists($table, $column)->where('tenant_id', tenant_id());
+    }
+}
+
+if (! function_exists('tenant_storage')) {
+    /** Quota-checked, usage-recorded file storage for the current tenant. */
+    function tenant_storage(): \App\Domains\Platform\Services\TenantStorage
+    {
+        return app(\App\Domains\Platform\Services\TenantStorage::class);
+    }
+}
+
 if (! function_exists('tenant_allowed_modules')) {
     /**
      * @return list<string>|null null means unrestricted (no plan gating; tenant
@@ -216,7 +236,12 @@ if (! function_exists('active_currency')) {
             return $sessionCurrency;
         }
 
-        return config('currency.base', 'USD');
+        $tenantCurrency = tenant()?->settings['currency'] ?? null;
+        if ($tenantCurrency && isset($currencies[$tenantCurrency])) {
+            return $tenantCurrency;
+        }
+
+        return config('currency.base', 'INR');
     }
 }
 
@@ -227,9 +252,9 @@ if (! function_exists('active_currency_info')) {
         $currencies = config('currency.currencies', []);
 
         return $currencies[$code] ?? [
-            'code' => 'USD',
-            'name' => 'US Dollar',
-            'symbol' => '$',
+            'code' => 'INR',
+            'name' => 'Indian Rupee',
+            'symbol' => '₹',
             'rate' => 1.0,
             'position' => 'prefix',
         ];
@@ -239,7 +264,7 @@ if (! function_exists('active_currency_info')) {
 if (! function_exists('active_currency_symbol')) {
     function active_currency_symbol(): string
     {
-        return active_currency_info()['symbol'] ?? '$';
+        return active_currency_info()['symbol'] ?? '₹';
     }
 }
 
@@ -352,7 +377,7 @@ if (! function_exists('format_currency')) {
         }
 
         $info = active_currency_info();
-        $symbol = $info['symbol'] ?? '$';
+        $symbol = $info['symbol'] ?? '₹';
         $position = $info['position'] ?? 'prefix';
 
         if ($position === 'suffix') {
@@ -538,6 +563,126 @@ if (! function_exists('format_duration')) {
         }
 
         return sprintf('%ds', $secs);
+if (! function_exists('billing_organization_details')) {
+    /**
+     * Resolves dynamic corporate billing/seller organization details
+     * from Company, Branch, GstConfiguration or Tenant with intelligent fallbacks.
+     *
+     * @param object|null $model
+     * @return array{
+     *     name: string,
+     *     legal_name: string|null,
+     *     avatar_char: string,
+     *     unit_subtext: string,
+     *     address: string,
+     *     gstin: string,
+     *     state_code: string,
+     *     state_name: string,
+     *     email: string|null,
+     *     phone: string|null
+     * }
+     */
+    function billing_organization_details(?object $model = null): array
+    {
+        $comp = ($model && method_exists($model, 'company')) ? $model->company : null;
+        $comp = $comp ?: company();
+        if (! $comp && class_exists(\App\Domains\HRMS\Models\Company::class)) {
+            $comp = \App\Domains\HRMS\Models\Company::withoutGlobalScopes()
+                ->where('tenant_id', tenant('id'))
+                ->orderByDesc('is_default')
+                ->first();
+        }
+
+        $warehouse = ($model && method_exists($model, 'warehouse')) ? $model->warehouse : null;
+        $branch = ($model && method_exists($model, 'branch')) ? $model->branch : null;
+        if (! $branch && $warehouse && method_exists($warehouse, 'branch')) {
+            $branch = $warehouse->branch;
+        }
+        if (! $comp && $warehouse && method_exists($warehouse, 'company')) {
+            $comp = $warehouse->company;
+        }
+        $tenant = tenant();
+
+        $gstConfig = null;
+        if (class_exists(\App\Models\GstConfiguration::class)) {
+            $gstQuery = \App\Models\GstConfiguration::query()
+                ->where('tenant_id', $tenant?->id ?? 1)
+                ->where('is_active', true);
+            if ($comp?->id) {
+                $gstQuery->where(function ($q) use ($comp) {
+                    $q->where('company_id', $comp->id)->orWhereNull('company_id');
+                });
+            }
+            $gstConfig = $gstQuery->orderByDesc('is_default')->first();
+        }
+
+        // 1. Organization Name
+        $name = $comp?->legal_name
+            ?: ($comp?->company_name
+            ?: ($tenant?->billing_name ?: ($tenant?->name ?: '')));
+
+        // 2. Address Line
+        $addrLine = $warehouse?->address
+            ?: ($branch?->address
+            ?: ($comp?->address
+            ?: ($gstConfig?->address_line1
+            ?: ($tenant?->billing_address ?: ''))));
+
+        $city = $branch?->city
+            ?: ($comp?->city
+            ?: ($gstConfig?->city ?: ''));
+
+        $pincode = $branch?->postal_code
+            ?: ($comp?->postal_code
+            ?: ($gstConfig?->pincode ?: ''));
+
+        $state = $comp?->state
+            ?: ($branch?->state
+            ?: ($tenant?->billing_state ?: ''));
+
+        $country = $branch?->country
+            ?: ($comp?->country ?: null);
+
+        $parts = array_filter([$addrLine, $city, $pincode, $state]);
+        if (! empty($parts) && $country) {
+            $parts[] = $country;
+        }
+        $address = ! empty($parts)
+            ? implode(', ', $parts)
+            : null;
+
+        // 3. GSTIN & State
+        $gstin = $comp?->gst_number
+            ?: ($gstConfig?->seller_gstin
+            ?: ($tenant?->billing_gstin ?: null));
+
+        $stateCode = ($gstin && strlen($gstin) >= 2 && is_numeric(substr($gstin, 0, 2)))
+            ? substr($gstin, 0, 2)
+            : ($gstConfig?->state_code ?: null);
+
+        $stateName = $comp?->state ?: ($branch?->state ?: ($tenant?->billing_state ?: ($stateCode ? \App\Domains\Accounting\Support\GstStates::name($stateCode) : null)));
+
+        // 4. Contact Email & Phone
+        $email = $comp?->email
+            ?: ($branch?->email
+            ?: ($gstConfig?->contact_email ?: ($tenant?->billing_email ?: null)));
+
+        $phone = $comp?->phone
+            ?: ($branch?->phone
+            ?: ($gstConfig?->contact_phone ?: ($tenant?->billing_phone ?: null)));
+
+        return [
+            'name'         => $name,
+            'legal_name'   => $comp?->legal_name,
+            'avatar_char'  => $name ? strtoupper(substr($name, 0, 1)) : '',
+            'unit_subtext' => $branch?->name ? $branch->name . ' Billing Unit' : null,
+            'address'      => $address,
+            'gstin'        => $gstin,
+            'state_code'   => $stateCode,
+            'state_name'   => $stateName,
+            'email'        => $email,
+            'phone'        => $phone,
+        ];
     }
 }
 

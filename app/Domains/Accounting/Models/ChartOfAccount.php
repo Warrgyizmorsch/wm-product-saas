@@ -134,6 +134,7 @@ class ChartOfAccount extends BaseModel
         'subtype',
         'normal_balance',
         'is_cash_or_bank',
+        'bill_wise',
         'opening_balance',
         'opening_balance_type',
         'parent_id',
@@ -148,10 +149,22 @@ class ChartOfAccount extends BaseModel
         'is_system' => 'boolean',
         'is_active' => 'boolean',
         'is_cash_or_bank' => 'boolean',
+        'bill_wise' => 'boolean',
         'parent_id' => 'integer',
         'ledger_group_id' => 'integer',
         'opening_balance' => 'decimal:2',
     ];
+
+    protected static function booted(): void
+    {
+        // A ledger with no opening balance carries its normal side, so the
+        // edit form never offers Debit for a loan, capital or income ledger.
+        static::saving(function (self $account) {
+            if ((float) $account->opening_balance == 0.0 && $account->normal_balance) {
+                $account->opening_balance_type = $account->normal_balance;
+            }
+        });
+    }
 
     public function parent(): BelongsTo
     {

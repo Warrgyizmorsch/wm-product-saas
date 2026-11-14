@@ -22,8 +22,11 @@ class SopRepository implements SopRepositoryInterface
      */
     public function getIndexData(array $filters, ?Employee $currentEmployee, bool $isHrOrAdmin, int $tenantId): array
     {
-        // Auto-assign any SOP that currently has 0 staff assignments
-        $unassignedSops = SopDocument::where('tenant_id', $tenantId)->has('assignments', '=', 0)->get();
+        // Auto-assign any published SOP that currently has 0 staff assignments
+        $unassignedSops = SopDocument::where('tenant_id', $tenantId)
+            ->where('status', 'published')
+            ->has('assignments', '=', 0)
+            ->get();
         foreach ($unassignedSops as $uSop) {
             $this->dispatchAssignments($uSop);
         }
@@ -97,23 +100,70 @@ class SopRepository implements SopRepositoryInterface
         $sops = $docQuery->paginate(15, ['*'], 'sop_page')->withQueryString();
 
         // 3. My SOPs (For the logged-in employee)
+        $allMyAssignments = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 10);
         $myPendingAssignments = collect();
         $myCompletedAssignments = collect();
         $myTotalRequired = 0;
         $myCompletedCount = 0;
+        $myPendingCount = 0;
+        $myTotalCount = 0;
 
         if ($currentEmployee) {
-            $allMyAssignments = SopAssignment::with(['document.category', 'document.department', 'document.sections'])
+            $baseMyAssignments = SopAssignment::whereHas('document', fn($q) => $q->where('status', 'published'))
+                ->where('tenant_id', $tenantId)
+                ->where('employee_id', $currentEmployee->id);
+
+            $myPendingCount = (clone $baseMyAssignments)->where('status', 'pending')->count();
+            $myCompletedCount = (clone $baseMyAssignments)->where('status', 'acknowledged')->count();
+            $myTotalCount = $myPendingCount + $myCompletedCount;
+            $myTotalRequired = $myTotalCount;
+
+            $myQuery = SopAssignment::with(['document.category', 'document.department', 'document.sections'])
                 ->whereHas('document', fn($q) => $q->where('status', 'published'))
                 ->where('tenant_id', $tenantId)
-                ->where('employee_id', $currentEmployee->id)
-                ->latest('assigned_at')
-                ->get();
+                ->where('employee_id', $currentEmployee->id);
 
-            $myPendingAssignments = $allMyAssignments->where('status', 'pending');
-            $myCompletedAssignments = $allMyAssignments->where('status', 'acknowledged');
-            $myTotalRequired = $allMyAssignments->count();
-            $myCompletedCount = $myCompletedAssignments->count();
+            // Filter search
+            if (!empty($filters['my_search'])) {
+                $term = '%' . trim($filters['my_search']) . '%';
+                $myQuery->whereHas('document', function ($q) use ($term) {
+                    $q->where('title', 'like', $term)
+                        ->orWhere('code', 'like', $term)
+                        ->orWhere('summary', 'like', $term)
+                        ->orWhere('objective', 'like', $term)
+                        ->orWhereHas('category', fn($cq) => $cq->where('name', 'like', $term));
+                });
+            }
+
+            // Filter status
+            if (!empty($filters['my_status'])) {
+                if ($filters['my_status'] === 'overdue') {
+                    $myQuery->where('status', 'pending')
+                        ->whereNotNull('due_date')
+                        ->where('due_date', '<', now()->toDateString());
+                } else {
+                    $myQuery->where('status', $filters['my_status']);
+                }
+            }
+
+            // Filter category
+            if (!empty($filters['my_category_id'])) {
+                $myQuery->whereHas('document', fn($q) => $q->where('sop_category_id', $filters['my_category_id']));
+            }
+
+            // Sorting
+            $mySort = $filters['my_sort'] ?? 'pending_first';
+            match ($mySort) {
+                'newest' => $myQuery->latest('assigned_at'),
+                'oldest' => $myQuery->oldest('assigned_at'),
+                'due_soon' => $myQuery->orderByRaw('CASE WHEN due_date IS NULL THEN 1 ELSE 0 END, due_date ASC'),
+                'title_asc' => $myQuery->join('sop_documents as sd_my', 'sop_assignments.sop_document_id', '=', 'sd_my.id')->orderBy('sd_my.title', 'asc')->select('sop_assignments.*'),
+                'title_desc' => $myQuery->join('sop_documents as sd_my', 'sop_assignments.sop_document_id', '=', 'sd_my.id')->orderBy('sd_my.title', 'desc')->select('sop_assignments.*'),
+                'code_asc' => $myQuery->join('sop_documents as sd_my', 'sop_assignments.sop_document_id', '=', 'sd_my.id')->orderBy('sd_my.code', 'asc')->select('sop_assignments.*'),
+                default => $myQuery->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")->latest('assigned_at'),
+            };
+
+            $allMyAssignments = $myQuery->paginate(10, ['*'], 'my_page')->withQueryString();
         }
 
         // 4. Compliance Matrix Data (SOP Compliance Breakdown)
@@ -128,8 +178,44 @@ class SopRepository implements SopRepositoryInterface
             ->where('status', 'published')
             ->get();
 
-        // 5. Masters for Dropdowns
-        $categories = SopCategory::where('tenant_id', $tenantId)->orderBy('name')->get();
+        // 5. Masters for Dropdowns and Categories Tab
+        $allCategories = SopCategory::where('tenant_id', $tenantId)->orderBy('name')->get();
+
+        $catQuery = SopCategory::where('tenant_id', $tenantId)->withCount('documents');
+
+        if (!empty($filters['cat_search'])) {
+            $catTerm = '%' . trim($filters['cat_search']) . '%';
+            $catQuery->where(function ($q) use ($catTerm) {
+                $q->where('name', 'like', $catTerm)
+                    ->orWhere('code', 'like', $catTerm)
+                    ->orWhere('description', 'like', $catTerm);
+            });
+        }
+
+        if (!empty($filters['cat_status'])) {
+            $catQuery->where('status', $filters['cat_status']);
+        }
+
+        if (isset($filters['cat_has_sops']) && $filters['cat_has_sops'] !== '') {
+            if ($filters['cat_has_sops'] === 'yes') {
+                $catQuery->has('documents');
+            } elseif ($filters['cat_has_sops'] === 'no') {
+                $catQuery->doesntHave('documents');
+            }
+        }
+
+        $catSort = $filters['cat_sort'] ?? 'name_asc';
+        match ($catSort) {
+            'name_desc' => $catQuery->orderBy('name', 'desc'),
+            'code_asc' => $catQuery->orderBy('code', 'asc'),
+            'code_desc' => $catQuery->orderBy('code', 'desc'),
+            'sops_desc' => $catQuery->orderBy('documents_count', 'desc'),
+            'newest' => $catQuery->latest(),
+            'oldest' => $catQuery->oldest(),
+            default => $catQuery->orderBy('name', 'asc'),
+        };
+
+        $categories = $catQuery->get();
         $departments = Department::where('tenant_id', $tenantId)->orderBy('name')->get();
         $designations = Designation::where('tenant_id', $tenantId)->orderBy('name')->get();
         $employees = Employee::where('tenant_id', $tenantId)->where('status', true)->orderBy('full_name')->get();
@@ -149,12 +235,16 @@ class SopRepository implements SopRepositoryInterface
             'orgComplianceRate' => $orgComplianceRate,
             'overdueCount' => $overdueCount,
             'sops' => $sops,
+            'allMyAssignments' => $allMyAssignments,
+            'myPendingCount' => $myPendingCount,
+            'myTotalCount' => $myTotalCount,
             'myPendingAssignments' => $myPendingAssignments,
             'myCompletedAssignments' => $myCompletedAssignments,
             'myTotalRequired' => $myTotalRequired,
             'myCompletedCount' => $myCompletedCount,
             'complianceMatrix' => $complianceMatrix,
             'categories' => $categories,
+            'allCategories' => $allCategories,
             'departments' => $departments,
             'designations' => $designations,
             'employees' => $employees,
@@ -205,12 +295,12 @@ class SopRepository implements SopRepositoryInterface
             // Create initial version history
             SopVersionHistory::create([
                 'tenant_id' => $tenantId,
-                'company_id' => $companyId,
                 'sop_document_id' => $sop->id,
-                'version_number' => '1.0',
-                'change_summary' => 'Initial SOP draft created.',
-                'changed_by' => $user?->id,
-                'created_at' => now(),
+                'version' => '1.0',
+                'change_type' => 'minor',
+                'changes_summary' => 'Initial SOP draft created.',
+                'created_by' => $user?->id,
+                'snapshot_data' => $sop->toArray(),
             ]);
 
             return $sop;
@@ -247,12 +337,12 @@ class SopRepository implements SopRepositoryInterface
             // Record version history
             SopVersionHistory::create([
                 'tenant_id' => $tenantId,
-                'company_id' => $companyId,
                 'sop_document_id' => $sop->id,
-                'version_number' => $newVersion,
-                'change_summary' => $changeSummary,
-                'changed_by' => $user?->id,
-                'created_at' => now(),
+                'version' => $newVersion,
+                'change_type' => 'minor',
+                'changes_summary' => $changeSummary,
+                'created_by' => $user?->id,
+                'snapshot_data' => $sop->fresh(['sections'])->toArray(),
             ]);
 
             return $sop;
@@ -319,9 +409,10 @@ class SopRepository implements SopRepositoryInterface
         $assignment->update([
             'status' => 'acknowledged',
             'acknowledged_at' => now(),
-            'notes' => $data['notes'] ?? null,
-            'compliance_score' => $data['compliance_score'] ?? 100,
-            'acknowledgement_signature' => $data['signature'] ?? $employee->full_name,
+            'signature_data' => $data['signature_data'] ?? ($data['signature'] ?? null),
+            'checklist_responses' => $data['checklist_responses'] ?? null,
+            'ip_address' => request()->ip() ?: '0.0.0.0',
+            'user_agent' => request()->userAgent() ?: 'Web Client',
         ]);
 
         return $assignment;
@@ -332,6 +423,10 @@ class SopRepository implements SopRepositoryInterface
      */
     public function dispatchAssignments(SopDocument $sop): int
     {
+        if ($sop->status !== 'published') {
+            return 0;
+        }
+
         $tenantId = $sop->tenant_id;
         $companyId = $sop->company_id;
 
@@ -411,23 +506,37 @@ class SopRepository implements SopRepositoryInterface
             ->get();
 
         $output = fopen('php://temp', 'r+');
-        fputcsv($output, ['SOP Code', 'SOP Title', 'Category', 'Version', 'Employee ID', 'Employee Name', 'Department', 'Designation', 'Assigned Date', 'Due Date', 'Status', 'Acknowledged Date', 'Compliance Score']);
+        fputcsv($output, [
+            __('hrms.sop.th_code'),
+            __('hrms.sop.th_title'),
+            __('hrms.sop.th_category'),
+            __('hrms.sop.th_version'),
+            __('hrms.sop.csv_th_emp_code'),
+            __('hrms.sop.csv_th_emp_name'),
+            __('hrms.sop.csv_th_department'),
+            __('hrms.sop.csv_th_designation'),
+            __('hrms.sop.csv_th_assigned_date'),
+            __('hrms.sop.csv_th_due_date'),
+            __('hrms.common.status'),
+            __('hrms.sop.csv_th_signoff_timestamp'),
+            __('hrms.sop.th_compliance'),
+        ]);
 
         foreach ($assignments as $a) {
             fputcsv($output, [
-                $a->document->code ?? 'N/A',
-                $a->document->title ?? 'N/A',
-                $a->document->category->name ?? 'Uncategorized',
-                $a->document->version ?? '1.0',
-                $a->employee->employee_id ?? 'N/A',
-                $a->employee->full_name ?? 'N/A',
-                $a->employee->department->name ?? 'N/A',
-                $a->employee->designation->name ?? 'N/A',
-                $a->assigned_at ? Carbon::parse($a->assigned_at)->format('Y-m-d') : 'N/A',
-                $a->due_date ? Carbon::parse($a->due_date)->format('Y-m-d') : 'N/A',
+                $a->document?->code ?? __('hrms.common.na'),
+                $a->document?->title ?? __('hrms.common.na'),
+                $a->document?->category?->name ?? __('hrms.sop.uncategorized'),
+                $a->document?->version ?? '1.0',
+                $a->employee?->employee_id ?? __('hrms.common.na'),
+                $a->employee?->full_name ?? ($a->employee?->first_name ?? __('hrms.common.na')),
+                $a->employee?->department?->name ?? __('hrms.common.na'),
+                $a->employee?->designation?->name ?? __('hrms.common.na'),
+                $a->assigned_at ? Carbon::parse($a->assigned_at)->format('Y-m-d') : __('hrms.common.na'),
+                $a->due_date ? Carbon::parse($a->due_date)->format('Y-m-d') : __('hrms.common.na'),
                 strtoupper($a->status),
-                $a->acknowledged_at ? Carbon::parse($a->acknowledged_at)->format('Y-m-d H:i') : 'N/A',
-                $a->compliance_score ? ($a->compliance_score . '%') : 'N/A',
+                $a->acknowledged_at ? Carbon::parse($a->acknowledged_at)->format('Y-m-d H:i') : __('hrms.common.na'),
+                $a->compliance_score ? ($a->compliance_score . '%') : __('hrms.common.na'),
             ]);
         }
 
@@ -462,13 +571,12 @@ class SopRepository implements SopRepositoryInterface
 
             SopSection::create([
                 'tenant_id' => $tenantId,
-                'company_id' => $companyId,
                 'sop_document_id' => $sop->id,
                 'step_number' => $order++,
                 'title' => $s['title'] ?? 'Section ' . $order,
                 'content' => $s['content'] ?? '',
+                'has_checklist' => !empty($checklist),
                 'checklist_items' => $checklist,
-                'order' => $order,
             ]);
         }
     }
@@ -496,43 +604,43 @@ class SopRepository implements SopRepositoryInterface
         fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
 
         // Official Audit Header Block
-        fputcsv($handle, ['STANDARD OPERATING PROCEDURE (SOP) COMPLIANCE AUDIT REPORT']);
-        fputcsv($handle, ['Document Code:', $sop->code, 'Version:', $sop->version, 'Status:', strtoupper($sop->status)]);
-        fputcsv($handle, ['Document Title:', $sop->title]);
-        fputcsv($handle, ['Category:', $sop->category->name ?? 'General', 'Department:', $sop->department->name ?? 'Organization-Wide']);
-        fputcsv($handle, ['Effective Date:', $sop->effective_date ? $sop->effective_date->format('Y-m-d') : 'N/A', 'Review Interval:', $sop->review_interval_months . ' Months']);
-        fputcsv($handle, ['Total Assigned Staff:', $totalAssigned, 'Compliant Staff:', $acknowledgedCount, 'Compliance Rate:', $complianceRate . '%']);
-        fputcsv($handle, ['Report Export Date:', now()->format('Y-m-d H:i:s')]);
+        fputcsv($handle, [__('hrms.sop.csv_report_title')]);
+        fputcsv($handle, [__('hrms.sop.csv_doc_code'), $sop->code, __('hrms.sop.csv_version'), $sop->version, __('hrms.sop.csv_status'), strtoupper($sop->status)]);
+        fputcsv($handle, [__('hrms.sop.csv_doc_title'), $sop->title]);
+        fputcsv($handle, [__('hrms.sop.csv_category'), $sop->category->name ?? __('hrms.sop.cat_general'), __('hrms.sop.csv_department'), $sop->department->name ?? __('hrms.sop.organization_wide')]);
+        fputcsv($handle, [__('hrms.sop.csv_effective_date'), $sop->effective_date ? $sop->effective_date->format('Y-m-d') : __('hrms.common.na'), __('hrms.sop.csv_review_interval'), __('hrms.sop.csv_months_suffix', ['count' => $sop->review_interval_months])]);
+        fputcsv($handle, [__('hrms.sop.csv_total_assigned'), $totalAssigned, __('hrms.sop.csv_compliant_staff'), $acknowledgedCount, __('hrms.sop.csv_compliance_rate'), $complianceRate . '%']);
+        fputcsv($handle, [__('hrms.sop.csv_export_date'), now()->format('Y-m-d H:i:s')]);
         fputcsv($handle, []); // Blank separator line
 
         // Compliance Roster Column Headers
         fputcsv($handle, [
-            'Employee Code',
-            'Employee Full Name',
-            'Work Email',
-            'Department',
-            'Designation',
-            'SOP Version',
-            'Compliance Status',
-            'Assigned Date',
-            'Due Date',
-            'Sign-Off Timestamp',
-            'Sign-Off IP Address',
+            __('hrms.sop.csv_th_emp_code'),
+            __('hrms.sop.csv_th_emp_name'),
+            __('hrms.sop.csv_th_work_email'),
+            __('hrms.sop.csv_th_department'),
+            __('hrms.sop.csv_th_designation'),
+            __('hrms.sop.csv_th_sop_version'),
+            __('hrms.sop.csv_th_compliance_status'),
+            __('hrms.sop.csv_th_assigned_date'),
+            __('hrms.sop.csv_th_due_date'),
+            __('hrms.sop.csv_th_signoff_timestamp'),
+            __('hrms.sop.csv_th_signoff_ip'),
         ]);
 
         foreach ($assignments as $a) {
-            $empName = $a->employee->full_name ?? ($a->employee->first_name ?? 'N/A');
+            $empName = $a->employee?->full_name ?? ($a->employee?->first_name ?? __('hrms.common.na'));
             fputcsv($handle, [
-                $a->employee->employee_id ?? ('EMP-' . $a->employee->id),
+                $a->employee?->employee_id ?? ('EMP-' . ($a->employee?->id ?? $a->employee_id)),
                 $empName,
-                $a->employee->office_email ?? $a->employee->personal_email ?? 'N/A',
-                $a->employee->department->name ?? 'N/A',
-                $a->employee->designation->name ?? 'N/A',
+                $a->employee?->office_email ?? ($a->employee?->personal_email ?? __('hrms.common.na')),
+                $a->employee?->department?->name ?? __('hrms.common.na'),
+                $a->employee?->designation?->name ?? __('hrms.common.na'),
                 $a->version_assigned,
                 strtoupper($a->status),
                 $a->assigned_at ? $a->assigned_at->format('Y-m-d H:i') : '',
                 $a->due_date ? $a->due_date->format('Y-m-d') : '',
-                $a->acknowledged_at ? $a->acknowledged_at->format('Y-m-d H:i:s') : 'Pending Sign-off',
+                $a->acknowledged_at ? $a->acknowledged_at->format('Y-m-d H:i:s') : __('hrms.sop.csv_pending_signoff'),
                 $a->ip_address ?? '',
             ]);
         }

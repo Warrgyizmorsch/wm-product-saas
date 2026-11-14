@@ -136,6 +136,18 @@ class EmployeeExitController extends Controller
 
     public function updateClearance(Request $request, EmployeeExitClearance $clearance): RedirectResponse
     {
+        $user = auth()->user();
+        $canClear = $user && (
+            $user->can('approve', $clearance->employeeExit)
+            || $user->can('approveManager', $clearance->employeeExit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.exit_policies.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($user, $clearance->employeeExit->employee_id)
+        );
+        abort_unless($canClear, 403, 'Unauthorized to update clearance items.');
+
         $validated = $request->validate([
             'status'           => 'required|in:cleared,pending,waived,issue_found,issues_found',
             'remarks'          => 'nullable|string',
@@ -157,6 +169,18 @@ class EmployeeExitController extends Controller
 
     public function updateDepartmentClearances(Request $request, EmployeeExit $exit, string $department): RedirectResponse
     {
+        $user = auth()->user();
+        $canClear = $user && (
+            $user->can('approve', $exit)
+            || $user->can('approveManager', $exit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.exit_policies.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($user, $exit->employee_id)
+        );
+        abort_unless($canClear, 403, 'Unauthorized to update departmental clearances.');
+
         $items = $request->input('clearances') ?: $request->input('items', []);
         $userId = auth()->id();
 
@@ -191,8 +215,40 @@ class EmployeeExitController extends Controller
         return $this->updateDepartmentClearances($request, $exit, 'all');
     }
 
+    public function syncClearanceCheckpoints(Request $request, EmployeeExit $exit): RedirectResponse
+    {
+        $this->authorize('update', $exit);
+
+        $this->clearanceService->syncExitClearancesWithPolicies($exit, true);
+        $this->exitRepository->recalculateFnf($exit);
+
+        return redirect()->back()->with('success', "Clearance checkpoints for {$exit->employee->full_name} have been synchronized with Offboarding Policies.");
+    }
+
+    public function syncAllClearanceCheckpoints(Request $request): RedirectResponse
+    {
+        $this->authorize('viewAny', EmployeeExit::class);
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $count = $this->clearanceService->syncAllActiveExitsWithPolicies($tenantId, null, true);
+
+        return redirect()->back()->with('success', "Successfully synchronized {$count} active exit cards with current Offboarding Policies.");
+    }
+
     public function storeAdhocExitClearance(Request $request, EmployeeExit $exit): RedirectResponse
     {
+        $user = auth()->user();
+        $canClear = $user && (
+            $user->can('approve', $exit)
+            || $user->can('approveManager', $exit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.exit_policies.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($user, $exit->employee_id)
+        );
+        abort_unless($canClear, 403, 'Unauthorized to add clearance items.');
+
         $validated = $request->validate([
             'department'         => 'nullable|string|max:100',
             'clearance_category' => 'nullable|string|max:100',
@@ -204,17 +260,19 @@ class EmployeeExitController extends Controller
         $tenantId = $exit->tenant_id ?: (tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id());
         $department = $validated['department'] ?? ($validated['clearance_category'] ?? 'hr_operations');
 
-        EmployeeExitClearance::create([
-            'tenant_id'        => $tenantId,
-            'employee_exit_id' => $exit->id,
-            'department'       => $department,
-            'item_name'        => $validated['item_name'],
-            'status'           => 'pending',
-            'remarks'          => $validated['remarks'] ?? null,
-            'deduction_amount' => $validated['deduction_amount'] ?? 0.00,
-        ]);
+        DB::transaction(function () use ($tenantId, $exit, $department, $validated) {
+            EmployeeExitClearance::create([
+                'tenant_id'        => $tenantId,
+                'employee_exit_id' => $exit->id,
+                'department'       => $department,
+                'item_name'        => $validated['item_name'],
+                'status'           => 'pending',
+                'remarks'          => $validated['remarks'] ?? null,
+                'deduction_amount' => $validated['deduction_amount'] ?? 0.00,
+            ]);
 
-        $this->exitRepository->recalculateFnf($exit);
+            $this->exitRepository->recalculateFnf($exit);
+        });
 
         return redirect()->back()->with('success', "Ad-hoc clearance item '{$validated['item_name']}' added.");
     }
@@ -222,18 +280,44 @@ class EmployeeExitController extends Controller
     public function destroyExitClearance(EmployeeExitClearance $clearance): RedirectResponse
     {
         $exit = $clearance->employeeExit;
-        $name = $clearance->item_name;
-        $clearance->delete();
+        $user = auth()->user();
+        $canClear = $user && $exit && (
+            $user->can('approve', $exit)
+            || $user->can('approveManager', $exit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.exit_policies.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($user, $exit->employee_id)
+        );
+        abort_unless($canClear, 403, 'Unauthorized to delete clearance items.');
 
-        if ($exit) {
-            $this->exitRepository->recalculateFnf($exit);
-        }
+        $name = $clearance->item_name;
+
+        DB::transaction(function () use ($clearance, $exit) {
+            $clearance->delete();
+
+            if ($exit) {
+                $this->exitRepository->recalculateFnf($exit);
+            }
+        });
 
         return redirect()->back()->with('success', "Clearance item '{$name}' removed.");
     }
 
     public function returnAssetDirect(Request $request, EmployeeExit $exit, Asset $asset): RedirectResponse
     {
+        $user = auth()->user();
+        $canClear = $user && (
+            $user->can('approve', $exit)
+            || $user->can('approveManager', $exit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.assets.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($user, $exit->employee_id)
+        );
+        abort_unless($canClear, 403, 'Unauthorized to process asset return.');
         $validated = $request->validate([
             'condition'           => 'nullable|string|in:good,fair,damaged,lost,scrapped,new',
             'condition_on_return' => 'nullable|string|in:good,fair,damaged,lost,scrapped,new',
@@ -292,9 +376,23 @@ class EmployeeExitController extends Controller
                         'cleared_by'       => auth()->id(),
                     ]
                 );
+            } else {
+                // If returned in good/fair condition with 0 deduction, mark any IT clearance recovery for this asset as cleared
+                EmployeeExitClearance::where('employee_exit_id', $exit->id)
+                    ->where('department', 'it_assets')
+                    ->where('item_name', "Hardware Recovery: {$asset->name}")
+                    ->update([
+                        'status'           => 'cleared',
+                        'deduction_amount' => 0.00,
+                        'recovery_amount'  => 0.00,
+                        'remarks'          => "Asset returned in {$condition} condition.",
+                        'cleared_by'       => auth()->id(),
+                        'cleared_at'       => now(),
+                    ]);
             }
         });
 
+        $this->clearanceService->checkAllClearancesCompleted($exit);
         $this->exitRepository->recalculateFnf($exit);
 
         return redirect()->back()->with('success', "Asset '{$asset->name}' marked as returned.");
@@ -309,10 +407,22 @@ class EmployeeExitController extends Controller
 
     public function finalizeFnF(Request $request, EmployeeExit $exit): RedirectResponse
     {
+        $user = auth()->user();
+        $canFinalize = $user && (
+            $user->can('approve', $exit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.payroll.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
+        abort_unless($canFinalize, 403, 'Unauthorized to finalize Full and Final settlement.');
+
         $validated = $request->validate([
             'payment_method'      => 'nullable|string|max:100',
             'payment_mode'        => 'nullable|string|max:100',
-            'settlement_channel'  => 'nullable|string|in:monthly_payroll,off_cycle',
+            'settlement_channel'  => 'required|string|in:monthly_payroll,off_cycle',
+            'bank_account_id'     => 'nullable|integer|exists:chart_of_accounts,id',
+            'payout_date'         => 'nullable|date',
             'payment_reference'   => 'nullable|string|max:255',
             'notes'               => 'nullable|string',
             'override_clearances' => 'nullable|boolean',
@@ -329,21 +439,102 @@ class EmployeeExitController extends Controller
             'other_deductions'    => 'nullable|numeric|min:0',
         ]);
 
+        if ($exit->clearances()->where('status', 'pending')->exists() && !$request->boolean('override_clearances')) {
+            return redirect()->back()->with('error', 'Cannot finalize FnF settlement: Pending clearance items exist. Please complete departmental clearances or check the clearance override option.');
+        }
+
         $settlement = $exit->fnfSettlement ?: $this->fnfService->saveSettlement($exit, $this->fnfService->calculateFnF($exit));
 
-        $validated['payment_mode'] = $validated['payment_method'] ?? ($validated['payment_mode'] ?? 'Bank Transfer');
-        $validated['payment_method'] = $validated['payment_mode'];
-        $validated['paid_at'] = now();
+        if (!empty($validated['override_reason'])) {
+            $validated['notes'] = trim(($validated['notes'] ?? '') . ' [Clearance Override: ' . $validated['override_reason'] . ']');
+        }
+
+        $channel = $validated['settlement_channel'] ?? 'monthly_payroll';
+
+        // OPTION A: Add in Payroll (Queued for regular Monthly Payroll run)
+        if ($channel === 'monthly_payroll') {
+            $updateData = [
+                'status'             => 'approved',
+                'settlement_channel' => 'monthly_payroll',
+                'payment_method'     => 'Monthly Payroll',
+                'notes'              => $validated['notes'] ?? $settlement->notes,
+            ];
+
+            if (isset($validated['unpaid_salary'])) {
+                $updateData['unpaid_salary_amount'] = (float) $validated['unpaid_salary'];
+            }
+            if (isset($validated['leave_encashment_amount'])) {
+                $updateData['leave_encashment_amount'] = (float) $validated['leave_encashment_amount'];
+            }
+            if (isset($validated['gratuity_amount'])) {
+                $updateData['gratuity_amount'] = (float) $validated['gratuity_amount'];
+            }
+            if (isset($validated['bonus_amount'])) {
+                $updateData['bonus_amount'] = (float) $validated['bonus_amount'];
+            }
+            if (isset($validated['other_earnings'])) {
+                $updateData['other_earnings'] = (float) $validated['other_earnings'];
+            }
+            if (isset($validated['notice_recovery_amount'])) {
+                $updateData['notice_shortfall_recovery'] = (float) $validated['notice_recovery_amount'];
+            }
+            if (isset($validated['asset_recovery_amount'])) {
+                $updateData['asset_damage_recovery'] = (float) $validated['asset_recovery_amount'];
+            }
+            if (isset($validated['other_deductions'])) {
+                $updateData['other_deductions'] = (float) $validated['other_deductions'];
+            }
+
+            if (isset($validated['unpaid_salary']) || isset($validated['leave_encashment_amount']) || isset($validated['gratuity_amount']) || isset($validated['notice_recovery_amount'])) {
+                $earnings = ($updateData['unpaid_salary_amount'] ?? $settlement->unpaid_salary_amount)
+                    + ($updateData['leave_encashment_amount'] ?? $settlement->leave_encashment_amount)
+                    + ($updateData['gratuity_amount'] ?? $settlement->gratuity_amount)
+                    + ($updateData['bonus_amount'] ?? $settlement->bonus_amount)
+                    + ($updateData['other_earnings'] ?? $settlement->other_earnings);
+                $deductions = ($updateData['notice_shortfall_recovery'] ?? $settlement->notice_shortfall_recovery)
+                    + ($updateData['asset_damage_recovery'] ?? $settlement->asset_damage_recovery)
+                    + (float) ($settlement->unsettled_advances_recovery ?? 0)
+                    + ($updateData['other_deductions'] ?? $settlement->other_deductions);
+                $updateData['total_earnings'] = round($earnings, 2);
+                $updateData['total_deductions'] = round($deductions, 2);
+                $updateData['net_payable_amount'] = round(max(0, $earnings - $deductions), 2);
+            }
+
+            $settlement->update($updateData);
+            $exit->update(['status' => 'approved']);
+
+            return redirect()->route('hrms.exits.index', ['tab' => 'fnf'])
+                ->with('success', "FnF settlement for {$exit->employee->full_name} is confirmed and queued for the regular Monthly Payroll run. Bank account and ledger disbursement will occur when monthly payroll is released.");
+        }
+
+        // OPTION B: Immediate Payout by Accounting (Off-Cycle)
+        if (empty($validated['bank_account_id'])) {
+            return redirect()->back()->with('error', 'Please select the bank or cash account the immediate settlement is paid from.');
+        }
+
+        $paymentMode = $validated['payment_method'] ?? ($validated['payment_mode'] ?? 'Bank Transfer');
+        $validated['payment_mode'] = $paymentMode;
+        $validated['payment_method'] = $paymentMode;
+        $validated['paid_at'] = !empty($validated['payout_date']) ? Carbon::parse($validated['payout_date']) : now();
+
+        try {
+            $accounting = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
+            $accounting->postFnFSettlementPayoutJournal($settlement, (int) $validated['bank_account_id'], $validated['paid_at']->toDateString());
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->with('error', 'Accounting payout refused: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('FnF accounting payout posting warning: ' . $e->getMessage());
+        }
 
         $this->exitRepository->settleFnf($settlement, $validated, auth()->id());
 
-        // Pre-generate all exit certificates upon settlement
+        // Pre-generate all exit certificates upon immediate settlement
         $this->docService->generateRelievingLetter($exit);
         $this->docService->generateExperienceCertificate($exit);
         $this->docService->generateNocCertificate($exit);
 
         return redirect()->route('hrms.exits.index', ['tab' => 'documents'])
-            ->with('success', "FnF settlement finalized and paid. Relieving letter & certificates generated for {$exit->employee->full_name}.");
+            ->with('success', "FnF settlement immediately paid and posted in Accounting for {$exit->employee->full_name}. Relieving letter & certificates generated.");
     }
 
     public function saveFnf(Request $request, EmployeeExit $exit): RedirectResponse
@@ -376,7 +567,10 @@ class EmployeeExitController extends Controller
             'relieving_letter'       => view('modules.hrms.employees.exits.documents.relieving-letter', $data),
             'experience_certificate' => view('modules.hrms.employees.exits.documents.experience-certificate', $data),
             'noc_certificate'        => view('modules.hrms.employees.exits.documents.noc-certificate', $data),
-            'fnf_statement'          => view('modules.hrms.employees.exits.documents.fnf-statement', array_merge($data, ['fnf' => $exit?->fnfSettlement])),
+            'fnf_statement'          => view('modules.hrms.employees.exits.documents.fnf-statement', array_merge($data, [
+                'fnf' => $exit?->fnfSettlement,
+                'settlement' => $exit?->fnfSettlement,
+            ])),
             default                  => view('modules.hrms.employees.exits.documents.custom_template_preview', $data),
         };
     }
@@ -423,8 +617,9 @@ class EmployeeExitController extends Controller
 
         $employee = $exit->employee;
         $company = $employee?->company ?: \App\Domains\HRMS\Models\Company::first();
-        $fnf = $exit->fnfSettlement ?: $this->fnfService->saveSettlement($exit, $this->fnfService->calculateFnF($exit));
+        $settlement = $exit->fnfSettlement ?: $this->fnfService->saveSettlement($exit, $this->fnfService->calculateFnF($exit));
+        $fnf = $settlement;
 
-        return view('modules.hrms.employees.exits.documents.fnf-statement', compact('exit', 'employee', 'company', 'fnf'));
+        return view('modules.hrms.employees.exits.documents.fnf-statement', compact('exit', 'employee', 'company', 'fnf', 'settlement'));
     }
 }

@@ -134,7 +134,7 @@
                                     @csrf
                                     @method('DELETE')
                                       <div class="hstack gap-2 justify-content-end align-items-center">
-                                          <a href="javascript:void(0)" class="action-dropdown-btn btn-view-dept" data-bs-toggle="modal" data-bs-target="#viewDeptModal" data-dept="{{ base64_encode($d->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
+                                          <a href="javascript:void(0)" class="action-dropdown-btn btn-view-dept" data-bs-toggle="modal" data-bs-target="#viewDeptModal" data-dept="{{ json_encode($d) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
                                               <i class="feather feather-eye"></i>
                                           </a>
                                          <x-ui.action-dropdown>
@@ -185,6 +185,7 @@
     </div>
 </div>
 
+@push('scripts')
 <script>
     (function() {
         function getInitials(name, fallback) {
@@ -199,7 +200,7 @@
 
         // Delegated View Action Trigger
         $(document).on('click', '.btn-view-dept', function() {
-            let dept = JSON.parse(atob(this.dataset.dept));
+            let dept = JSON.parse(this.dataset.dept);
             
             let nameEl = document.getElementById('modal_view_dept_name');
             if (nameEl) nameEl.innerText = dept.name;
@@ -349,6 +350,7 @@
         });
     })();
 </script>
+@endpush
 
 <!-- View Dept Modal -->
 <div class="modal fade" id="viewDeptModal" tabindex="-1" aria-labelledby="viewDeptModalLabel" aria-hidden="true">

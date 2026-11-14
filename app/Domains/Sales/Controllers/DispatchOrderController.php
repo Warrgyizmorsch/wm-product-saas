@@ -75,9 +75,13 @@ class DispatchOrderController extends Controller
         $prefillSalesOrder = null;
         if ($soId) {
             $prefillSalesOrder = \App\Domains\Sales\Models\SalesOrder::with(['items', 'customer'])->find($soId);
-            if ($prefillSalesOrder && !in_array($prefillSalesOrder->status, ['Confirmed', 'Partially Shipped'])) {
+            if ($prefillSalesOrder && !in_array($prefillSalesOrder->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])) {
                 return redirect()->route('sales.dispatches.index')
                     ->with('error', 'Sales Order must be Confirmed before creating a Dispatch Order.');
+            }
+            if ($prefillSalesOrder && $prefillSalesOrder->hasOnlyServices()) {
+                return redirect()->route('sales.orders.show', $prefillSalesOrder->id)
+                    ->with('info', "Sales Order {$prefillSalesOrder->sales_order_number} contains only service items. Services do not require physical dispatch or shipping and can be directly invoiced.");
             }
             if ($prefillSalesOrder) {
                 $mr = MaterialRequirement::where('sales_order_id', $prefillSalesOrder->id)->first();
@@ -85,7 +89,7 @@ class DispatchOrderController extends Controller
             }
         } elseif ($mrId) {
             $mr = MaterialRequirement::with('salesOrder.customer')->find($mrId);
-            if ($mr && $mr->salesOrder && !in_array($mr->salesOrder->status, ['Confirmed', 'Partially Shipped'])) {
+            if ($mr && $mr->salesOrder && !in_array($mr->salesOrder->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])) {
                 return redirect()->route('sales.dispatches.index')
                     ->with('error', 'Sales Order must be Confirmed before creating a Dispatch Order.');
             }
@@ -103,9 +107,10 @@ class DispatchOrderController extends Controller
             'salesOrder.customer',
             'items.product',
             'items.warehouse',
+            'items.serialNumbers',
         ])
         ->whereHas('salesOrder', function ($q) {
-            $q->whereIn('status', ['Confirmed', 'Partially Shipped']);
+            $q->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered']);
         })
         ->whereIn('id', $pendingDOIds)
         ->latest()
@@ -154,18 +159,41 @@ class DispatchOrderController extends Controller
 
     public function getAvailableSerials(Request $request): JsonResponse
     {
-        $productId = $request->input('product_id');
-        $warehouseId = $request->input('warehouse_id');
+        $productId = (int) $request->input('product_id');
+        $warehouseId = (int) $request->input('warehouse_id');
+        $mrItemId = (int) $request->input('material_requirement_item_id');
         $status = $request->input('status', 'Available');
         $tenantId = require_tenant_id();
+        $companyId = company_id() ?? current_company_id();
 
-        $serials = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
-            ->where('product_id', $productId)
-            ->when($warehouseId, function ($q) use ($warehouseId) {
-                return $q->where('warehouse_id', $warehouseId);
-            })
-            ->where('status', $status)
-            ->pluck('serial_number');
+        $query = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
+            ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->where('product_id', $productId);
+
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
+        }
+
+        $query->where(function ($q) use ($mrItemId) {
+            $q->where('status', 'Available')
+              ->orWhere(function ($sub) use ($mrItemId) {
+                  $sub->where('status', 'Reserved')
+                      ->where(function ($mrQ) use ($mrItemId) {
+                          if ($mrItemId) {
+                              $mrQ->where('material_requirement_item_id', $mrItemId)
+                                  ->orWhereNull('material_requirement_item_id');
+                          } else {
+                              $mrQ->whereNull('material_requirement_item_id');
+                          }
+                      });
+              });
+        });
+
+        if ($mrItemId) {
+            $query->orderByRaw("CASE WHEN material_requirement_item_id = {$mrItemId} THEN 0 ELSE 1 END");
+        }
+
+        $serials = $query->orderBy('serial_number')->pluck('serial_number');
 
         return response()->json(['success' => true, 'serials' => $serials]);
     }
@@ -253,7 +281,7 @@ class DispatchOrderController extends Controller
             'items.*.product_id'      => ['required', 'exists:products,id'],
             'items.*.warehouse_id'    => ['required', 'exists:warehouses,id'],
             'items.*.quantity'        => ['required', 'numeric', 'min:0.0001'],
-            'items.*.serial_numbers'  => ['nullable', 'string'],
+            'items.*.serial_numbers'  => ['nullable'],
             'items.*.batch_number'    => ['nullable', 'string'],
         ], [
             'items.*.quantity.min'      => 'Dispatch quantity must be greater than 0.',
@@ -261,8 +289,21 @@ class DispatchOrderController extends Controller
             'items.*.quantity.numeric'  => 'Dispatch quantity must be a valid number.',
         ]);
 
+        foreach ($validated['items'] as $idx => $itemData) {
+            $product = Product::find($itemData['product_id']);
+            if ($product && $product->track_serial_number) {
+                $rawSn = $itemData['serial_numbers'] ?? '';
+                $serials = is_array($rawSn) ? $rawSn : array_values(array_filter(array_map('trim', preg_split('/[\r\n,;]+/', (string)$rawSn))));
+                $qty = (float) $itemData['quantity'];
+                if (count($serials) < $qty) {
+                    return redirect()->back()->withInput()->with('error', "Product '{$product->name}' is serial-tracked. Please enter all " . (int)$qty . " serial number(s) (currently entered: " . count($serials) . ").");
+                }
+            }
+        }
+
         try {
             $dispatch = $this->dispatchService->createDispatchOrder($validated, Auth::id() ?? 1);
+            \App\Domains\Sales\Services\SalesNotificationService::notifyDispatchCreated($dispatch);
             return redirect()->route('sales.dispatches.index')->with('success', "Dispatch Order {$dispatch->dispatch_number} created successfully.");
         } catch (Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
@@ -278,7 +319,7 @@ class DispatchOrderController extends Controller
         return view('modules.sales.dispatches.show', compact('dispatch'));
     }
 
-    public function confirm(int $id): RedirectResponse
+    public function confirm(Request $request, int $id): RedirectResponse
     {
         $dispatch = $this->dispatchRepo->find($id);
         if (!$dispatch) abort(404);
@@ -286,14 +327,22 @@ class DispatchOrderController extends Controller
 
         try {
             $dispatch = $this->dispatchService->confirmDispatchOrder($dispatch);
-            return redirect()->back()
+            $redirect = $request->filled('redirect_to')
+                ? redirect()->to($request->input('redirect_to'))
+                : redirect()->back();
+
+            return $redirect
                 ->with('success', "Dispatch Order {$dispatch->dispatch_number} confirmed and warehouse stock reserved successfully. Invoice creation is now enabled.");
         } catch (Exception $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            $redirect = $request->filled('redirect_to')
+                ? redirect()->to($request->input('redirect_to'))
+                : redirect()->back();
+
+            return $redirect->with('error', $e->getMessage());
         }
     }
 
-    public function ship(int $id): RedirectResponse
+    public function ship(Request $request, int $id): RedirectResponse
     {
         $dispatch = $this->dispatchRepo->find($id);
         if (!$dispatch) abort(404);
@@ -302,18 +351,20 @@ class DispatchOrderController extends Controller
         try {
             $dispatch = $this->dispatchService->shipDispatchOrder($dispatch);
 
-            \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.dispatch.shipped', [
-                'doc_no' => $dispatch->dispatch_number,
-                'customer_name' => $dispatch->customer?->name ?? 'Customer',
-                'transporter' => $dispatch->transporter?->name ?? $dispatch->carrier ?? 'Carrier',
-                'tracking_no' => $dispatch->tracking_number ?? $dispatch->lr_number ?? 'N/A',
-                'date' => now()->format('Y-m-d'),
-            ], route('inventory.dispatches.show', $dispatch->id), $dispatch);
+            \App\Domains\Sales\Services\SalesNotificationService::notifyDispatchShipped($dispatch);
 
-            return redirect()->back()
+            $redirect = $request->filled('redirect_to')
+                ? redirect()->to($request->input('redirect_to'))
+                : redirect()->back();
+
+            return $redirect
                 ->with('success', "Dispatch Order {$dispatch->dispatch_number} marked as Shipped (Gate Outward) and physical stock deducted from warehouse successfully.");
         } catch (Exception $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            $redirect = $request->filled('redirect_to')
+                ? redirect()->to($request->input('redirect_to'))
+                : redirect()->back();
+
+            return $redirect->with('error', $e->getMessage());
         }
     }
 
@@ -343,10 +394,15 @@ class DispatchOrderController extends Controller
         ];
 
         if ($request->hasFile('pod_file')) {
-            $updateData['pod_attachment_path'] = $request->file('pod_file')->store('pods', 'public');
+            $updateData['pod_attachment_path'] = $request->file('pod_file')->storeTenantFile('pods', 'public');
         }
 
         $dispatch->update($updateData);
+
+        // Auto sync Material Requirement and Sales Order status to Delivered / Partially Delivered
+        $this->dispatchService->syncFulfillmentStatuses((int)$dispatch->sales_order_id, $dispatch->material_requirement_id ? (int)$dispatch->material_requirement_id : null);
+
+        \App\Domains\Sales\Services\SalesNotificationService::notifyDispatchDelivered($dispatch);
 
         return redirect()->route('sales.dispatches.show', $dispatch->id)
             ->with('success', 'Dispatch Order status updated to Delivered successfully.');
@@ -375,5 +431,22 @@ class DispatchOrderController extends Controller
 
         return redirect()->route('sales.dispatches.show', $dispatch->id)
             ->with('success', 'Tracking & logistics details updated successfully.');
+    }
+
+    public function cancel(Request $request, int $id): RedirectResponse
+    {
+        $dispatch = $this->dispatchRepo->find($id);
+        if (!$dispatch) abort(404);
+        $this->authorize('update', $dispatch);
+
+        $reason = $request->input('reason', 'Cancelled by user');
+
+        try {
+            $this->dispatchService->cancelDispatchOrder($dispatch, $reason);
+            return redirect()->route('sales.dispatches.show', $dispatch->id)
+                ->with('success', "Dispatch Order {$dispatch->dispatch_number} cancelled and reserved inventory restored to available stock.");
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
 }

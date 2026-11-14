@@ -192,6 +192,17 @@
                     // The block draws its own card; keep the edit tools that sit in front of it.
                     const tools = holder.querySelector('.dash-tools');
                     holder.innerHTML = (tools ? tools.outerHTML : '') + d.html;
+
+                    // Scripts from fetched widget HTML are inert after innerHTML assignment.
+                    // Execute only scripts that explicitly opt in, after their markup exists.
+                    holder.querySelectorAll('script[data-execute-widget-script]').forEach(source => {
+                        const executable = document.createElement('script');
+                        Array.from(source.attributes).forEach(attribute => {
+                            executable.setAttribute(attribute.name, attribute.value);
+                        });
+                        executable.textContent = source.textContent;
+                        source.replaceWith(executable);
+                    });
                     
                     // Relocate embedded modals directly to document.body to prevent parent container stacking/blur issues
                     holder.querySelectorAll('.modal').forEach(modal => {

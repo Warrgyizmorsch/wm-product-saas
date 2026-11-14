@@ -136,8 +136,13 @@ class TimeLogService
 
     public function approve(TimeLog $timeLog, User $approver): TimeLog
     {
-        // Separation of duty: cannot approve own timesheet
-        if ((int) $timeLog->user_id === (int) $approver->id) {
+        // Separation of duty: regular team members cannot self-approve, but Project Owner,
+        // Project Manager, and Tenant Owner/Admins have supreme authority to approve.
+        $isOwnerOrManager = (int) $timeLog->project?->owner_id === (int) $approver->id
+            || (int) $timeLog->project?->manager_id === (int) $approver->id
+            || $approver->hasAnyRole('owner', 'tenant_owner', 'admin', 'super_admin');
+
+        if ((int) $timeLog->user_id === (int) $approver->id && !$isOwnerOrManager) {
             throw ValidationException::withMessages([
                 'approved_by' => [__('projects.cannot_approve_own_timelog', [
                     'default' => 'A team member cannot approve their own timesheet entry.',
@@ -184,7 +189,11 @@ class TimeLogService
 
     public function reject(TimeLog $timeLog, User $approver, ?string $remarks = null): TimeLog
     {
-        if ((int) $timeLog->user_id === (int) $approver->id) {
+        $isOwnerOrManager = (int) $timeLog->project?->owner_id === (int) $approver->id
+            || (int) $timeLog->project?->manager_id === (int) $approver->id
+            || $approver->hasAnyRole('owner', 'tenant_owner', 'admin', 'super_admin');
+
+        if ((int) $timeLog->user_id === (int) $approver->id && !$isOwnerOrManager) {
             throw ValidationException::withMessages([
                 'approved_by' => [__('projects.cannot_reject_own_timelog', [
                     'default' => 'A team member cannot reject their own timesheet entry.',

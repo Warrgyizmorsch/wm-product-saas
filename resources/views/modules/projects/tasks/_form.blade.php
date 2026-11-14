@@ -11,6 +11,7 @@
     @endforeach
 </x-ui.odoo-form-ui>
 <x-ui.odoo-form-ui type="input" id="task_title" label="{{ __('projects.task_title') }}" name="title" :required="true"
+    maxlength="255"
     :value="old('title')"
     :errorText="$errors->first('title')" />
 <x-ui.odoo-form-ui type="textarea" id="task_description" label="{{ __('projects.description') }}" name="description"
@@ -57,5 +58,6 @@
     </div>
 </div>
 <x-ui.odoo-form-ui type="input" inputType="number" id="task_estimated_hours" label="{{ __('projects.estimated_hours') }}" name="estimated_hours"
+    step="0.01" min="0" inputmode="decimal"
     :value="old('estimated_hours')"
     :errorText="$errors->first('estimated_hours')" />

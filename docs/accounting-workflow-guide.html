@@ -1,0 +1,607 @@
+<title>Accounting Workflow Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky stage nav over a single reading column; each tab is one view of the same accounting cycle. */
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --ink:#15202b; --muted:#5b6672; --line:#dde2e8;
+  --accent:#1f5fbf; --accent-soft:#e6eefb; --dr:#0d7a55; --dr-soft:#e2f4ec; --cr:#b5462a; --cr-soft:#fbe9e3;
+  --warn:#9a6a00; --warn-soft:#fbf1d9;
+  --display:"Plus Jakarta Sans",system-ui,sans-serif; --body:"DM Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f141a; --surface:#171e26; --ink:#e7ecf1; --muted:#9aa6b2; --line:#2a3440;
+  --accent:#7aa8f0; --accent-soft:#1c2b42; --dr:#5ccf9f; --dr-soft:#15302a; --cr:#f0906f; --cr-soft:#3a2119;
+  --warn:#e3b44d; --warn-soft:#352b14; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f141a; --surface:#171e26; --ink:#e7ecf1; --muted:#9aa6b2; --line:#2a3440;
+  --accent:#7aa8f0; --accent-soft:#1c2b42; --dr:#5ccf9f; --dr-soft:#15302a; --cr:#f0906f; --cr-soft:#3a2119;
+  --warn:#e3b44d; --warn-soft:#352b14; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--body)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.25;margin:0}
+h1{font-size:clamp(26px,4vw,36px);font-weight:800;letter-spacing:-.01em}
+h2{font-size:22px;font-weight:700}
+h3{font-size:16px;font-weight:700}
+p{margin:0}
+.eyebrow{font:600 11px/1 var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:.86em}
+
+header.top{background:var(--surface);border-bottom:1px solid var(--line)}
+header.top .wrap{padding-block:28px 22px;display:grid;gap:10px}
+header.top p.lede{color:var(--muted);max-width:68ch}
+
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+nav.tabs .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:0}
+nav.tabs button{font:600 14px var(--body);color:var(--muted);background:none;border:0;border-bottom:2px solid transparent;padding:12px 12px 10px;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+nav.tabs button:focus-visible,.stage:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+main .wrap{padding-block:28px 64px;display:grid;gap:36px}
+section.view{display:grid;gap:28px}
+.intro{display:grid;gap:8px;max-width:72ch}
+.intro p{color:var(--muted)}
+
+/* Cycle diagram */
+.cycle{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;counter-reset:st}
+.stage{counter-increment:st;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:6px;cursor:pointer;font:inherit;color:inherit;position:relative}
+.stage::before{content:counter(st);font:700 12px var(--mono);color:var(--accent);background:var(--accent-soft);border-radius:999px;width:24px;height:24px;display:grid;place-items:center}
+.stage .who{font-size:12px;color:var(--muted)}
+.stage[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.detail{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;display:grid;gap:16px}
+.detail .cols{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px}
+.detail ol,.detail ul{margin:0;padding-left:20px;display:grid;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.note{font-size:13.5px;padding:10px 12px;border-radius:8px;background:var(--warn-soft);color:var(--ink);border-left:3px solid var(--warn)}
+
+/* Source flow */
+.flow{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:stretch}
+.flow .col{display:grid;gap:8px;align-content:start}
+.flow .box{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13.5px}
+.flow .box b{display:block;font-family:var(--display);font-size:13.5px}
+.flow .box span{color:var(--muted);font-size:12.5px}
+.flow .core{background:var(--accent-soft);border-color:var(--accent)}
+.flow .arrow{align-self:center;color:var(--muted);font:600 20px var(--mono)}
+
+/* Tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 11.5px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td.num{font-family:var(--mono);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dr{color:var(--dr);font-weight:600}.cr{color:var(--cr);font-weight:600}
+.tag{font:600 11px var(--mono);padding:2px 6px;border-radius:4px;white-space:nowrap}
+.tag.dr{background:var(--dr-soft)}.tag.cr{background:var(--cr-soft)}
+.tag.auto{background:var(--accent-soft);color:var(--accent)}
+.tag.man{background:var(--warn-soft);color:var(--warn)}
+
+/* Voucher cards */
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.vcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:10px;align-content:start}
+.vcard p{color:var(--muted);font-size:13.5px}
+.entry{font-family:var(--mono);font-size:12.5px;display:grid;gap:2px;background:var(--bg);border-radius:6px;padding:8px 10px}
+.entry div{display:flex;justify-content:space-between;gap:10px}
+.entry .c{padding-left:18px}
+
+/* Screens index */
+.filter{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.filter input{font:inherit;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-width:0;flex:1 1 240px;max-width:360px}
+.sgroup{display:grid;gap:10px}
+.slist{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+.scr{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:3px}
+.scr b{font-family:var(--display);font-size:14px}
+.scr span{font-size:12.5px;color:var(--muted)}
+
+/* Screen by screen */
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+.legend>span{display:flex;gap:6px;align-items:center}
+.op{font:700 11px var(--mono);width:22px;height:22px;display:inline-grid;place-items:center;border-radius:5px;background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.op.on{background:var(--dr-soft);color:var(--dr);border-color:transparent}
+.sbs{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
+.sidx{position:sticky;top:calc(env(safe-area-inset-top,0px) + 56px);display:grid;gap:10px;max-height:calc(100vh - 80px);overflow:auto;padding-right:4px}
+.sidx input{font:inherit;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%}
+.sidx .g{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.sidx button{display:block;width:100%;text-align:left;font:500 13.5px var(--body);color:var(--ink);background:none;border:0;border-radius:6px;padding:6px 10px;cursor:pointer}
+.sidx button:hover{background:var(--surface)}
+.sidx button[aria-current="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.sdetail{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;display:grid;gap:18px;min-width:0}
+.sdetail .head{display:grid;gap:6px}
+.sdetail .path{font:12.5px var(--mono);color:var(--muted)}
+.sdetail .meta{display:flex;flex-wrap:wrap;gap:16px;align-items:center;font-size:13.5px}
+.crud{display:flex;gap:4px}
+.sdetail h4{font:700 13px var(--display);margin:0 0 6px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.btnlist{display:grid;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.btnlist div{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr);gap:12px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13.5px}
+.btnlist div:last-child{border-bottom:0}
+.ui-btn{font:600 12.5px var(--body);background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:3px 9px;justify-self:start;align-self:start}
+.fields{display:flex;flex-wrap:wrap;gap:6px}
+.fields span{font-size:12.5px;padding:3px 8px;border-radius:5px;border:1px solid var(--line);background:var(--bg)}
+.flowline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.flowline .s{padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-weight:600}
+.flowline .a{color:var(--muted)}
+#crudTable td.c{text-align:center}
+@media (max-width:820px){.sbs{grid-template-columns:minmax(0,1fr)}.sidx{position:static;max-height:260px}.btnlist div{grid-template-columns:minmax(0,1fr);gap:4px}}
+
+/* Demo script */
+.demo{display:grid;gap:12px}
+.dstep{display:grid;grid-template-columns:64px minmax(0,1fr);gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.dstep .t{font:600 13px var(--mono);color:var(--accent)}
+.dstep .say{font-size:13.5px;color:var(--muted);font-style:italic}
+.dstep .body{display:grid;gap:6px;min-width:0}
+
+/* Checklist */
+.check{display:grid;gap:8px}
+.check label{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer}
+.check input{margin-top:4px;accent-color:var(--accent)}
+.check small{display:block;color:var(--muted)}
+
+@media (max-width:820px){
+  .cycle{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .detail .cols{grid-template-columns:minmax(0,1fr)}
+  .flow{grid-template-columns:minmax(0,1fr)}
+  .flow .arrow{transform:rotate(90deg);justify-self:center}
+}
+@media (prefers-reduced-motion:no-preference){.stage{transition:border-color .15s,box-shadow .15s}}
+</style>
+
+<header class="top"><div class="wrap">
+  <span class="eyebrow">Finance · Accounting module</span>
+  <h1>How accounting runs in the ERP</h1>
+  <p class="lede">One guide for people using the Accounting screens day to day and for anyone demonstrating them to a customer. It follows the books from first setup to year-end close and shows which screen does what, who uses it, and which entries the system posts on its own.</p>
+</div></header>
+
+<nav class="tabs" aria-label="Guide sections"><div class="wrap" role="tablist">
+  <button role="tab" data-view="cycle" aria-selected="true">The accounting cycle</button>
+  <button role="tab" data-view="sources" aria-selected="false">Where entries come from</button>
+  <button role="tab" data-view="vouchers" aria-selected="false">Voucher types</button>
+  <button role="tab" data-view="screens" aria-selected="false">Screen by screen</button>
+  <button role="tab" data-view="demo" aria-selected="false">20-minute demo</button>
+  <button role="tab" data-view="close" aria-selected="false">Month-end checklist</button>
+</div></nav>
+
+<main><div class="wrap">
+
+<!-- ============ CYCLE ============ -->
+<section class="view" id="cycle">
+  <div class="intro">
+    <h2>Eight stages, repeated every month</h2>
+    <p>Setup happens once. Stages 2 to 8 repeat each month. Pick a stage to see its screens, the steps, and what happens in the books.</p>
+  </div>
+  <div class="cycle" id="stages"></div>
+  <div class="detail" id="stageDetail" aria-live="polite"></div>
+</section>
+
+<!-- ============ SOURCES ============ -->
+<section class="view" id="sources" hidden>
+  <div class="intro">
+    <h2>Most entries post themselves</h2>
+    <p>Your team works in Sales, Purchase, Inventory and HRMS as usual. When a document is approved or posted there, Accounting writes the journal automatically. Accountants key in only what no other module covers, using vouchers and journals.</p>
+  </div>
+  <div class="flow">
+    <div class="col">
+      <span class="eyebrow">Other modules</span>
+      <div class="box"><b>Sales</b><span>Invoice posted · Customer payment · Sales return</span></div>
+      <div class="box"><b>Purchase</b><span>Bill posted · Vendor payment · Purchase return</span></div>
+      <div class="box"><b>Inventory / Production</b><span>Stock issued for sale or consumed in production</span></div>
+      <div class="box"><b>HRMS</b><span>Payroll run · Travel expense claims</span></div>
+      <div class="box"><b>Fixed assets</b><span>Capitalisation · Depreciation · Disposal</span></div>
+      <div class="box"><b>Bank reconciliation</b><span>Bank charges, interest and receipts found on the statement</span></div>
+    </div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="col">
+      <span class="eyebrow">Accounting engine</span>
+      <div class="box core"><b>Journal</b><span>Every entry balances: total debit = total credit. Each one gets a number, a date in an open period, and an audit-trail record.</span></div>
+      <div class="box"><b>Manual vouchers</b><span>Payment, Receipt, Contra, Credit/Debit Note, Sales, Purchase, Journal</span></div>
+      <div class="box"><b>Maker-checker</b><span>Manual entries above the approval limit wait in Pending Approvals</span></div>
+      <div class="box"><b>Posting Failures</b><span>An automatic entry that could not post (for example, a missing account) is listed here to retry</span></div>
+    </div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="col">
+      <span class="eyebrow">Output</span>
+      <div class="box"><b>Books</b><span>Day Book, Cash Book, Bank Book, General Ledger, Party Ledger</span></div>
+      <div class="box"><b>Financial statements</b><span>Trial Balance, Profit &amp; Loss, Balance Sheet, Cash Flow</span></div>
+      <div class="box"><b>Receivables &amp; payables</b><span>AR Aging, AP Aging, Bills Outstanding</span></div>
+      <div class="box"><b>Compliance</b><span>GST Summary, GSTR-1, GSTR-3B, GSTR-2B match, TDS returns</span></div>
+      <div class="box"><b>Dashboard</b><span>Cash, receivables, payables, profit and trends at a glance</span></div>
+    </div>
+  </div>
+
+  <div class="intro"><h3>What each automatic posting does</h3>
+    <p>Example amounts are for an intra-state sale or purchase of ₹10,000 plus 18% GST (9% CGST + 9% SGST). Inter-state documents use IGST instead.</p></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Business event</th><th>Where it is done</th><th>Debit</th><th>Credit</th></tr></thead>
+    <tbody>
+      <tr><td>Sales invoice posted</td><td>Sales › Invoices</td><td class="dr">Accounts Receivable ₹11,800</td><td class="cr">Sales Revenue ₹10,000<br>Output CGST ₹900 · Output SGST ₹900</td></tr>
+      <tr><td>Customer pays</td><td>Sales › Payments</td><td class="dr">Bank or Cash ₹11,800<br>(TDS Receivable if the customer deducted TDS)</td><td class="cr">Accounts Receivable ₹11,800<br>(Advance from Customers if no invoice yet)</td></tr>
+      <tr><td>Goods leave stock for a sale</td><td>Inventory (delivery)</td><td class="dr">Cost of Goods Sold</td><td class="cr">Inventory</td></tr>
+      <tr><td>Sales return approved</td><td>Sales › Returns</td><td class="dr">Sales Returns ₹10,000<br>Output CGST/SGST ₹1,800</td><td class="cr">Accounts Receivable ₹11,800</td></tr>
+      <tr><td>Purchase bill posted</td><td>Purchase › Bills</td><td class="dr">Inventory or Expense ₹10,000<br>Input CGST ₹900 · Input SGST ₹900</td><td class="cr">Accounts Payable ₹11,800</td></tr>
+      <tr><td>Vendor paid</td><td>Purchase › Payments</td><td class="dr">Accounts Payable ₹11,800<br>(Advance to Suppliers if no bill yet)</td><td class="cr">Bank or Cash ₹11,800</td></tr>
+      <tr><td>Purchase return approved</td><td>Purchase › Returns</td><td class="dr">Accounts Payable ₹11,800</td><td class="cr">Inventory ₹10,000<br>Input CGST/SGST ₹1,800</td></tr>
+      <tr><td>Material consumed in production</td><td>Production › Orders</td><td class="dr">Work in Progress</td><td class="cr">Raw Material Inventory</td></tr>
+      <tr><td>Payroll processed</td><td>HRMS › Payroll</td><td class="dr">Salary &amp; Wages Expense</td><td class="cr">Salary Payable · PF/ESI/PT Payable · TDS Payable</td></tr>
+      <tr><td>Monthly depreciation posted</td><td>Accounting › Depreciation</td><td class="dr">Depreciation Expense</td><td class="cr">Accumulated Depreciation</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">If an automatic entry cannot post, the document in Sales or Purchase still saves. The entry waits in <b>Accounting › Posting Failures</b>. Fix the cause (usually a missing account in the Chart of Accounts) and press Retry.</p>
+</section>
+
+<!-- ============ VOUCHERS ============ -->
+<section class="view" id="vouchers" hidden>
+  <div class="intro">
+    <h2>Which voucher to use</h2>
+    <p>Vouchers are ready-made journal forms for common transactions. Pick the one that matches what happened and the system fills in the right side for you. Use a plain Journal only when no voucher fits.</p>
+  </div>
+  <div class="vgrid" id="vgrid"></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Situation</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td>Paying rent, electricity or a vendor outside the Purchase module</td><td>Payment Voucher</td></tr>
+      <tr><td>Money received that is not a sales receipt: interest, a refund, owner's capital</td><td>Receipt Voucher</td></tr>
+      <tr><td>Cash deposited in bank, cash withdrawn, transfer between two own bank accounts</td><td>Contra Voucher</td></tr>
+      <tr><td>Giving a customer a discount or price correction after the invoice</td><td>Credit Note</td></tr>
+      <tr><td>Asking a vendor for a price correction after their bill</td><td>Debit Note</td></tr>
+      <tr><td>Accruals, provisions, reclassifications, opening balances, corrections</td><td>Journal</td></tr>
+      <tr><td>A wrong entry that is already posted</td><td>Open it and press Reverse. Posted entries are never edited or deleted, so the audit trail stays complete.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ SCREENS ============ -->
+<section class="view" id="screens" hidden>
+  <div class="intro">
+    <h2>Screen by screen</h2>
+    <p>Every Accounting screen, what it is for, every button on it and what that button does. All screens sit under <b>Finance › Accounting</b> in the sidebar, and each person sees only the screens their role allows.</p>
+  </div>
+  <div class="legend">
+    <span><span class="op on">C</span> Create</span><span><span class="op on">R</span> View / search</span><span><span class="op on">U</span> Edit</span><span><span class="op on">D</span> Delete</span><span><span class="op">–</span> Not allowed on this screen</span>
+  </div>
+  <div class="sbs">
+    <aside class="sidx">
+      <input id="q" type="search" placeholder="Find a screen or button" aria-label="Find a screen or button">
+      <div id="slists"></div>
+    </aside>
+    <article class="sdetail" id="sdetail" aria-live="polite"></article>
+  </div>
+  <div class="intro"><h3>Create, view, edit and delete at a glance</h3>
+    <p>Accounting entries are never edited or deleted once posted. They are corrected by reversing them, so the audit trail always shows what happened.</p></div>
+  <div class="tbl"><table id="crudTable">
+    <thead><tr><th>Screen</th><th>C</th><th>R</th><th>U</th><th>D</th><th>Other actions</th></tr></thead><tbody></tbody>
+  </table></div>
+</section>
+
+<!-- ============ DEMO ============ -->
+<section class="view" id="demo" hidden>
+  <div class="intro">
+    <h2>A 20-minute customer demo</h2>
+    <p>Tell one story from start to finish: a trading company buys goods, sells them, gets paid, and closes the month. Each step shows one screen, and the italic line is what to say. Prepare a demo company that already has a month of sample data, so every report has numbers in it.</p>
+  </div>
+  <div class="demo" id="demoSteps"></div>
+  <p class="note">If the customer asks “Can my accountant still pass manual entries?”, show <b>Journals › New</b>, enter a ₹2,00,000 provision, and show that it lands in <b>Pending Approvals</b> for a second person. That one answer covers control, audit and flexibility.</p>
+</section>
+
+<!-- ============ CLOSE ============ -->
+<section class="view" id="close" hidden>
+  <div class="intro">
+    <h2>Month-end checklist</h2>
+    <p>Work top to bottom before closing a period. Ticks are saved in this browser only, so each person keeps their own list.</p>
+  </div>
+  <div class="check" id="checklist"></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="resetChecks" type="button" style="font:600 13px var(--body);padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer">Clear ticks</button></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Period status</th><th>What it allows</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag auto">Open</span></td><td>Anyone with permission can post into it.</td></tr>
+      <tr><td><span class="tag man">Closed</span></td><td>Ordinary posting stops. A finance admin can reopen it for a late correction.</td></tr>
+      <tr><td><span class="tag cr">Locked</span></td><td>Final. Use it once returns are filed or the auditor has signed off.</td></tr>
+      <tr><td><b>Year close</b></td><td>Fiscal Years › Close moves the year's profit or loss into Retained Earnings. Assets, liabilities and capital carry forward as they are.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+</div></main>
+
+<script>
+const STAGES=[
+ {t:"Set up the books",who:"Finance admin · once",
+  screens:["Chart of Accounts","Ledger Groups","Cost Centers","Fiscal Years & Periods","Tax Rates","TDS Setup","Bank Rules","Asset Categories"],
+  steps:["Review the Chart of Accounts. A standard Indian chart is created for every new company. Add your own bank accounts, expense heads and branches.","Create the fiscal year (April to March). Monthly periods are generated for it.","Check GST tax rates and TDS sections, and enter your TAN and deductor details.","Add cost centers if you track profit by branch, department or project.","Enter opening balances with a Journal dated the first day, and break up customer and vendor balances bill by bill in Bill Settlement."],
+  behind:"Nothing is posted yet. These masters decide which account each automatic entry uses later.",
+  tip:"Most posting failures later trace back to a missing account here. Spend the time once."},
+ {t:"Record daily transactions",who:"Sales, purchase and stores teams",
+  screens:["Sales invoices & payments","Purchase bills & payments","Sales & purchase returns","Payroll","Travel expenses"],
+  steps:["Teams work in their own modules as normal.","When a document is posted or approved, Accounting writes the balanced journal on its own.","The entry links back to its source document, so you can drill from a ledger line to the invoice."],
+  behind:"Automatic entries bypass approval. They are checked at source, in the module that created them.",
+  tip:"Accountants do not re-key sales or purchases. That removes the most common source of mismatches."},
+ {t:"Enter manual vouchers",who:"Accountant",
+  screens:["Payment Vouchers","Receipt Vouchers","Contra Vouchers","Credit Notes","Debit Notes","Sales Vouchers","Purchase Vouchers","Journals"],
+  steps:["Choose the voucher that matches the transaction (see the Voucher types tab).","Enter date, party, accounts and amounts. The voucher cannot be saved unless debit equals credit.","Against a customer or vendor, choose which bill you are settling, or leave the amount On Account.","Save. It posts at once, or goes to approval if it is above your company's limit."],
+  behind:"Each voucher becomes a numbered journal in the open period for its date.",
+  tip:"Use Reverse to correct a mistake. Posted entries are never edited."},
+ {t:"Approve entries",who:"Finance manager",
+  screens:["Pending Approvals","Posting Failures"],
+  steps:["Open Pending Approvals and review each held entry.","Approve to post it, or Reject with a reason so the maker can fix and resubmit.","Check Posting Failures for automatic entries that need a fix, then Retry or Dismiss."],
+  behind:"The person who entered a journal can never approve it. The entry posts into whichever period is open on the day it is approved.",
+  tip:"The approval limit and who may skip approval are set per company."},
+ {t:"Reconcile bank",who:"Accountant",
+  screens:["Bank Reconciliation","Bank Rules","Bank Book"],
+  steps:["Create a reconciliation for the bank account and month.","Upload the bank statement (Excel, CSV or PDF) and map its columns the first time.","Press Auto-match. Lines matching your book entries by amount and date pair up.","For lines with no entry yet (bank charges, interest, a customer deposit) use Create & Match, or settle them against open bills.","Complete the reconciliation when the difference is zero."],
+  behind:"Bank Rules remember recurring lines, such as monthly bank charges, so they match automatically next time.",
+  tip:"Export the reconciliation statement as PDF for the auditor file."},
+ {t:"Fixed assets & budgets",who:"Accountant · Finance manager",
+  screens:["Fixed Asset Register","Depreciation","Asset Disposals","Asset Write-offs","Asset Revaluations","Budgets","Budget vs Actual"],
+  steps:["Assets bought through Purchase appear in the register. Capitalise them to start depreciation.","Each month, Generate depreciation, then Review, Approve and Post the schedule.","Sales, scrapping and revaluations follow the same approve-then-post steps.","Compare spending with the approved budget in Budget vs Actual."],
+  behind:"Posting a schedule writes the depreciation journal. Assets that were sold or written off stop depreciating.",
+  tip:""},
+ {t:"Tax compliance",who:"Tax accountant",
+  screens:["GST Summary","GSTR-1","GSTR-3B","Upload GST Returns","GSTR-2B Reconciliation","TDS Register & Challans","TDS Returns (26Q / 24Q)","TDS Receivable"],
+  steps:["Check GST Summary for output tax, input credit and net payable.","Export GSTR-1 in portal format, upload it, and mark it filed.","Import GSTR-2B and match it with your purchase bills to see which input credit is safe to claim.","Use GSTR-3B figures to file the monthly return.","Record TDS challans, then generate 26Q (vendors) and 24Q (salary), plus Form 16A and Form 16."],
+  behind:"All figures come from posted journals and documents. Nothing is typed in twice.",
+  tip:"Lock the period after filing so filed numbers cannot move."},
+ {t:"Review & close",who:"Finance manager · Owner",
+  screens:["Dashboard","Trial Balance","Profit & Loss","Balance Sheet","Cash Flow","AR Aging","AP Aging","Fiscal Years & Periods"],
+  steps:["Check that the Trial Balance balances and nothing looks unusual.","Review Profit & Loss and Balance Sheet, and export them to PDF or Excel.","Follow up overdue customers from AR Aging and plan payments from AP Aging.","Close the period. At year end, close the fiscal year to carry profit into Retained Earnings."],
+  behind:"Reports include reversed entries together with their reversals, so totals always match the ledger.",
+  tip:"Run through the Month-end checklist tab before closing."}
+];
+const VOUCHERS=[
+ {n:"Payment Voucher",w:"Money goes out of cash or bank.",e:[["Dr","Rent Expense","25,000"],["Cr","HDFC Bank","25,000"]],ex:"Paid office rent"},
+ {n:"Receipt Voucher",w:"Money comes into cash or bank.",e:[["Dr","HDFC Bank","1,200"],["Cr","Interest Income","1,200"]],ex:"Bank credited FD interest"},
+ {n:"Contra Voucher",w:"Moves money between your own cash and bank accounts. No party, no income or expense.",e:[["Dr","HDFC Bank","50,000"],["Cr","Cash in Hand","50,000"]],ex:"Deposited cash in bank"},
+ {n:"Credit Note",w:"Reduces what a customer owes you.",e:[["Dr","Sales Returns / Discount","2,000"],["Dr","Output GST","360"],["Cr","Customer A/c","2,360"]],ex:"Price discount to Mehta Stores"},
+ {n:"Debit Note",w:"Reduces what you owe a vendor.",e:[["Dr","Vendor A/c","1,180"],["Cr","Purchases","1,000"],["Cr","Input GST","180"]],ex:"Short supply from Kumar Metals"},
+ {n:"Sales / Purchase Voucher",w:"Records a sale or purchase directly in Accounting, for companies not using the Sales or Purchase module.",e:[["Dr","Customer A/c","11,800"],["Cr","Sales","10,000"],["Cr","Output GST","1,800"]],ex:"Counter sale entered by accountant"},
+ {n:"Journal",w:"Any other adjustment that does not touch cash or bank directly.",e:[["Dr","Audit Fees Expense","40,000"],["Cr","Audit Fees Payable","40,000"]],ex:"Year-end provision"}
+];
+// Screen catalogue. crud: [C,R,U,D] — true, false, or a short note shown on hover/in table.
+// b: [button, what it does]. f: fields on the form. flow: status steps.
+const RPT_BTNS=[["View / Apply","Runs the report for the filters you chose."],["Reset","Clears the filters back to the default period."],["PDF","Downloads the report as shown, with your filters, as a PDF."],["Excel","Downloads the same report as an Excel file for further working."]];
+const VCH=(name,use,party)=>({g:"Daily entry",n:name+"s",who:"Accountant",path:"Accounting › "+name+"s",
+  p:use,crud:[true,true,"No. Reverse instead","No. Reverse instead"],
+  f:["Date","Party Name"+(party?"":" (optional)"),"Reference No.","Payment Method","Memo","Lines: Account · Cost Center · Project · Description · Debit · Credit"],
+  b:[["New "+name,"Opens a blank "+name.toLowerCase()+" form."],["Filters: Status · Posted by · From · To","Narrows the list. Apply runs the filter, Reset clears it."],["Add Line","Adds another account line to the entry."],["Clone this line","Copies a line, useful when only the amount changes."],["Remove this line","Deletes that line from the form before saving."],["Post "+name,"Saves and posts. The button stays disabled until total debit equals total credit. Above the approval limit it goes to Pending Approvals instead."],["Discard / Cancel","Leaves the form without saving."],["Open (row)","Shows the posted entry with all its lines."],["Approve & post","Shown to an approver on a held entry. Posts it."],["Reject","Shown to an approver. Sends the entry back with a reason."],["Reverse "+name,"Posts an equal and opposite entry dated as you choose. The original stays visible, marked Reversed."]],
+  flow:["Draft / Pending approval","Posted","Reversed"],
+  tip:"Against a customer or vendor, a side panel asks which bills this amount settles. Choose bills, use “Settle oldest bills first”, or leave it On Account."});
+const SCREENS=[
+ {g:"Overview",n:"Dashboard",who:"Owner · Finance manager",path:"Accounting › Dashboard",
+  p:"One page with cash and bank balances, receivables, payables, profit trend, expense mix, GST due, budgets, pending approvals and close status.",
+  crud:[false,true,"Layout only",false],f:["Period / date filters","Consolidated or single company"],
+  b:[["New Journal","Shortcut to a blank journal."],["Export","Downloads the dashboard as PDF or Excel."],["Print","Opens a print-ready version."],["Custom","Lets you add, move, resize and remove widgets. Your layout is saved for you."],["Widget links","Each card links to the report behind its number."]],
+  tip:"Different roles see different tabs, so the owner and the accountant each see what matters to them."},
+
+ {g:"Masters & setup",n:"Chart of Accounts",who:"Finance admin",path:"Accounting › Chart of Accounts",
+  p:"The list of every account the company uses (cash, bank, customers, sales, expenses and so on). Every entry in the system posts to these accounts.",
+  crud:[true,true,true,"Only if unused and not a system account"],
+  f:["Code","Name","Type (Asset / Liability / Equity / Income / Expense)","Subtype","Parent account","Ledger group","Normal balance","Opening balance + Dr/Cr","Cash or bank account","Track bill by bill","Description","Active"],
+  b:[["New Account","Opens the account form in a pop-up."],["Apply / Reset","Filters the list by type, group or text, or clears the filter."],["Edit (pencil)","Opens the same form to change name, group, opening balance and so on."],["Delete (bin)","Removes the account. Refused for system accounts and for any account with posted entries. Mark it inactive instead."]],
+  tip:"A standard Indian chart is created for every new company. Turn on “Track bill by bill” for customer and vendor accounts so payments can be matched to invoices."},
+ {g:"Masters & setup",n:"Ledger Groups",who:"Finance admin",path:"Accounting › Ledger Groups",
+  p:"Headings that group accounts together, such as Current Assets or Indirect Expenses. They decide where an account appears in the Balance Sheet and P&L.",
+  crud:[true,true,true,"Only if no accounts or sub-groups use it"],f:["Code","Name","Nature","Parent group","Active"],
+  b:[["Create Ledger Group","Saves the new group."],["Edit","Changes name, nature or parent."],["Delete","Refused while any account or sub-group is under it."],["Cancel","Closes the form without saving."]]},
+ {g:"Masters & setup",n:"Cost Centers",who:"Finance admin",path:"Accounting › Cost Centers",
+  p:"Branches, departments or projects you want to see profit and cost for. Pick one on any journal line.",
+  crud:[true,true,true,"Only if no entries use it"],f:["Code","Name","Description","Active"],
+  b:[["Create Cost Center","Saves the new cost center."],["Edit","Changes its details."],["Delete","Refused once any journal line uses it. Make it inactive instead."]]},
+ {g:"Masters & setup",n:"Fiscal Years & Periods",who:"Finance admin",path:"Accounting › Fiscal Years & Periods",
+  p:"Creates the financial year and its monthly periods, and controls which months are open for posting.",
+  crud:[true,true,false,false],f:["Name (e.g. FY 2026-27)","Start date","End date"],
+  b:[["New Fiscal Year","Creates the year and its 12 monthly periods."],["Close (period)","Stops ordinary posting into that month."],["Lock (period)","Makes the month final. A locked month cannot be reopened."],["Reopen (period)","Opens a closed month again for a late correction."],["Close (year)","Moves the year's profit or loss into Retained Earnings and closes the year."],["Reopen (year)","Undoes a year close if a correction is needed."]],
+  flow:["Open","Closed","Locked"]},
+ {g:"Masters & setup",n:"Tax Rates",who:"Finance admin",path:"Accounting › Tax Rates",
+  p:"GST and other tax rates used on invoices, bills and vouchers, with the account each tax posts to.",
+  crud:[true,true,true,true],f:["Name","Type","Rate %","Tax payable account","Compound tax","Active"],
+  b:[["Create Tax Rate","Saves a new rate."],["Edit","Changes the rate or its account."],["Delete","Removes the rate."]]},
+ {g:"Masters & setup",n:"TDS Setup",who:"Finance admin · Tax accountant",path:"Accounting › TDS Setup",
+  p:"TDS sections with their rates and limits, and your company's deductor details used on returns and certificates.",
+  crud:[false,true,true,false],f:["Section: Name · Nature of payment · Rate for Individual/HUF · Rate for Others · Rate without PAN · Single bill limit · Yearly limit · Deduct only above limit (194Q) · Active","Deductor: TAN · Name · Type · PAN · Responsible person · Designation · PAN · Address · City · State · PIN · Email · Phone"],
+  b:[["Save section","Saves the rate and limits for that TDS section."],["Save details","Saves your deductor details."],["Cancel","Closes the section form."]]},
+ {g:"Masters & setup",n:"Asset Categories",who:"Finance admin",path:"Accounting › Asset Categories",
+  p:"Groups of fixed assets (machinery, vehicles, computers) with the accounts and the depreciation method they use.",
+  crud:[true,true,true,"Only if no assets are linked"],f:["Name","Description","Fixed asset account","Accumulated depreciation account","Depreciation expense account","Gain on disposal account","Loss on disposal account","Default method","Useful life (months)","Production machinery"],
+  b:[["Add Category","Opens the category form."],["Save Changes","Saves a new or edited category."],["Delete","Refused while any asset belongs to it."],["Asset Register","Goes to the asset list."]]},
+ {g:"Masters & setup",n:"Bank Rules",who:"Accountant",path:"Accounting › Bank Rules",
+  p:"Rules that recognise recurring bank-statement lines, such as monthly bank charges, so reconciliation matches or posts them automatically.",
+  crud:[true,true,true,true],f:["Name","Priority","Bank account","Match type","Text to match","Money in / out","Min and max amount","Post to account","Party","Narration","Post automatically","Active"],
+  b:[["New Rule","Opens the rule form."],["Save rule","Saves it. It applies from the next auto-match."],["Pause / Activate","Turns a rule off or on without deleting it."],["Delete","Removes the rule."],["Bank Reconciliation","Goes back to reconciliation."]]},
+
+ VCH("Payment Voucher","Records money paid out of cash or bank: rent, utilities, a vendor paid outside the Purchase module.",false),
+ VCH("Receipt Voucher","Records money received into cash or bank that is not a Sales receipt: interest, refunds, capital.",false),
+ Object.assign(VCH("Contra Voucher","Moves money between your own cash and bank accounts: deposit, withdrawal, bank-to-bank transfer.",false),{tip:"No party and no income or expense. Only cash and bank accounts."}),
+ VCH("Credit Note","Reduces what a customer owes: discounts, price corrections, goods taken back outside the Sales module.",true),
+ VCH("Debit Note","Reduces what you owe a vendor: short supply, price difference.",true),
+ VCH("Sales Voucher","Records a sale directly in Accounting, for companies not using the Sales module.",true),
+ VCH("Purchase Voucher","Records a purchase directly in Accounting, for companies not using the Purchase module.",true),
+ Object.assign(VCH("Journal","Any balanced adjustment: opening balances, accruals, provisions, reclassifications.",false),
+  {n:"Journals",path:"Accounting › Journals",f:["Journal Date","Memo","Lines: Account · Cost Center · Project · Description · Debit · Credit"],
+   tip:"The Journals list shows every entry in the system, including those posted automatically from Sales, Purchase, Inventory and HRMS. Filter by Source to see where each came from."}),
+ {g:"Daily entry",n:"Bill Settlement",who:"Accountant",path:"Accounting › Bill Settlement",
+  p:"Matches payments and receipts to the exact invoices or bills they pay, so aging and outstanding reports are bill by bill. Also splits an opening balance into its individual bills.",
+  crud:[true,true,false,"Undo a settlement"],f:["Party","Settled on","Note","Amount per bill"],
+  b:[["Auto-match oldest first","Fills the oldest open bills first with the available amount."],["Clear","Empties the amounts you entered."],["Save","Saves the settlement. Those bills now show as paid."],["Undo","Removes a saved settlement. The bills become open again."],["Add bill / Save breakup","Splits an opening balance into separate bills with their dates."],["Make it one bill again","Joins a split opening balance back into one amount."]]},
+
+ {g:"Control",n:"Pending Approvals",who:"Finance manager (approver)",path:"Accounting › Pending Approvals",
+  p:"Manual journals and vouchers above the approval limit wait here until a second person approves them. They are not in the books until then.",
+  crud:[false,true,false,false],f:["Settings: Approval on/off · Amount limit · Approvers may post without approval"],
+  b:[["Approve","Posts the entry into the period that is open on its date today."],["Reject","Opens a box for the reason, then sends it back to the person who entered it."],["Save settings","Saves the approval limit and rules for the company."]],
+  flow:["Pending approval","Posted or Rejected"],
+  tip:"The person who entered an entry can never approve it."},
+ {g:"Control",n:"Posting Failures",who:"Accountant",path:"Accounting › Posting Failures",
+  p:"Automatic entries from other modules that could not post, usually because an account is missing in the Chart of Accounts. The source document is still saved.",
+  crud:[false,true,false,"Dismiss"],f:["Filter: Source"],
+  b:[["Retry","Tries the posting again after you fix the cause."],["Dismiss","Removes the item from the list without posting, when you have handled it another way."],["Apply / Reset","Filters by source module."]]},
+ {g:"Control",n:"Audit Trail",who:"Finance manager · Auditor",path:"Accounting › Audit Trail",
+  p:"A permanent record of who created, approved, rejected or reversed every entry and changed every master, with date and time.",
+  crud:[false,true,false,false],f:["Subject","Event"],b:RPT_BTNS},
+ {g:"Control",n:"Vouchers by Staff",who:"Finance manager",path:"Accounting › Vouchers by Staff",
+  p:"How many entries each user posted and their total value, for a date range.",crud:[false,true,false,false],f:["From","To"],b:RPT_BTNS},
+
+ {g:"Bank & assets",n:"Bank Reconciliation",who:"Accountant",path:"Accounting › Bank Reconciliation",
+  p:"Matches your bank statement with your book entries for a month, so you know every bank line is recorded and the bank balance agrees.",
+  crud:[true,true,"Period and balances while open","Statement lines and uploads"],
+  f:["Bank account","Statement from date","Statement date","Opening balance","Closing balance","Notes"],
+  b:[["New Reconciliation","Starts a reconciliation for a bank account and month."],["Start Reconciliation","Saves the period and balances and opens the workspace."],["Upload","Imports the bank statement (Excel, CSV or PDF)."],["Import with this mapping","First time only: tells the system which column is date, amount and narration."],["Auto-Match","Pairs statement lines with book entries of the same amount and nearby date, and applies Bank Rules."],["Match","Links a statement line to a book entry you pick."],["Record & Match / Post & Match","Creates the missing entry (bank charges, interest, a deposit) and matches it in one step."],["Split across several ledgers","Splits one bank line across more than one account."],["Unmatch","Breaks a wrong match."],["Post selected… / Delete selected","Posts or removes several statement lines at once."],["Remove (upload)","Deletes an uploaded statement file and its lines."],["Edit period / balances","Corrects the dates or opening and closing balances."],["Complete & Lock","Finishes the month once the difference is zero."],["Reopen","Unlocks a completed reconciliation."],["BRS","Downloads the Bank Reconciliation Statement as PDF or Excel."]],
+  flow:["In progress","Completed"],
+  tip:"Tabs inside the workspace: Statement Lines (All / Unmatched / Matched), Reconciliation Statement, and Uploads."},
+ {g:"Bank & assets",n:"Fixed Asset Register",who:"Accountant",path:"Accounting › Fixed Asset Register",
+  p:"Every fixed asset with its cost, depreciation so far, book value, location and history. Assets bought through Purchase appear here automatically.",
+  crud:[true,true,false,"Use Disposal or Write-off"],f:["Asset Category","Asset Name","Description","Brand","Model Number","Asset Code","Serial Number","Condition","Purchase Date","Purchase Cost","Notes"],
+  b:[["Register Asset","Adds an asset by hand."],["View","Opens the asset's full history."],["Capitalize Asset","Sets the date it was put to use so depreciation starts."],["Post capitalization entry","Posts the journal that moves its cost into the fixed asset account."],["Asset Categories","Goes to the categories list."],["Apply / Reset","Filters by category or status."]],
+  flow:["Registered","Capitalized","Disposed / Written off"]},
+ {g:"Bank & assets",n:"Depreciation",who:"Accountant · Finance manager",path:"Accounting › Depreciation",
+  p:"Calculates and posts monthly depreciation for all capitalised assets.",
+  crud:["Generate",true,false,false],f:["Month","Year"],
+  b:[["Generate for month","Calculates depreciation for every eligible asset for that month."],["Review","Marks the schedule as checked."],["Approve","Approves the reviewed schedule."],["Post","Posts the depreciation journal into the books."]],
+  flow:["Generated","Reviewed","Approved","Posted"],
+  tip:"Assets that were sold or written off are left out automatically."},
+ ...[["Asset Disposals","Sale or scrapping of an asset. Calculates the gain or loss against its book value and posts it.",["Asset","Disposal Date","Disposal Type","Sale Proceeds (excl. GST)","GST Charged","GST Type","Remarks"],"New Disposal"],
+     ["Asset Write-offs","Removes a lost, stolen or destroyed asset from the books, charging its book value as a loss.",["Asset","Write-off Date","Reason"],"New Write-off"],
+     ["Asset Revaluations","Changes an asset's value up or down, and optionally its remaining life and residual value.",["Asset","Revaluation Date","Revalued Amount","Revised useful life (months)","Revised residual value","Reason"],"New Revaluation"]]
+   .map(([n,p,f,nb])=>({g:"Bank & assets",n,who:"Accountant (maker) · Finance manager (approver)",path:"Accounting › "+n,p,
+     crud:[true,true,false,false],f,
+     b:[[nb,"Opens the form."],["Submit for Approval","Saves it and sends it to an approver."],["Discard / Cancel","Leaves without saving."],["Approve","Approver accepts it."],["Reject","Approver refuses it with a reason."],["Post","Posts the journal and updates the asset."]],
+     flow:["Pending approval","Approved","Posted"]})),
+ {g:"Bank & assets",n:"Budgets",who:"Finance manager",path:"Accounting › Budgets",
+  p:"Yearly spending or income targets by account, used in Budget vs Actual.",
+  crud:[true,true,"Draft only","Draft only"],f:["Budget Name","Fiscal Year","Lines: Account · Amount"],
+  b:[["New Budget","Opens a blank budget."],["Add a line","Adds an account and amount."],["Clone / Remove this line","Copies or deletes a line."],["Save / Discard","Saves the budget as draft or leaves without saving."],["Edit","Changes a draft budget."],["Approve","Locks the budget. Approved budgets cannot be edited or deleted."],["Delete","Removes a draft budget."],["View vs Actual","Opens Budget vs Actual for this budget."]],
+  flow:["Draft","Approved"]},
+
+ ...[["Day Book","Every entry posted on a date, in order.",["Date"]],
+     ["Cash Book","All movements of a cash account with running balance.",["Account","From","To"]],
+     ["Bank Book","All movements of one bank account with running balance.",["Account","From","To"]],
+     ["General Ledger","Every entry in one account with running balance. Click an entry to open it.",["Accounting Period","Account"]],
+     ["Party Ledger","Statement for one customer, vendor, transporter or employee. Send it to the party to confirm balances.",["Party type","Party","From","To"]],
+     ["Trial Balance","Closing balance of every account. Total debit must equal total credit.",["Show","Accounting Period","Cost Center","Project"]],
+     ["Profit & Loss","Income minus expenses for the period, giving net profit or loss.",["Accounting Period"]],
+     ["Balance Sheet","What the company owns and owes on a date: assets, liabilities and equity.",["As of Accounting Period"]],
+     ["Cash Flow","Where cash came from and where it went: operating, investing, financing.",["Accounting Period"]],
+     ["AR Aging","Customer dues grouped by how overdue they are: 0–30, 31–60, 61–90, 90+ days.",["As Of Date","Age By (invoice or due date)"]],
+     ["AP Aging","Vendor dues grouped by how overdue they are.",["As Of Date","Age By"]],
+     ["Bills Outstanding","Every unpaid invoice or bill, party by party.",["Show","Party Type","Party","As Of Date"]],
+     ["Budget vs Actual","Approved budget compared with actual spending, with the difference.",["Budget"]]]
+   .map(([n,p,f])=>({g:"Books & reports",n,who:"Accountant · Finance manager",path:"Accounting › "+n,p,crud:[false,true,false,false],f,
+     b:n==="Bills Outstanding"?RPT_BTNS.slice(0,2):RPT_BTNS})),
+
+ ...[["GST Summary","Output GST on sales, input GST on purchases, and the net amount payable.",["From","To"]],
+     ["GSTR-1","Outward supplies return built from your posted sales.",["From","To"]],
+     ["GSTR-3B","Monthly summary return figures.",["From","To"]]]
+   .map(([n,p,f])=>({g:"GST & TDS",n,who:"Tax accountant",path:"Accounting › "+n,p,crud:[false,true,false,false],f,b:RPT_BTNS})),
+ {g:"GST & TDS",n:"Upload GST Returns",who:"Tax accountant",path:"Accounting › Upload GST Returns",
+  p:"Prepares GSTR-1 in the GST portal's format, section by section (B2B, B2C, HSN summary, documents issued), and tracks its filing status.",
+  crud:[false,true,"Filing status",false],f:["Return period","Section"],
+  b:[["Show","Loads the return for the chosen period."],["Export (Offline)","Downloads the JSON file for the GST offline tool or portal."],["Send (Online)","Prepares the online upload."],["Mark as Uploaded","Records that this period has been uploaded."],["Delete (from portal)","Records a delete request for entries already on the portal."],["Reset Delete Request / Reset Upload Status","Undoes those status changes."],["GSTR-1 Report","Opens the read-only GSTR-1 report."]]},
+ {g:"GST & TDS",n:"GSTR-2B Reconciliation",who:"Tax accountant",path:"Accounting › GSTR-2B Reconciliation",
+  p:"Imports the GSTR-2B file from the portal and matches it with your purchase bills, so you claim only the input credit your suppliers have reported.",
+  crud:["Upload file",true,false,"Remove import"],f:["GSTR-2B file"],
+  b:[["Upload & match","Imports the file and matches it with your bills."],["Open","Shows matched, mismatched and missing invoices."],["Re-run matching","Matches again after you fix a bill."],["Remove","Deletes this import. Your bills are not affected."],["Search","Finds a supplier or invoice in the results."]]},
+ {g:"GST & TDS",n:"TDS Register & Challans",who:"Tax accountant",path:"Accounting › TDS Register & Challans",
+  p:"All TDS deducted on vendor payments and salary, and the challans you paid to the government.",
+  crud:["Record challan",true,false,false],f:["Challan serial no.","BSR code","Deposit date","Paid from (bank)","Interest","Late fee (234E)","Notes"],
+  b:[["Show / Reset","Filters the register by period or section."],["Record challan & post","Saves the challan and posts the payment from TDS Payable to bank."]]},
+ {g:"GST & TDS",n:"TDS Returns (26Q / 24Q)",who:"Tax accountant",path:"Accounting › TDS Returns",
+  p:"Quarterly TDS returns: 26Q for vendors and 24Q for salary, plus Form 16A and Form 16 certificates.",
+  crud:[false,true,false,false],f:["Return type","Quarter"],
+  b:[["Show","Builds the return for the quarter."],["PDF / Excel","Downloads the return."],["Form 16A","Downloads the certificate for a vendor."],["Form 16","Downloads the salary certificate for an employee."]]},
+ {g:"GST & TDS",n:"TDS Receivable",who:"Accountant",path:"Accounting › TDS Receivable",
+  p:"TDS your customers deducted from their payments to you. Track whether you have received their certificate so you can claim it.",
+  crud:[false,true,"Certificate status",false],f:["Customer","Period"],
+  b:[["Show / Reset","Filters the list."],["Certificate received","Marks or unmarks that the customer's TDS certificate has arrived."]]}
+];
+const DEMO=[
+ ["0:00","Dashboard","Open on the Accounting Dashboard and point out cash, receivables, payables and this month's profit.","“This is what the owner sees every morning, with no reports to run.”"],
+ ["2:00","Chart of Accounts","Show the ready-made Indian chart and add one bank account live.","“Your books are ready on day one. You only add what is specific to you.”"],
+ ["4:00","Purchase bill → Journal","Post a purchase bill in Purchase, then open Journals and show the entry it created.","“Your purchase team never touches accounting, but the books are already up to date.”"],
+ ["6:00","Sales invoice → Party Ledger","Post a sales invoice, then open the customer's Party Ledger with the new balance.","“GST is split correctly for intra- and inter-state sales automatically.”"],
+ ["8:00","Receipt + Bill Settlement","Record the customer payment against that invoice and show the bill closing in Bills Outstanding.","“You always know which invoice is paid, not just a running balance.”"],
+ ["10:00","Payment Voucher + Approval","Enter a large expense voucher, then log in as the manager and approve it.","“Big entries need a second person. The maker can never approve their own.”"],
+ ["12:00","Bank Reconciliation","Upload a sample statement, press Auto-match, then Create & Match one bank charge.","“A month's reconciliation in a few minutes.”"],
+ ["15:00","GST Summary → GSTR-1","Show net GST payable, then export the GSTR-1 file.","“The return comes straight from your invoices, with no re-typing.”"],
+ ["17:00","Trial Balance → P&L → Balance Sheet","Walk down from Trial Balance to the statements and export a PDF.","“Your CA gets audit-ready statements whenever they ask.”"],
+ ["19:00","Period close + Audit Trail","Close the month, then show the Audit Trail for one entry.","“Once a month is closed nothing changes quietly, and every change is recorded.”"]
+];
+const CHECKS=[
+ ["Clear Posting Failures","Every automatic entry has posted."],
+ ["Clear Pending Approvals","No manual entry is left waiting."],
+ ["Complete bank reconciliation for every bank account","The difference is zero."],
+ ["Count cash and match it with the Cash Book",""],
+ ["Generate, approve and post depreciation",""],
+ ["Pass accruals and provisions by Journal","Salary, rent, audit fees, interest."],
+ ["Match GSTR-2B with purchase bills","Follow up suppliers who have not filed."],
+ ["File GSTR-1 and GSTR-3B; mark filed",""],
+ ["Deposit TDS and record challans","Due on the 7th of the next month."],
+ ["Check the Trial Balance balances and review unusual balances",""],
+ ["Review AR Aging and send reminders",""],
+ ["Export P&L and Balance Sheet for management",""],
+ ["Close the period (lock it after filing or audit)",""]
+];
+const $=s=>document.querySelector(s);
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// Cycle
+const st=$("#stages");
+STAGES.forEach((s,i)=>{const b=document.createElement("button");b.className="stage";b.type="button";b.setAttribute("aria-pressed",i===0);
+ b.innerHTML=`<h3>${esc(s.t)}</h3><span class="who">${esc(s.who)}</span>`;b.onclick=()=>showStage(i);st.appendChild(b);});
+function showStage(i){const s=STAGES[i];[...st.children].forEach((b,j)=>b.setAttribute("aria-pressed",j===i));
+ $("#stageDetail").innerHTML=`<div><span class="eyebrow">Stage ${i+1} of 8 · ${esc(s.who)}</span><h2 style="margin-top:6px">${esc(s.t)}</h2></div>
+ <div class="chips">${s.screens.map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div>
+ <div class="cols"><div style="display:grid;gap:8px"><span class="eyebrow">Steps</span><ol>${s.steps.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>
+ <div style="display:grid;gap:12px;align-content:start"><div style="display:grid;gap:6px"><span class="eyebrow">What happens in the books</span><p>${esc(s.behind)}</p></div>
+ ${s.tip?`<p class="note">${esc(s.tip)}</p>`:""}</div></div>`;}
+showStage(0);
+
+// Vouchers
+$("#vgrid").innerHTML=VOUCHERS.map(v=>`<div class="vcard"><h3>${esc(v.n)}</h3><p>${esc(v.w)}</p>
+ <div class="entry"><div style="color:var(--muted)"><span>${esc(v.ex)}</span><span>₹</span></div>${v.e.map(([s,a,n])=>`<div class="${s==="Cr"?"c":""}"><span><span class="tag ${s.toLowerCase()}">${s}</span> ${esc(a)}</span><span>${n}</span></div>`).join("")}</div></div>`).join("");
+
+// Screens
+let cur=0;
+const opCell=v=>v===true?'<span class="op on">✓</span>':v===false?'<span class="op">–</span>':`<span class="op on" title="${esc(v)}">✓</span>`;
+const opNote=v=>typeof v==="string"?`<small style="display:block;color:var(--muted);font-size:11px">${esc(v)}</small>`:"";
+function renderIndex(q){q=q.trim().toLowerCase();let html="",last="";
+ SCREENS.forEach((s,i)=>{const hay=(s.n+" "+s.p+" "+s.g+" "+s.b.map(x=>x.join(" ")).join(" ")).toLowerCase();
+  if(q&&!hay.includes(q))return;
+  if(s.g!==last){html+=`<div class="g">${esc(s.g)}</div>`;last=s.g;}
+  html+=`<button type="button" data-i="${i}" aria-current="${i===cur}">${esc(s.n)}</button>`;});
+ $("#slists").innerHTML=html||`<p style="color:var(--muted);font-size:13px">Nothing matches “${esc(q)}”.</p>`;}
+function showScreen(i){cur=i;const s=SCREENS[i];
+ document.querySelectorAll("#slists button").forEach(b=>b.setAttribute("aria-current",+b.dataset.i===i));
+ const L=["C","R","U","D"];
+ $("#sdetail").innerHTML=`<div class="head"><span class="eyebrow">${esc(s.g)}</span><h2>${esc(s.n)}</h2><span class="path">${esc(s.path)}</span></div>
+ <p>${esc(s.p)}</p>
+ <div class="meta"><span><b>Used by:</b> ${esc(s.who)}</span>
+  <span class="crud">${s.crud.map((v,j)=>`<span class="op ${v?"on":""}" title="${esc(["Create","View","Edit","Delete"][j]+(typeof v==="string"?": "+v:v?"":": not allowed"))}">${L[j]}</span>`).join("")}</span></div>
+ ${s.crud.some(v=>typeof v==="string")?`<p style="font-size:13px;color:var(--muted)">${s.crud.map((v,j)=>typeof v==="string"?`<b>${["Create","View","Edit","Delete"][j]}:</b> ${esc(v)}`:"").filter(Boolean).join(" · ")}</p>`:""}
+ ${s.flow?`<div><h4>Status flow</h4><div class="flowline">${s.flow.map(x=>`<span class="s">${esc(x)}</span>`).join('<span class="a">→</span>')}</div></div>`:""}
+ ${s.f&&s.f.length?`<div><h4>${s.crud[0]||s.crud[2]?"Fields on the form":"Filters"}</h4><div class="fields">${s.f.map(x=>`<span>${esc(x)}</span>`).join("")}</div></div>`:""}
+ <div><h4>Buttons and what they do</h4><div class="btnlist">${s.b.map(([b,d])=>`<div><span class="ui-btn">${esc(b)}</span><span>${esc(d)}</span></div>`).join("")}</div></div>
+ ${s.tip?`<p class="note">${esc(s.tip)}</p>`:""}`;}
+$("#slists").addEventListener("click",e=>{const b=e.target.closest("button[data-i]");if(!b)return;showScreen(+b.dataset.i);
+ if(window.innerWidth<=820)$("#sdetail").scrollIntoView({behavior:"smooth",block:"start"});});
+$("#q").addEventListener("input",e=>{renderIndex(e.target.value);});
+renderIndex("");showScreen(0);
+$("#crudTable tbody").innerHTML=SCREENS.map(s=>{const other=s.b.map(x=>x[0]).filter(x=>!/^(New |Create |Add |Edit|Delete|Apply|Reset|Cancel|Discard|Save$|View|Show|PDF|Excel|Filters|Open|Clone|Remove this)/.test(x)).slice(0,5).join(", ");
+ return `<tr><td><b>${esc(s.n)}</b></td>${s.crud.map(v=>`<td class="c">${opCell(v)}${opNote(v)}</td>`).join("")}<td>${esc(other)||'<span style="color:var(--muted)">–</span>'}</td></tr>`}).join("");
+
+// Demo
+$("#demoSteps").innerHTML=DEMO.map(([t,s,d,say])=>`<div class="dstep"><span class="t">${t}</span><div class="body"><h3>${esc(s)}</h3><p>${esc(d)}</p><p class="say">${esc(say)}</p></div></div>`).join("");
+
+// Checklist
+const KEY="acct-close-checks";let saved={};try{saved=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){}
+function renderChecks(){$("#checklist").innerHTML=CHECKS.map(([t,s],i)=>`<label for="ck${i}"><input type="checkbox" id="ck${i}" data-i="${i}" ${saved[i]?"checked":""}><span>${esc(t)}${s?`<small>${esc(s)}</small>`:""}</span></label>`).join("");}
+renderChecks();
+$("#checklist").addEventListener("change",e=>{const i=e.target.dataset.i;saved[i]=e.target.checked;try{localStorage.setItem(KEY,JSON.stringify(saved))}catch(err){}});
+$("#resetChecks").onclick=()=>{saved={};try{localStorage.removeItem(KEY)}catch(e){}renderChecks();};
+
+// Tabs
+const tabs=[...document.querySelectorAll("nav.tabs button")];
+function show(v){if(!document.getElementById(v))v="cycle";tabs.forEach(b=>b.setAttribute("aria-selected",b.dataset.view===v));
+ document.querySelectorAll("section.view").forEach(s=>s.hidden=s.id!==v);}
+tabs.forEach(b=>b.onclick=()=>{show(b.dataset.view);try{history.replaceState(null,"","#"+b.dataset.view)}catch(e){}});
+show(location.hash.slice(1)||"cycle");
+</script>

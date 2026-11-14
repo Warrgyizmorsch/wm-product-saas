@@ -219,8 +219,39 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             ->get();
         $penalties = \App\Domains\HRMS\Models\EmployeePenalty::where('employee_id', $employee->id)->get();
 
-        $documents = \App\Domains\HRMS\Models\Document::where('documentable_type', Employee::class)
+        $tenantId = tenant_id() ?? $employee->tenant_id ?? 1;
+        $requiredMasters = \App\Domains\HRMS\Models\DocumentMaster::where('status', 'active')
+            ->where('is_required', true)
+            ->get();
+
+        foreach ($requiredMasters as $rm) {
+            $exists = \App\Domains\HRMS\Models\Document::where('documentable_type', Employee::class)
+                ->where('documentable_id', $employee->id)
+                ->where(function ($q) use ($rm) {
+                    $q->where('document_master_id', $rm->id)
+                      ->orWhere('name', $rm->name);
+                })
+                ->exists();
+
+            if (!$exists) {
+                \App\Domains\HRMS\Models\Document::create([
+                    'tenant_id'          => $tenantId,
+                    'documentable_type'  => Employee::class,
+                    'documentable_id'    => $employee->id,
+                    'document_master_id' => $rm->id,
+                    'name'               => $rm->name,
+                    'description'        => $rm->description,
+                    'status'             => 'requested',
+                    'has_expiry'         => (bool) $rm->expiry_applicable,
+                    'requires_signature' => (bool) $rm->requires_signature,
+                ]);
+            }
+        }
+
+        $documents = \App\Domains\HRMS\Models\Document::with(['documentMaster.category', 'requestedBy', 'signedBy'])
+            ->where('documentable_type', Employee::class)
             ->where('documentable_id', $employee->id)
+            ->orderBy('id', 'desc')
             ->paginate(10, ['*'], 'doc_page')
             ->withQueryString();
 
@@ -277,11 +308,11 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         $validated['status'] = $request->input('status', '1') === '1';
 
         if ($request->hasFile('photo')) {
-            $validated['photo'] = $request->file('photo')->store('employees', 'public');
+            $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
         }
 
         if ($request->hasFile('resume')) {
-            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'local');
+            $validated['resume_path'] = $request->file('resume')->storeTenantFile('employees/resumes', 'local');
         }
 
         $userIdInput = $validated['user_id'] ?? $request->input('user_id');
@@ -333,7 +364,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             if ($employee->photo) {
                 Storage::disk('public')->delete($employee->photo);
             }
-            $validated['photo'] = $request->file('photo')->store('employees', 'public');
+            $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
         }
 
         if ($request->hasFile('resume')) {
@@ -345,7 +376,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
                     Storage::disk('public')->delete($employee->resume_path);
                 }
             }
-            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'local');
+            $validated['resume_path'] = $request->file('resume')->storeTenantFile('employees/resumes', 'local');
         }
 
         $updated = $employee->update($validated);

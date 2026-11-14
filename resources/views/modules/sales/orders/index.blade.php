@@ -161,15 +161,22 @@
                                 <span class="fw-bold text-dark">{{ $order->customer?->name ?? '—' }}</span>
                             </td>
                             <td>
-                                <span class="badge {{ $billingStatusBadge }} px-2 py-1 fs-11 fw-bold">
-                                    @if($billingStatusLabel === 'Open') {{ __('crm.status_open') }}
-                                    @elseif($billingStatusLabel === 'Partially Invoiced') {{ __('crm.status_partially_invoiced') }}
-                                    @elseif($billingStatusLabel === 'Fully Invoiced') {{ __('crm.status_fully_invoiced') }}
-                                    @elseif($billingStatusLabel === 'Cancelled') {{ __('crm.status_cancelled') }}
-                                    @else {{ $billingStatusLabel }}
-                                    @endif
-                                </span>
-                                <small class="text-muted d-block fs-10 mt-0.5">{{ __('crm.so_state') }} {{ $order->status }}</small>
+                                @if($order->status === 'Completed')
+                                    <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-1 fs-11 fw-bold">
+                                        <i class="feather-check-circle me-1"></i>Completed
+                                    </span>
+                                    <small class="text-muted d-block fs-10 mt-0.5">{{ __('crm.status_fully_invoiced') }}</small>
+                                @else
+                                    <span class="badge {{ $billingStatusBadge }} px-2 py-1 fs-11 fw-bold">
+                                        @if($billingStatusLabel === 'Open') {{ __('crm.status_open') }}
+                                        @elseif($billingStatusLabel === 'Partially Invoiced') {{ __('crm.status_partially_invoiced') }}
+                                        @elseif($billingStatusLabel === 'Fully Invoiced') {{ __('crm.status_fully_invoiced') }}
+                                        @elseif($billingStatusLabel === 'Cancelled') {{ __('crm.status_cancelled') }}
+                                        @else {{ $billingStatusLabel }}
+                                        @endif
+                                    </span>
+                                    <small class="text-muted d-block fs-10 mt-0.5">{{ __('crm.so_state') }} {{ $order->status }}</small>
+                                @endif
                             </td>
                             <td class="text-end fw-bold text-dark">{{ format_currency($order->total_amount) }}</td>
                             <td class="text-end fw-bold text-success">{{ format_currency($invoicedAmt) }}</td>
@@ -177,7 +184,7 @@
                             
                             {{-- Send Status & Action Column --}}
                             <td class="text-center py-2">
-                                @if(in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped']))
+                                @if(in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped', 'Completed']))
                                     <span class="badge bg-soft-secondary text-secondary fs-10 fw-bold px-2 py-0.5 d-inline-block mb-1">{{ __('crm.status_sent') }}</span>
                                     @if($order->invoices && $order->invoices->count() > 0)
                                         <a href="{{ route('sales.orders.show', $order->id) }}#tab-invoices" class="d-block text-primary fs-11 fw-semibold text-decoration-underline">{{ __('crm.view_invoice_history') }}</a>

@@ -152,10 +152,19 @@
         
         <!-- Header -->
         <div class="header">
-            <div class="company-name">{{ $company->company_name ?? 'WARRGYIZMORSCH SAAS' }}</div>
+            <div class="company-name">{{ $company->company_name ?? $company->legal_name ?? config('app.name', 'ERP') }}</div>
             <div class="company-details">
-                {{ $company->address ?? 'Corporate Head Office, Tech Park Area' }}<br>
-                Email: {{ $company->email ?? 'finance@warrgyizmorsch.com' }} | Tel: {{ $company->phone ?? '+91 1800-PAYROLL' }}
+                @php
+                    $companyAddr = array_filter([$company->address ?? null, $company->city ?? null, $company->state ?? null, $company->postal_code ?? null]);
+                @endphp
+                @if(!empty($companyAddr))
+                    {{ implode(', ', $companyAddr) }}<br>
+                @endif
+                @if(!empty($company->email) || !empty($company->phone))
+                    @if(!empty($company->email))Email: {{ $company->email }}@endif
+                    @if(!empty($company->email) && !empty($company->phone)) | @endif
+                    @if(!empty($company->phone))Tel: {{ $company->phone }}@endif
+                @endif
             </div>
             <div class="slip-title">
                 Salary Slip<br>
@@ -176,25 +185,25 @@
                 </td>
                 <td width="25%">
                     <div class="info-label">Designation</div>
-                    <div class="info-value">{{ $employee->job_title }}</div>
+                    <div class="info-value">{{ $employee->job_title ?? $employee->designation?->name ?? '—' }}</div>
                 </td>
                 <td width="25%">
                     <div class="info-label">Department</div>
-                    <div class="info-value">{{ $employee->department->name ?? 'HR & General Admin' }}</div>
+                    <div class="info-value">{{ $employee->department?->name ?? '—' }}</div>
                 </td>
             </tr>
             <tr>
                 <td>
                     <div class="info-label">Bank Name</div>
-                    <div class="info-value">{{ $employee->bank_name ?? 'N/A' }}</div>
+                    <div class="info-value">{{ $employee->bank_name ?? '—' }}</div>
                 </td>
                 <td>
                     <div class="info-label">Account Number</div>
-                    <div class="info-value">{{ $employee->account_number ?? 'N/A' }}</div>
+                    <div class="info-value">{{ $employee->account_number ?? '—' }}</div>
                 </td>
                 <td>
                     <div class="info-label">PAN Number</div>
-                    <div class="info-value">{{ $employee->pan_number ?? '—' }}</div>
+                    <div class="info-value">{{ $employee->pan_card_number ?? $employee->pan_number ?? '—' }}</div>
                 </td>
                 <td>
                     <div class="info-label">UAN / PF Number</div>
@@ -208,7 +217,7 @@
                 </td>
                 <td>
                     <div class="info-label">Paid Days</div>
-                    <div class="info-value">{{ ($calc['total_days'] ?? 30) - ($calc['lop_days'] ?? 0) }} Days</div>
+                    <div class="info-value">{{ $calc['paid_days'] ?? (($calc['total_days'] ?? 30) - ($calc['lop_days'] ?? 0)) }} Days</div>
                 </td>
                 <td>
                     <div class="info-label">Loss of Pay (LOP)</div>
@@ -216,10 +225,16 @@
                 </td>
                 <td>
                     <div class="info-label">Salary Mode</div>
-                    <div class="info-value">Bank Transfer</div>
+                    <div class="info-value">{{ !empty($employee->account_number) ? 'Bank Transfer' : 'Cash / Cheque' }}</div>
                 </td>
             </tr>
         </table>
+
+        @php
+            $earningItems = array_filter($details, fn($i) => ($i['type'] ?? '') === 'earning');
+            $deductionItems = array_filter($details, fn($i) => ($i['type'] ?? '') === 'deduction');
+            $maxRows = max(count($earningItems), count($deductionItems), 3);
+        @endphp
 
         <!-- Earnings and Deductions Grid -->
         <table style="width: 100%; border-spacing: 0; margin-bottom: 20px;">
@@ -236,34 +251,16 @@
                         </thead>
                         <tbody>
                             @php $grossEarning = 0; @endphp
-                            @foreach($details as $item)
-                                @if(($item['type'] ?? '') === 'earning')
-                                    @php $grossEarning += ($item['calculated_value'] ?? 0); @endphp
-                                    <tr>
-                                        <td>{{ $item['name'] }}</td>
-                                        <td class="amount-col">&#8377;{{ number_format($item['calculated_value'] ?? 0, 2) }}</td>
-                                    </tr>
-                                @endif
+                            @foreach($earningItems as $item)
+                                @php $grossEarning += ($item['calculated_value'] ?? 0); @endphp
+                                <tr>
+                                    <td>{{ $item['name'] }}</td>
+                                    <td class="amount-col">&#8377;{{ number_format($item['calculated_value'] ?? 0, 2) }}</td>
+                                </tr>
                             @endforeach
 
-                            @if(($calc['adhoc_earnings'] ?? 0) > 0)
-                                @php $grossEarning += $calc['adhoc_earnings']; @endphp
-                                <tr>
-                                    <td>Ad-hoc Earnings (Bonus)</td>
-                                    <td class="amount-col">&#8377;{{ number_format($calc['adhoc_earnings'], 2) }}</td>
-                                </tr>
-                            @endif
-
-                            @if(($calc['retro_lop_reversals'] ?? 0) > 0)
-                                @php $grossEarning += $calc['retro_lop_reversals']; @endphp
-                                <tr>
-                                    <td>Retroactive LOP Refunds</td>
-                                    <td class="amount-col">&#8377;{{ number_format($calc['retro_lop_reversals'], 2) }}</td>
-                                </tr>
-                            @endif
-
                             <!-- Fill empty rows to align heights -->
-                            @for ($k = 0; $k < max(0, 5 - count($details)); $k++)
+                            @for ($k = 0; $k < ($maxRows - count($earningItems)); $k++)
                                 <tr>
                                     <td>&nbsp;</td>
                                     <td class="amount-col">&nbsp;</td>
@@ -272,7 +269,7 @@
 
                             <tr class="total-row">
                                 <td>Gross Earnings</td>
-                                <td class="amount-col">&#8377;{{ number_format($grossEarning, 2) }}</td>
+                                <td class="amount-col">&#8377;{{ number_format($calc['total_earnings'] ?? $grossEarning, 2) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -290,28 +287,16 @@
                         </thead>
                         <tbody>
                             @php $totalDeduction = 0; @endphp
-                            @foreach($details as $item)
-                                @if(($item['type'] ?? '') === 'deduction')
-                                    @php $totalDeduction += ($item['calculated_value'] ?? 0); @endphp
-                                    <tr>
-                                        <td>{{ $item['name'] }}</td>
-                                        <td class="amount-col">&#8377;{{ number_format($item['calculated_value'] ?? 0, 2) }}</td>
-                                    </tr>
-                                @endif
+                            @foreach($deductionItems as $item)
+                                @php $totalDeduction += ($item['calculated_value'] ?? 0); @endphp
+                                <tr>
+                                    <td>{{ $item['name'] }}</td>
+                                    <td class="amount-col">&#8377;{{ number_format($item['calculated_value'] ?? 0, 2) }}</td>
+                                </tr>
                             @endforeach
 
-                            @if(($calc['adhoc_deductions'] ?? 0) > 0)
-                                @php $totalDeduction += $calc['adhoc_deductions']; @endphp
-                                <tr>
-                                    <td>Ad-hoc Deductions</td>
-                                    <td class="amount-col">&#8377;{{ number_format($calc['adhoc_deductions'], 2) }}</td>
-                                </tr>
-                            @endif
-
-
-
                             <!-- Fill empty rows to align heights -->
-                            @for ($k = 0; $k < max(0, 5 - count($details)); $k++)
+                            @for ($k = 0; $k < ($maxRows - count($deductionItems)); $k++)
                                 <tr>
                                     <td>&nbsp;</td>
                                     <td class="amount-col">&nbsp;</td>
@@ -320,7 +305,7 @@
 
                             <tr class="total-row">
                                 <td>Total Deductions</td>
-                                <td class="amount-col">&#8377;{{ number_format($totalDeduction, 2) }}</td>
+                                <td class="amount-col">&#8377;{{ number_format($calc['total_deductions'] ?? $totalDeduction, 2) }}</td>
                             </tr>
                         </tbody>
                     </table>

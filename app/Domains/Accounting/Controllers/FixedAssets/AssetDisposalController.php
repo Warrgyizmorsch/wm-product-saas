@@ -63,11 +63,12 @@ class AssetDisposalController extends Controller
         abort_unless($this->policy->create($request->user()), 403);
 
         $validated = $request->validate([
-            'asset_id' => ['required', 'integer', 'exists:assets,id'],
+            'asset_id' => ['required', 'integer', tenant_exists('assets')],
             'disposal_type' => ['required', 'string', 'in:sale,scrap,lost'],
             'disposal_date' => ['required', 'date'],
             'sale_proceeds' => ['nullable', 'numeric', 'min:0'],
             'tax_amount' => ['nullable', 'numeric', 'min:0'],
+            'gst_type' => ['nullable', 'in:cgst_sgst,igst'],
             'remarks' => ['nullable', 'string', 'max:1000'],
         ]);
 

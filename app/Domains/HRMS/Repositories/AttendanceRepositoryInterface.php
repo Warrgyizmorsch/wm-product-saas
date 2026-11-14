@@ -10,11 +10,13 @@ interface AttendanceRepositoryInterface
 
     public function checkIn(int $employeeId, ?float $latitude = null, ?float $longitude = null, ?string $selfiePath = null): Attendance;
 
-    public function checkOut(int $attendanceId, ?float $latitude = null, ?float $longitude = null, ?string $selfiePath = null): Attendance;
+    public function checkOut(int $attendanceId, ?float $latitude = null, ?float $longitude = null, ?string $selfiePath = null, mixed $routeSnapshot = null): Attendance;
 
-    public function breakIn(int $attendanceId);
+    public function uploadRouteSnapshot(mixed $snapshotData, int $attendanceId): ?string;
 
-    public function breakOut(int $attendanceId);
+    public function breakIn(int $attendanceId, ?float $latitude = null, ?float $longitude = null);
+
+    public function breakOut(int $attendanceId, ?float $latitude = null, ?float $longitude = null);
 
     public function getEmployeeAttendanceLogs(int $employeeId);
 

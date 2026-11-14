@@ -20,6 +20,15 @@ class SalesOrderExport implements FromCollection, WithHeadings, WithMapping, Sho
         $query = SalesOrder::where('tenant_id', $this->tenantId)
             ->with(['customer', 'salesPerson', 'quotation', 'invoices', 'dispatches']);
 
+        $currentUser = auth()->user();
+        if ($currentUser && !app(\App\Services\Access\AccessService::class)->allows($currentUser, 'sales.orders.view', ['tenant_id' => $this->tenantId])) {
+            $query->where(function ($q) use ($currentUser) {
+                $q->where('sales_person_id', $currentUser->id)
+                  ->orWhereHas('customer.crmAccount', fn($caq) => $caq->where('owner_id', $currentUser->id))
+                  ->orWhereHas('quotation', fn($qq) => $qq->where('sales_person_id', $currentUser->id));
+            });
+        }
+
         // 1. Status Filter
         if (!empty($this->filters['status']) && $this->filters['status'] !== 'all') {
             $query->where('status', $this->filters['status']);
@@ -58,10 +67,22 @@ class SalesOrderExport implements FromCollection, WithHeadings, WithMapping, Sho
         $sortBy = $this->filters['sort_by'] ?? 'order_date';
         $sortOrder = strtolower($this->filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $allowedSorts = ['sales_order_number', 'order_date', 'shipment_date', 'total_amount', 'status', 'created_at'];
-        if (in_array($sortBy, $allowedSorts, true)) {
-            $query->orderBy($sortBy, $sortOrder);
+        if ($sortBy === 'order_date') {
+            $query->orderBy('order_date', $sortOrder)
+                  ->orderBy('sales_order_number', $sortOrder === 'asc' ? 'asc' : 'desc')
+                  ->orderBy('id', $sortOrder === 'asc' ? 'asc' : 'desc');
+        } elseif ($sortBy === 'sales_order_number') {
+            $query->orderBy('sales_order_number', $sortOrder)
+                  ->orderBy('order_date', 'desc')
+                  ->orderBy('id', $sortOrder);
+        } elseif (in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortOrder)
+                  ->orderBy('sales_order_number', 'desc')
+                  ->orderBy('id', 'desc');
         } else {
-            $query->orderBy('id', 'desc');
+            $query->orderBy('order_date', 'desc')
+                  ->orderBy('sales_order_number', 'desc')
+                  ->orderBy('id', 'desc');
         }
 
         return $query->get();

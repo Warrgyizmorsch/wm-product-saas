@@ -18,8 +18,8 @@ class StockTransferApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -29,6 +29,7 @@ class StockTransferApiController extends Controller
      */
     public function meta(): JsonResponse
     {
+        $this->authorize('viewAny', StockTransfer::class);
         [$tenantId] = $this->resolveTenantContext();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'code']);
         $products   = Product::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'sku']);
@@ -48,6 +49,7 @@ class StockTransferApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', StockTransfer::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = StockTransfer::query()
@@ -88,6 +90,8 @@ class StockTransferApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', StockTransfer::class);
+
         $validator = Validator::make($request->all(), [
             'from_warehouse_id' => ['required', 'integer', 'different:to_warehouse_id'],
             'to_warehouse_id'   => ['required', 'integer'],
@@ -163,6 +167,8 @@ class StockTransferApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $transfer);
+
         return response()->json([
             'success' => true,
             'data'    => $transfer,
@@ -183,6 +189,8 @@ class StockTransferApiController extends Controller
                 'message' => 'Stock Transfer not found',
             ], 404);
         }
+
+        $this->authorize('update', $transfer);
 
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Pending,In Transit,In-Transit,Completed,Cancelled'],
@@ -223,6 +231,8 @@ class StockTransferApiController extends Controller
                 'message' => 'Stock Transfer not found',
             ], 404);
         }
+
+        $this->authorize('update', $transfer);
 
         if (!in_array($transfer->status, ['Draft', 'Pending'])) {
             return response()->json([
@@ -278,6 +288,8 @@ class StockTransferApiController extends Controller
                 'message' => 'Stock Transfer not found',
             ], 404);
         }
+
+        $this->authorize('update', $transfer);
 
         if (!in_array($transfer->status, ['In Transit', 'In-Transit'])) {
             return response()->json([
@@ -347,6 +359,8 @@ class StockTransferApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('update', $transfer);
+
         if (in_array($transfer->status, ['Completed', 'In Transit', 'In-Transit'])) {
             return response()->json([
                 'success' => false,
@@ -368,6 +382,7 @@ class StockTransferApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', StockTransfer::class);
         [$tenantId] = $this->resolveTenantContext();
 
         return \Maatwebsite\Excel\Facades\Excel::download(

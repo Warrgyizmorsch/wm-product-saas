@@ -48,6 +48,7 @@ class DispatchOrder extends BaseModel
         'driver_phone',
         'status',
         'notes',
+        'cancellation_reason',
     ];
 
     protected $casts = [
@@ -150,6 +151,22 @@ class DispatchOrder extends BaseModel
         $actual = $this->actual_freight_billed;
         $expected = (float) $this->freight_amount;
         return round($actual - $expected, 2);
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(function (self $dispatch) {
+            if ($dispatch->wasChanged('status') && ($dispatch->sales_order_id || $dispatch->material_requirement_id)) {
+                try {
+                    app(\App\Domains\Sales\Services\DispatchOrderService::class)->syncFulfillmentStatuses(
+                        (int) $dispatch->sales_order_id,
+                        $dispatch->material_requirement_id ? (int) $dispatch->material_requirement_id : null
+                    );
+                } catch (\Throwable $e) {
+                    // Fail gracefully
+                }
+            }
+        });
     }
 }
 

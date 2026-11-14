@@ -8,6 +8,7 @@ use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\LeadHistory;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\DealStatus;
 use App\Domains\CRM\Services\DealHealthService;
@@ -151,8 +152,10 @@ class CrmDealController extends Controller
             ];
         }
 
-        $allDeals = CrmDeal::with(['account', 'contact', 'quotations', 'lead'])
-            ->where('tenant_id', $tenantId)
+        $dealsQuery = CrmDeal::with(['account', 'contact', 'quotations', 'lead'])
+            ->where('tenant_id', $tenantId);
+
+        $allDeals = $dealsQuery
             ->orderBy('updated_at', 'desc')
             ->get();
 
@@ -275,6 +278,8 @@ class CrmDealController extends Controller
             }
         }
 
+        \App\Domains\CRM\Services\CrmNotificationService::notifyDealCreated($deal);
+
         return redirect()->route('crm.deals.show', $deal)->with('success', 'Deal created successfully.');
     }
 
@@ -309,18 +314,13 @@ class CrmDealController extends Controller
             $activeQuotation = $deal->quotations->first();
         }
 
-        // Fetch linked lead for complete activity roll-up & document history
+        // Fetch linked lead for complete activity roll-up & document history (only if this deal was converted from a lead)
         $linkedLead = null;
         if (!empty($deal->lead_id)) {
             $linkedLead = \App\Domains\CRM\Models\Lead::with(['histories.user', 'leadDocuments', 'owner'])->find($deal->lead_id);
         }
         if (!$linkedLead) {
             $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
-                ->orWhere(function($q) use ($deal) {
-                    if ($deal->crm_account_id) {
-                        $q->where('crm_account_id', $deal->crm_account_id);
-                    }
-                })
                 ->with(['histories.user', 'leadDocuments', 'owner'])
                 ->first();
         }
@@ -409,7 +409,13 @@ class CrmDealController extends Controller
         if ($stage === 'Closed Won') $stage = 'Won';
         if ($stage === 'Closed Lost') $stage = 'Lost';
 
-        if ($stage === 'Won') {
+        // Lock check: Once Won, a deal cannot be moved to any other stage
+        $isCurrentlyWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+        if ($isCurrentlyWon && strtolower((string)$stage) !== 'won') {
+            return back()->withErrors(['stage' => 'This deal is already Won and finalized. Its stage cannot be changed.'])->withInput();
+        }
+
+        if (!$isCurrentlyWon && $stage === 'Won') {
             $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
             if (!$hasAcceptedQuote) {
                 return back()->withErrors(['stage' => 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.'])->withInput();
@@ -489,6 +495,30 @@ class CrmDealController extends Controller
         if ($stage === 'New') $stage = 'Qualification';
         if ($stage === 'Qualified') $stage = 'Needs Analysis';
 
+        // Lock check: Once Won, a deal cannot be moved to any other stage
+        $isCurrentlyWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+        if ($isCurrentlyWon) {
+            if (strtolower((string)$stage) !== 'won') {
+                $errMsg = 'This deal is already Won and finalized. Its stage cannot be changed.';
+                if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $errMsg
+                    ], 422);
+                }
+                return redirect()->back()->with('error', $errMsg);
+            }
+
+            if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Deal is already Won.',
+                    'stage' => $deal->stage
+                ]);
+            }
+            return redirect()->back()->with('info', 'Deal is already Won.');
+        }
+
         if ($stage === 'Won') {
             $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
             if (!$hasAcceptedQuote) {
@@ -518,20 +548,14 @@ class CrmDealController extends Controller
         $targetStatus = $dealStatuses->firstWhere('name', $stage);
         $prob = $targetStatus ? $targetStatus->probability : ($probMap[$stage] ?? $deal->probability);
 
+        $oldStage = $deal->stage ?: 'Qualification';
         $deal->update([
             'stage'        => $stage,
             'probability'  => $prob,
             'close_reason' => $validated['close_reason'] ?? $deal->close_reason,
         ]);
 
-        if (in_array($stage, ['Won', 'Closed Won'])) {
-            \App\Domains\Platform\Services\NotificationRuleService::trigger('crm.deal.won', [
-                'deal_title' => $deal->title,
-                'customer_name' => $deal->account?->name ?? 'Customer',
-                'amount' => number_format((float)($deal->estimated_value ?? $deal->amount ?? 0), 2),
-                'won_by' => auth()->user()?->name ?? 'User',
-            ], route('crm.deals.show', $deal->id), $deal);
-        }
+        \App\Domains\CRM\Services\CrmNotificationService::notifyDealStageUpdated($deal, $oldStage, $stage);
 
         $msg = "Deal stage updated to {$stage} successfully!";
 
@@ -563,13 +587,7 @@ class CrmDealController extends Controller
             'documents.*' => 'file|max:10240'
         ]);
 
-        $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
-            ->orWhere(function($q) use ($deal) {
-                if ($deal->crm_account_id) {
-                    $q->where('crm_account_id', $deal->crm_account_id);
-                }
-            })
-            ->first();
+        $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)->first();
 
         if (!$linkedLead) {
             $tenantId = tenant_id() ?? 1;
@@ -786,12 +804,25 @@ class CrmDealController extends Controller
             ]);
 
             if ($leadObj) {
-                $leadObj->update([
-                    'status'         => 'Won',
-                    'crm_account_id' => $account->id,
-                    'is_customer'    => true,
-                    'converted_at'   => now(),
-                ]);
+                Lead::$allowWonTransition = true;
+                try {
+                    $oldLeadStatus = $leadObj->status;
+                    $leadObj->update([
+                        'status'         => 'Won',
+                        'crm_account_id' => $account->id,
+                        'is_customer'    => true,
+                        'converted_at'   => now(),
+                    ]);
+                    LeadHistory::logEvent(
+                        $leadObj,
+                        'status_changed',
+                        $oldLeadStatus,
+                        'Won',
+                        "Deal #{$deal->deal_number} marked as Won and linked to Customer '{$customer->name}'."
+                    );
+                } finally {
+                    Lead::$allowWonTransition = false;
+                }
             }
 
             // Sync all quotations linked to this deal or lead
@@ -862,12 +893,25 @@ class CrmDealController extends Controller
             ]);
 
             if ($leadObj) {
-                $leadObj->update([
-                    'status'         => 'Won',
-                    'crm_account_id' => $newAccount->id,
-                    'is_customer'    => true,
-                    'converted_at'   => now(),
-                ]);
+                Lead::$allowWonTransition = true;
+                try {
+                    $oldLeadStatus = $leadObj->status;
+                    $leadObj->update([
+                        'status'         => 'Won',
+                        'crm_account_id' => $newAccount->id,
+                        'is_customer'    => true,
+                        'converted_at'   => now(),
+                    ]);
+                    LeadHistory::logEvent(
+                        $leadObj,
+                        'status_changed',
+                        $oldLeadStatus,
+                        'Won',
+                        "Deal #{$deal->deal_number} converted to new Customer & Account. Lead marked as Won."
+                    );
+                } finally {
+                    Lead::$allowWonTransition = false;
+                }
             }
 
             // Sync lead contacts → account
@@ -1092,6 +1136,10 @@ class CrmDealController extends Controller
             }
         }
 
+        if ($ownerId) {
+            \App\Domains\CRM\Services\CrmNotificationService::notifyDealAssigned($deal, $ownerId, auth()->id());
+        }
+
         $targetUser = $ownerId ? \App\Models\User::find($ownerId) : null;
         $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
         $message = "Deal owner successfully updated to {$ownerName}!";
@@ -1158,6 +1206,11 @@ class CrmDealController extends Controller
                     );
                 }
             }
+
+            if ($ownerId) {
+                \App\Domains\CRM\Services\CrmNotificationService::notifyDealAssigned($deal, $ownerId, auth()->id());
+            }
+
             $updatedCount++;
         }
 

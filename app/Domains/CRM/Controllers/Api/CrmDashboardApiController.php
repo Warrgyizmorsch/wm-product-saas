@@ -18,7 +18,7 @@ class CrmDashboardApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
+        $companyId = company_id() ?? $user?->company_id;
         $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
@@ -30,6 +30,8 @@ class CrmDashboardApiController extends Controller
      */
     public function metrics(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $totalLeads = Lead::where('tenant_id', $tenantId)->count();

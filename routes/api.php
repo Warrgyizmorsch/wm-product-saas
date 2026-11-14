@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\ForgotPasswordApiController;
 use App\Http\Controllers\Api\MapApiController;
 use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\ProfileApiController;
@@ -21,6 +22,21 @@ Route::prefix('auth')->name('auth.')->group(function () {
     Route::post('/login', [LoginController::class, 'apiLogin'])
         ->middleware('throttle:5,1')
         ->name('login');
+
+    // Public OTP-based forgot password routes
+    Route::prefix('forgot-password')->name('forgot-password.')->group(function () {
+        Route::post('/send-otp', [ForgotPasswordApiController::class, 'sendOtp'])
+            ->middleware('throttle:20,1')
+            ->name('send-otp');
+
+        Route::post('/verify-otp', [ForgotPasswordApiController::class, 'verifyOtp'])
+            ->middleware('throttle:20,1')
+            ->name('verify-otp');
+
+        Route::post('/reset', [ForgotPasswordApiController::class, 'resetPassword'])
+            ->middleware('throttle:10,1')
+            ->name('reset');
+    });
 
     // Authenticated profile & permissions route
     Route::get('/me', [LoginController::class, 'apiMe'])
@@ -75,9 +91,20 @@ Route::prefix('notifications')
 // Production Module API v1
 Route::prefix('v1/production')->group(base_path('app/Domains/Production/Routes/api.php'));
 
+// Accounting integration kit API v1 (Tally etc.)
+Route::prefix('v1/accounting/integrations')->group(base_path('app/Domains/Accounting/Routes/integration_api.php'));
+
 // Twilio Voice Telephony Webhook Routes (Public endpoints called by Twilio Cloud)
 Route::match(['get', 'post'], 'crm/webhooks/twilio/voice', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'handleTwilioVoiceWebhook'])
     ->name('api.crm.webhooks.twilio.voice');
 Route::match(['get', 'post'], 'crm/webhooks/twilio/status', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'handleTwilioStatusWebhook'])
     ->name('api.crm.webhooks.twilio.status');
+
+// Public Demo Requests API (For landing page mossierp.com)
+Route::post('/v1/public/demo-requests', [\App\Domains\Platform\Controllers\Api\PublicDemoRequestController::class, 'store'])
+    ->middleware('throttle:30,1')
+    ->name('api.public.demo-requests.store');
+Route::post('/public/demo-requests', [\App\Domains\Platform\Controllers\Api\PublicDemoRequestController::class, 'store'])
+    ->middleware('throttle:30,1');
+
 

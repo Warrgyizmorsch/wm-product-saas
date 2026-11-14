@@ -51,4 +51,11 @@ class UpdateTaskRequest extends FormRequest
             'estimated_hours' => ['nullable', 'numeric', 'min:0'],
         ];
     }
+
+    public function attributes(): array
+    {
+        return [
+            'task_list_id' => __('projects.task_list'),
+        ];
+    }
 }

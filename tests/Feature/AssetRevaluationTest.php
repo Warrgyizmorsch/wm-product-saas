@@ -58,6 +58,11 @@ class AssetRevaluationTest extends TestCase
             'is_system' => true, 'is_active' => true,
         ]);
         ChartOfAccount::create([
+            'tenant_id' => $this->tenant->id, 'code' => '1510', 'name' => 'Accumulated Depreciation',
+            'type' => ChartOfAccount::TYPE_ASSET, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT,
+            'is_system' => true, 'is_active' => true,
+        ]);
+        ChartOfAccount::create([
             'tenant_id' => $this->tenant->id, 'code' => '3200', 'name' => 'Revaluation Reserve',
             'type' => ChartOfAccount::TYPE_EQUITY, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT,
             'is_system' => true, 'is_active' => true,

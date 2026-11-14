@@ -110,7 +110,13 @@ class AssetFixedAssetsRbacTest extends TestCase
 
         $this->assertTrue(app(AssetPolicy::class)->capitalize($accountant, $this->asset));
 
-        $capitalized = app(AssetCapitalizationService::class)->capitalize($this->asset, [], $accountant->id);
+        $capitalized = app(AssetCapitalizationService::class)->capitalize($this->asset, [
+            'funding_source' => AssetCapitalizationService::FUNDING_OPENING_BALANCE,
+            'funding_account_id' => ChartOfAccount::create([
+                'tenant_id' => $this->tenant->id, 'code' => '3030', 'name' => "Proprietor's Capital",
+                'type' => ChartOfAccount::TYPE_EQUITY, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'is_active' => true,
+            ])->id,
+        ], $accountant->id);
         $this->assertSame(Asset::STATUS_ACTIVE, $capitalized->status);
     }
 

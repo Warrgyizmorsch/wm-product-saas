@@ -55,12 +55,7 @@ class ProbationApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
-            ->first()
-            ?? Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        return Employee::resolveForUser($user);
     }
 
     public function index(Request $request): JsonResponse
@@ -111,7 +106,7 @@ class ProbationApiController extends Controller
                 'email'              => $emp->office_email ?? $emp->personal_email ?? null,
                 'department'         => $emp->department?->name ?? null,
                 'designation'        => $emp->designation?->name ?? null,
-                'joining_date'       => $emp->joining_date ? Carbon::parse($emp->joining_date)->format('Y-m-d') : null,
+                'joining_date'       => $emp->date_of_joining ? Carbon::parse($emp->date_of_joining)->format('Y-m-d') : null,
                 'probation_end_date' => $probEndDate ? $probEndDate->format('Y-m-d') : null,
                 'days_remaining'     => $daysRemaining,
                 'status'             => $probEndDate && $probEndDate->isPast() ? 'overdue' : ($daysRemaining !== null && $daysRemaining <= 15 ? 'due_soon' : 'in_probation'),

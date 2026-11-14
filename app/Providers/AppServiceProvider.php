@@ -43,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
 
         // One builder per request, so the sidebar and the header's app launcher share a single computation.
         $this->app->scoped(\App\Core\Navigation\MenuBuilder::class);
+        // Per request / job: caches each tenant's excluded plan features for that request only.
+        $this->app->scoped(\App\Domains\Platform\Services\PlanFeatureGate::class);
+        $this->app->scoped(\App\Domains\Platform\Services\UsageLimitService::class);
+        $this->app->scoped(\App\Domains\Platform\Services\TenantStorage::class);
 
         // Loads every module's Dashboard/widgets.php once per request.
         $this->app->singleton(\App\Core\Dashboard\WidgetRegistry::class);
@@ -402,6 +406,12 @@ class AppServiceProvider extends ServiceProvider
         );
 
 
+        // ── Accounting: Integration kit ───────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Services\Integration\IntegrationRefRepositoryInterface::class,
+            \App\Domains\Accounting\Services\Integration\IntegrationRefRepository::class
+        );
+
         // ── Accounting: Chart of Accounts ─────────────────────────────────────
         $this->app->bind(
             \App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface::class,
@@ -436,6 +446,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Domains\Accounting\Repositories\TaxRateRepositoryInterface::class,
             \App\Domains\Accounting\Repositories\TaxRateRepository::class
+        );
+
+        // ── Accounting: TDS (Purchase asks this how much to deduct on a bill) ──
+        $this->app->bind(
+            \App\Domains\Accounting\Services\Tds\TdsCalculatorInterface::class,
+            \App\Domains\Accounting\Services\Tds\TdsCalculator::class
         );
 
         // ── Accounting: Voucher Detail ──────────────────────────────────────────
@@ -482,6 +498,36 @@ class AppServiceProvider extends ServiceProvider
         // users.email) exceed that. 191 chars * 4 bytes = 764 bytes, safely under it.
         Schema::defaultStringLength(191);
 
+        // Plan usage caps (config/plan_limits.php) on every capped model's creating event.
+        \App\Domains\Platform\Services\UsageLimitService::guardModels();
+
+        // Local disks that update tenant storage usage on delete/move, so usage
+        // drops as soon as any module removes a file.
+        foreach (config('filesystems.disks', []) as $diskName => $diskConfig) {
+            if (($diskConfig['driver'] ?? null) === 'local') {
+                config(["filesystems.disks.$diskName.tracked_name" => $diskName]);
+            }
+        }
+        \Illuminate\Support\Facades\Storage::extend('local', function ($app, array $config) {
+            $name = $config['tracked_name'] ?? 'local';
+            $base = $app['filesystem']->createLocalDriver($config, $name);
+
+            return (new \App\Domains\Platform\Support\TrackedLocalFilesystemAdapter($base->getDriver(), $base->getAdapter(), $config))
+                ->trackAs($name)
+                ->shouldServeSignedUrls($config['serve'] ?? false, fn () => $app['url']);
+        });
+
+        // Uploads counted against the tenant's storage allowance: same arguments
+        // as store()/storeAs(), but checked and recorded by TenantStorage.
+        \Illuminate\Http\UploadedFile::macro('storeTenantFile', function (string $path = '', array|string $options = []) {
+            /** @var \Illuminate\Http\UploadedFile $this */
+            return tenant_storage()->store($this, $path, $options);
+        });
+        \Illuminate\Http\UploadedFile::macro('storeTenantFileAs', function (string $path, ?string $name = null, array|string $options = []) {
+            /** @var \Illuminate\Http\UploadedFile $this */
+            return tenant_storage()->store($this, $path, $options, $name ?? $this->hashName());
+        });
+
         // ── Production Module Named API Rate Limiters ─────────────────────────
         $productionRateLimitKey = function (\Illuminate\Http\Request $request): string {
             $tenantId = $request->user()?->tenant_id
@@ -490,6 +536,27 @@ class AppServiceProvider extends ServiceProvider
             $client = $request->user()?->id ? "u:{$request->user()->id}" : "ip:{$request->ip()}";
             return "t:{$tenantId}:{$client}";
         };
+
+        // Accounting integration kit: the relay polls and reports one job at a time.
+        \Illuminate\Support\Facades\RateLimiter::for('accounting-integration', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(600)->by($productionRateLimitKey($request));
+        });
+
+        // A connector token works on the integration API and nowhere else, so a
+        // token sitting on a customer's PC can't reach the rest of the ERP.
+        \Laravel\Sanctum\Sanctum::authenticateAccessTokensUsing(function ($token, bool $isValid) {
+            if (! $isValid) {
+                return false;
+            }
+
+            foreach ((array) $token->abilities as $ability) {
+                if (str_starts_with((string) $ability, \App\Domains\Accounting\Models\IntegrationConnection::abilityPrefix())) {
+                    return request()->is('api/v1/accounting/integrations/*');
+                }
+            }
+
+            return true;
+        });
 
         \Illuminate\Support\Facades\RateLimiter::for('production-api', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(120)->by($productionRateLimitKey($request));
@@ -594,9 +661,11 @@ class AppServiceProvider extends ServiceProvider
         foreach ([
             \App\Domains\Projects\Events\TaskAssigned::class,
             \App\Domains\Projects\Events\TaskCompleted::class,
+            \App\Domains\Projects\Events\IssueAssigned::class,
             \App\Domains\Projects\Events\IssueLogged::class,
             \App\Domains\Projects\Events\IssueResolved::class,
             \App\Domains\Projects\Events\IssueRetested::class,
+            \App\Domains\Projects\Events\MilestoneCompleted::class,
             \App\Domains\Projects\Events\TimesheetSubmitted::class,
             \App\Domains\Projects\Events\TimesheetApproved::class,
             \App\Domains\Projects\Events\TimesheetRejected::class,
@@ -1026,7 +1095,7 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
-            \App\Domains\HRMS\Models\AttendancePenaltyRule::class,
+            \App\Domains\HRMS\Models\AttendancePenalty::class,
             \App\Domains\HRMS\Policies\PenalizationPolicy::class
         );
 
@@ -1050,10 +1119,6 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
         );
 
-        \Illuminate\Support\Facades\Gate::policy(
-            \App\Domains\HRMS\Models\DocumentType::class,
-            \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
-        );
 
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\Document::class,
@@ -1070,10 +1135,6 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Policies\ExpensePolicyPolicy::class
         );
 
-        \Illuminate\Support\Facades\Gate::policy(
-            \App\Domains\HRMS\Models\ExitClearanceItem::class,
-            \App\Domains\HRMS\Policies\ExitClearancePolicy::class
-        );
 
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\ExitClearanceTemplate::class,
@@ -1119,6 +1180,22 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Models\Feedback360Cycle::class,
             \App\Domains\HRMS\Policies\Feedback360Policy::class
         );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Feedback360Participant::class,
+            \App\Domains\HRMS\Policies\Feedback360Policy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Feedback360Nomination::class,
+            \App\Domains\HRMS\Policies\Feedback360Policy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Feedback360Competency::class,
+            \App\Domains\HRMS\Policies\Feedback360Policy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Feedback360Question::class,
+            \App\Domains\HRMS\Policies\Feedback360Policy::class
+        );
 
         // ── Fixed Asset Policies ────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
@@ -1156,5 +1233,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Models\Access\Role::class,
             \App\Domains\Access\Policies\RolePolicy::class
         );
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \App\Domains\HRMS\Commands\CheckDocumentExpiryCommand::class,
+            ]);
+        }
     }
 }

@@ -351,7 +351,7 @@
                                     @endif
 
                                     <!-- View Pass Details Button -->
-                                    <x-ui.button variant="light" size="sm" href="{{ route('visitor.passes.show', $pass->id) }}" icon="feather-eye" title="{{ __('visitor.view_pass') }}" class="border">
+                                    <x-ui.button variant="light" size="sm" href="{{ route('visitor.passes.show', ['pass' => $pass->id, 'from' => 'approvals']) }}" icon="feather-eye" title="{{ __('visitor.view_pass') }}" class="border">
                                     </x-ui.button>
                                 </div>
                             </td>

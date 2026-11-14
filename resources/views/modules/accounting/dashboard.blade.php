@@ -143,7 +143,8 @@
     <script>
         (function () {
             // The widgets read the page's own filters.
-            window.dashboardBaseQuery = () => @json($widgetQuery);
+            // Parenthesised: a bare `=> {...}` is parsed as a function body, not an object.
+            window.dashboardBaseQuery = () => (@json($widgetQuery));
 
             // Custom: show the date fields and send preset=custom with them;
             // closing it again goes back to the preset the page is showing.

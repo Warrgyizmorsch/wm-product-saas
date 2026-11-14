@@ -70,7 +70,11 @@
                     <x-ui.icon-input label="{{ $label }} Date" icon="feather-calendar" type="date" name="voucher_date" :value="old('voucher_date', date('Y-m-d'))" :required="true" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.icon-input label="Party Name" icon="feather-user" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+                    @if ($type === 'contra')
+                        <x-ui.icon-input label="Party Name" icon="feather-user" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+                    @else
+                        @include('modules.accounting.vouchers._party-field')
+                    @endif
                 </div>
                 <div class="col-md-6">
                     <x-ui.icon-input label="Reference No." icon="feather-hash" name="reference_no" :value="old('reference_no')" placeholder="Cheque / UTR / UPI ref" />
@@ -92,7 +96,11 @@
                     <x-ui.odoo-form-ui type="input" inputType="date" label="{{ $label }} Date" name="voucher_date" :value="old('voucher_date', date('Y-m-d'))" :required="true" />
                 </div>
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" label="Party Name" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+                    @if ($type === 'contra')
+                        <x-ui.odoo-form-ui type="input" label="Party Name" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+                    @else
+                        @include('modules.accounting.vouchers._party-field')
+                    @endif
                 </div>
                 <div class="col-md-4">
                     <x-ui.odoo-form-ui type="input" label="Reference No." name="reference_no" :value="old('reference_no')" placeholder="Cheque / UTR / UPI ref" />
@@ -135,6 +143,9 @@
             <button type="button" class="btn btn-light-brand btn-sm mt-2 addLineBtn" data-voucher-type="{{ $type }}">
                 <i class="feather-plus me-1"></i>Add Line
             </button>
+            @unless ($type === 'contra')
+                @include('modules.accounting.bill-wise._line-panel', ['formKey' => $type, 'accounts' => $accounts])
+            @endunless
             @if ($type === 'contra')
                 <p class="fs-11 text-muted mt-2 mb-0"><i class="feather-info"></i> Every line of a Contra voucher must be a Cash or Bank account.</p>
             @endif
@@ -201,6 +212,7 @@
                                 <select name="" class="form-select odoo-table-select odoo-select2 account-select" required data-placeholder="${escapeHtmlVoucherLine(rowLabel)}">
                                     ${opts}
                                 </select>
+                                ${window.BillWiseBox ? BillWiseBox.rowFields() : ''}
                             </td>
                             <td>
                                 <input type="text" name="" class="odoo-table-input description-input" placeholder="Line description..." value="${escapeHtmlVoucherLine(values.description || '')}">
@@ -231,6 +243,7 @@
                         $(this).find('.description-input').attr('name', `items[${index}][description]`);
                         $(this).find('.debit-input').attr('name', `items[${index}][debit]`);
                         $(this).find('.credit-input').attr('name', `items[${index}][credit]`);
+                        if (window.BillWiseBox) BillWiseBox.rename($(this), index);
                     });
 
                     const rowCount = $table.find('tbody .item-row').length;
@@ -246,6 +259,7 @@
                     }
 
                     reindexRows();
+                    if (window.BillWiseBox) BillWiseBox.refresh(newRow);
 
                     return newRow;
                 }
@@ -315,12 +329,16 @@
                     calculateTotals();
                 });
 
+                if (window.BillWiseBox) BillWiseBox.attach(type, $table);
+
                 // Reset to the two fixed rows and re-init whenever the form becomes
                 // visible (drawer opened) so a previous fill doesn't linger.
                 $table.find('tbody').empty();
                 addRow(0);
                 addRow(1);
                 calculateTotals();
+
+                if (window.VoucherParty) VoucherParty.init(type);
             }
 
             window.voucherFormConfigs = window.voucherFormConfigs || {};

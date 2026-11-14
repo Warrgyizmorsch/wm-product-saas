@@ -23,6 +23,7 @@ class JournalService
         private readonly AccountingAuditLogService $auditLog,
         private readonly JournalApprovalSettings $approvalSettings,
         private readonly AccessService $access,
+        private readonly BillWise\BillAllocationService $bills,
     ) {
     }
 
@@ -117,6 +118,11 @@ class JournalService
                 "Journal {$journal->journal_number} approved and posted",
                 ['total_debit' => $journal->total_debit, 'maker_id' => $journal->posted_by, 'approver_id' => $approverId]
             );
+
+            // Now on the ledger, so now in the bill-wise register, with the bills
+            // chosen when it was entered (the rest On Account).
+            $this->bills->allocateJournal($journal, $journal->bill_allocation_hints ?? []);
+            app(\App\Domains\Accounting\Services\Tds\TdsDeductionRecorder::class)->captureManualJournal($journal);
 
             return $journal->fresh(['entries']);
         });
@@ -294,6 +300,14 @@ class JournalService
                 ]
             );
 
+            // Receivable / Payable party lines into the bill-wise register:
+            // the poster's hints (New Ref invoice, Agst Ref bill ...), the rest
+            // On Account. A reversal mirrors its original instead.
+            if (empty($meta['is_reversal'])) {
+                $this->bills->allocateJournal($journal, $meta['bill_allocations'] ?? []);
+                app(\App\Domains\Accounting\Services\Tds\TdsDeductionRecorder::class)->captureManualJournal($journal);
+            }
+
             return $journal;
         });
     }
@@ -310,7 +324,15 @@ class JournalService
         $branchId = $meta['branch_id'] ?? branch_id();
         $journalDate = Carbon::parse($meta['journal_date'] ?? now());
 
-        $this->assertLinesAreBalanced($lines);
+        $lineTenantId = $tenantId !== null ? (int) $tenantId : null;
+        $this->assertLinesAreBalanced($lines, $lineTenantId);
+        $this->assertAccountsUsable(
+            $lines,
+            $lineTenantId,
+            // Manual entries can't use a deactivated account; automatic postings and
+            // reversals of older entries still can, so they never fail mid-flow.
+            enforceActive: ($meta['source'] ?? Journal::SOURCE_MANUAL) === Journal::SOURCE_MANUAL && empty($meta['is_reversal']),
+        );
 
         if ($period !== null && !$journalDate->betweenIncluded(
             Carbon::parse($period->start_date)->startOfDay(),
@@ -325,7 +347,7 @@ class JournalService
             $totalDebit = array_sum(array_column($lines, 'debit'));
             $totalCredit = array_sum(array_column($lines, 'credit'));
 
-            $journalNumber = $this->journals->nextJournalNumber($tenantId, $meta['journal_number_prefix'] ?? 'JNL');
+            $journalNumber = $this->journals->nextJournalNumber($tenantId, $meta['journal_number_prefix'] ?? 'JNL', $journalDate);
 
             $journal = $this->journals->createWithEntries([
                 'tenant_id' => $tenantId,
@@ -345,10 +367,29 @@ class JournalService
                 'total_credit' => round($totalCredit, 2),
                 'posted_by' => $meta['posted_by'] ?? null,
                 'posted_at' => $status === Journal::STATUS_POSTED ? now() : null,
+                // Kept until approval so the chosen bills apply when it posts.
+                'bill_allocation_hints' => $status === Journal::STATUS_PENDING_APPROVAL && ! empty($meta['bill_allocations'])
+                    ? $meta['bill_allocations']
+                    : null,
             ], $lines);
 
             return $journal;
         });
+    }
+
+    /**
+     * Reverse a journal on its own date rather than today — for entries that
+     * belong to a fixed date, like opening balances. The original's period must
+     * still be open.
+     */
+    public function reverseOnOriginalDate(int $journalId, ?string $reason = null, ?int $postedBy = null): Journal
+    {
+        $original = $this->journals->findWithEntries($journalId)
+            ?? throw new InvalidArgumentException('Journal not found.');
+
+        $period = $this->periods->assertOpenPeriodForDate(Carbon::parse($original->journal_date));
+
+        return $this->reverseJournal($journalId, $reason, $postedBy, $period);
     }
 
     /**
@@ -410,6 +451,7 @@ class JournalService
                 'branch_id' => $original->branch_id,
                 'journal_date' => $period !== null ? $original->journal_date : now(),
                 'source' => $original->source,
+                'is_reversal' => true,
                 'voucher_type' => $original->voucher_type,
                 'journal_number_prefix' => $original->voucher_type
                     ? \App\Domains\Accounting\Support\VoucherType::prefix($original->voucher_type)
@@ -427,6 +469,8 @@ class JournalService
                 'reversed_journal_id' => $reversal->id,
                 'idempotency_key' => null,
             ]);
+
+            $this->bills->mirrorReversal($original, $reversal);
 
             $this->auditLog->record(
                 $original,
@@ -468,6 +512,27 @@ class JournalService
     public function trialBalance(AccountingPeriod $period, ?int $costCenterId = null, ?int $projectId = null): Collection
     {
         return $this->journals->trialBalance($period->id, $costCenterId, $projectId);
+    }
+
+    /**
+     * Total of the parties on one control account that sit on the "wrong"
+     * side as at $asOfDate: customers in credit on Receivable, suppliers in
+     * debit on Payable. Returned positive.
+     */
+    public function oppositeSidePartyTotal(int $tenantId, int $controlAccountId, \DateTimeInterface $asOfDate, bool $debitNormal): float
+    {
+        $total = $this->journals->partyBalancesUpTo($tenantId, $controlAccountId, $asOfDate)
+            ->map(fn ($row) => (float) $row->balance)
+            ->filter(fn ($balance) => $debitNormal ? $balance < 0 : $balance > 0)
+            ->sum();
+
+        return round(abs($total), 2);
+    }
+
+    /** Closing balance of every account at the end of $period (cumulative). */
+    public function trialBalanceAsAt(AccountingPeriod $period, ?int $costCenterId = null, ?int $projectId = null): Collection
+    {
+        return $this->journals->trialBalanceUpTo(Carbon::parse($period->end_date)->endOfDay(), $costCenterId, $projectId);
     }
 
     /**
@@ -532,18 +597,33 @@ class JournalService
      */
     public function partyLedger(string $partyType, int $partyId, \DateTimeInterface $from, \DateTimeInterface $to, float $seedOpeningBalance = 0.0): array
     {
-        $sign = $partyType === JournalEntry::PARTY_VENDOR ? -1 : 1;
+        // Customers read positive when they owe us; suppliers, employees and
+        // transporters when we owe them.
+        $sign = $partyType === JournalEntry::PARTY_CUSTOMER ? 1 : -1;
 
         $openingTotals = $this->journals->partyOpeningBalance($partyType, $partyId, $from);
         $opening = round($seedOpeningBalance + $sign * ($openingTotals['debit'] - $openingTotals['credit']), 2);
 
         $running = $opening;
-        $entries = $this->journals->partyLedgerEntries($partyType, $partyId, $from, $to)->map(function ($entry) use ($sign, &$running) {
+        $lines = $this->journals->partyLedgerEntries($partyType, $partyId, $from, $to);
+
+        // Each line's bill-wise allocation (New Ref INV-1, Agst INV-1, On Account).
+        $refs = BillWise\BillAllocationService::enabled()
+            ? \App\Domains\Accounting\Models\BillAllocation::with('bill')->whereIn('journal_entry_id', $lines->pluck('id'))->get()->groupBy('journal_entry_id')
+            : collect();
+
+        $entries = $lines->map(function ($entry) use ($sign, &$running, $refs) {
             $running = round($running + $sign * ($entry->debit - $entry->credit), 2);
 
             return [
                 'entry' => $entry,
                 'running_balance' => $running,
+                'bill_refs' => ($refs[$entry->id] ?? collect())->map(fn ($a) => match ($a->ref_type) {
+                    \App\Domains\Accounting\Models\BillAllocation::NEW_REF => 'New Ref ' . $a->bill?->ref_number,
+                    \App\Domains\Accounting\Models\BillAllocation::AGAINST_REF => 'Agst ' . $a->bill?->ref_number . ' ' . number_format(abs((float) $a->amount), 2),
+                    \App\Domains\Accounting\Models\BillAllocation::ADVANCE => 'Advance ' . number_format(abs((float) $a->amount), 2),
+                    default => 'On Account ' . number_format(abs((float) $a->amount), 2),
+                })->values()->all(),
             ];
         });
 
@@ -578,7 +658,7 @@ class JournalService
      * @param int $decimals minor-unit scale of the transaction currency (2 for INR/USD,
      *                      0 for JPY, 3 for KWD)
      */
-    private function assertLinesAreBalanced(array $lines, int $decimals = 2): void
+    private function assertLinesAreBalanced(array $lines, ?int $tenantId = null, int $decimals = 2): void
     {
         if (count($lines) < 2) {
             throw new InvalidArgumentException('A journal requires at least two lines.');
@@ -620,7 +700,10 @@ class JournalService
         }
 
         $accountIds = array_values(array_unique(array_column($lines, 'chart_of_account_id')));
+        // Only this tenant's sub-accounts make an account a group: another tenant
+        // must never be able to freeze these accounts by parenting under them.
         $groupAccountIds = ChartOfAccount::withoutGlobalScopes()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->whereIn('parent_id', $accountIds)
             ->pluck('parent_id')
             ->unique();
@@ -639,6 +722,32 @@ class JournalService
         if ($totalDebitMinor !== $totalCreditMinor) {
             throw new InvalidArgumentException(
                 "Journal is not balanced: total debit {$totalDebit} does not equal total credit {$totalCredit}."
+            );
+        }
+    }
+
+    /**
+     * Every line's account must belong to the journal's tenant (defence in depth
+     * behind the tenant-scoped request validation, and the only check for
+     * postings that don't come from a form) and, when $enforceActive, be active.
+     */
+    private function assertAccountsUsable(array $lines, ?int $tenantId, bool $enforceActive): void
+    {
+        $accountIds = array_values(array_unique(array_map('intval', array_column($lines, 'chart_of_account_id'))));
+        $accounts = ChartOfAccount::withoutGlobalScopes()->whereIn('id', $accountIds)->get(['id', 'tenant_id', 'code', 'is_active']);
+
+        if ($accounts->count() !== count($accountIds)) {
+            throw new InvalidArgumentException('One or more journal lines use an account that does not exist.');
+        }
+
+        if ($tenantId !== null && $accounts->contains(fn (ChartOfAccount $a) => (int) $a->tenant_id !== $tenantId)) {
+            throw new InvalidArgumentException('One or more journal lines use an account from another workspace.');
+        }
+
+        $inactive = $accounts->where('is_active', false);
+        if ($enforceActive && $inactive->isNotEmpty()) {
+            throw new InvalidArgumentException(
+                "Account {$inactive->pluck('code')->implode(', ')} is inactive. Reactivate it or choose another account."
             );
         }
     }

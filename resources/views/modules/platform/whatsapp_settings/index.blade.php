@@ -145,7 +145,7 @@
                                 <x-ui.modal-form-ui type="input" label="Bridge Node.js URL" name="bridge_url" id="dbBridgeUrl" :value="$config->bridge_url" placeholder="http://127.0.0.1:3210" :required="true" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.modal-form-ui type="input" label="Bridge Secret Token" name="bridge_token" id="dbBridgeToken" :value="$config->bridge_token" placeholder="wm_erp_whatsapp_secret_token_2026" :required="true" />
+                                <x-ui.modal-form-ui type="input" label="Bridge Secret Token" name="bridge_token" id="dbBridgeToken" :value="$config->bridge_token" placeholder="A long random secret" :required="true" />
                             </div>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">

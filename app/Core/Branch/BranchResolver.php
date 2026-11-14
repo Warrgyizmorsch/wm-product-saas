@@ -9,6 +9,14 @@ class BranchResolver
 {
     public function resolve(Request $request, int $companyId): ?Branch
     {
+        $explicitBranchId = $request->header('X-Branch-Id') ?: ($request->header('X-Branch') ?: $request->input('branch_id'));
+        if ($explicitBranchId) {
+            $branch = Branch::query()->where('company_id', $companyId)->find($explicitBranchId);
+            if ($branch !== null) {
+                return $branch;
+            }
+        }
+
         $sessionBranchId = $request->hasSession() ? $request->session()->get('branch_id') : null;
 
         if ($sessionBranchId) {

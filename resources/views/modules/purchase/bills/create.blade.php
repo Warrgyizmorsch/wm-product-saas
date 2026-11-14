@@ -55,10 +55,39 @@
     @php
         $po = $selectedGrn->purchaseOrder;
         
-        // Initial order tax percent from PO or default 18%
-        $initialOrderTaxPercent = (float)($po?->order_tax_percent ?? 18.00);
-        if ($initialOrderTaxPercent <= 0) {
-            $initialOrderTaxPercent = 18.00;
+        // Determine tax option inherited from PO
+        $defaultTaxType = $po?->tax_type;
+        if (!$defaultTaxType && $po) {
+            if (($po->tax_amount ?? 0) > 0) {
+                $defaultTaxType = 'order_wise_tax';
+            } else {
+                $hasPoItemTax = false;
+                foreach ($po->items ?? [] as $pi) {
+                    if (($pi->tax_percent ?? 0) > 0) {
+                        $hasPoItemTax = true;
+                        break;
+                    }
+                }
+                $defaultTaxType = $hasPoItemTax ? 'item_wise_tax' : 'without_tax';
+            }
+        } elseif (!$defaultTaxType) {
+            $defaultTaxType = 'order_wise_tax';
+        }
+
+        // Calculate initial order tax percent from PO (inherited directly, never forced to 18)
+        $initialOrderTaxPercent = 0.00;
+        if ($po) {
+            if ($po->tax_type === 'order_wise_tax') {
+                $poTaxable = max(0, (float)$po->subtotal - (float)$po->discount_amount);
+                $poTax = (float)$po->tax_amount ?: ((float)$po->cgst_amount + (float)$po->sgst_amount + (float)$po->igst_amount);
+                if ($poTaxable > 0 && $poTax > 0) {
+                    $initialOrderTaxPercent = round(($poTax / $poTaxable) * 100, 2);
+                } else {
+                    $initialOrderTaxPercent = 0.00;
+                }
+            } elseif ($po->tax_type === 'item_wise_tax' || $po->tax_type === 'without_tax') {
+                $initialOrderTaxPercent = 0.00;
+            }
         }
     @endphp
 
@@ -82,12 +111,6 @@
                                     <i class="feather-check-circle me-1"></i>Source GRN: {{ $selectedGrn->grn_number }} @if($po) (PO: {{ $po->purchase_order_number }}) @endif
                                 </span>
                             @endif
-                        </div>
-
-                        <!-- Status Pipeline -->
-                        <div class="so-status-pipeline d-none d-sm-inline-flex">
-                            <span class="pipeline-step active">Draft</span>
-                            <span class="pipeline-step">Posted</span>
                         </div>
                     </div>
 
@@ -142,9 +165,9 @@
                             </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui type="select" label="Tax Option" name="tax_type" id="taxTypeSelect" required="true">
-                                <option value="without_tax" @selected(old('tax_type', $po?->tax_type ?? '') === 'without_tax')>Without Tax</option>
-                                <option value="item_wise_tax" @selected(old('tax_type', $po?->tax_type ?? '') === 'item_wise_tax')>Item Level Tax</option>
-                                <option value="order_wise_tax" @selected(old('tax_type', $po?->tax_type ?? 'order_wise_tax') === 'order_wise_tax')>Order Level Tax</option>
+                                <option value="without_tax" @selected(old('tax_type', $defaultTaxType) === 'without_tax')>Without Tax</option>
+                                <option value="item_wise_tax" @selected(old('tax_type', $defaultTaxType) === 'item_wise_tax')>Item Level Tax</option>
+                                <option value="order_wise_tax" @selected(old('tax_type', $defaultTaxType) === 'order_wise_tax')>Order Level Tax</option>
                             </x-ui.odoo-form-ui>
 
                             <div id="gstTypeContainer">
@@ -190,7 +213,7 @@
                                     </div>
                                 </div>
                                 <div id="customFreightTaxPercentContainer" class="mt-2 d-none">
-                                    <x-ui.odoo-form-ui type="input" label="Custom Freight Tax (%)" name="freight_tax_percent" id="freightTaxPercentInput" inputType="number" step="0.01" min="0" max="100" value="18" />
+                                    <x-ui.odoo-form-ui type="input" label="Custom Freight Tax (%)" name="freight_tax_percent" id="freightTaxPercentInput" inputType="number" step="0.01" min="0" max="100" value="{{ old('freight_tax_percent', $initialOrderTaxPercent > 0 ? $initialOrderTaxPercent : 0) }}" />
                                 </div>
                             </div>
                         </div>
@@ -235,10 +258,16 @@
                                             // Inherit item discount percent
                                             $discPct = (float)($poItem?->discount_percent ?? 0);
                                             
-                                            // Inherit Tax Percent from PO Item or Product
-                                            $inheritedTaxRate = $poItem?->tax_percent ?? (($poItem?->cgst_percent ?? 0) + ($poItem?->sgst_percent ?? 0) + ($poItem?->igst_percent ?? 0));
-                                            if (!$inheritedTaxRate || $inheritedTaxRate <= 0) {
-                                                $inheritedTaxRate = (float)($initialOrderTaxPercent ?? $item->product?->tax_rate ?? 18);
+                                            // Inherit Tax Percent from PO Item or Product (exact rate from PO, not default 18)
+                                            $inheritedTaxRate = 0.00;
+                                            if ($poItem) {
+                                                if ($poItem->tax_percent !== null) {
+                                                    $inheritedTaxRate = (float)$poItem->tax_percent;
+                                                } else {
+                                                    $inheritedTaxRate = (float)(($poItem->cgst_percent ?? 0) + ($poItem->sgst_percent ?? 0) + ($poItem->igst_percent ?? 0));
+                                                }
+                                            } else {
+                                                $inheritedTaxRate = (float)($item->product?->tax_rate ?? 0.00);
                                             }
 
                                             $qty = (float) $item->accepted_qty;
@@ -379,7 +408,7 @@
                                         <hr class="my-2 border-slate">
                                         <div class="d-flex justify-content-between align-items-center mb-2" id="orderTaxPercentRow">
                                             <span class="text-muted fs-13 fw-semibold">Order Tax Rate (%):</span>
-                                            <input type="number" name="order_tax_percent" id="orderTaxPercentInput" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 30px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" min="0" step="0.01" value="{{ $initialOrderTaxPercent }}">
+                                            <input type="number" name="order_tax_percent" id="orderTaxPercentInput" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 30px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" min="0" step="0.01" value="{{ old('order_tax_percent', $initialOrderTaxPercent) }}">
                                         </div>
 
                                         <div class="d-flex justify-content-between align-items-center mb-2" id="summaryOrderTaxAmtRow">
@@ -413,6 +442,8 @@
                                         <span class="fw-bold fs-14 text-primary">Grand Total:</span>
                                         <input type="text" id="summaryGrandtotalText" class="form-control form-control-sm text-end fw-extrabold" style="width: 150px; height: 34px; border: 1px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb; font-size: 15px;" readonly value="0.00">
                                     </div>
+
+                                    @include('modules.purchase.bills._tds-summary', ['vendorId' => $selectedGrn->vendor_id])
                                 </div>
                             </div>
                         </div>
@@ -682,7 +713,7 @@
                                 var rRate = parseFloat($(this).find('.item-tax-rate').val()) || 0;
                                 if (rRate > maxTaxRate) maxTaxRate = rRate;
                             });
-                            if (maxTaxRate <= 0) maxTaxRate = 18;
+                            if (maxTaxRate <= 0) maxTaxRate = 0;
                             freightTaxAmount = freightAmount * (maxTaxRate / 100);
                             $('#summaryFreightTaxLabel').text('Add: Freight Tax (Highest Rate ' + maxTaxRate + '%):');
                         }
@@ -730,6 +761,11 @@
                     $('#cgstText').val('₹' + halfTax.toFixed(2));
                     $('#sgstText').val('₹' + halfTax.toFixed(2));
                 }
+
+                // TDS is on the value before GST.
+                if (window.refreshBillTds) {
+                    window.refreshBillTds(itemsTaxableValue + freightAmount, grandTotal);
+                }
             }
 
             // Auto-fill empty tax rate input only when switching tax type option
@@ -739,7 +775,7 @@
                         var taxInput = $(this).find('.item-tax-rate');
                         var rawVal = $.trim(taxInput.val());
                         if (rawVal === '') {
-                            var defaultPct = parseFloat($('#orderTaxPercentInput').val()) || 18;
+                            var defaultPct = parseFloat($('#orderTaxPercentInput').val()) || 0;
                             taxInput.val(defaultPct);
                         }
                     });

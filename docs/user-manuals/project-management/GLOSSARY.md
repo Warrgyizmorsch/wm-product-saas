@@ -7,6 +7,9 @@ This glossary defines technical, operational, and architectural terms used acros
 ### Activity Log (`ActivityLog`)
 An immutable audit log record created whenever significant mutations occur on a project (such as task status changes, member additions, or budget updates). Stored in `project_activity_logs`. Captures the actor's `user_id`, action verb, title, description, and metadata JSON.
 
+### Aggregate Produced Yield
+The cumulative quantity of finished items produced across all Production Orders linked to a project task ($\sum \text{produced\_quantity}$). When linked production orders reach `'Completed'`, the system compares aggregate output against ordered threshold: $\sum \text{produced\_quantity} \ge (\sum \text{quantity} - 0.0001)$. If met, the task auto-completes and updates milestone progress; otherwise, a shortfall warning is flagged.
+
 ### Baseline
 The approved schedule and financial target established during project kick-off (initial `start_date`, `target_end_date`, and `budget_amount`). Baselines can be formally revised through an approved **Change Request**.
 
@@ -21,7 +24,11 @@ The contractual billing model associated with a project. Supported values in `pr
 A formal domain entity used to manage scope alterations. Stored in `project_change_requests`. Tracks title, description, `schedule_impact_days`, `cost_impact_amount`, and status (`Pending`, `Approved`, `Rejected`, `Implemented`). Approving a change request updates the active project baseline.
 
 ### Closure Gate
-A programmatic validation checkpoint enforced by `ProjectClosureService::evaluateGates()` before a project can transition to `closed`. Evaluates five conditions: zero open tasks & incomplete subtasks, zero unresolved issues, reviews & governance satisfaction, complete billing settlement (zero unbilled approved hours or milestones), and complete milestone conclusion.
+A programmatic validation checkpoint enforced by `ProjectClosureService::evaluateGates()` before a project can transition to `closed`. Evaluates five conditions: zero open tasks & incomplete subtasks, zero unresolved issues, reviews & governance satisfaction, complete billing settlement (zero unbilled approved hours or milestones), and complete milestone conclusion. Closed projects cannot be reopened.
+
+### Cost Per Hour vs Rate Per Hour
+- **Cost Per Hour (`cost_per_hour`)**: Internal labor rate representing organizational payroll or contractor cost. Used in budget variance and margin analytics.
+- **Rate Per Hour (`rate_per_hour`)**: External billable hourly rate charged to clients on Time & Materials invoices.
 
 ### Critical Path
 The continuous sequence of dependent tasks that represents the longest overall duration through the project network. Any delay to a task on the critical path directly delays the project delivery date. Critical path tasks have a **Total Float** of zero or less ($\text{Total Float} \le 0$) and are flagged `is_critical = true`.
@@ -61,6 +68,9 @@ An offset in calendar days applied to a task dependency:
 - **Late Finish (LF)**: The latest possible date a task can finish without postponing the overall project completion date.
 - **Late Start (LS)**: The latest possible date a task can start ($LF - \text{Duration} + 1$).
 
+### Manufacturing Summary
+A dedicated view component on project and milestone workspaces that aggregates all linked Production Orders, tracking order counts, aggregate produced vs ordered quantities, and shop-floor completion status.
+
 ### Milestone (`Milestone`)
 A major project event marking the completion of a significant phase, deliverable, or decision point. Stored in `project_milestones`. Milestones have zero planned labor duration but can carry a contractual `billing_amount`.
 
@@ -68,7 +78,10 @@ A major project event marking the completion of a significant phase, deliverable
 The security framework ensuring complete organizational data isolation. Enforced via `App\Core\Database\BaseModel` traits (`tenant_id`, `company_id`, `branch_id`) and route middleware (`tenant.context`).
 
 ### Project (`Project`)
-The root domain aggregate representing a planned enterprise undertaking with defined start dates, end dates, budget, customer, manager, and lifecycle status. Stored in `projects`.
+The root domain aggregate representing a planned enterprise undertaking with defined start dates, end dates, budget, customer, manager, and lifecycle status (`Draft`, `Active`, `On Hold`, `Completed`, `Closed`, `Cancelled`). Stored in `projects`.
+
+### Project Code
+A standardized unique code assigned to each project (`code` attribute). When left blank at creation, `ProjectService` auto-generates a sequence following `PRJ-%04d` (e.g., `PRJ-0001`), scoped to company and branch.
 
 ### Project Member (`ProjectMember`)
 An associative entity linking an ERP `User` to a specific `Project`. Stored in `project_members`. Defines the collaborator's project role (`project_role`), billable `rate_per_hour`, internal `cost_per_hour`, and `budget_hours`.
@@ -76,20 +89,29 @@ An associative entity linking an ERP `User` to a specific `Project`. Stored in `
 ### Project Review (`ProjectReview`)
 A formal review checkpoint evaluating deliverables. Stored in `project_reviews`. Categorized by `review_type` (`Internal`, `Client UAT`, `Milestone Gate`) and recorded with formal status (`Pending`, `Approved`, `Rework Required`).
 
+### Purchase Requisition Linking
+The association of a project task with one or more Purchase Requisition lines via `purchase_requisition_items.project_task_id`. Confined to items in the same company and branch to track material demand without generating automated Purchase Orders.
+
+### Ripple Rescheduling
+A dynamic scheduling mode in the Gantt timeline that automatically shifts downstream successor tasks when an upstream predecessor task is delayed, preserving dependency lags. Contrasted with `Isolated` mode which modifies only the dragged task.
+
 ### Sales Invoice Creation Service (`SalesInvoiceCreationService`)
 The domain service residing in `App\Domains\Sales\Services\` responsible for generating official ERP sales invoices. Project Management delegates billing execution to `SalesInvoiceCreationService::createDraftInvoice()` rather than writing directly to billing tables.
+
+### Sales Order Conversion
+The automated process orchestrated by `SalesOrderProjectBridgeService` converting a confirmed Sales Order into a project. Generates the `Fulfillment & Delivery` task list, milestone deliverables corresponding to order lines, and fulfillment tasks with duplicate-conversion prevention.
 
 ### Subtask (`SubTask`)
 A checklist line item subordinate to a parent `Task`. Stored in `project_sub_tasks`. Used to break down work into discrete verifiable steps. Checking off subtasks automatically updates the parent task's completion percentage.
 
 ### Task (`Task`)
-The primary unit of executable work within a project. Stored in `project_tasks`. Belongs to a `TaskList`, tracks `estimated_hours`, `actual_hours`, `priority`, `status`, and scheduling parameters (`start_date`, `due_date`, `total_float`, `is_critical`).
+The primary unit of executable work within a project. Stored in `project_tasks`. Belongs to a `TaskList`, tracks `estimated_hours`, `actual_hours`, `priority`, `status`, and scheduling parameters (`start_date`, `due_date`, `total_float`, `is_critical`). Can link to Production Orders and Purchase Requisitions.
 
 ### Task List (`TaskList`)
 A grouping container used to structure tasks into phases, work packages, or sprint backlogs. Stored in `project_task_lists`. Supports sort position reordering.
 
 ### Time Log (`TimeLog`)
-A record of labor time spent by a team member on a specific task. Stored in `project_time_logs`. Stores date, decimal hours, billability flag, hourly billing rate, and approval status (`Pending`, `Approved`, `Rejected`).
+A record of labor time spent by a team member on a specific task. Stored in `project_time_logs`. Stores date, decimal hours (0.01 to 24.00), billability flag, hourly billing rate, and approval status (`Pending`, `Approved`, `Rejected`).
 
 ### Total Float
 The amount of time a task can be delayed from its Early Start without delaying the project completion date ($\text{Total Float} = LS - ES = LF - EF$). Tasks with $\text{Total Float} \le 0$ are on the Critical Path.

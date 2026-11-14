@@ -72,6 +72,11 @@ class ProjectReview extends BaseModel
         return $this->belongsTo(User::class, 'reviewer_id');
     }
 
+    public function getReviewerDisplayNameAttribute(): string
+    {
+        return $this->reviewer?->name ?: ($this->reviewer_name ?: '—');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

@@ -132,16 +132,16 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="pendingFreightTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;" class="ps-3">{{ __('purchase.dispatch_number') }}</th>
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;">{{ __('purchase.ref_invoice_number') }}</th>
-                        <th style="min-width: 170px; background-color: #e8ecf1 !important;">{{ __('purchase.customer') }}</th>
-                        <th style="min-width: 160px; background-color: #e8ecf1 !important;">{{ __('purchase.transporter') }}</th>
-                        <th style="min-width: 130px; background-color: #e8ecf1 !important;">{{ __('purchase.lr_bilty') }}</th>
-                        <th style="min-width: 100px; background-color: #e8ecf1 !important;">{{ __('purchase.terms') }}</th>
-                        <th style="min-width: 130px; background-color: #e8ecf1 !important;" class="text-end">{{ __('purchase.expected_freight') }}</th>
-                        <th style="min-width: 100px; background-color: #e8ecf1 !important;" class="text-center">{{ __('purchase.status') }}</th>
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.actions') }}</th>
+                    <tr>
+                        <th style="min-width: 140px;" class="ps-3">{{ __('purchase.dispatch_number') }}</th>
+                        <th style="min-width: 140px;">{{ __('purchase.ref_invoice_number') }}</th>
+                        <th style="min-width: 170px;">{{ __('purchase.customer') }}</th>
+                        <th style="min-width: 160px;">{{ __('purchase.transporter') }}</th>
+                        <th style="min-width: 130px;">{{ __('purchase.lr_bilty') }}</th>
+                        <th style="min-width: 100px;">{{ __('purchase.terms') }}</th>
+                        <th style="min-width: 130px;" class="text-end">{{ __('purchase.expected_freight') }}</th>
+                        <th style="min-width: 100px;" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="min-width: 140px;" class="text-end pe-3">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -90,6 +90,7 @@ class Asset extends BaseModel
         'directly_attributable_cost',
         'capitalization_cost',
         'recoverable_tax',
+        'recoverable_tax_gst_type',
         'non_recoverable_tax',
         'residual_value',
         'useful_life_months',
@@ -150,6 +151,12 @@ class Asset extends BaseModel
         }
 
         return in_array($to, self::TRANSITIONS[$from] ?? [], true);
+    }
+
+    /** Sold, scrapped, written off, lost or disposed: off the books for good. */
+    public function isRetired(): bool
+    {
+        return (self::TRANSITIONS[(string) $this->status] ?? null) === [];
     }
 
     /**

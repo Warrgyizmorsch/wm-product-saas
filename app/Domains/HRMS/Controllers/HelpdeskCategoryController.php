@@ -18,30 +18,40 @@ class HelpdeskCategoryController extends Controller
     ) {
     }
 
-    public function index(Request $request): View
+    private function checkCanManage(): void
     {
         $tenantId = tenant_id();
         $user = auth()->user();
 
-        $canManage = $user && ($this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
 
         if (!$canManage) {
             abort(403, 'Unauthorized to manage helpdesk categories.');
         }
+    }
+
+    public function index(Request $request): View
+    {
+        $this->checkCanManage();
+        $tenantId = tenant_id();
 
         $categories = $this->kbRepository->getAllCategoriesWithCounts();
         $agents = Employee::where('tenant_id', $tenantId)->orderBy('full_name')->get();
 
-        return view('modules.hrms.helpdesk.categories', compact('categories', 'agents', 'canManage'));
+        return view('modules.hrms.helpdesk.categories', compact('categories', 'agents'));
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $this->checkCanManage();
+        $tenantId = tenant_id();
+
         $request->validate([
             'name'              => 'required|string|max:255',
             'description'       => 'nullable|string',
-            'default_agent_id'  => 'nullable|exists:employees,id',
+            'default_agent_id'  => ['nullable', \Illuminate\Validation\Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'default_sla_hours' => 'required|integer|min:1',
             'is_confidential'   => 'nullable|boolean',
         ]);
@@ -55,21 +65,25 @@ class HelpdeskCategoryController extends Controller
         ]);
 
         return redirect()->route('hrms.helpdesk.categories.index')
-            ->with('success', 'Helpdesk category created successfully.');
+            ->with('success', __('hrms.helpdesk.flash_category_created'));
     }
 
-    public function update(Request $request, int $id): RedirectResponse
+    public function update(Request $request, mixed $id = null): RedirectResponse
     {
+        $this->checkCanManage();
+        $tenantId = tenant_id();
+        $categoryId = (int) ($id ?: $request->route('category'));
+
         $request->validate([
             'name'              => 'required|string|max:255',
             'description'       => 'nullable|string',
-            'default_agent_id'  => 'nullable|exists:employees,id',
+            'default_agent_id'  => ['nullable', \Illuminate\Validation\Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'default_sla_hours' => 'required|integer|min:1',
             'is_confidential'   => 'nullable|boolean',
             'is_active'         => 'nullable|boolean',
         ]);
 
-        $this->kbRepository->updateCategory($id, [
+        $this->kbRepository->updateCategory($categoryId, [
             'name'              => $request->input('name'),
             'description'       => $request->input('description'),
             'default_agent_id'  => $request->input('default_agent_id'),
@@ -79,14 +93,24 @@ class HelpdeskCategoryController extends Controller
         ]);
 
         return redirect()->route('hrms.helpdesk.categories.index')
-            ->with('success', 'Helpdesk category updated successfully.');
+            ->with('success', __('hrms.helpdesk.flash_category_updated'));
     }
 
-    public function destroy(int $id): RedirectResponse
+    public function destroy(Request $request, mixed $id = null): RedirectResponse
     {
-        $this->kbRepository->deleteCategory($id);
+        $this->checkCanManage();
+        $tenantId = tenant_id();
+        $categoryId = (int) ($id ?: $request->route('category'));
+
+        $category = \App\Domains\HRMS\Models\HelpdeskCategory::where('tenant_id', $tenantId)->findOrFail($categoryId);
+        if ($category->tickets()->exists()) {
+            return redirect()->route('hrms.helpdesk.categories.index')
+                ->with('error', __('hrms.helpdesk.flash_category_has_tickets'));
+        }
+
+        $this->kbRepository->deleteCategory($categoryId);
 
         return redirect()->route('hrms.helpdesk.categories.index')
-            ->with('success', 'Category deleted successfully.');
+            ->with('success', __('hrms.helpdesk.flash_category_deleted'));
     }
 }

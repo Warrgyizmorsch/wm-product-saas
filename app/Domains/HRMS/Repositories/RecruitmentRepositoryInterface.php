@@ -34,5 +34,9 @@ interface RecruitmentRepositoryInterface
 
     public function sendOfferEmail(JobOffer $offer, array $validated, ?int $tenantId): array;
 
-    public function convertToEmployee(JobOffer $offer, ?int $tenantId): array;
+    public function updateOfferStatus(JobOffer $offer, string $status, ?string $reason = null, ?int $tenantId = null): array;
+
+    public function downloadOfferPdf(JobOffer $offer);
+
+    public function convertToEmployee(JobOffer $offer, ?int $tenantId = null, ?string $specifiedPassword = null): array;
 }

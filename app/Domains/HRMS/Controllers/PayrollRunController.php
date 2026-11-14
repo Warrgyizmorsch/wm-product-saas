@@ -82,13 +82,57 @@ class PayrollRunController extends Controller
         return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', $result['message']);
     }
 
-    public function releasePayouts(PayrollRun $run)
+    public function releasePayouts(Request $request, PayrollRun $run)
     {
         $this->authorize('process', $run);
 
-        $this->payrollRunRepository->releasePayouts($run);
+        $validated = $request->validate([
+            'bank_account_id' => ['nullable', 'integer'],
+            'payout_date' => ['nullable', 'date'],
+        ]);
+
+        try {
+            $this->payrollRunRepository->releasePayouts($run, $validated['bank_account_id'] ?? null, $validated['payout_date'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            // Nothing was marked paid: the books refused (no open period, not enough cash ...).
+            return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])
+                ->with('error', 'Payouts not released — ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::error('Payroll payout release failed: ' . $e->getMessage());
+            return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])
+                ->with('error', 'Payouts not released due to an error: ' . $e->getMessage());
+        }
 
         return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', 'Payroll payouts released successfully.');
+    }
+
+    /** Pay a PF / ESI / PT / TDS challan out of the chosen bank account. */
+    public function payStatutoryDue(Request $request)
+    {
+        $this->authorize('process', PayrollRun::class);
+
+        $validated = $request->validate([
+            'due' => ['required', 'string', 'in:' . implode(',', array_keys(\App\Domains\Accounting\Services\PayrollAccountingService::STATUTORY_DUES))],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'bank_account_id' => ['required', 'integer'],
+            'payment_date' => ['required', 'date'],
+            'reference' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        try {
+            $journal = app(\App\Domains\Accounting\Services\PayrollAccountingService::class)->postStatutoryPayment(
+                (int) (tenant_id() ?? auth()->user()->tenant_id),
+                $validated['due'],
+                (float) $validated['amount'],
+                (int) $validated['bank_account_id'],
+                $validated['payment_date'],
+                $validated['reference'] ?? null,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', 'Payment not recorded — ' . $e->getMessage());
+        }
+
+        return back()->with('success', "Statutory payment recorded as {$journal->journal_number}.");
     }
 
     public function toggleHold(Request $request, Employee $employee, string $month)
@@ -107,27 +151,15 @@ class PayrollRunController extends Controller
         return redirect()->back()->with('success', $msg);
     }
 
-    public function mySalary()
+    public function mySalary(Request $request)
     {
         $user = auth()->user();
-        $employee = $user?->employee;
-        if (!$employee && $user) {
-            $employee = Employee::where('tenant_id', tenant_id())
-                ->where(function ($q) use ($user) {
-                    if ($user->email) {
-                        $q->where('office_email', $user->email)
-                          ->orWhere('personal_email', $user->email);
-                    }
-                })->first();
-        }
+        $employee = $user ? Employee::resolveForUser($user) : null;
         if (!$employee) {
-            $employee = Employee::where('tenant_id', tenant_id())->first();
-        }
-        if (!$employee) {
-            return redirect()->back()->with('error', 'No employee profile linked to your user account.');
+            return redirect()->back()->with('error', __('hrms.assets.error_no_employee_profile'));
         }
 
-        $data = $this->payrollRunRepository->getMySalaryData($employee);
+        $data = $this->payrollRunRepository->getMySalaryData($employee, $request->all());
 
         return view('modules.hrms.payroll.my_salary', $data);
     }
@@ -165,8 +197,20 @@ class PayrollRunController extends Controller
     public function downloadPayslip(PayrollRun $run, Employee $employee)
     {
         $user = auth()->user();
-        if ($user->employee && $user->employee->id !== $employee->id) {
-            abort(403, 'Unauthorized access to this payslip.');
+        $isAuthorized = $user && (
+            $user->can('viewAny', PayrollRun::class)
+            || $user->can('process', $run)
+            || $user->can('approve', $run)
+            || (method_exists($user, 'hasHrPermission') && ($user->hasHrPermission('hr.payroll.manage') || $user->hasHrPermission('hrms.payroll_runs.view') || $user->hasHrPermission('hrms.payroll.manage')))
+        );
+
+        if (!$isAuthorized) {
+            if (!$user || !$user->employee || $user->employee->id !== $employee->id) {
+                abort(403, 'Unauthorized access to this payslip.');
+            }
+            if (!in_array($run->status, ['locked', 'paid'])) {
+                abort(403, 'Payslip is not yet released.');
+            }
         }
 
         $data = $this->payrollRunRepository->getPayslipData($run, $employee);
@@ -197,6 +241,40 @@ class PayrollRunController extends Controller
         }
 
         $pdf = Pdf::loadView('modules.hrms.payroll.pdf_payslip', $data);
+        return $pdf->download($fileName);
+    }
+
+    public function downloadRangePayslips(Request $request)
+    {
+        $user = auth()->user();
+        $employee = $user ? Employee::resolveForUser($user) : null;
+        if (!$employee) {
+            return redirect()->back()->with('error', __('hrms.assets.error_no_employee_profile'));
+        }
+
+        $validated = $request->validate([
+            'from_month' => 'required|string',
+            'to_month'   => 'required|string',
+        ]);
+
+        $fromMonth = min($validated['from_month'], $validated['to_month']);
+        $toMonth   = max($validated['from_month'], $validated['to_month']);
+
+        $payslipsData = $this->payrollRunRepository->getRangePayslipsData($employee, $fromMonth, $toMonth);
+
+        if (empty($payslipsData)) {
+            return redirect()->back()->with('error', __('hrms.payroll.no_payslips_found_range', ['from' => $fromMonth, 'to' => $toMonth]));
+        }
+
+        $fileName = 'payslips_' . ($employee->employee_id ?: 'emp') . '_' . $fromMonth . '_to_' . $toMonth . '.pdf';
+
+        $pdf = Pdf::loadView('modules.hrms.payroll.pdf_payslips_range', [
+            'payslips'   => $payslipsData,
+            'employee'   => $employee,
+            'fromMonth'  => $fromMonth,
+            'toMonth'    => $toMonth,
+        ]);
+
         return $pdf->download($fileName);
     }
 }

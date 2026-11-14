@@ -29,6 +29,19 @@ class Product extends BaseModel
         self::MODEL_HYBRID,
     ];
 
+    protected static function booted(): void
+    {
+        // product_images rows cascade away with the product, but the image files
+        // don't — remove the product's folder (ProductImageService layout) too,
+        // which also frees it from the tenant's storage usage.
+        static::deleted(function (Product $product): void {
+            if ($product->tenant_id) {
+                \Illuminate\Support\Facades\Storage::disk('public')
+                    ->deleteDirectory("uploads/tenants/{$product->tenant_id}/products/{$product->id}");
+            }
+        });
+    }
+
     protected $fillable = [
         'tenant_id',
         'company_id',
@@ -37,7 +50,6 @@ class Product extends BaseModel
         'name',
         'sku',
         'type', // finished_good, raw_material, component, etc.
-        'planning_type', // stock, manufacture, purchase, manual
         'default_production_model', // pure_manufacturing, subcontract_complete, subcontract_company_material, hybrid
         'supplier_method',
         'item_type', // Goods, Service
@@ -112,6 +124,17 @@ class Product extends BaseModel
             return 'serial';
         }
         return 'standard';
+    }
+
+    public function isService(): bool
+    {
+        return strcasecmp((string)$this->item_type, 'Service') === 0 
+            || strcasecmp((string)$this->type, 'service') === 0;
+    }
+
+    public function isGoods(): bool
+    {
+        return !$this->isService();
     }
 
     public function parent(): BelongsTo
@@ -297,6 +320,16 @@ class Product extends BaseModel
     {
         $tenantId = $tenantId ?? $this->tenant_id ?? (tenant_id() ?? 1);
         return app(\App\Domains\Accounting\Services\AccountResolverService::class)->resolveInventoryAccount($this, $tenantId);
+    }
+
+    public function getHsnCodeAttribute(): ?string
+    {
+        return $this->hsn_sac;
+    }
+
+    public function getHsnAttribute(): ?string
+    {
+        return $this->hsn_sac;
     }
 }
 

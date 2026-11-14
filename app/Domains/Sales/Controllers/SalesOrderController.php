@@ -26,7 +26,8 @@ class SalesOrderController extends Controller
         private readonly SalesOrderRepository $orderRepo,
         private readonly SalesOrderService $salesOrders,
         private readonly MaterialRequirementService $materialRequirementService,
-    ) {}
+    ) {
+    }
 
     public function index(Request $request): View
     {
@@ -50,30 +51,48 @@ class SalesOrderController extends Controller
         );
     }
 
-    public function create(Request $request): View
+    public function create(Request $request): View|RedirectResponse
     {
         $this->authorize('create', SalesOrder::class);
 
         $prefillQuotation = null;
         if ($request->has('quotation_id')) {
             $prefillQuotation = Quotation::query()
-                ->with(['items.product', 'lead', 'crmAccount', 'crmDeal.account', 'crmDeal.contact'])
+                ->with(['items.product', 'lead', 'crmAccount', 'crmDeal.account', 'crmDeal.contact', 'salesOrder'])
                 ->find($request->input('quotation_id'));
 
             if ($prefillQuotation) {
+                // If quotation already converted, redirect to the existing sales order to prevent duplicates
+                if ($prefillQuotation->salesOrder) {
+                    return redirect()
+                        ->route('sales.orders.show', $prefillQuotation->salesOrder->id)
+                        ->with('info', "Quotation {$prefillQuotation->quotation_number} has already been converted to Sales Order {$prefillQuotation->salesOrder->sales_order_number}.");
+                }
+
                 // Ensure customer object & ID are resolved/synced for the quotation
                 $prefillCustomer = $prefillQuotation->customer;
+                if (!$prefillCustomer) {
+                    $dealId = $prefillQuotation->crm_deal_id;
+                    $convertUrl = $dealId
+                        ? route('crm.deals.showConvertForm', $dealId)
+                        : route('crm.quotations.showConvertForm', $prefillQuotation->id);
+
+                    return redirect($convertUrl)->with('warning', 'Please convert this quotation/deal to a customer before creating a Sales Order.');
+                }
             }
         }
 
         $customers = Customer::query()->orderBy('name')->get();
         $products = Product::query()->where('status', 'active')->get();
         $salesReps = User::query()->orderBy('name')->get();
-        
+
         $quotations = Quotation::query()
             ->where('is_current', true)
+            ->whereIn('status', ['Accepted', 'Won'])
+            ->whereDoesntHave('salesOrder')
             ->latest()
-            ->get();
+            ->get()
+            ->filter(fn($q) => !empty($q->customer));
 
         $warehouses = Warehouse::query()->orderBy('name')->get();
         $paymentTerms = PaymentTerm::query()->where('is_active', true)->orderBy('due_days')->get();
@@ -95,52 +114,54 @@ class SalesOrderController extends Controller
         $this->authorize('create', SalesOrder::class);
 
         $validated = $request->validate([
-            'customer_id'        => ['required', 'exists:customers,id'],
-            'quotation_id'       => ['nullable', 'exists:quotations,id'],
-            'sales_person_id'    => ['nullable', 'exists:users,id'],
+            'customer_id' => ['required', 'exists:customers,id'],
+            'quotation_id' => ['nullable', 'exists:quotations,id'],
+            'sales_person_id' => ['nullable', 'exists:users,id'],
             'sales_order_number' => ['required', 'string', 'max:255'],
-            'order_date'         => ['required', 'date'],
-            'shipment_date'      => ['nullable', 'date', 'after_or_equal:order_date'],
-            'payment_terms'      => ['nullable', 'string', 'max:255'],
-            'billing_address'    => ['nullable', 'string'],
-            'shipping_address'   => ['nullable', 'string'],
-            'discount_type'      => ['nullable', 'string', 'in:without_discount,item_wise,order_wise'],
-            'tax_type'           => ['nullable', 'string', 'in:without_tax,item_wise_tax,order_wise_tax'],
-            'gst_type'           => ['nullable', 'string', 'in:cgst_sgst,igst'],
-            'order_tax_rate'     => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'discount'           => ['nullable', 'numeric', 'min:0'],
-            'shipping_charges'   => ['nullable', 'numeric', 'min:0'],
-            'freight_terms'      => ['nullable', 'string', 'in:To Pay,To Be Billed,Prepaid,Customer Pickup'],
-            'freight_amount'     => ['nullable', 'numeric', 'min:0'],
-            'freight_tax_rate'   => ['nullable', 'string'],
-            'adjustment'         => ['nullable', 'numeric'],
-            'terms_conditions'   => ['nullable', 'string'],
-            'notes'              => ['nullable', 'string'],
-            'items.*.product_id'  => ['required', 'integer', 'exists:products,id'],
-            'items.*.warehouse_id'=> ['nullable', 'integer', 'exists:warehouses,id'],
-            'items.*.item_name'   => ['nullable', 'string', 'max:255'],
+            'order_date' => ['required', 'date'],
+            'shipment_date' => ['nullable', 'date', 'after_or_equal:order_date'],
+            'payment_terms' => ['nullable', 'string', 'max:255'],
+            'billing_address' => ['nullable', 'string'],
+            'shipping_address' => ['nullable', 'string'],
+            'discount_type' => ['nullable', 'string', 'in:without_discount,item_wise,order_wise'],
+            'tax_mode' => ['nullable', 'string', 'in:exclusive,inclusive'],
+            'tax_type' => ['nullable', 'string', 'in:without_tax,item_wise_tax,order_wise_tax'],
+            'gst_type' => ['nullable', 'string', 'in:cgst_sgst,igst'],
+            'order_tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'discount' => ['nullable', 'numeric', 'min:0'],
+            'shipping_charges' => ['nullable', 'numeric', 'min:0'],
+            'freight_terms' => ['nullable', 'string', 'in:To Pay,To Be Billed,Prepaid,Customer Pickup'],
+            'freight_amount' => ['nullable', 'numeric', 'min:0'],
+            'freight_tax_rate' => ['nullable', 'string'],
+            'adjustment' => ['nullable', 'numeric'],
+            'terms_conditions' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+            'items.*.item_name' => ['nullable', 'string', 'max:255'],
             'items.*.description' => ['nullable', 'string'],
-            'items.*.quantity'    => ['required', 'integer', 'min:1'],
-            'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
-            'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'items.*.discount'    => ['nullable', 'numeric', 'min:0'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'items.*.discount' => ['nullable', 'numeric', 'min:0'],
         ], [
             'items.*.product_id.required' => 'Please select a valid Product from the dropdown for each item line.',
-            'items.*.product_id.exists'   => 'The selected product does not exist in inventory.',
+            'items.*.product_id.exists' => 'The selected product does not exist in inventory.',
         ]);
+
+        if (!empty($validated['quotation_id'])) {
+            $existingOrder = SalesOrder::where('quotation_id', $validated['quotation_id'])->first();
+            if ($existingOrder) {
+                return back()->withInput()->withErrors([
+                    'quotation_id' => "This quotation has already been converted to Sales Order {$existingOrder->sales_order_number}."
+                ]);
+            }
+        }
 
         $order = $this->salesOrders->create($validated, $request->input('items', []));
 
-        // Trigger Notification Master Rules
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.order.created', [
-            'doc_no'             => $order->sales_order_number,
-            'customer_name'      => $order->customer?->name ?? 'Customer',
-            'amount'             => format_currency($order->total_amount ?? 0),
-            'created_by'         => auth()->user()?->name ?? 'User',
-            'created_by_user_id' => auth()->id(),
-            'assigned_user_id'   => $order->sales_person_id,
-            'date'               => now()->format('d M Y h:i A'),
-        ], route('sales.orders.show', $order->id), $order);
+        // Trigger Notification Master Rules & Pusher Alerts
+        \App\Domains\Sales\Services\SalesNotificationService::notifyOrderCreated($order);
 
         return redirect()->route('sales.orders.show', $order->id)->with('success', 'Sales Order successfully created!');
     }
@@ -148,7 +169,8 @@ class SalesOrderController extends Controller
     public function show(int|string $id): View
     {
         $id = (int) $id;
-        if ($id <= 0) abort(404, 'Sales Order not found.');
+        if ($id <= 0)
+            abort(404, 'Sales Order not found.');
 
         $order = $this->orderRepo->findWithDetails($id);
         $this->authorize('view', $order);
@@ -159,10 +181,12 @@ class SalesOrderController extends Controller
     public function downloadPdf(int|string $id)
     {
         $id = (int) $id;
-        if ($id <= 0) abort(404, 'Sales Order not found.');
+        if ($id <= 0)
+            abort(404, 'Sales Order not found.');
 
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404, 'Sales Order not found.');
+        if (!$order)
+            abort(404, 'Sales Order not found.');
         $this->authorize('view', $order);
 
         $pdf = Pdf::loadView('modules.sales.orders.pdf', compact('order'));
@@ -172,10 +196,12 @@ class SalesOrderController extends Controller
     public function edit(int|string $id): View|RedirectResponse
     {
         $id = (int) $id;
-        if ($id <= 0) abort(404, 'Sales Order not found.');
+        if ($id <= 0)
+            abort(404, 'Sales Order not found.');
 
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404, 'Sales Order not found.');
+        if (!$order)
+            abort(404, 'Sales Order not found.');
 
         if ($order->status !== 'Draft') {
             return redirect()->route('sales.orders.show', $order->id)
@@ -183,7 +209,7 @@ class SalesOrderController extends Controller
         }
 
         $this->authorize('update', $order);
-          
+
         $customers = Customer::query()->orderBy('name')->get();
         $products = Product::query()->where('status', 'active')->get();
         $salesReps = User::query()->orderBy('name')->get();
@@ -197,10 +223,12 @@ class SalesOrderController extends Controller
     public function update(Request $request, int|string $id): RedirectResponse
     {
         $id = (int) $id;
-        if ($id <= 0) abort(404, 'Sales Order not found.');
+        if ($id <= 0)
+            abort(404, 'Sales Order not found.');
 
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404, 'Sales Order not found.');
+        if (!$order)
+            abort(404, 'Sales Order not found.');
 
         if ($order->status !== 'Draft') {
             return redirect()->route('sales.orders.show', $order->id)
@@ -210,38 +238,39 @@ class SalesOrderController extends Controller
         $this->authorize('update', $order);
 
         $validated = $request->validate([
-            'customer_id'        => ['required', 'exists:customers,id'],
-            'quotation_id'       => ['nullable', 'exists:quotations,id'],
-            'sales_person_id'    => ['nullable', 'exists:users,id'],
+            'customer_id' => ['required', 'exists:customers,id'],
+            'quotation_id' => ['nullable', 'exists:quotations,id'],
+            'sales_person_id' => ['nullable', 'exists:users,id'],
             'sales_order_number' => ['required', 'string', 'max:255'],
-            'order_date'         => ['required', 'date'],
-            'shipment_date'      => ['nullable', 'date', 'after_or_equal:order_date'],
-            'payment_terms'      => ['nullable', 'string', 'max:255'],
-            'billing_address'    => ['nullable', 'string'],
-            'shipping_address'   => ['nullable', 'string'],
-            'discount_type'      => ['nullable', 'string', 'in:without_discount,item_wise,order_wise'],
-            'tax_type'           => ['nullable', 'string', 'in:without_tax,item_wise_tax,order_wise_tax'],
-            'gst_type'           => ['nullable', 'string', 'in:cgst_sgst,igst'],
-            'order_tax_rate'     => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'discount'           => ['nullable', 'numeric', 'min:0'],
-            'shipping_charges'   => ['nullable', 'numeric', 'min:0'],
-            'freight_terms'      => ['nullable', 'string', 'in:To Pay,To Be Billed,Prepaid,Customer Pickup'],
-            'freight_amount'     => ['nullable', 'numeric', 'min:0'],
-            'freight_tax_rate'   => ['nullable', 'string'],
-            'adjustment'         => ['nullable', 'numeric'],
-            'terms_conditions'   => ['nullable', 'string'],
-            'notes'              => ['nullable', 'string'],
-            'items.*.product_id'  => ['required', 'integer', 'exists:products,id'],
-            'items.*.warehouse_id'=> ['nullable', 'integer', 'exists:warehouses,id'],
-            'items.*.item_name'   => ['nullable', 'string', 'max:255'],
+            'order_date' => ['required', 'date'],
+            'shipment_date' => ['nullable', 'date', 'after_or_equal:order_date'],
+            'payment_terms' => ['nullable', 'string', 'max:255'],
+            'billing_address' => ['nullable', 'string'],
+            'shipping_address' => ['nullable', 'string'],
+            'discount_type' => ['nullable', 'string', 'in:without_discount,item_wise,order_wise'],
+            'tax_mode' => ['nullable', 'string', 'in:exclusive,inclusive'],
+            'tax_type' => ['nullable', 'string', 'in:without_tax,item_wise_tax,order_wise_tax'],
+            'gst_type' => ['nullable', 'string', 'in:cgst_sgst,igst'],
+            'order_tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'discount' => ['nullable', 'numeric', 'min:0'],
+            'shipping_charges' => ['nullable', 'numeric', 'min:0'],
+            'freight_terms' => ['nullable', 'string', 'in:To Pay,To Be Billed,Prepaid,Customer Pickup'],
+            'freight_amount' => ['nullable', 'numeric', 'min:0'],
+            'freight_tax_rate' => ['nullable', 'string'],
+            'adjustment' => ['nullable', 'numeric'],
+            'terms_conditions' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+            'items.*.item_name' => ['nullable', 'string', 'max:255'],
             'items.*.description' => ['nullable', 'string'],
-            'items.*.quantity'    => ['required', 'integer', 'min:1'],
-            'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
-            'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'items.*.discount'    => ['nullable', 'numeric', 'min:0'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'items.*.discount' => ['nullable', 'numeric', 'min:0'],
         ], [
             'items.*.product_id.required' => 'Please select a valid Product from the dropdown for each item line.',
-            'items.*.product_id.exists'   => 'The selected product does not exist in inventory.',
+            'items.*.product_id.exists' => 'The selected product does not exist in inventory.',
         ]);
 
         $this->salesOrders->update($order, $validated, $request->input('items', []));
@@ -252,58 +281,89 @@ class SalesOrderController extends Controller
     public function confirm(int|string $id): RedirectResponse
     {
         $id = (int) $id;
-        if ($id <= 0) abort(404, 'Sales Order not found.');
+        if ($id <= 0)
+            abort(404, 'Sales Order not found.');
 
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404, 'Sales Order not found.');
+        if (!$order)
+            abort(404, 'Sales Order not found.');
         $this->authorize('confirm', $order);
 
         if ($order->status !== 'Draft') {
             return back()->withErrors(['status' => 'Only Draft Sales Orders can be confirmed.']);
         }
 
-        $nextRequirementNumber = $this->materialRequirementService->getNextRequirementNumber();
-        $this->orderRepo->confirmOrder($order, $nextRequirementNumber);
+        $isServiceOnly = $order->hasOnlyServices();
+        $nextRequirementNumber = $isServiceOnly ? '' : $this->materialRequirementService->getNextRequirementNumber();
+        $delivery = $this->orderRepo->confirmOrder($order, $nextRequirementNumber);
 
-        // Trigger Notification Master Rules
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.order.confirmed', [
-            'doc_no'             => $order->sales_order_number,
-            'customer_name'      => $order->customer?->name ?? 'Customer',
-            'amount'             => format_currency($order->total_amount ?? 0),
-            'confirmed_by'       => auth()->user()?->name ?? 'User',
-            'created_by_user_id' => $order->created_by,
-            'assigned_user_id'   => $order->sales_person_id,
-            'date'               => now()->format('d M Y h:i A'),
-        ], route('sales.orders.show', $order->id), $order);
+        // Trigger Notification Master Rules & Pusher Alerts
+        \App\Domains\Sales\Services\SalesNotificationService::notifyOrderConfirmed($order);
 
-        return redirect()->route('sales.orders.show', $order->id)->with('success', 'Sales Order confirmed and Material Requirement generated successfully!');
+        $successMsg = $isServiceOnly
+            ? 'Sales Order confirmed successfully! (Service order: Material requirement and dispatch are bypassed; direct billing is enabled).'
+            : 'Sales Order confirmed and Material Requirement generated successfully!';
+
+        return redirect()->route('sales.orders.show', $order->id)->with('success', $successMsg);
     }
 
-    public function cancel(int|string $id): RedirectResponse
+    public function cancel(Request $request, int|string $id): RedirectResponse
     {
         $id = (int) $id;
-        if ($id <= 0) abort(404, 'Sales Order not found.');
+        if ($id <= 0)
+            abort(404, 'Sales Order not found.');
 
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404, 'Sales Order not found.');
+        if (!$order)
+            abort(404, 'Sales Order not found.');
         $this->authorize('cancel', $order);
 
-        if ($order->status === 'Shipped') {
-            return back()->withErrors(['status' => 'Cannot cancel a Shipped Sales Order.']);
+        $reason = $request->input('reason', 'Cancelled by user');
+
+        try {
+            $this->orderRepo->cancelOrder($order, $reason);
+            \App\Domains\Sales\Services\SalesNotificationService::notifyOrderCancelled($order, $reason);
+            return back()->with('success', 'Sales Order and associated un-shipped dispatch orders cancelled successfully.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['status' => $e->getMessage()]);
         }
+    }
 
-        $this->orderRepo->cancelOrder($order);
+    public function shortClose(Request $request, int|string $id): RedirectResponse
+    {
+        $id = (int) $id;
+        if ($id <= 0)
+            abort(404, 'Sales Order not found.');
 
-        return back()->with('success', 'Sales Order cancelled successfully.');
+        $order = $this->orderRepo->find($id);
+        if (!$order)
+            abort(404, 'Sales Order not found.');
+        $this->authorize('shortClose', $order);
+
+        $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        $reason = $request->input('reason');
+
+        try {
+            $this->orderRepo->shortCloseOrder($order, $reason);
+            \App\Domains\Sales\Services\SalesNotificationService::notifyOrderShortClosed($order, $reason);
+            return back()->with('success', "Sales Order {$order->sales_order_number} has been Short-Closed. Remaining open quantities have been cleanly cancelled.");
+        } catch (\Exception $e) {
+            return back()->withErrors(['status' => $e->getMessage()]);
+        }
     }
 
     public function destroy(int|string $id): RedirectResponse
     {
         $id = (int) $id;
-        if ($id <= 0) abort(404, 'Sales Order not found.');
+        if ($id <= 0)
+            abort(404, 'Sales Order not found.');
 
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404, 'Sales Order not found.');
+        if (!$order)
+            abort(404, 'Sales Order not found.');
         $this->authorize('delete', $order);
 
         $this->salesOrders->delete($order);
@@ -314,30 +374,35 @@ class SalesOrderController extends Controller
     public function convertToProject(Request $request, SalesOrder|int|string $order, \App\Domains\Sales\Services\SalesOrderProjectBridgeService $bridgeService): RedirectResponse
     {
         $order = $order instanceof SalesOrder ? $order : $this->orderRepo->find((int) $order);
-        if (!$order) abort(404, 'Sales Order not found.');
+        if (!$order)
+            abort(404, 'Sales Order not found.');
 
         $this->authorize('view', $order);
         $this->authorize('create', \App\Domains\Projects\Models\Project::class);
 
-        if ($order->status !== 'Confirmed') {
-            return back()->withErrors(['status' => 'Only Confirmed Sales Orders can be converted to a Delivery Project.']);
+        if (in_array($order->status, ['Draft', 'Cancelled'])) {
+            return back()->withErrors(['status' => 'Draft or Cancelled Sales Orders cannot be converted to a Delivery Project.']);
+        }
+
+        if ($order->projects()->exists()) {
+            return back()->withErrors(['conversion' => 'A Delivery Project has already been created for this Sales Order.']);
         }
 
         $validated = $request->validate([
-            'project_name'   => 'nullable|string|max:255',
-            'manager_id'     => 'nullable|integer|exists:users,id',
-            'start_date'     => 'nullable|date',
-            'end_date'       => 'nullable|date|after_or_equal:start_date',
-            'budget_amount'  => 'nullable|numeric|min:0',
+            'project_name' => 'nullable|string|max:255',
+            'manager_id' => 'nullable|integer|exists:users,id',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'budget_amount' => 'nullable|numeric|min:0',
             'cost_center_id' => 'nullable|integer|exists:cost_centers,id',
         ]);
 
         $customData = array_filter([
-            'name'           => $validated['project_name'] ?? null,
-            'manager_id'     => $validated['manager_id'] ?? null,
-            'start_date'     => $validated['start_date'] ?? null,
-            'end_date'       => $validated['end_date'] ?? null,
-            'budget_amount'  => $validated['budget_amount'] ?? null,
+            'name' => $validated['project_name'] ?? null,
+            'manager_id' => $validated['manager_id'] ?? null,
+            'start_date' => $validated['start_date'] ?? null,
+            'end_date' => $validated['end_date'] ?? null,
+            'budget_amount' => $validated['budget_amount'] ?? null,
             'cost_center_id' => $validated['cost_center_id'] ?? null,
         ]);
 

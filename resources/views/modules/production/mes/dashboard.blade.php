@@ -517,7 +517,8 @@
                                         <th style="min-width: 110px; width: 110px;">{{ __('production.actual_finish') }}</th>
                                         <th class="text-center" style="min-width: 90px; width: 90px;">{{ __('production.done_qty') }}</th>
                                         <th class="text-center" style="min-width: 90px; width: 90px;">{{ __('production.pending_qty') }}</th>
-                                        <th class="pe-3" style="min-width: 110px; width: 110px;">{{ __('production.assign_to') }}</th>
+                                        <th style="min-width: 120px; width: 120px;">{{ __('production.assign_to') }}</th>
+                                        <th class="pe-3" style="min-width: 120px; width: 120px;">Executed By</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -547,14 +548,13 @@
                                             }
 
                                             $doneQty = (float) ($orderOp->quantity_produced ?? 0.0);
-                                            $pendingQty = max(0.0, $moQty - $doneQty);
-                                            $isCompleted = ($op->status === 'completed') || ($doneQty >= $moQty && $moQty > 0);
-
                                             $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
                                             $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($orderOp->id);
                                             $acceptedQty = (float) ($orderOp->quantity_produced ?? 0.0);
                                             $rejectedQty = (float) ($orderOp->quantity_rejected ?? 0.0);
                                             $scrappedQty = (float) ($orderOp->quantity_scrapped ?? 0.0);
+                                            $pendingQty = max(0.0, $moQty - ($doneQty + $pendingQcQty + $scrappedQty + $rejectedQty));
+                                            $isCompleted = ($op->status === 'completed') || ($doneQty >= $moQty && $moQty > 0);
                                             $outputPid = $orderOp->product_id ?? $orderOp->source_product_id ?? $order->product_id;
                                             $rmScrapQty = (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $op->tenant_id)
                                                 ->where('production_order_id', $op->production_order_id ?? $op->order_id)
@@ -570,8 +570,8 @@
                                                     ->latest('id')
                                                     ->first();
 
-                                            $assignedUser = $activeAssignment?->user ?? $orderOp->operator ?? null;
-                                            $assignmentStatus = $activeAssignment?->status ?? ($assignedUser ? 'accepted' : null);
+                                            $assignedUser = $activeAssignment?->user ?? null;
+                                            $assignmentStatus = $activeAssignment?->status ?? null;
 
                                             if ($assignmentStatus === 'assigned') {
                                                 $assignedName = 'Pending: ' . ($assignedUser->name ?? 'Operator');
@@ -588,6 +588,16 @@
                                                 $assignedBadgeClass = 'bg-soft-secondary text-dark border';
                                                 $assignedIcon = 'feather-user';
                                                 $assignedTooltip = 'No Operator Assigned';
+                                            }
+
+                                            // Executed By resolution (person who starts or logs progress on the operation)
+                                            $executedUser = $orderOp->relationLoaded('executedBy') ? $orderOp->executedBy : ($orderOp->executedBy ?? null);
+                                            if (!$executedUser && $orderOp->relationLoaded('progressLogs')) {
+                                                $latestProgressLog = $orderOp->progressLogs->sortByDesc('id')->first();
+                                                $executedUser = $latestProgressLog?->user ?? null;
+                                            } elseif (!$executedUser) {
+                                                $latestProgressLog = \App\Domains\Production\Models\ProductionOrderProgressLog::where('operation_id', $orderOp->id)->latest('id')->first();
+                                                $executedUser = $latestProgressLog?->user ?? null;
                                             }
                                         @endphp
 
@@ -650,7 +660,7 @@
                                                         @endif
 
                                                         {{-- QC & Disposition Context Actions for Outsourced Operations --}}
-                                                        @if($isQcRequired || $rejectedQty > 0)
+                                                        @if(($isQcRequired && ($pendingQcQty > 0 || $isCompleted)) || $rejectedQty > 0)
                                                             <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
                                                                 @if($isQcRequired)
                                                                     @if($pendingQcQty > 0)
@@ -665,12 +675,6 @@
                                                                             class="badge bg-soft-success text-success border border-success-subtle p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 text-nowrap">
                                                                             <i class="feather-check-circle fs-11"></i>QC Passed
                                                                         </span>
-                                                                    @else
-                                                                        <button type="button"
-                                                                            class="btn btn-xs btn-outline-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
-                                                                            data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
-                                                                            title="Run Quality Inspection on Received Subcontract Goods">
-                                                                            <i class="feather-shield-check fs-11"></i>{{ __('production.run_qc') }}</button>
                                                                     @endif
                                                                 @endif
                                                                 @if($rejectedQty > 0)
@@ -695,13 +699,6 @@
                                                                     data-bs-toggle="tooltip" data-bs-placement="top"
                                                                     title="Process Completed (Done Qty Reached)">
                                                                     <i class="feather-check text-white fs-12"></i>
-                                                                </span>
-                                                                <span class="d-inline-block" data-bs-toggle="tooltip" data-bs-placement="top"
-                                                                    title="Log Additional Output">
-                                                                    <button type="button" class="action-icon-btn view-btn"
-                                                                        data-bs-toggle="modal" data-bs-target="#completeModal{{ $op->id }}">
-                                                                        <i class="feather-rotate-cw fs-12"></i>
-                                                                    </button>
                                                                 </span>
                                                             @elseif($op->status === 'running')
                                                                 <form method="POST" action="{{ route('production.mes.pause', $op->id) }}"
@@ -764,7 +761,7 @@
                                                         </div>
 
                                                         {{-- QC & Disposition Context Actions --}}
-                                                        @if($isQcRequired || $rejectedQty > 0)
+                                                        @if(($isQcRequired && ($pendingQcQty > 0 || $isCompleted)) || $rejectedQty > 0)
                                                             <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
                                                                 @if($isQcRequired)
                                                                     @if($pendingQcQty > 0)
@@ -779,12 +776,6 @@
                                                                             class="badge bg-soft-success text-success border border-success-subtle p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 text-nowrap">
                                                                             <i class="feather-check-circle fs-11"></i>QC Passed
                                                                         </span>
-                                                                    @else
-                                                                        <button type="button"
-                                                                            class="btn btn-xs btn-outline-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
-                                                                            data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
-                                                                            title="Run Inline Quality Inspection">
-                                                                            <i class="feather-shield-check fs-11"></i>{{ __('production.run_qc') }}</button>
                                                                     @endif
                                                                 @endif
                                                                 @if($rejectedQty > 0)
@@ -963,7 +954,7 @@
                                             </td>
 
                                             {{-- Assign To (Wrapped Multi-line, NO TRUNCATE) --}}
-                                            <td class="pe-3 align-top">
+                                            <td class="align-top">
                                                 @if($isOutsourced)
                                                     <span
                                                         class="badge bg-soft-purple text-purple border border-purple-subtle fs-10 text-wrap d-inline-block"
@@ -972,13 +963,21 @@
                                                         <i class="feather-briefcase me-1"></i>{{ $vendorName }}
                                                     </span>
                                                 @else
+                                                    @php
+                                                        $isOpStarted = in_array($op->status, ['running', 'paused', 'completed'])
+                                                            || in_array($orderOp->status ?? '', ['running', 'paused', 'completed'])
+                                                            || !empty($op->actual_start)
+                                                            || !empty($orderOp->actual_start_time)
+                                                            || ((float) ($orderOp->quantity_produced ?? 0) > 0);
+                                                        $canChangeOperator = !$isCompleted && (!$isOpStarted || !$assignedUser);
+                                                    @endphp
                                                     <div class="d-flex align-items-center gap-1 flex-wrap">
                                                         <span class="badge {{ $assignedBadgeClass }} fs-10 text-wrap d-inline-block"
                                                             data-bs-toggle="tooltip" data-bs-placement="top"
                                                             title="{{ $assignedTooltip }}">
                                                             <i class="{{ $assignedIcon }} me-1"></i>{{ $assignedName }}
                                                         </span>
-                                                        @if(!$isCompleted)
+                                                        @if($canChangeOperator)
                                                             <button type="button"
                                                                 class="btn btn-xs btn-outline-primary p-0.5 px-1 fs-10 border shadow-none"
                                                                 title="{{ $assignedName !== 'Unassigned' ? 'Reassign Operator' : 'Assign Operator' }}"
@@ -988,6 +987,21 @@
                                                             </button>
                                                         @endif
                                                     </div>
+                                                @endif
+                                            </td>
+
+                                            {{-- Executed By --}}
+                                            <td class="pe-3 align-top">
+                                                @if($isOutsourced)
+                                                    <span class="text-muted fs-11">—</span>
+                                                @elseif($executedUser)
+                                                    <span class="badge bg-soft-info text-info border border-info-subtle fs-10 text-wrap d-inline-block"
+                                                        data-bs-toggle="tooltip" data-bs-placement="top"
+                                                        title="Executed / Logged by {{ $executedUser->name }}">
+                                                        <i class="feather-play-circle me-1"></i>{{ $executedUser->name }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-muted fs-11">—</span>
                                                 @endif
                                             </td>
                                         </tr>
@@ -1135,7 +1149,8 @@
                                         })
                                         ->sum('quantity')
                                 );
-                                $activeRemainingToComplete = max(0.0, $activeTargetQty - (($activeOrderOp->quantity_produced ?? 0.0) + $activeScrapQty + ($activeOrderOp->quantity_rejected ?? 0.0)));
+                                $activePendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($activeOrderOp->id);
+                                $activeRemainingToComplete = max(0.0, $activeTargetQty - (($activeOrderOp->quantity_produced ?? 0.0) + $activePendingQcQty + $activeScrapQty + ($activeOrderOp->quantity_rejected ?? 0.0)));
                             @endphp
                             <x-ui.modal id="completeModal{{ $activeOp->id }}"
                                 title="{{ ($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied') ? 'RECEIVE SUBCONTRACT GOODS (VENDOR SUPPLIED) — ' . html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') : 'ADD PRODUCTION OF — ' . html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}"
@@ -1237,7 +1252,23 @@
                         @endif
 
                             {{-- Assign Operator Modal (Shopfloor Assignment) --}}
-                            @if(!$isActiveOutsourced && $activeOp->status !== 'completed')
+                            @php
+                                $activeAssignment = $activeOrderOp->relationLoaded('operatorAssignments')
+                                    ? $activeOrderOp->operatorAssignments->whereIn('status', ['assigned', 'accepted'])->sortByDesc('id')->first()
+                                    : \App\Domains\Production\Models\ProductionOperatorAssignment::where('tenant_id', $activeOp->tenant_id ?? require_tenant_id())
+                                        ->where('production_order_operation_id', $activeOrderOp->id)
+                                        ->whereIn('status', ['assigned', 'accepted'])
+                                        ->latest('id')
+                                        ->first();
+                                $activeAssignedUser = $activeAssignment?->user ?? null;
+                                $isActiveOpStarted = in_array($activeOp->status, ['running', 'paused', 'completed'])
+                                    || in_array($activeOrderOp->status ?? '', ['running', 'paused', 'completed'])
+                                    || !empty($activeOp->actual_start)
+                                    || !empty($activeOrderOp->actual_start_time)
+                                    || ((float) ($activeOrderOp->quantity_produced ?? 0) > 0);
+                                $canChangeActiveOperator = ($activeOp->status !== 'completed') && (!$isActiveOpStarted || !$activeAssignedUser);
+                            @endphp
+                            @if(!$isActiveOutsourced && $canChangeActiveOperator)
                                 <x-ui.modal id="assignOperatorModal{{ $activeOp->id }}"
                                     title="Assign Operator — Op #{{ $activeOp->sequence }} ({{ $activeOrderOp->name ?? '' }})"
                                     class="text-start" :showFooter="true">
@@ -1249,7 +1280,7 @@
                                         <x-ui.odoo-form-ui type="select" label="Select Operator" name="user_id" :required="true">
                                             <option value="">-- Choose Operator --</option>
                                             @foreach($operators as $operator)
-                                                <option value="{{ $operator->id }}" {{ (($assignedUser->id ?? $activeOp->assignedOperator->id ?? $activeOrderOp->operator_id ?? null) == $operator->id) ? 'selected' : '' }}>
+                                                <option value="{{ $operator->id }}" {{ (($activeAssignedUser->id ?? $activeOp->assignedOperator->id ?? $activeOrderOp->operator_id ?? null) == $operator->id) ? 'selected' : '' }}>
                                                     {{ $operator->name }} ({{ ucfirst($operator->role) }})
                                                 </option>
                                             @endforeach
@@ -1416,12 +1447,12 @@
 
                                         <div class="col-md-4">
                                             <x-ui.odoo-form-ui type="input" label="Accepted Qty (Good Usable Output)"
-                                                name="accepted_qty" inputType="number" step="any" value="{{ $activePendingQcQty }}"
+                                                name="accepted_qty" id="qc_accepted_qty_{{ $activeOp->id }}" inputType="number" step="any" min="0" max="{{ (float) $activePendingQcQty }}" value="{{ (float) $activePendingQcQty }}"
                                                 :required="true" />
                                         </div>
                                         <div class="col-md-4">
                                             <x-ui.odoo-form-ui type="input" label="Rejected Qty (Defective Output)" name="rejected_qty"
-                                                inputType="number" step="any" value="0" :required="true" />
+                                                id="qc_rejected_qty_{{ $activeOp->id }}" inputType="number" step="any" min="0" max="{{ (float) $activePendingQcQty }}" value="0" :required="true" />
                                         </div>
                                         <div class="col-md-4">
                                             <x-ui.odoo-form-ui type="select" label="Defect Reason (If Rejected)" name="defect_reason">
@@ -1445,7 +1476,7 @@
                                 <x-slot name="footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
                                     <button type="button" class="btn btn-warning text-dark fw-bold px-4"
-                                        onclick="document.getElementById('qcForm{{ $activeOp->id }}').submit();">
+                                        onclick="submitShopfloorQcInspection('{{ $activeOp->id }}', {{ (float) $activePendingQcQty }});">
                                         <i class="feather-check-circle me-1"></i>Submit QC Inspection
                                     </button>
                                 </x-slot>
@@ -1758,6 +1789,50 @@
                     });
                     updateQualityChecklist(selectEl);
                 });
+
+                window.submitShopfloorQcInspection = function (opId, maxPending) {
+                    const form = document.getElementById('qcForm' + opId);
+                    if (!form) return;
+                    const acceptedInput = form.querySelector('input[name="accepted_qty"]');
+                    const rejectedInput = form.querySelector('input[name="rejected_qty"]');
+                    const accepted = parseFloat(acceptedInput ? acceptedInput.value : 0) || 0;
+                    const rejected = parseFloat(rejectedInput ? rejectedInput.value : 0) || 0;
+                    const total = accepted + rejected;
+
+                    const showWarning = function (msg) {
+                        if (typeof window.confirmAction === 'function') {
+                            window.confirmAction({
+                                title: 'Quality Inspection Alert',
+                                message: msg,
+                                variant: 'warning',
+                                confirmButtonText: 'OK',
+                                hideCancel: true,
+                                cancelButtonText: ''
+                            });
+                        } else {
+                            alert(msg);
+                        }
+                    };
+
+                    if (maxPending <= 0) {
+                        showWarning('Quality inspection cannot be logged: There are no units pending QC for this operation. Output must be logged first.');
+                        return false;
+                    }
+                    if (accepted < 0 || rejected < 0) {
+                        showWarning('Quantities cannot be negative.');
+                        return false;
+                    }
+                    if (total <= 0) {
+                        showWarning('Total inspected quantity (Accepted + Rejected) must be greater than zero.');
+                        return false;
+                    }
+                    if (total > maxPending + 0.0001) {
+                        showWarning('Total units logged for QC (' + total + ') cannot exceed the pending QC units (' + maxPending + ').');
+                        return false;
+                    }
+
+                    form.submit();
+                };
             });
         </script>
     @endpush

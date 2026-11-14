@@ -78,6 +78,9 @@ The Project Management domain adheres strictly to modern Laravel 12 and enterpri
 | **Quality Reviews & Change Requests** | Fully Implemented | `ProjectReview`, `ChangeRequest` |
 | **Milestones & Deliverables** | Fully Implemented | `Milestone`, `MilestoneService` |
 | **Project Billing & Invoicing Bridge** | Fully Implemented | `ProjectBillingService`, `SalesInvoiceCreationService` |
+| **Sales Order Conversion Bridge** | Fully Implemented | `SalesOrderProjectBridgeService`, `SalesOrderController` |
+| **Manufacturing & Shop-Floor Sync** | Fully Implemented | `TaskController::linkProductionOrder`, `SyncProductionTaskCompletionListener` |
+| **Procurement Item Linking** | Fully Implemented | `TaskController::linkPurchaseRequisition`, `purchase_requisition_items` |
 | **Controlled Closure (5 Gates)** | Fully Implemented | `ProjectClosureService::evaluateGates()` |
 | **Domain Events & Notifications** | Fully Implemented | 12 Domain Events, `ProjectNotificationListener` |
 | **Executive Dashboard & Reporting** | Fully Implemented | `ProjectDashboardService`, `ProjectReportService` (7 reports) |
@@ -92,11 +95,12 @@ A common misunderstanding in ERP implementations is domain responsibility overla
 > **Canonical Ownership Rules**:
 > 1. **Project Management owns project execution, task schedules, timesheets, and issue tracking.**
 > 2. **CRM owns Customer master records.** Projects merely associate `customer_id`.
-> 3. **Sales owns Customer Invoices.** Project billing gathers billing items and calls `SalesInvoiceCreationService::createDraftInvoice()`.
+> 3. **Sales owns Customer Orders and Invoices.** Confirmed Sales Orders can be converted into delivery projects via `SalesOrderProjectBridgeService`. Project billing gathers unbilled items and calls `SalesInvoiceCreationService::createDraftInvoice()`.
 > 4. **Accounting owns the General Ledger.** Accounting reacts asynchronously to `InvoicePosted` events emitted by Sales via `PostSalesInvoiceJournal`. Project Management never generates journal entries directly.
 > 5. **Inventory owns Product Masters.** Project billing queries active 'Service' products for line item SKUs. No physical inventory movements occur.
-> 6. **Production Planning operates independently.** Production orders have no `project_id` foreign keys in the current schema; manufacturing handoffs are coordinated administratively or via Make-to-Order sales orders.
-> 7. **HRMS manages canonical User profiles.** Project Management assigns `User` instances as members and project managers without maintaining separate employee tables.
+> 6. **Production executes shop-floor manufacturing.** Project tasks can link to Production Orders scoped to the same company and branch. When all linked orders complete and aggregate output satisfies ordered quantity ($\sum \text{produced} \ge \sum \text{ordered} - 0.0001$), `SyncProductionTaskCompletionListener` automatically marks the task `Completed` and recalculates milestone progress.
+> 7. **Purchasing manages vendor requisitions.** Project tasks can link to Purchase Requisition items (`purchase_requisition_items.project_task_id`) scoped to the same company and branch. Automated generation of Purchase Orders directly from tasks is not supported.
+> 8. **HRMS manages canonical User profiles.** Project Management assigns `User` instances as members and project managers without maintaining separate employee tables.
 
 ---
 

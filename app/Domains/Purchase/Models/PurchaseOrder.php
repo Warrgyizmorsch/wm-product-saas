@@ -17,6 +17,9 @@ class PurchaseOrder extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
+    protected ?string $rbacPermission = 'purchase.orders.view';
+    protected ?string $rbacOwnerColumn = 'created_by';
+
     protected static function boot()
     {
         parent::boot();
@@ -87,6 +90,17 @@ class PurchaseOrder extends BaseModel
         'grand_total' => 'decimal:2',
     ];
 
+    public function getOrderNumberAttribute(): string
+    {
+        return $this->attributes['purchase_order_number'] ?? '';
+    }
+
+
+    public function getOrderDateAttribute()
+    {
+        return $this->attributes['date'] ?? null;
+    }
+
     public function productionOrder(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Production\Models\ProductionOrder::class, 'production_order_id');
@@ -135,6 +149,68 @@ class PurchaseOrder extends BaseModel
     public function getBalanceDueAttribute(): float
     {
         return max(0.0, (float)$this->grand_total - $this->total_advance_paid);
+    }
+
+    public function getRemainingAdvanceLimit(): float
+    {
+        $poTotal = (float) ($this->grand_total ?: $this->total_amount);
+        $tenantId = $this->tenant_id;
+
+        // Total non-cancelled bills raised against this PO
+        $billedAmount = (float) VendorBill::where('tenant_id', $tenantId)
+            ->where(function ($q) {
+                $q->where('purchase_order_id', $this->id)
+                  ->orWhereIn('goods_receipt_note_id', function ($sub) {
+                      $sub->select('id')->from('goods_receipt_notes')->where('purchase_order_id', $this->id);
+                  });
+            })
+            ->where('status', '!=', 'Cancelled')
+            ->sum('grand_total');
+
+        // Total advance payments made against this PO
+        $totalAdvancePaid = (float) PurchaseAdvancePayment::where('tenant_id', $tenantId)
+            ->where('purchase_order_id', $this->id)
+            ->where('status', '!=', 'cancelled')
+            ->sum('amount');
+
+        // Total advance payments already allocated/applied to bills
+        $allocatedAdvance = (float) VendorPaymentAllocation::where('tenant_id', $tenantId)
+            ->whereIn('vendor_payment_id', function ($vp) use ($tenantId) {
+                $vp->select('id')->from('vendor_payments')
+                    ->where('tenant_id', $tenantId)
+                    ->where('purchase_order_id', $this->id)
+                    ->where('payment_type', 'Advance')
+                    ->where('status', '!=', 'cancelled');
+            })
+            ->sum('allocated_amount');
+
+        // Advance paid that is still floating (not yet applied to any bill)
+        $unappliedAdvance = max(0.0, $totalAdvancePaid - $allocatedAdvance);
+
+        // Remaining headroom on the PO for paying advances
+        return max(0.0, round($poTotal - $billedAmount - $unappliedAdvance, 4));
+    }
+
+    public function getUnappliedAdvanceAmount(): float
+    {
+        $tenantId = $this->tenant_id;
+
+        $totalAdvancePaid = (float) PurchaseAdvancePayment::where('tenant_id', $tenantId)
+            ->where('purchase_order_id', $this->id)
+            ->where('status', '!=', 'cancelled')
+            ->sum('amount');
+
+        $allocatedAdvance = (float) VendorPaymentAllocation::where('tenant_id', $tenantId)
+            ->whereIn('vendor_payment_id', function ($vp) use ($tenantId) {
+                $vp->select('id')->from('vendor_payments')
+                    ->where('tenant_id', $tenantId)
+                    ->where('purchase_order_id', $this->id)
+                    ->where('payment_type', 'Advance')
+                    ->where('status', '!=', 'cancelled');
+            })
+            ->sum('allocated_amount');
+
+        return max(0.0, round($totalAdvancePaid - $allocatedAdvance, 4));
     }
 
     public function getOrderedQtyAttribute(): float

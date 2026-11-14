@@ -27,10 +27,19 @@
         <button onclick="window.print()" style="padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Print Gate Pass (PDF)</button>
     </div>
 
+    @php
+        $org = billing_organization_details($challan);
+    @endphp
     <div class="challan-header">
         <div>
-            <div class="company-title">{{ tenant()?->name ?? 'SaaS ERP Manufacturing' }}</div>
-            <div style="font-size: 11px; color: #555; margin-top: 4px;">Main Works & Warehouse Division</div>
+            <div class="company-title">{{ $org['name'] }}</div>
+            @if(!empty($org['address']))
+                <div style="font-size: 11px; color: #555; margin-top: 3px; max-width: 450px;">{{ $org['address'] }}</div>
+            @endif
+            <div style="font-size: 10px; color: #555; margin-top: 2px;">
+                @if(!empty($org['gstin'])) <strong>GSTIN:</strong> {{ $org['gstin'] }} @endif
+                @if(!empty($org['phone'])) &nbsp;|&nbsp; <strong>Phone:</strong> {{ $org['phone'] }} @endif
+            </div>
         </div>
         <div>
             <div class="challan-title">Subcontract Delivery Challan</div>

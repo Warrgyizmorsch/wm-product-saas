@@ -2,6 +2,7 @@
 
 namespace App\Services\Access;
 
+use App\Domains\Platform\Services\PlanFeatureGate;
 use App\Models\Access\Permission;
 use App\Models\Access\Role;
 use App\Models\Access\RolePermission;
@@ -23,6 +24,35 @@ class AccessService
      */
     public function allows(User $user, string $permissionName, array $context = []): bool
     {
+        // ── Plan features ──
+        // The tenant's plan comes before every grant and override: a feature the
+        // plan leaves out is view-only for everyone in that tenant, its owner
+        // included. Platform staff (no tenant of their own) are never gated.
+        $gate = app(PlanFeatureGate::class);
+        $planTenantId = $user->tenant_id === null ? null : ($context['tenant_id'] ?? $user->tenant_id);
+
+        if (! $gate->allows($permissionName, $planTenantId)) {
+            $gate->noteDenial($gate->featureFor($permissionName));
+
+            return false;
+        }
+
+        $allowed = $this->decide($user, $permissionName, $context);
+
+        if (! $allowed) {
+            $gate->noteDenial(null);
+        }
+
+        return $allowed;
+    }
+
+    /**
+     * Role grants, overrides and admin bypasses — allows() minus the plan check.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function decide(User $user, string $permissionName, array $context): bool
+    {
         // ── Platform Admin Override ──
         // Only truly platform-level roles bypass every check, including
         // platform-only permissions (e.g. platform.tenants.manage). tenant_owner
@@ -43,6 +73,10 @@ class AccessService
             $isPlatformAdminRole = Role::query()
                 ->whereIn('id', $roleIds)
                 ->whereIn('slug', ['super_admin', 'admin'])
+                // Only the platform's own system roles: a tenant can create a role
+                // with slug "admin" of its own, which must never reach other tenants.
+                ->whereNull('tenant_id')
+                ->where('is_system', true)
                 ->exists();
             if ($isPlatformAdminRole) {
                 return true;
@@ -183,6 +217,10 @@ class AccessService
             $isPlatformAdminRole = Role::query()
                 ->whereIn('id', $roleIds)
                 ->whereIn('slug', ['super_admin', 'admin'])
+                // Only the platform's own system roles: a tenant can create a role
+                // with slug "admin" of its own, which must never reach other tenants.
+                ->whereNull('tenant_id')
+                ->where('is_system', true)
                 ->exists();
 
             if ($isPlatformAdminRole) {
@@ -221,6 +259,42 @@ class AccessService
      * who may edit a system role's permissions) check role membership here
      * directly instead.
      */
+    /**
+     * Whether $user may open the /admin platform console. Two kinds of account
+     * qualify: one holding the platform's own super_admin/admin system role
+     * (today's owners are tenant-bound, so tenant_id alone can't decide), and a
+     * tenant-less platform staff account granted platform.console.access. A
+     * tenant owner's SCOPE_TENANT grant of that permission never qualifies.
+     */
+    public function canUsePlatformConsole(User $user): bool
+    {
+        if ($user->isDeactivated()) {
+            return false;
+        }
+
+        if ($this->holdsPlatformAdminRole($user) || $this->legacyAdminRoleTextAllows($user, 'platform.console.access', [])) {
+            return true;
+        }
+
+        return $user->tenant_id === null && $this->allows($user, 'platform.console.access');
+    }
+
+    /**
+     * The platform's own super_admin/admin system role — never a tenant's role
+     * of the same slug (RoleService reserves those, and tenant_id is checked).
+     */
+    public function holdsPlatformAdminRole(User $user, ?int $tenantId = null): bool
+    {
+        $roleIds = $this->roleIdsFor($user, $tenantId ?? $user->tenant_id);
+
+        return $roleIds->isNotEmpty() && Role::query()
+            ->whereIn('id', $roleIds)
+            ->whereIn('slug', ['super_admin', 'admin'])
+            ->whereNull('tenant_id')
+            ->where('is_system', true)
+            ->exists();
+    }
+
     public function hasRole(User $user, string $roleSlug, ?int $tenantId = null): bool
     {
         $roleIds = $this->roleIdsFor($user, $tenantId ?? $user->tenant_id);
@@ -250,6 +324,11 @@ class AccessService
 
         if (! $this->hasRole($actor, 'super_admin')) {
             $query->where('slug', '!=', 'super_admin');
+        }
+
+        // Platform staff roles carry SCOPE_PLATFORM grants: never for a tenant's user.
+        if ($tenantId !== null) {
+            $query->where(fn ($q) => $q->whereNotNull('tenant_id')->orWhereNotIn('slug', Role::PLATFORM_STAFF_SLUGS));
         }
 
         return $query->orderBy('level')->get();

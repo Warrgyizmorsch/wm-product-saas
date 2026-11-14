@@ -197,7 +197,11 @@ class PurchaseRfqService
 
             foreach ($validated['items'] as $item) {
                 $baseRate = convert_to_base((float)$item['rate']);
+                $discAmount = convert_to_base((float)($item['discount_amount'] ?? 0.00));
                 $amount = $item['quantity'] * $baseRate;
+                $taxAmount = convert_to_base((float)($item['tax_amount'] ?? 0.00));
+                $lineTotal = max(0, $amount - $discAmount) + $taxAmount;
+
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $po->id,
                     'product_id' => $item['product_id'],
@@ -206,7 +210,7 @@ class PurchaseRfqService
                     'rate' => $baseRate,
                     'amount' => $amount,
                     'discount_percent' => $item['discount_percent'] ?? 0.00,
-                    'discount_amount' => convert_to_base((float)($item['discount_amount'] ?? 0.00)),
+                    'discount_amount' => $discAmount,
                     'tax_percent' => $item['tax_percent'] ?? 0.00,
                     'cgst_percent' => $item['cgst_percent'] ?? 0.00,
                     'sgst_percent' => $item['sgst_percent'] ?? 0.00,
@@ -214,12 +218,41 @@ class PurchaseRfqService
                     'cgst_amount' => convert_to_base((float)($item['cgst_amount'] ?? 0.00)),
                     'sgst_amount' => convert_to_base((float)($item['sgst_amount'] ?? 0.00)),
                     'igst_amount' => convert_to_base((float)($item['igst_amount'] ?? 0.00)),
-                    'tax_amount' => convert_to_base((float)($item['tax_amount'] ?? 0.00)),
-                    'total_amount' => convert_to_base((float)($item['total_amount'] ?? $amount)),
+                    'tax_amount' => $taxAmount,
+                    'total_amount' => $lineTotal,
                 ]);
             }
 
-            $rfq->update(['status' => 'Confirmed']);
+            // Check whether all RFQ items are now ordered across all linked POs
+            $rfq->load('items');
+            $linkedOrders = PurchaseOrder::where('tenant_id', $tenantId)
+                ->where('source_type', 'rfq')
+                ->where(function ($q) use ($rfq) {
+                    $q->where('reference', $rfq->rfq_number)
+                      ->orWhere('reference', 'RFQ: ' . $rfq->rfq_number);
+                })
+                ->where('status', '!=', 'Cancelled')
+                ->with('items')
+                ->get();
+
+            $allFullyOrdered = $rfq->items->isNotEmpty();
+            foreach ($rfq->items as $rfqItem) {
+                $itemOrderedQty = 0;
+                foreach ($linkedOrders as $lo) {
+                    foreach ($lo->items as $loItem) {
+                        if ($loItem->product_id == $rfqItem->product_id) {
+                            $itemOrderedQty += (float) $loItem->quantity;
+                        }
+                    }
+                }
+                if ($itemOrderedQty < (float) $rfqItem->quantity) {
+                    $allFullyOrdered = false;
+                    break;
+                }
+            }
+
+            $newRfqStatus = $allFullyOrdered ? 'Confirmed' : 'Partially Ordered';
+            $rfq->update(['status' => $newRfqStatus]);
 
             return $po;
         });

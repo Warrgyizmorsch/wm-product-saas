@@ -20,10 +20,24 @@ class Feedback360Controller extends Controller
      */
     private function resolveContext(): array
     {
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
         $user = auth()->user();
 
+        if (!$tenantId) {
+            abort(403, __('hrms.feedback_360.unauthorized_tenant'));
+        }
+
         return [(int) $tenantId, $user];
+    }
+
+    /**
+     * Guard administrative actions against unauthorized access.
+     */
+    private function authorizeAdmin(?\App\Models\User $user, int $tenantId): void
+    {
+        if (!$this->feedbackRepository->isHrAdminUser($user, $tenantId)) {
+            abort(403, __('hrms.feedback_360.access_denied_admin'));
+        }
     }
 
     /**
@@ -80,6 +94,7 @@ class Feedback360Controller extends Controller
     public function storeCycle(Request $request): RedirectResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        $this->authorizeAdmin($user, $tenantId);
 
         $request->validate([
             'name'                       => 'required|string|max:255',
@@ -90,14 +105,19 @@ class Feedback360Controller extends Controller
             'nomination_deadline'        => 'nullable|date',
             'submission_deadline'        => 'nullable|date',
             'status'                     => 'nullable|in:draft,nomination,in_progress,review,completed,closed',
-            'is_peer_anonymous'          => 'nullable',
-            'is_direct_report_anonymous' => 'nullable',
-            'allow_self_nomination'      => 'nullable',
-            'require_manager_approval'   => 'nullable',
+            'is_peer_anonymous'          => 'nullable|boolean',
+            'is_direct_report_anonymous' => 'nullable|boolean',
+            'allow_self_nomination'      => 'nullable|boolean',
+            'require_manager_approval'   => 'nullable|boolean',
             'min_peer_nominations'       => 'nullable|integer|min:0|max:20',
             'max_peer_nominations'       => 'nullable|integer|min:1|max:30',
             'employee_ids'               => 'nullable|array',
             'employee_ids.*'             => 'exists:employees,id',
+            'competency_ids'             => 'required|array|min:1',
+            'competency_ids.*'           => 'exists:feedback_360_competencies,id',
+        ], [
+            'competency_ids.required' => __('hrms.feedback_360.val_competency_required'),
+            'competency_ids.min'      => __('hrms.feedback_360.val_competency_required'),
         ]);
 
         try {
@@ -110,9 +130,9 @@ class Feedback360Controller extends Controller
             $cycle = $this->feedbackRepository->storeCycle($data, $tenantId, $user);
 
             return redirect()->route('hrms.feedback360.cycles.show', $cycle->id)
-                ->with('success', "Feedback cycle '{$cycle->name}' created successfully.");
+                ->with('success', __('hrms.feedback_360.cycle_created_success', ['name' => $cycle->name]));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to create cycle: ' . $e->getMessage())->withInput();
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_create_cycle', ['message' => $e->getMessage()]))->withInput();
         }
     }
 
@@ -122,6 +142,7 @@ class Feedback360Controller extends Controller
     public function updateCycle(Request $request, int $id): RedirectResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        $this->authorizeAdmin($user, $tenantId);
 
         $request->validate([
             'name'                       => 'required|string|max:255',
@@ -131,12 +152,14 @@ class Feedback360Controller extends Controller
             'nomination_deadline'        => 'nullable|date',
             'submission_deadline'        => 'nullable|date',
             'status'                     => 'nullable|in:draft,nomination,in_progress,review,completed,closed',
-            'is_peer_anonymous'          => 'nullable',
-            'is_direct_report_anonymous' => 'nullable',
-            'allow_self_nomination'      => 'nullable',
-            'require_manager_approval'   => 'nullable',
+            'is_peer_anonymous'          => 'nullable|boolean',
+            'is_direct_report_anonymous' => 'nullable|boolean',
+            'allow_self_nomination'      => 'nullable|boolean',
+            'require_manager_approval'   => 'nullable|boolean',
             'min_peer_nominations'       => 'nullable|integer|min:0|max:20',
             'max_peer_nominations'       => 'nullable|integer|min:1|max:30',
+            'competency_ids'             => 'nullable|array',
+            'competency_ids.*'           => 'exists:feedback_360_competencies,id',
         ]);
 
         try {
@@ -150,9 +173,9 @@ class Feedback360Controller extends Controller
 
             $this->feedbackRepository->updateCycle($id, $data, $tenantId, $user);
 
-            return redirect()->back()->with('success', 'Feedback cycle updated successfully.');
+            return redirect()->back()->with('success', __('hrms.feedback_360.cycle_updated_success'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to update cycle: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_update_cycle', ['message' => $e->getMessage()]));
         }
     }
 
@@ -161,15 +184,16 @@ class Feedback360Controller extends Controller
      */
     public function destroyCycle(int $id): RedirectResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+        $this->authorizeAdmin($user, $tenantId);
 
         try {
             $this->feedbackRepository->deleteCycle($id, $tenantId);
 
             return redirect()->route('hrms.feedback360.index', ['active_tab' => 'cycles'])
-                ->with('success', 'Feedback cycle deleted successfully.');
+                ->with('success', __('hrms.feedback_360.cycle_deleted_success'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to delete cycle: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_delete_cycle', ['message' => $e->getMessage()]));
         }
     }
 
@@ -179,6 +203,7 @@ class Feedback360Controller extends Controller
     public function launchCycle(Request $request, int $id): RedirectResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        $this->authorizeAdmin($user, $tenantId);
 
         $request->validate([
             'status' => 'required|in:draft,nomination,in_progress,review,completed,closed',
@@ -187,9 +212,9 @@ class Feedback360Controller extends Controller
         try {
             $this->feedbackRepository->launchCycle($id, $request->input('status'), $tenantId, $user);
 
-            return redirect()->back()->with('success', 'Cycle stage updated successfully.');
+            return redirect()->back()->with('success', __('hrms.feedback_360.stage_updated_success'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to change stage: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_change_stage', ['message' => $e->getMessage()]));
         }
     }
 
@@ -199,6 +224,7 @@ class Feedback360Controller extends Controller
     public function addParticipants(Request $request, int $id): RedirectResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        $this->authorizeAdmin($user, $tenantId);
 
         $request->validate([
             'employee_ids'   => 'required|array',
@@ -208,30 +234,96 @@ class Feedback360Controller extends Controller
         try {
             $count = $this->feedbackRepository->addParticipantsToCycle($id, $request->input('employee_ids'), $tenantId, $user);
 
-            return redirect()->back()->with('success', "{$count} participant(s) enrolled into the feedback cycle.");
+            return redirect()->back()->with('success', __('hrms.feedback_360.participants_enrolled_success', ['count' => $count]));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to enroll participants: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_enroll_participants', ['message' => $e->getMessage()]));
         }
     }
 
     /**
-     * Nominate peer reviewers for a participant.
+     * Nominate peer and direct report reviewers for a participant.
      */
     public function nominatePeers(Request $request, int $participantId): RedirectResponse
     {
         [$tenantId, $user] = $this->resolveContext();
 
         $request->validate([
-            'peer_ids'   => 'required|array',
-            'peer_ids.*' => 'exists:employees,id',
+            'peer_ids'            => 'nullable|array',
+            'peer_ids.*'          => 'exists:employees,id',
+            'direct_report_ids'   => 'nullable|array',
+            'direct_report_ids.*' => 'exists:employees,id',
         ]);
 
-        try {
-            $this->feedbackRepository->nominatePeers($participantId, $request->input('peer_ids'), $tenantId, $user);
+        $peerIds = (array) $request->input('peer_ids', []);
+        $directReportIds = (array) $request->input('direct_report_ids', []);
 
-            return redirect()->back()->with('success', 'Peer reviewers nominated successfully.');
+        if (empty($peerIds) && empty($directReportIds)) {
+            return redirect()->back()->with('error', __('hrms.feedback_360.select_at_least_one_nominee'));
+        }
+
+        try {
+            $this->feedbackRepository->nominatePeers($participantId, $peerIds, $tenantId, $user, $directReportIds);
+
+            return redirect()->back()->with('success', __('hrms.feedback_360.reviewers_nominated_success'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to nominate peers: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_nominate_reviewers', ['message' => $e->getMessage()]));
+        }
+    }
+
+    /**
+     * Delete an assigned rater from a participant's feedback roster.
+     */
+    public function destroyNomination(int $nominationId): RedirectResponse
+    {
+        [$tenantId, $user] = $this->resolveContext();
+
+        try {
+            $this->feedbackRepository->deleteNomination($nominationId, $tenantId, $user);
+
+            return redirect()->back()->with('success', __('hrms.feedback_360.rater_removed_success'));
+        } catch (Exception $e) {
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_remove_rater', ['message' => $e->getMessage()]));
+        }
+    }
+
+    /**
+     * Manually add raters (peers, direct reports, or managers) to a participant.
+     */
+    public function addRater(Request $request, int $participantId): RedirectResponse
+    {
+        [$tenantId, $user] = $this->resolveContext();
+
+        $request->validate([
+            'reviewer_id'    => 'nullable|exists:employees,id',
+            'reviewer_ids'   => 'nullable|array',
+            'reviewer_ids.*' => 'exists:employees,id',
+            'reviewer_type'  => 'required|in:peer,direct_report,manager',
+        ]);
+
+        $reviewerIds = (array) ($request->input('reviewer_ids') ?? []);
+        if (empty($reviewerIds) && $request->filled('reviewer_id')) {
+            $reviewerIds = [(int) $request->input('reviewer_id')];
+        }
+        $reviewerIds = array_values(array_filter(array_map('intval', $reviewerIds)));
+
+        if (empty($reviewerIds)) {
+            return redirect()->back()->with('error', __('hrms.feedback_360.select_at_least_one_nominee'));
+        }
+
+        try {
+            foreach ($reviewerIds as $rId) {
+                $this->feedbackRepository->addRaterToParticipant(
+                    $participantId,
+                    $rId,
+                    $request->input('reviewer_type'),
+                    $tenantId,
+                    $user
+                );
+            }
+
+            return redirect()->back()->with('success', __('hrms.feedback_360.reviewer_added_success'));
+        } catch (Exception $e) {
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_add_reviewer', ['message' => $e->getMessage()]));
         }
     }
 
@@ -251,10 +343,10 @@ class Feedback360Controller extends Controller
             $isApproved = ($request->input('action') === 'approve');
             $this->feedbackRepository->approveNomination($nominationId, $isApproved, $request->input('reason'), $tenantId, $user);
 
-            $msg = $isApproved ? 'Nomination approved.' : 'Nomination rejected.';
+            $msg = $isApproved ? __('hrms.feedback_360.nomination_approved') : __('hrms.feedback_360.nomination_rejected');
             return redirect()->back()->with('success', $msg);
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to process nomination: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_process_nomination', ['message' => $e->getMessage()]));
         }
     }
 
@@ -282,10 +374,10 @@ class Feedback360Controller extends Controller
                 $user
             );
 
-            $actionWord = $isApproved ? 'approved' : 'rejected';
-            return redirect()->back()->with('success', "{$count} peer nomination(s) {$actionWord} successfully.");
+            $actionWord = $isApproved ? __('hrms.feedback_360.word_approved') : __('hrms.feedback_360.word_rejected');
+            return redirect()->back()->with('success', __('hrms.feedback_360.batch_nominations_processed', ['count' => $count, 'action' => $actionWord]));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to process batch nominations: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_batch_nominations', ['message' => $e->getMessage()]));
         }
     }
 
@@ -308,13 +400,13 @@ class Feedback360Controller extends Controller
             $this->feedbackRepository->submitReview($nominationId, $request->all(), $tenantId, $user);
 
             $msg = $isDraft 
-                ? 'Feedback evaluation draft saved successfully. You can return and complete it anytime.'
-                : 'Your 360-degree feedback evaluation was submitted successfully. Thank you!';
+                ? __('hrms.feedback_360.review_draft_saved')
+                : __('hrms.feedback_360.review_submitted_success');
 
             return redirect()->route('hrms.feedback360.index', ['active_tab' => 'my_reviews'])
                 ->with('success', $msg);
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to save review: ' . $e->getMessage())->withInput();
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_save_review', ['message' => $e->getMessage()]))->withInput();
         }
     }
 
@@ -333,9 +425,9 @@ class Feedback360Controller extends Controller
         try {
             $this->feedbackRepository->publishReport($participantId, $request->all(), $tenantId, $user);
 
-            return redirect()->back()->with('success', '360° Evaluation Report has been published and made available to the employee.');
+            return redirect()->back()->with('success', __('hrms.feedback_360.report_published_success'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to publish report: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_publish_report', ['message' => $e->getMessage()]));
         }
     }
 
@@ -345,13 +437,14 @@ class Feedback360Controller extends Controller
     public function bulkRemind(int $cycleId): RedirectResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        $this->authorizeAdmin($user, $tenantId);
 
         try {
             $count = $this->feedbackRepository->bulkRemind($cycleId, $tenantId, $user);
 
-            return redirect()->back()->with('success', "Reminders sent to {$count} reviewer(s) with pending feedback.");
+            return redirect()->back()->with('success', __('hrms.feedback_360.reminders_sent_success', ['count' => $count]));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to send reminders: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_send_reminders', ['message' => $e->getMessage()]));
         }
     }
 
@@ -362,14 +455,11 @@ class Feedback360Controller extends Controller
     public function storeCompetency(Request $request): RedirectResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        $this->authorizeAdmin($user, $tenantId);
 
         $request->validate([
             'name'                      => 'required|string|max:150',
-            'code'                      => 'nullable|string|max:50',
-            'category'                  => 'required|string|max:100',
-            'cycle_id'                  => 'nullable|exists:feedback_360_cycles,id',
             'description'               => 'nullable|string|max:1000',
-            'weightage'                 => 'nullable|numeric|min:1|max:100',
             'questions'                 => 'nullable|array',
             'questions.*.question_text' => 'nullable|string|max:500',
         ]);
@@ -378,29 +468,31 @@ class Feedback360Controller extends Controller
             $this->feedbackRepository->storeCompetency($request->all(), $tenantId, $user);
 
             return redirect()->route('hrms.feedback360.index', ['active_tab' => 'competencies_questions'])
-                ->with('success', 'Competency and questions saved successfully.');
+                ->with('success', __('hrms.feedback_360.competency_saved_success'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to create competency: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_create_competency', ['message' => $e->getMessage()]));
         }
     }
 
     public function destroyCompetency(int $id): RedirectResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+        $this->authorizeAdmin($user, $tenantId);
 
         try {
             $this->feedbackRepository->deleteCompetency($id, $tenantId);
 
             return redirect()->route('hrms.feedback360.index', ['active_tab' => 'competencies_questions'])
-                ->with('success', 'Competency deleted successfully.');
+                ->with('success', __('hrms.feedback_360.competency_deleted_success'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to delete competency: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_delete_competency', ['message' => $e->getMessage()]));
         }
     }
 
     public function storeQuestion(Request $request): RedirectResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        $this->authorizeAdmin($user, $tenantId);
 
         $request->validate([
             'question_text'        => 'required|string|max:500',
@@ -413,23 +505,24 @@ class Feedback360Controller extends Controller
             $this->feedbackRepository->storeQuestion($request->all(), $tenantId, $user);
 
             return redirect()->route('hrms.feedback360.index', ['active_tab' => 'competencies_questions'])
-                ->with('success', 'Question added to feedback library.');
+                ->with('success', __('hrms.feedback_360.question_added_success'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to add question: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_add_question', ['message' => $e->getMessage()]));
         }
     }
 
     public function destroyQuestion(int $id): RedirectResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+        $this->authorizeAdmin($user, $tenantId);
 
         try {
             $this->feedbackRepository->deleteQuestion($id, $tenantId);
 
             return redirect()->route('hrms.feedback360.index', ['active_tab' => 'competencies_questions'])
-                ->with('success', 'Question deleted successfully.');
+                ->with('success', __('hrms.feedback_360.question_deleted_success'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to delete question: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.feedback_360.failed_delete_question', ['message' => $e->getMessage()]));
         }
     }
 }

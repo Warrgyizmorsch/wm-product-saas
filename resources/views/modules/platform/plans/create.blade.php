@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Add Plan | SaaS ERP')
+@section('title', 'Add Plan | Platform Console')
 @section('page-title', 'Add Plan')
-@section('breadcrumb', 'Platform / Plans / Add')
+@section('breadcrumb', 'Plans / Add')
 
 @section('page-actions')
     <a href="{{ route('platform.plans.index') }}" class="btn btn-light">

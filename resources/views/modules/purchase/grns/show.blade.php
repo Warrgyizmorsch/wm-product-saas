@@ -205,39 +205,6 @@
 
     <div class="row text-dark">
         <div class="col-12">
-            <!-- Toast Notifications -->
-
-            @php
-                $hasSubcontractItem = $grn->items ? $grn->items->contains(function($i) {
-                    return !empty($i->purchaseOrderItem?->production_order_operation_id) 
-                        || strtolower($i->product?->item_type ?? '') === 'service' 
-                        || strtolower($i->product?->type ?? '') === 'service';
-                }) : false;
-            @endphp
-
-            @if($hasSubcontractItem)
-                <div class="alert alert-info border-0 shadow-sm d-flex align-items-center justify-content-between mb-4">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="feather-info fs-18 text-info"></i>
-                        <div>
-                            <strong class="text-dark">Service Receipt — No Physical Inventory</strong>
-                            <div class="fs-12 text-muted">This receipt processes outsourced subcontract operations or service products without increasing physical warehouse stock count.</div>
-                        </div>
-                    </div>
-                    <span class="badge bg-info text-white font-monospace fs-11 px-3 py-1.5">Subcontract Receipt</span>
-                </div>
-            @elseif($grn->status === 'Approved')
-                <div class="alert alert-success d-flex align-items-center mb-4 border-0 shadow-sm">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="feather-check-circle fs-18 text-success"></i>
-                        <div>
-                            <strong class="text-dark">{{ __('purchase.grn_approved_stock_updated') }}</strong>
-                            <div class="fs-12 text-muted">{{ __('purchase.stock_credited_to') }} {{ $grn->warehouse?->name ?? __('purchase.main_warehouse') }}. {{ __('purchase.stock_transaction_records_created') }}</div>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
             <!-- Main Single GRN Card -->
             <div class="card border-0 shadow-sm bg-white mb-4 print-area odoo-sheet">
                 <div class="card-header bg-white border-bottom py-0 px-4 d-print-none d-flex justify-content-between align-items-center flex-wrap gap-2" style="min-height: 52px;">
@@ -427,8 +394,8 @@
                                             <td class="text-center font-monospace fw-bold text-primary">{{ number_format($item->received_qty, 2) }}</td>
                                             <td class="text-center font-monospace text-danger fw-semibold">{{ number_format($item->rejected_qty, 2) }}</td>
                                             <td class="text-center font-monospace text-success fw-bold">{{ number_format($item->accepted_qty, 2) }}</td>
-                                            <td class="text-end font-monospace">{{ number_format($item->unit_rate, 2) }}</td>
-                                            <td class="text-end pe-3 font-monospace fw-bold text-dark">{{ number_format($item->total_amount, 2) }}</td>
+                                            <td class="text-end font-monospace">{{ format_currency($item->unit_rate) }}</td>
+                                            <td class="text-end pe-3 font-monospace fw-bold text-dark">{{ format_currency($item->total_amount) }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>

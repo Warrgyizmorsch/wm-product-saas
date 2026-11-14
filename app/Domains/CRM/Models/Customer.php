@@ -9,10 +9,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
+use App\Models\Concerns\NormalizesTaxIdentity;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 class Customer extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch;
+    use HasFactory, BelongsToCompany, BelongsToBranch, NormalizesTaxIdentity;
+
+    protected ?string $rbacPermission = 'crm.customers.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->whereHas('crmAccount', fn($aq) => $aq->where('owner_id', $user->id));
+    }
 
     /**
      * Set to TRUE before Customer::create() inside deal conversion
@@ -35,10 +45,13 @@ class Customer extends BaseModel
         'billing_address',
         'shipping_address',
         'opening_balance',
+        'opening_balance_type',
+        'opening_bills',
     ];
 
     protected $casts = [
         'opening_balance' => 'float',
+        'opening_bills' => 'array',
     ];
 
     protected static function boot()
@@ -52,27 +65,23 @@ class Customer extends BaseModel
             }
 
             $alreadyExists = CrmAccount::where('tenant_id', $customer->tenant_id)
-                ->where(function ($q) use ($customer) {
-                    $q->where('customer_id', $customer->id);
-                    if (!empty($customer->email)) {
-                        $q->orWhere('email', $customer->email);
-                    }
-                })->exists();
+                ->where('customer_id', $customer->id)
+                ->exists();
 
             if (!$alreadyExists) {
                 CrmAccount::create([
-                    'tenant_id'        => $customer->tenant_id,
-                    'company_id'       => $customer->company_id,
-                    'branch_id'        => $customer->branch_id,
-                    'customer_id'      => $customer->id,
-                    'name'             => $customer->name,
-                    'email'            => $customer->email,
-                    'phone'            => $customer->phone,
-                    'gstin'            => $customer->gstin,
-                    'billing_address'  => $customer->billing_address ?? null,
+                    'tenant_id' => $customer->tenant_id,
+                    'company_id' => $customer->company_id,
+                    'branch_id' => $customer->branch_id,
+                    'customer_id' => $customer->id,
+                    'name' => $customer->name,
+                    'email' => $customer->email,
+                    'phone' => $customer->phone,
+                    'gstin' => $customer->gstin,
+                    'billing_address' => $customer->billing_address ?? null,
                     'shipping_address' => $customer->shipping_address ?? null,
-                    'status'           => strtolower($customer->status ?: 'active') === 'active' ? 'active' : 'inactive',
-                    'owner_id'         => auth()->id() ?? 1,
+                    'status' => strtolower($customer->status ?: 'active') === 'active' ? 'active' : 'inactive',
+                    'owner_id' => auth()->id() ?? 1,
                 ]);
             }
         });
@@ -96,5 +105,15 @@ class Customer extends BaseModel
     public function payments()
     {
         return $this->hasMany(CustomerPayment::class, 'customer_id');
+    }
+
+    /**
+     * Opening balance as this party's statements show it: an amount owed by the customer (debit) is positive; an advance received (credit) is negative.
+     */
+    public function signedOpeningBalance(): float
+    {
+        $amount = (float) ($this->opening_balance ?? 0);
+
+        return ($this->opening_balance_type ?: 'debit') === 'debit' ? $amount : -$amount;
     }
 }

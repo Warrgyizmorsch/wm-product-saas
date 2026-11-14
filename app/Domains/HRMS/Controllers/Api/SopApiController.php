@@ -10,10 +10,12 @@ use App\Domains\HRMS\Repositories\SopRepositoryInterface;
 use App\Domains\HRMS\Services\HrmsScopeService;
 use App\Domains\HRMS\Services\SopService;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class SopApiController extends Controller
 {
@@ -22,6 +24,67 @@ class SopApiController extends Controller
         private readonly SopRepositoryInterface $sopRepository,
         private readonly HrmsScopeService $scopeService
     ) {}
+
+    /**
+     * RBAC helper: check if user has full SOP management privileges.
+     */
+    private function canManageSop(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->scopeService->isCompanyAdmin($user) ||
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.sop.manage');
+    }
+
+    /**
+     * RBAC helper: check if user can create SOPs.
+     */
+    private function canCreateSop(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->canManageSop($user) || $user->hasHrPermission('hrms.sop.create');
+    }
+
+    /**
+     * RBAC helper: check if user can update SOPs.
+     */
+    private function canUpdateSop(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->canManageSop($user) || $user->hasHrPermission('hrms.sop.update');
+    }
+
+    /**
+     * RBAC helper: check if user can delete SOPs.
+     */
+    private function canDeleteSop(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->canManageSop($user) || $user->hasHrPermission('hrms.sop.delete');
+    }
+
+    /**
+     * Check if user is an HR Manager, Admin, or has operational SOP visibility.
+     */
+    private function isHrOrAdmin(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->canManageSop($user) ||
+            $user->hasHrPermission('hrms.sop.create') ||
+            $user->hasHrPermission('hrms.sop.update') ||
+            $user->hasHrPermission('hrms.sop.delete') ||
+            $user->hasHrPermission('hrms.employees.view');
+    }
 
     /**
      * Standardized JSON success response envelope.
@@ -55,17 +118,16 @@ class SopApiController extends Controller
      */
     private function resolveContext(): array
     {
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id ?? 1;
         $user = auth()->user();
-        $currentEmployee = $this->scopeService->resolveEmployee($user, $tenantId);
-        $isHrOrAdmin = $user && (
-            $this->scopeService->isCompanyAdmin($user) ||
-            $user->hasHrPermission('hr.settings.manage') ||
-            $user->hasHrPermission('hrms.sop.manage') ||
-            $user->hasHrPermission('hrms.employees.view')
-        );
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? $user?->tenant_id;
+        if (!$tenantId) {
+            throw new Exception('Tenant context not resolved.');
+        }
 
-        return [$tenantId, $user, $currentEmployee, (bool) $isHrOrAdmin];
+        $currentEmployee = $this->scopeService->resolveEmployee($user, (int) $tenantId);
+        $isHrOrAdmin = $this->isHrOrAdmin($user);
+
+        return [(int) $tenantId, $user, $currentEmployee, (bool) $isHrOrAdmin];
     }
 
     // =========================================================================
@@ -188,7 +250,7 @@ class SopApiController extends Controller
             $paginated = $query->paginate($perPage);
 
             // Transform items concisely
-            $items = $paginated->getCollection()->map(function ($doc) use ($currentEmployee, $isHrOrAdmin) {
+            $items = $paginated->getCollection()->map(function ($doc) use ($currentEmployee, $isHrOrAdmin, $user) {
                 $totalAssigned = $doc->assignments()->count();
                 $ackCount = $doc->assignments()->where('status', 'acknowledged')->count();
                 $complianceRate = $totalAssigned > 0 ? round(($ackCount / $totalAssigned) * 100, 1) : 0.0;
@@ -227,10 +289,10 @@ class SopApiController extends Controller
                     'my_acknowledgment_status'  => $myStatus,
                     'capabilities'              => [
                         'can_view'         => true,
-                        'can_edit'         => $isHrOrAdmin,
-                        'can_delete'       => $isHrOrAdmin,
-                        'can_publish'      => $isHrOrAdmin,
-                        'can_assign'       => $isHrOrAdmin,
+                        'can_edit'         => $this->canUpdateSop($user),
+                        'can_delete'       => $this->canDeleteSop($user),
+                        'can_publish'      => $this->canManageSop($user),
+                        'can_assign'       => $this->canManageSop($user),
                         'can_acknowledge'  => ($myStatus === 'pending'),
                     ],
                     'created_at'                => $doc->created_at?->format('Y-m-d H:i:s'),
@@ -361,10 +423,10 @@ class SopApiController extends Controller
                 ],
                 'capabilities'              => [
                     'can_view'         => true,
-                    'can_edit'         => $isHrOrAdmin,
-                    'can_delete'       => $isHrOrAdmin,
-                    'can_publish'      => $isHrOrAdmin,
-                    'can_assign'       => $isHrOrAdmin,
+                    'can_edit'         => $this->canUpdateSop($user),
+                    'can_delete'       => $this->canDeleteSop($user),
+                    'can_publish'      => $this->canManageSop($user),
+                    'can_assign'       => $this->canManageSop($user),
                     'can_acknowledge'  => ($myAssignment && $myAssignment['status'] === 'pending'),
                 ],
                 'sections'                  => $sections,
@@ -384,20 +446,23 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized. Only Admins and HR Managers can create SOP documents.', 403);
+        if (!$this->canCreateSop($user)) {
+            return $this->sendError('Unauthorized. Only Admins and authorized HR personnel can create SOP documents.', 403);
         }
 
         $validator = Validator::make($request->all(), [
             'title'                      => 'required|string|max:255',
             'code'                       => 'nullable|string|max:50',
-            'sop_category_id'            => 'nullable|integer|exists:sop_categories,id',
-            'department_id'              => 'nullable|integer|exists:departments,id',
+            'sop_category_id'            => ['nullable', 'integer', Rule::exists('sop_categories', 'id')->where('tenant_id', $tenantId)],
+            'department_id'              => ['nullable', 'integer', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
             'criticality'                => 'nullable|in:low,medium,high,critical',
             'target_audience_type'       => 'nullable|in:all,department,designation,custom',
             'target_department_ids'      => 'nullable|array',
+            'target_department_ids.*'    => [Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
             'target_designation_ids'     => 'nullable|array',
+            'target_designation_ids.*'   => [Rule::exists('designations', 'id')->where('tenant_id', $tenantId)],
             'target_employee_ids'        => 'nullable|array',
+            'target_employee_ids.*'      => [Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'is_mandatory'               => 'nullable|boolean',
             'auto_assign_new_hires'      => 'nullable|boolean',
             'acknowledgment_days_limit'  => 'nullable|integer|min:1|max:365',
@@ -407,7 +472,7 @@ class SopApiController extends Controller
             'objective'                  => 'nullable|string',
             'scope'                      => 'nullable|string',
             'prerequisites'              => 'nullable|string',
-            'status'                     => 'nullable|in:draft,published',
+            'status'                     => 'nullable|in:draft,under_review,published',
             'sections'                   => 'nullable|array',
             'sections.*.title'           => 'required_with:sections|string|max:255',
             'sections.*.content'         => 'required_with:sections|string',
@@ -421,9 +486,13 @@ class SopApiController extends Controller
         try {
             $data = $validator->validated();
 
+            if (($data['target_audience_type'] ?? '') === 'department' && !empty($data['department_id']) && empty($data['target_department_ids'])) {
+                $data['target_department_ids'] = [(int) $data['department_id']];
+            }
+
             if ($request->hasFile('attachment')) {
                 $file = $request->file('attachment');
-                $path = $file->store('hrms/sops', 'public');
+                $path = $file->storeTenantFile('hrms/sops', 'public');
                 $data['attachment_path'] = $path;
             }
 
@@ -449,8 +518,8 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized. Only Admins and HR Managers can edit SOP documents.', 403);
+        if (!$this->canUpdateSop($user)) {
+            return $this->sendError('Unauthorized. Only Admins and authorized HR personnel can edit SOP documents.', 403);
         }
 
         $sop = SopDocument::where('tenant_id', $tenantId)->find($id);
@@ -461,13 +530,16 @@ class SopApiController extends Controller
         $validator = Validator::make($request->all(), [
             'title'                      => 'sometimes|required|string|max:255',
             'code'                       => 'nullable|string|max:50',
-            'sop_category_id'            => 'nullable|integer|exists:sop_categories,id',
-            'department_id'              => 'nullable|integer|exists:departments,id',
+            'sop_category_id'            => ['nullable', 'integer', Rule::exists('sop_categories', 'id')->where('tenant_id', $tenantId)],
+            'department_id'              => ['nullable', 'integer', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
             'criticality'                => 'nullable|in:low,medium,high,critical',
             'target_audience_type'       => 'nullable|in:all,department,designation,custom',
             'target_department_ids'      => 'nullable|array',
+            'target_department_ids.*'    => [Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
             'target_designation_ids'     => 'nullable|array',
+            'target_designation_ids.*'   => [Rule::exists('designations', 'id')->where('tenant_id', $tenantId)],
             'target_employee_ids'        => 'nullable|array',
+            'target_employee_ids.*'      => [Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'is_mandatory'               => 'nullable|boolean',
             'auto_assign_new_hires'      => 'nullable|boolean',
             'acknowledgment_days_limit'  => 'nullable|integer|min:1|max:365',
@@ -477,7 +549,7 @@ class SopApiController extends Controller
             'objective'                  => 'nullable|string',
             'scope'                      => 'nullable|string',
             'prerequisites'              => 'nullable|string',
-            'status'                     => 'nullable|in:draft,published,archived',
+            'status'                     => 'nullable|in:draft,under_review,published,archived',
             'version_bump'               => 'nullable|in:none,minor,major',
             'changes_summary'            => 'nullable|string|max:500',
             'sections'                   => 'nullable|array',
@@ -490,9 +562,13 @@ class SopApiController extends Controller
         try {
             $data = $validator->validated();
 
+            if (($data['target_audience_type'] ?? '') === 'department' && !empty($data['department_id']) && empty($data['target_department_ids'])) {
+                $data['target_department_ids'] = [(int) $data['department_id']];
+            }
+
             if ($request->hasFile('attachment')) {
                 $file = $request->file('attachment');
-                $path = $file->store('hrms/sops', 'public');
+                $path = $file->storeTenantFile('hrms/sops', 'public');
                 $data['attachment_path'] = $path;
             }
 
@@ -518,8 +594,8 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->canDeleteSop($user)) {
+            return $this->sendError('Unauthorized. You do not have permission to delete SOPs.', 403);
         }
 
         $sop = SopDocument::where('tenant_id', $tenantId)->find($id);
@@ -547,8 +623,8 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->canManageSop($user)) {
+            return $this->sendError('Unauthorized. You do not have permission to publish SOPs.', 403);
         }
 
         $sop = SopDocument::where('tenant_id', $tenantId)->find($id);
@@ -584,8 +660,8 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->canManageSop($user)) {
+            return $this->sendError('Unauthorized. You do not have permission to archive SOPs.', 403);
         }
 
         $sop = SopDocument::where('tenant_id', $tenantId)->find($id);
@@ -609,8 +685,8 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->canManageSop($user)) {
+            return $this->sendError('Unauthorized. You do not have permission to dispatch SOP assignments.', 403);
         }
 
         $sop = SopDocument::where('tenant_id', $tenantId)->find($id);
@@ -619,6 +695,14 @@ class SopApiController extends Controller
         }
 
         try {
+            if ($sop->status !== 'published') {
+                $sop->update([
+                    'status'      => 'published',
+                    'approved_by' => $user?->id,
+                    'approved_at' => now(),
+                ]);
+            }
+
             $assignedCount = $this->sopService->dispatchAssignments($sop);
             return $this->sendSuccess([
                 'assigned_count' => $assignedCount,
@@ -636,8 +720,8 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->canManageSop($user)) {
+            return $this->sendError('Unauthorized. You do not have permission to send reminders.', 403);
         }
 
         $sop = SopDocument::where('tenant_id', $tenantId)->find($id);
@@ -671,7 +755,7 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
+        if (!$this->canManageSop($user) && !$isHrOrAdmin) {
             return $this->sendError('Unauthorized. Only HR/Admins can export audit logs.', 403);
         }
 
@@ -758,8 +842,8 @@ class SopApiController extends Controller
             return $this->sendError('Assignment record not found.', 404);
         }
 
-        // Authorization check
-        if ($currentEmployee && $assignment->employee_id !== $currentEmployee->id && !$isHrOrAdmin) {
+        // Authorization check: only assigned employee or HR Admin with management privilege can acknowledge
+        if (!$this->canManageSop($user) && (!$currentEmployee || $assignment->employee_id !== $currentEmployee->id)) {
             return $this->sendError('Unauthorized to acknowledge this SOP on behalf of another employee.', 403);
         }
 
@@ -800,8 +884,8 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->canManageSop($user)) {
+            return $this->sendError('Unauthorized. You do not have permission to send reminders.', 403);
         }
 
         $assignment = SopAssignment::with(['document', 'employee'])->where('tenant_id', $tenantId)->find($id);
@@ -834,7 +918,7 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
+        if (!$this->canManageSop($user) && !$isHrOrAdmin) {
             return $this->sendError('Unauthorized.', 403);
         }
 
@@ -887,7 +971,7 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
+        if (!$this->canManageSop($user) && !$isHrOrAdmin) {
             return $this->sendError('Unauthorized.', 403);
         }
 
@@ -976,8 +1060,8 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->canManageSop($user)) {
+            return $this->sendError('Unauthorized to manage SOP categories.', 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -1018,8 +1102,8 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->canManageSop($user)) {
+            return $this->sendError('Unauthorized to manage SOP categories.', 403);
         }
 
         $category = SopCategory::where('tenant_id', $tenantId)->find($id);
@@ -1061,13 +1145,18 @@ class SopApiController extends Controller
     {
         [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->canManageSop($user)) {
+            return $this->sendError('Unauthorized to manage SOP categories.', 403);
         }
 
         $category = SopCategory::where('tenant_id', $tenantId)->find($id);
         if (!$category) {
             return $this->sendError('Category not found.', 404);
+        }
+
+        $linkedDocsCount = $category->documents()->count();
+        if ($linkedDocsCount > 0) {
+            return $this->sendError("Cannot delete category because {$linkedDocsCount} SOP document(s) are linked to it.", 422);
         }
 
         try {

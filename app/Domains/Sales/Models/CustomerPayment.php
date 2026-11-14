@@ -8,10 +8,22 @@ use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Domains\CRM\Models\Customer;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 class CustomerPayment extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch;
+
+    protected ?string $rbacPermission = 'sales.payments.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->where(function (Builder $sub) use ($user) {
+            $sub->whereHas('customer.crmAccount', fn($caq) => $caq->where('crm_accounts.owner_id', $user->id))
+                ->orWhereHas('allocations.salesOrder', fn($soq) => $soq->where('sales_orders.sales_person_id', $user->id));
+        });
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -25,8 +37,23 @@ class CustomerPayment extends BaseModel
         'bank_account_id',
         'reference_no',
         'status',
-        'notes'
+        'notes',
+        // TDS the customer withheld: the invoice is settled by amount + tds_amount.
+        'tds_amount',
+        'tds_section_code',
+        'tds_certificate_received',
     ];
+
+    protected $casts = [
+        'tds_amount' => 'float',
+        'tds_certificate_received' => 'boolean',
+    ];
+
+    /** What this receipt settles on the customer's account: money received plus TDS withheld. */
+    public function settledAmount(): float
+    {
+        return round((float) $this->amount + (float) ($this->tds_amount ?? 0), 2);
+    }
 
     public function customer(): BelongsTo
     {

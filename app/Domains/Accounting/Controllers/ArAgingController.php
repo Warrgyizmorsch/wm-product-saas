@@ -2,7 +2,7 @@
 
 namespace App\Domains\Accounting\Controllers;
 
-use App\Domains\Sales\Models\Invoice;
+use App\Domains\Accounting\Support\BillAgeing;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
 use Illuminate\Http\Request;
@@ -11,20 +11,17 @@ use Illuminate\View\View;
 
 class ArAgingController extends Controller
 {
-    /**
-     * Statuses that still carry an open receivable balance. Draft invoices
-     * aren't posted yet, Paid/Cancelled have nothing outstanding. 'Sent' is
-     * the normal state for an invoice that has gone out to the customer and
-     * still carries a real GL receivable (posting to the ledger happens
-     * automatically at creation, independent of this workflow status).
-     */
-    private const OPEN_STATUSES = ['Sent', 'Posted', 'Partially Paid'];
-
     public function __construct(
         private readonly AccessService $access,
+        private readonly BillAgeing $ageing,
     ) {
     }
 
+    /**
+     * Receivables by age from the bill-wise register: every open bill
+     * (invoices, opening dues, returns) plus money received On Account, so
+     * each customer's total is their ledger balance.
+     */
     public function index(Request $request): View
     {
         abort_unless($this->access->allows(auth()->user(), 'accounting.reports.view', [
@@ -32,70 +29,21 @@ class ArAgingController extends Controller
         ]), 403);
 
         $asOf = $request->filled('as_of') ? Carbon::parse($request->string('as_of')) : Carbon::today();
+        $basis = $request->input('basis') === BillAgeing::BASIS_BILL ? BillAgeing::BASIS_BILL : BillAgeing::BASIS_DUE;
 
-        $invoices = Invoice::withoutGlobalScope('branch')->with('customer')
-            ->whereIn('status', self::OPEN_STATUSES)
-            ->where('balance_due', '>', 0)
-            ->orderBy('due_date')
-            ->get();
-
-        $buckets = ['not_due' => 0.0, '0_30' => 0.0, '31_60' => 0.0, '61_90' => 0.0, '90_plus' => 0.0];
-        $customers = [];
-
-        foreach ($invoices as $invoice) {
-            $customerId = $invoice->customer_id;
-            $customerName = $invoice->customer?->name ?? 'Unknown Customer';
-
-            $dueDate = $invoice->due_date ? Carbon::parse($invoice->due_date) : null;
-            // Carbon 3's diffInDays() is signed (not absolute) by default, so
-            // asOf->diffInDays(pastDate) returns a negative number — abs() it
-            // or every overdue invoice falls into the "not_due" bucket.
-            $daysOverdue = ($dueDate && $dueDate->lt($asOf)) ? abs($asOf->diffInDays($dueDate)) : 0;
-            $bucket = $this->bucketFor($daysOverdue);
-
-            $balance = (float) $invoice->balance_due;
-
-            $customers[$customerId] ??= [
-                'customer_id' => $customerId,
-                'name' => $customerName,
-                'buckets' => $buckets,
-                'total' => 0.0,
-                'invoices' => [],
-            ];
-
-            $customers[$customerId]['buckets'][$bucket] += $balance;
-            $customers[$customerId]['total'] += $balance;
-            $customers[$customerId]['invoices'][] = [
-                'invoice' => $invoice,
-                'due_date' => $dueDate,
-                'days_overdue' => max(0, $daysOverdue),
-                'bucket' => $bucket,
-                'balance' => $balance,
-            ];
-
-            $buckets[$bucket] += $balance;
-        }
-
-        $grandTotal = array_sum($buckets);
-
-        usort($customers, fn ($a, $b) => $b['total'] <=> $a['total']);
+        // Customers on Accounts Receivable only (other bill-wise ledgers such as
+        // advances to employees are in Bills Outstanding).
+        $ledgerId = app(\App\Domains\Accounting\Services\SystemAccountService::class)->get(\App\Domains\Accounting\Support\SystemAccount::AR, (int) (tenant_id() ?? auth()->user()->tenant_id))?->id;
+        $report = $this->ageing->build('receivable', $asOf, $basis, $ledgerId);
 
         return view('modules.accounting.reports.ar-aging', [
             'asOf' => $asOf,
-            'customers' => $customers,
-            'buckets' => $buckets,
-            'grandTotal' => $grandTotal,
+            'basis' => $basis,
+            'customers' => array_map(fn ($p) => ['invoices' => $p['documents']] + $p, $report['parties']),
+            'buckets' => $report['buckets'],
+            'onAccount' => $report['onAccount'],
+            'advance' => $report['advance'],
+            'grandTotal' => $report['grandTotal'],
         ]);
-    }
-
-    private function bucketFor(int $daysOverdue): string
-    {
-        return match (true) {
-            $daysOverdue <= 0 => 'not_due',
-            $daysOverdue <= 30 => '0_30',
-            $daysOverdue <= 60 => '31_60',
-            $daysOverdue <= 90 => '61_90',
-            default => '90_plus',
-        };
     }
 }

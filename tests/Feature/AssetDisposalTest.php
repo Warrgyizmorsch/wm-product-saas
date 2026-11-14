@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Core\Tenant\TenantContext;
+use App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule;
 use App\Domains\Accounting\FixedAssets\Models\AssetDisposal;
+use App\Domains\Accounting\FixedAssets\Services\AssetDepreciationService;
 use App\Domains\Accounting\FixedAssets\Services\AssetDisposalService;
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
@@ -74,6 +76,16 @@ class AssetDisposalTest extends TestCase
         ChartOfAccount::create([
             'tenant_id' => $this->tenant->id, 'code' => '1020', 'name' => 'Bank Account',
             'type' => ChartOfAccount::TYPE_ASSET, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT,
+            'is_system' => true, 'is_active' => true,
+        ]);
+        ChartOfAccount::create([
+            'tenant_id' => $this->tenant->id, 'code' => '2100', 'name' => 'Duties & Taxes (Output)',
+            'type' => ChartOfAccount::TYPE_LIABILITY, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT,
+            'is_system' => true, 'is_active' => true,
+        ]);
+        ChartOfAccount::create([
+            'tenant_id' => $this->tenant->id, 'code' => '5400', 'name' => 'Depreciation Expense',
+            'type' => ChartOfAccount::TYPE_EXPENSE, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT,
             'is_system' => true, 'is_active' => true,
         ]);
 
@@ -177,6 +189,68 @@ class AssetDisposalTest extends TestCase
 
         $journal = Journal::withoutGlobalScopes()->findOrFail($disposal->journal_id);
         $this->assertEquals((float) $journal->total_debit, (float) $journal->total_credit);
+    }
+
+    /** @test */
+    public function gst_on_a_sale_is_collected_into_the_bank_and_not_booked_as_a_loss(): void
+    {
+        $asset = $this->makeActiveAsset(100000, 60000); // NBV = 40000
+
+        $disposal = $this->service->dispose($asset, [
+            'disposal_type' => 'sale',
+            'disposal_date' => now()->toDateString(),
+            'sale_proceeds' => 30000, // excl. GST
+            'tax_amount' => 5400,
+        ], $this->user->id);
+
+        $this->assertEquals(-10000.0, (float) $disposal->gain_loss_amount); // 30000 - 40000; GST is not a loss
+
+        $disposal = $this->service->post($this->service->approve($disposal, $this->user->id), $this->user->id);
+        $journal = Journal::withoutGlobalScopes()->with('entries.account')->findOrFail($disposal->journal_id);
+        $line = fn (string $code) => $journal->entries->first(fn ($e) => $e->account->code === $code);
+
+        $this->assertEquals(35400.0, (float) $line('1020')->debit);   // buyer pays price + GST
+        $this->assertEquals(10000.0, (float) $line('5910')->debit);
+        $this->assertEquals(60000.0, (float) $line('1510')->debit);
+        $this->assertEquals(100000.0, (float) $line('1500')->credit);
+        $this->assertEquals(5400.0, (float) $line('2100')->credit);
+        $this->assertEquals((float) $journal->total_debit, (float) $journal->total_credit);
+    }
+
+    /** @test */
+    public function selling_an_asset_discards_its_unposted_depreciation(): void
+    {
+        $asset = $this->makeActiveAsset(100000, 60000);
+        $depreciation = app(AssetDepreciationService::class);
+        $depreciation->generateSchedule($asset, (int) now()->year, (int) now()->month, $this->user->id);
+
+        $disposal = $this->service->dispose($asset, [
+            'disposal_type' => 'sale', 'disposal_date' => now()->toDateString(), 'sale_proceeds' => 40000,
+        ], $this->user->id);
+        $this->service->post($this->service->approve($disposal, $this->user->id), $this->user->id);
+
+        $this->assertSame(0, AssetDepreciationSchedule::where('asset_id', $asset->id)->count());
+    }
+
+    /** @test */
+    public function depreciation_cannot_be_posted_for_a_sold_asset(): void
+    {
+        $asset = $this->makeActiveAsset(100000, 60000);
+        $depreciation = app(AssetDepreciationService::class);
+        $schedule = $depreciation->generateSchedule($asset, (int) now()->year, (int) now()->month, $this->user->id);
+        $schedule = $depreciation->approve($depreciation->review($schedule, $this->user->id), $this->user->id);
+
+        $asset->update(['status' => Asset::STATUS_SOLD, 'book_value' => 0]);
+
+        try {
+            $depreciation->post($schedule, $this->user->id);
+            $this->fail('Depreciation was posted for a sold asset.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('no longer depreciates', $e->getMessage());
+        }
+
+        $this->assertNull($schedule->fresh()->journal_id);
+        $this->assertEquals(60000.0, (float) $asset->fresh()->accumulated_depreciation);
     }
 
     /** @test */

@@ -20,12 +20,45 @@
 @section('content')
 
     @php
+        $currencySymbol = active_currency_symbol();
         $sortBy = request('sort_by', 'created_at');
         $sortOrder = request('sort_order', 'desc');
         $activeStatus = request('status');
+        $formattedPayable = $currencySymbol . (active_currency() === 'INR' ? format_indian_number($totalOutstandingPayable, 2) : number_format($totalOutstandingPayable, 2));
     @endphp
 
     <div class="erp-single-panel bg-white p-4 rounded-3 border shadow-sm">
+        {{-- TOP SUMMARY KPI CARDS (Matching Common Component x-ui.stat-widget) --}}
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <x-ui.stat-widget 
+                    :title="__('purchase.total_suppliers') ?? 'Total Suppliers'" 
+                    :value="$totalCount" 
+                    :subtitle="__('purchase.all_registered_suppliers') ?? 'All Registered Suppliers'" 
+                    icon="feather-users" 
+                    color="primary" 
+                    variant="compact" />
+            </div>
+            <div class="col-md-4">
+                <x-ui.stat-widget 
+                    :title="__('purchase.active_suppliers') ?? 'Active Suppliers'" 
+                    :value="$activeCount" 
+                    :subtitle="($inactiveCount > 0 ? $inactiveCount . ' ' . __('purchase.inactive_only') : __('purchase.operational_suppliers'))" 
+                    icon="feather-check-circle" 
+                    color="success" 
+                    variant="compact" />
+            </div>
+            <div class="col-md-4">
+                <x-ui.stat-widget 
+                    :title="__('purchase.total_outstanding_payable') ?? 'Total Outstanding Payable'" 
+                    :value="$formattedPayable" 
+                    :subtitle="__('purchase.pending_vendor_bills') ?? 'Pending Vendor Payables'" 
+                    icon="feather-dollar-sign" 
+                    color="info" 
+                    variant="compact" />
+            </div>
+        </div>
+
         {{-- 1. Header & Actions Toolbar (Matches Customer Listing Header 100%) --}}
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <h5 class="fw-bold text-dark mb-0">{{ __('purchase.suppliers_directory') }}</h5>
@@ -100,15 +133,15 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="vendorsTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
+                    <tr>
+                        <th style="width: 35px;" class="text-center">
                             <input type="checkbox" class="form-check-input" id="selectAllVendors">
                         </th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('purchase.supplier_name') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('purchase.email_address') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('purchase.phone_mobile') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('purchase.status') }}</th>
-                        <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.action') }}</th>
+                        <th>{{ __('purchase.supplier_name') }}</th>
+                        <th>{{ __('purchase.email_address') }}</th>
+                        <th>{{ __('purchase.phone_mobile') }}</th>
+                        <th>{{ __('purchase.status') }}</th>
+                        <th style="width: 5%;" class="text-end pe-3">{{ __('purchase.action') }}</th>
                     </tr>
                 </thead>
                 <tbody>

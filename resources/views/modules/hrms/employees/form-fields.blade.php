@@ -282,10 +282,10 @@
                         <div class="fw-bold text-dark fs-12 mb-2"><i class="feather-map-pin me-1 text-primary"></i> WFH Geofence Coordinates</div>
                         <div class="row g-2 align-items-end">
                             <div class="col-md-4">
-                                <x-ui.odoo-form-ui type="input" label="WFH Latitude" name="wfh_latitude" id="{{ $prefix }}_wfh_latitude" :value="$fieldValue('wfh_latitude', $isEdit && isset($employee) ? $employee->wfh_latitude : '')" placeholder="e.g. 28.6139" :errorText="$errors->first('wfh_latitude')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService" />
+                                <x-ui.odoo-form-ui type="input" label="WFH Latitude" name="wfh_latitude" id="{{ $prefix }}_wfh_latitude" :value="$fieldValue('wfh_latitude', $isEdit && isset($employee) ? $employee->wfh_latitude : '')" placeholder="Latitude" :errorText="$errors->first('wfh_latitude')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService" />
                             </div>
                             <div class="col-md-4">
-                                <x-ui.odoo-form-ui type="input" label="WFH Longitude" name="wfh_longitude" id="{{ $prefix }}_wfh_longitude" :value="$fieldValue('wfh_longitude', $isEdit && isset($employee) ? $employee->wfh_longitude : '')" placeholder="e.g. 77.2090" :errorText="$errors->first('wfh_longitude')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService" />
+                                <x-ui.odoo-form-ui type="input" label="WFH Longitude" name="wfh_longitude" id="{{ $prefix }}_wfh_longitude" :value="$fieldValue('wfh_longitude', $isEdit && isset($employee) ? $employee->wfh_longitude : '')" placeholder="Longitude" :errorText="$errors->first('wfh_longitude')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService" />
                             </div>
                             <div class="col-md-4 d-flex align-items-end">
                                 <div class="d-flex gap-2 w-100">
@@ -408,7 +408,7 @@
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_nick_name') }}" name="nick_name" id="{{ $prefix }}_nick_name" :value="$fieldValue('nick_name')" placeholder="{{ __('hrms.employees.frm_nick_name_placeholder') }}" :errorText="$errors->first('nick_name')" data-field-group="employee" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_dob') }}" name="date_of_birth" id="{{ $prefix }}_date_of_birth" inputType="date" :value="$fieldValue('date_of_birth', '')" :errorText="$errors->first('date_of_birth')" data-field-group="employee" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_dob') }}" name="date_of_birth" id="{{ $prefix }}_date_of_birth" inputType="date" max="{{ date('Y-m-d') }}" :value="$fieldValue('date_of_birth', '')" :errorText="$errors->first('date_of_birth')" data-field-group="employee" />
                         </div>
                         <div class="col-md-4">
                             <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_marital_status') }}" name="marital_status" id="{{ $prefix }}_marital_status" select2-selector="default" :errorText="$errors->first('marital_status')" data-field-group="employee">
@@ -458,19 +458,19 @@
                     <div class="employee-modal-section-title">{{ __('hrms.employees.contact_compliance') }}</div>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_mobile') }}" name="personal_mobile_number" id="{{ $prefix }}_personal_mobile_number" :value="$fieldValue('personal_mobile_number')" placeholder="{{ __('hrms.employees.frm_mobile_placeholder') }}" :errorText="$errors->first('personal_mobile_number')" data-field-group="employee" />
+                            <x-ui.odoo-form-ui type="input" inputType="tel" pattern="(?=.*[0-9])[0-9+().\s-]+" label="{{ __('hrms.employees.frm_mobile') }}" name="personal_mobile_number" id="{{ $prefix }}_personal_mobile_number" :value="$fieldValue('personal_mobile_number')" placeholder="{{ __('hrms.employees.frm_mobile_placeholder') }}" :errorText="$errors->first('personal_mobile_number')" data-field-group="employee" />
                         </div>
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :required="false" :value="$fieldValue('personal_email', $isEdit ? ($employee->personal_email ?? '') : '')" placeholder="{{ __('hrms.employees.frm_email_placeholder') }}" :errorText="$errors->first('personal_email')" data-field-group="employee" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_home_phone') }}" name="home_phone" id="{{ $prefix }}_home_phone" :value="$fieldValue('home_phone')" placeholder="{{ __('hrms.employees.frm_home_phone_placeholder') }}" :errorText="$errors->first('home_phone')" data-field-group="employee" />
+                            <x-ui.odoo-form-ui type="input" inputType="tel" pattern="(?=.*[0-9])[0-9+().\s-]+" label="{{ __('hrms.employees.frm_home_phone') }}" name="home_phone" id="{{ $prefix }}_home_phone" :value="$fieldValue('home_phone')" placeholder="{{ __('hrms.employees.frm_home_phone_placeholder') }}" :errorText="$errors->first('home_phone')" data-field-group="employee" />
                         </div>
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_emergency_name') }}" name="emergency_contact_name" id="{{ $prefix }}_emergency_contact_name" :value="$fieldValue('emergency_contact_name')" placeholder="{{ __('hrms.employees.frm_emergency_name_placeholder') }}" :errorText="$errors->first('emergency_contact_name')" data-field-group="employee" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_emergency_number') }}" name="emergency_contact_number" id="{{ $prefix }}_emergency_contact_number" :value="$fieldValue('emergency_contact_number')" placeholder="{{ __('hrms.employees.frm_emergency_number_placeholder') }}" :errorText="$errors->first('emergency_contact_number')" data-field-group="employee" />
+                            <x-ui.odoo-form-ui type="input" inputType="tel" pattern="(?=.*[0-9])[0-9+().\s-]+" label="{{ __('hrms.employees.frm_emergency_number') }}" name="emergency_contact_number" id="{{ $prefix }}_emergency_contact_number" :value="$fieldValue('emergency_contact_number')" placeholder="{{ __('hrms.employees.frm_emergency_number_placeholder') }}" :errorText="$errors->first('emergency_contact_number')" data-field-group="employee" />
                         </div>
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_emergency_relation') }}" name="emergency_contact_relation" id="{{ $prefix }}_emergency_contact_relation" :value="$fieldValue('emergency_contact_relation')" placeholder="{{ __('hrms.employees.frm_emergency_relation_placeholder') }}" :errorText="$errors->first('emergency_contact_relation')" data-field-group="employee" />
@@ -513,6 +513,13 @@
                         </div>
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_pan') }}" name="pan_card_number" id="{{ $prefix }}_pan_card_number" :value="$fieldValue('pan_card_number')" placeholder="{{ __('hrms.employees.frm_pan_placeholder') }}" :errorText="$errors->first('pan_card_number')" data-field-group="employee" />
+                        </div>
+                        {{-- Keys of the PF ECR and ESIC monthly return. --}}
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="UAN (PF)" name="uan_number" id="{{ $prefix }}_uan_number" :value="$fieldValue('uan_number')" placeholder="12-digit UAN" maxlength="12" :errorText="$errors->first('uan_number')" data-field-group="employee" />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="ESI IP number" name="esi_ip_number" id="{{ $prefix }}_esi_ip_number" :value="$fieldValue('esi_ip_number')" placeholder="10-digit insurance number" maxlength="10" :errorText="$errors->first('esi_ip_number')" data-field-group="employee" />
                         </div>
                     </div>
 
@@ -776,6 +783,20 @@ const runEmployeeFormSetup = () => {
         // Location Detection handler
         let wfhMap = null;
         let wfhMarker = null;
+        const setEmployeeWfhMarker = (lat, lng) => {
+            const latInput = $('#' + prefix + '_wfh_latitude');
+            const lngInput = $('#' + prefix + '_wfh_longitude');
+            if (!wfhMarker) {
+                wfhMarker = L.marker([lat, lng], { draggable: true }).addTo(wfhMap);
+                wfhMarker.on('dragend', function(e) {
+                    const position = e.target.getLatLng();
+                    latInput.val(position.lat.toFixed(8));
+                    lngInput.val(position.lng.toFixed(8));
+                });
+            } else {
+                wfhMarker.setLatLng([lat, lng]);
+            }
+        };
 
         const initWfhMapPicker = () => {
             if (typeof L === 'undefined') {
@@ -790,38 +811,37 @@ const runEmployeeFormSetup = () => {
             const mapContainer = document.getElementById(mapContainerId);
             if (!mapContainer) return;
 
-            let initialLat = parseFloat(latInput.val()) || 28.6139; // Default to New Delhi or a sensible center
-            let initialLng = parseFloat(lngInput.val()) || 77.2090;
+            let initialLat = parseFloat(latInput.val());
+            let initialLng = parseFloat(lngInput.val());
+            const hasInitialCoordinates = Number.isFinite(initialLat) && Number.isFinite(initialLng);
             
             if (wfhMap) {
                 wfhMap.invalidateSize();
-                wfhMap.setView([initialLat, initialLng], wfhMap.getZoom() || 13);
-                if (wfhMarker) {
-                    wfhMarker.setLatLng([initialLat, initialLng]);
+                if (hasInitialCoordinates) {
+                    wfhMap.setView([initialLat, initialLng], wfhMap.getZoom() || 13);
+                    setEmployeeWfhMarker(initialLat, initialLng);
                 }
                 return;
             }
 
-            wfhMap = L.map(mapContainerId).setView([initialLat, initialLng], 13);
+            wfhMap = L.map(mapContainerId);
+            if (hasInitialCoordinates) {
+                wfhMap.setView([initialLat, initialLng], 13);
+            } else {
+                wfhMap.fitWorld();
+            }
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(wfhMap);
 
-            wfhMarker = L.marker([initialLat, initialLng], {
-                draggable: true
-            }).addTo(wfhMap);
-
-            // Update inputs on marker drag
-            wfhMarker.on('dragend', function(e) {
-                const position = e.target.getLatLng();
-                latInput.val(position.lat.toFixed(8));
-                lngInput.val(position.lng.toFixed(8));
-            });
+            if (hasInitialCoordinates) {
+                setEmployeeWfhMarker(initialLat, initialLng);
+            }
 
             // Update marker and inputs on map click
             wfhMap.on('click', function(e) {
-                wfhMarker.setLatLng(e.latlng);
+                setEmployeeWfhMarker(e.latlng.lat, e.latlng.lng);
                 latInput.val(e.latlng.lat.toFixed(8));
                 lngInput.val(e.latlng.lng.toFixed(8));
             });
@@ -831,7 +851,7 @@ const runEmployeeFormSetup = () => {
                 const lat = parseFloat(latInput.val());
                 const lng = parseFloat(lngInput.val());
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    wfhMarker.setLatLng([lat, lng]);
+                    setEmployeeWfhMarker(lat, lng);
                     wfhMap.setView([lat, lng], wfhMap.getZoom() || 14);
                 }
             };
@@ -846,7 +866,7 @@ const runEmployeeFormSetup = () => {
                     const lat = parseFloat(place.lat);
                     const lng = parseFloat(place.lng);
                     wfhMap.setView([lat, lng], 15);
-                    wfhMarker.setLatLng([lat, lng]);
+                    setEmployeeWfhMarker(lat, lng);
 
                     latInput.val(lat.toFixed(8));
                     lngInput.val(lng.toFixed(8));
@@ -906,8 +926,8 @@ const runEmployeeFormSetup = () => {
                     $('#' + prefix + '_wfh_latitude').val(lat.toFixed(8));
                     $('#' + prefix + '_wfh_longitude').val(lng.toFixed(8));
                     
-                    if (wfhMap && wfhMarker) {
-                        wfhMarker.setLatLng([lat, lng]);
+                    if (wfhMap) {
+                        setEmployeeWfhMarker(lat, lng);
                         wfhMap.setView([lat, lng], 15);
                     } else {
                         // If map isn't open yet, auto-open it so user sees the detected location
@@ -915,8 +935,8 @@ const runEmployeeFormSetup = () => {
                         if (mapWrap && mapWrap.style.display === 'none') {
                             window['toggleWfhMapPicker_' + prefix]();
                             setTimeout(() => {
-                                if (wfhMap && wfhMarker) {
-                                    wfhMarker.setLatLng([lat, lng]);
+                                if (wfhMap) {
+                                    setEmployeeWfhMarker(lat, lng);
                                     wfhMap.setView([lat, lng], 15);
                                 }
                             }, 600);

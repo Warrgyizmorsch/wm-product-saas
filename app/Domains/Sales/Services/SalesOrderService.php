@@ -8,6 +8,9 @@ use App\Domains\Inventory\Models\Product;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\CrmDeal;
+use App\Domains\CRM\Models\Customer;
+use App\Domains\HRMS\Models\Company;
+use App\Models\GstConfiguration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -30,22 +33,47 @@ class SalesOrderService
 
     public function getNextSalesOrderNumber(): string
     {
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
         $year = now()->format('Y');
-        $prefix = "{$year}-";
 
-        $latest = SalesOrder::query()
-            ->where('sales_order_number', 'like', "{$prefix}%")
-            ->orderBy('id', 'desc')
-            ->first();
+        // Fetch all order numbers for this tenant matching current year (handling DB raw column and prefixed formats)
+        $allNumbers = SalesOrder::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($year) {
+                $q->where('sales_order_number', 'like', "{$year}-%")
+                  ->orWhere('sales_order_number', 'like', "SO-{$year}-%");
+            })
+            ->pluck('sales_order_number');
 
-        $nextNum = 1;
-        if ($latest) {
-            $rawNum = $latest->getRawOriginal('sales_order_number');
-            $lastNumStr = str_replace($prefix, '', $rawNum);
-            $nextNum = intval($lastNumStr) + 1;
+        $maxNum = 0;
+        foreach ($allNumbers as $soNum) {
+            $cleanNum = preg_replace('/^(SO-)?' . $year . '-/i', '', $soNum);
+            if (is_numeric($cleanNum)) {
+                $intVal = intval($cleanNum);
+                if ($intVal > $maxNum) {
+                    $maxNum = $intVal;
+                }
+            }
         }
 
-        return 'SO-' . $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        $nextNum = $maxNum + 1;
+        $nextFormatted = str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        $nextDbNumber = "{$year}-{$nextFormatted}";
+
+        // Ensure uniqueness against both raw DB format (YYYY-XXXX) and model format (SO-YYYY-XXXX)
+        while (SalesOrder::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($nextDbNumber) {
+                $q->where('sales_order_number', $nextDbNumber)
+                  ->orWhere('sales_order_number', "SO-{$nextDbNumber}");
+            })
+            ->exists()) {
+            $nextNum++;
+            $nextFormatted = str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+            $nextDbNumber = "{$year}-{$nextFormatted}";
+        }
+
+        return "SO-{$nextDbNumber}";
     }
 
     public function create(array $data, array $items): SalesOrder
@@ -55,27 +83,79 @@ class SalesOrderService
                 $data['sales_order_number'] = $this->getNextSalesOrderNumber();
             }
 
+            $taxMode = $data['tax_mode'] ?? 'exclusive';
             $discountType = $data['discount_type'] ?? 'item_wise';
             $taxType = $data['tax_type'] ?? 'item_wise_tax';
             $orderTaxRate = floatval($data['order_tax_rate'] ?? 0);
 
+            // Auto-resolve gst_type if empty and tax_type is not without_tax
+            if (empty($data['gst_type']) && $taxType !== 'without_tax' && !empty($data['customer_id'])) {
+                $data['gst_type'] = $this->resolveGstType((int)$data['customer_id'], $data['company_id'] ?? null, $data['tenant_id'] ?? null);
+            }
+
             $subtotal = 0;
-            $tax = 0;
-            $itemsData = [];
+            $rawLines = [];
 
             foreach ($items as $item) {
                 $qty = intval($item['quantity'] ?? 0);
                 $price = convert_to_base((float)($item['unit_price'] ?? 0));
                 $taxRate = ($taxType === 'item_wise_tax') ? floatval($item['tax_rate'] ?? 0) : 0;
-                $discount = ($discountType === 'item_wise') ? convert_to_base((float)($item['discount'] ?? 0)) : 0;
+                $lineDiscount = ($discountType === 'item_wise') ? convert_to_base((float)($item['discount'] ?? 0)) : 0;
                 $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
                 $warehouseId = !empty($item['warehouse_id']) ? intval($item['warehouse_id']) : null;
 
-                $amount = ($qty * $price) - $discount;
-                $itemTax = ($taxType === 'item_wise_tax') ? ($amount * ($taxRate / 100)) : 0;
+                $lineGross = $qty * $price;
+                $subtotal += $lineGross;
 
-                $subtotal += ($qty * $price);
-                $tax += $itemTax;
+                $rawLines[] = [
+                    'product_id' => $productId,
+                    'warehouse_id' => $warehouseId,
+                    'item' => $item,
+                    'qty' => $qty,
+                    'price' => $price,
+                    'tax_rate' => $taxRate,
+                    'line_discount' => $lineDiscount,
+                    'line_gross' => $lineGross,
+                ];
+            }
+
+            $discountVal = 0;
+            if ($discountType === 'item_wise') {
+                foreach ($rawLines as $rl) {
+                    $discountVal += floatval($rl['line_discount'] ?? 0);
+                }
+            } elseif ($discountType === 'order_wise') {
+                $discountVal = convert_to_base((float)($data['discount'] ?? 0));
+            }
+
+            $tax = 0;
+            $itemsData = [];
+
+            foreach ($rawLines as $rl) {
+                $lineGross = $rl['line_gross'];
+                $taxRate = $rl['tax_rate'];
+                $qty = $rl['qty'];
+                $price = $rl['price'];
+                $productId = $rl['product_id'];
+                $warehouseId = $rl['warehouse_id'];
+                $item = $rl['item'];
+
+                $lineDisc = ($discountType === 'item_wise') 
+                    ? $rl['line_discount'] 
+                    : (($subtotal > 0 && $discountVal > 0) ? ($lineGross / $subtotal) * $discountVal : 0);
+
+                if ($taxMode === 'inclusive') {
+                    $lineNet = max(0, $lineGross - $lineDisc);
+                    $lineBase = ($taxRate > 0 && $taxType === 'item_wise_tax') ? round($lineNet / (1 + ($taxRate / 100)), 4) : $lineNet;
+                    $itemTax = ($taxType === 'item_wise_tax') ? ($lineNet - $lineBase) : 0;
+                    $tax += $itemTax;
+                    $amount = $lineGross - ($discountType === 'item_wise' ? $lineDisc : 0);
+                } else {
+                    $lineTaxable = max(0, $lineGross - $lineDisc);
+                    $itemTax = ($taxType === 'item_wise_tax') ? ($lineTaxable * ($taxRate / 100)) : 0;
+                    $tax += $itemTax;
+                    $amount = $lineGross - ($discountType === 'item_wise' ? $lineDisc : 0);
+                }
 
                 $itemName = $item['item_name'] ?? 'Product/Service';
                 if ($productId) {
@@ -93,26 +173,23 @@ class SalesOrderService
                     'quantity' => $qty,
                     'unit_price' => $price,
                     'tax_rate' => $taxRate,
-                    'discount' => $discount,
+                    'discount' => ($discountType === 'item_wise') ? $rl['line_discount'] : 0,
                     'amount' => $amount,
                 ];
             }
 
-            $discountVal = 0;
-            if ($discountType === 'item_wise') {
-                foreach ($itemsData as $it) {
-                    $discountVal += floatval($it['discount'] ?? 0);
-                }
-            } elseif ($discountType === 'order_wise') {
-                $discountVal = convert_to_base((float)($data['discount'] ?? 0));
-            }
-
             if ($taxType === 'order_wise_tax') {
                 $taxableAmount = max(0, $subtotal - $discountVal);
-                $tax = $taxableAmount * ($orderTaxRate / 100);
+                if ($taxMode === 'inclusive') {
+                    $tax = ($orderTaxRate > 0) ? ($taxableAmount - ($taxableAmount / (1 + ($orderTaxRate / 100)))) : 0;
+                } else {
+                    $tax = $taxableAmount * ($orderTaxRate / 100);
+                }
             } elseif ($taxType === 'without_tax') {
                 $tax = 0;
             }
+
+            $tax = round($tax, 2);
 
             $freightTerms = $data['freight_terms'] ?? 'To Pay';
             $freightAmount = convert_to_base((float)($data['freight_amount'] ?? $data['shipping_charges'] ?? 0));
@@ -121,15 +198,21 @@ class SalesOrderService
             $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
             $totalTax = $tax;
 
-            $taxableSubtotal = max(0, $subtotal - $discountVal);
-            $totalAmount = $taxableSubtotal + $totalTax + $effectiveFreight + $adjustment;
+            if ($taxMode === 'inclusive') {
+                $totalAmount = max(0, $subtotal - $discountVal) + $effectiveFreight + $adjustment;
+            } else {
+                $taxableSubtotal = max(0, $subtotal - $discountVal);
+                $totalAmount = $taxableSubtotal + $totalTax + $effectiveFreight + $adjustment;
+            }
 
+            $data['tax_mode'] = $taxMode;
             $data['freight_terms'] = $freightTerms;
             $data['freight_amount'] = $freightAmount;
             $data['shipping_charges'] = $freightAmount;
             $data['discount'] = $discountVal;
             $data['subtotal'] = $subtotal;
             $data['tax'] = $totalTax;
+            $data['adjustment'] = $adjustment;
             $data['total_amount'] = max(0, $totalAmount);
 
             $salesOrder = $this->salesOrders->create($data);
@@ -155,6 +238,7 @@ class SalesOrderService
                             $deal->update([
                                 'stage' => 'Won',
                                 'probability' => 100,
+                                'estimated_value' => $salesOrder->total_amount,
                             ]);
                         }
                     }
@@ -172,27 +256,82 @@ class SalesOrderService
         }
 
         return DB::transaction(function () use ($salesOrder, $data, $items) {
+            $taxMode = $data['tax_mode'] ?? $salesOrder->tax_mode ?? 'exclusive';
             $discountType = $data['discount_type'] ?? $salesOrder->discount_type ?? 'item_wise';
             $taxType = $data['tax_type'] ?? $salesOrder->tax_type ?? 'item_wise_tax';
             $orderTaxRate = floatval($data['order_tax_rate'] ?? $salesOrder->order_tax_rate ?? 0);
 
+            // Auto-resolve gst_type if empty and tax_type is not without_tax
+            if (empty($data['gst_type']) && $taxType !== 'without_tax') {
+                $customerId = $data['customer_id'] ?? $salesOrder->customer_id;
+                if ($customerId) {
+                    $data['gst_type'] = $this->resolveGstType((int)$customerId, $data['company_id'] ?? $salesOrder->company_id, $data['tenant_id'] ?? $salesOrder->tenant_id);
+                }
+            }
+
             $subtotal = 0;
-            $tax = 0;
-            $itemsData = [];
+            $rawLines = [];
 
             foreach ($items as $item) {
                 $qty = intval($item['quantity'] ?? 0);
                 $price = convert_to_base((float)($item['unit_price'] ?? 0));
                 $taxRate = ($taxType === 'item_wise_tax') ? floatval($item['tax_rate'] ?? 0) : 0;
-                $discount = ($discountType === 'item_wise') ? convert_to_base((float)($item['discount'] ?? 0)) : 0;
+                $lineDiscount = ($discountType === 'item_wise') ? convert_to_base((float)($item['discount'] ?? 0)) : 0;
                 $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
                 $warehouseId = !empty($item['warehouse_id']) ? intval($item['warehouse_id']) : null;
 
-                $amount = ($qty * $price) - $discount;
-                $itemTax = ($taxType === 'item_wise_tax') ? ($amount * ($taxRate / 100)) : 0;
+                $lineGross = $qty * $price;
+                $subtotal += $lineGross;
 
-                $subtotal += ($qty * $price);
-                $tax += $itemTax;
+                $rawLines[] = [
+                    'product_id' => $productId,
+                    'warehouse_id' => $warehouseId,
+                    'item' => $item,
+                    'qty' => $qty,
+                    'price' => $price,
+                    'tax_rate' => $taxRate,
+                    'line_discount' => $lineDiscount,
+                    'line_gross' => $lineGross,
+                ];
+            }
+
+            $discountVal = 0;
+            if ($discountType === 'item_wise') {
+                foreach ($rawLines as $rl) {
+                    $discountVal += floatval($rl['line_discount'] ?? 0);
+                }
+            } elseif ($discountType === 'order_wise') {
+                $discountVal = convert_to_base((float)($data['discount'] ?? 0));
+            }
+
+            $tax = 0;
+            $itemsData = [];
+
+            foreach ($rawLines as $rl) {
+                $lineGross = $rl['line_gross'];
+                $taxRate = $rl['tax_rate'];
+                $qty = $rl['qty'];
+                $price = $rl['price'];
+                $productId = $rl['product_id'];
+                $warehouseId = $rl['warehouse_id'];
+                $item = $rl['item'];
+
+                $lineDisc = ($discountType === 'item_wise') 
+                    ? $rl['line_discount'] 
+                    : (($subtotal > 0 && $discountVal > 0) ? ($lineGross / $subtotal) * $discountVal : 0);
+
+                if ($taxMode === 'inclusive') {
+                    $lineNet = max(0, $lineGross - $lineDisc);
+                    $lineBase = ($taxRate > 0 && $taxType === 'item_wise_tax') ? round($lineNet / (1 + ($taxRate / 100)), 4) : $lineNet;
+                    $itemTax = ($taxType === 'item_wise_tax') ? ($lineNet - $lineBase) : 0;
+                    $tax += $itemTax;
+                    $amount = $lineGross - ($discountType === 'item_wise' ? $lineDisc : 0);
+                } else {
+                    $lineTaxable = max(0, $lineGross - $lineDisc);
+                    $itemTax = ($taxType === 'item_wise_tax') ? ($lineTaxable * ($taxRate / 100)) : 0;
+                    $tax += $itemTax;
+                    $amount = $lineGross - ($discountType === 'item_wise' ? $lineDisc : 0);
+                }
 
                 $itemName = $item['item_name'] ?? 'Product/Service';
                 if ($productId) {
@@ -210,26 +349,23 @@ class SalesOrderService
                     'quantity' => $qty,
                     'unit_price' => $price,
                     'tax_rate' => $taxRate,
-                    'discount' => $discount,
+                    'discount' => ($discountType === 'item_wise') ? $rl['line_discount'] : 0,
                     'amount' => $amount,
                 ];
             }
 
-            $discountVal = 0;
-            if ($discountType === 'item_wise') {
-                foreach ($itemsData as $it) {
-                    $discountVal += floatval($it['discount'] ?? 0);
-                }
-            } elseif ($discountType === 'order_wise') {
-                $discountVal = convert_to_base((float)($data['discount'] ?? 0));
-            }
-
             if ($taxType === 'order_wise_tax') {
                 $taxableAmount = max(0, $subtotal - $discountVal);
-                $tax = $taxableAmount * ($orderTaxRate / 100);
+                if ($taxMode === 'inclusive') {
+                    $tax = ($orderTaxRate > 0) ? ($taxableAmount - ($taxableAmount / (1 + ($orderTaxRate / 100)))) : 0;
+                } else {
+                    $tax = $taxableAmount * ($orderTaxRate / 100);
+                }
             } elseif ($taxType === 'without_tax') {
                 $tax = 0;
             }
+
+            $tax = round($tax, 2);
 
             $freightTerms = $data['freight_terms'] ?? $salesOrder->freight_terms ?? 'To Pay';
             $freightAmount = convert_to_base((float)($data['freight_amount'] ?? $data['shipping_charges'] ?? 0));
@@ -238,15 +374,21 @@ class SalesOrderService
             $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
             $totalTax = $tax;
 
-            $taxableSubtotal = max(0, $subtotal - $discountVal);
-            $totalAmount = $taxableSubtotal + $totalTax + $effectiveFreight + $adjustment;
+            if ($taxMode === 'inclusive') {
+                $totalAmount = max(0, $subtotal - $discountVal) + $effectiveFreight + $adjustment;
+            } else {
+                $taxableSubtotal = max(0, $subtotal - $discountVal);
+                $totalAmount = $taxableSubtotal + $totalTax + $effectiveFreight + $adjustment;
+            }
 
+            $data['tax_mode'] = $taxMode;
             $data['freight_terms'] = $freightTerms;
             $data['freight_amount'] = $freightAmount;
             $data['shipping_charges'] = $freightAmount;
             $data['discount'] = $discountVal;
             $data['subtotal'] = $subtotal;
             $data['tax'] = $totalTax;
+            $data['adjustment'] = $adjustment;
             $data['total_amount'] = max(0, $totalAmount);
 
             $salesOrder->update($data);
@@ -260,5 +402,66 @@ class SalesOrderService
     public function delete(SalesOrder $salesOrder): bool
     {
         return $salesOrder->delete();
+    }
+
+    /**
+     * Resolve GST type (cgst_sgst for Intra-state, igst for Inter-state)
+     * based on active company GST number starting 2 digits vs customer GSTIN starting 2 digits.
+     */
+    public function resolveGstType(Customer|int $customer, ?int $companyId = null, ?int $tenantId = null): string
+    {
+        if (is_numeric($customer)) {
+            $customer = Customer::find($customer);
+        }
+        if (!$customer) {
+            return 'cgst_sgst';
+        }
+
+        $tenantId ??= $customer->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
+
+        $company = null;
+        if ($companyId) {
+            $company = Company::find($companyId);
+        }
+        if (!$company && function_exists('company') && company()) {
+            $company = company();
+        }
+        if (!$company && function_exists('current_company_id') && current_company_id()) {
+            $company = Company::find(current_company_id());
+        }
+        if (!$company) {
+            $company = Company::where('tenant_id', $tenantId)->first();
+        }
+
+        // Active company GST number (or tax_number / gstin / GstConfiguration seller_gstin)
+        $companyGst = strtoupper(trim((string) ($company?->gst_number ?? $company?->tax_number ?? $company?->gstin ?? '')));
+        if (empty($companyGst)) {
+            $gstConfig = GstConfiguration::getForCurrentContext();
+            if ($gstConfig && $gstConfig->seller_gstin) {
+                $companyGst = strtoupper(trim((string) $gstConfig->seller_gstin));
+            }
+        }
+
+        $customerGst = strtoupper(trim((string) ($customer->gstin ?? $customer->tax_number ?? '')));
+
+        $cleanCompanyGst = preg_replace('/[^0-9A-Za-z]/', '', $companyGst);
+        $cleanCustomerGst = preg_replace('/[^0-9A-Za-z]/', '', $customerGst);
+
+        $companyPrefix = substr($cleanCompanyGst, 0, 2);
+        $customerPrefix = substr($cleanCustomerGst, 0, 2);
+
+        // 1. Primary rule: Compare first 2 digits of company GST and customer GSTIN
+        if (!empty($companyPrefix) && !empty($customerPrefix)) {
+            return ($companyPrefix === $customerPrefix) ? 'cgst_sgst' : 'igst';
+        }
+
+        // 2. Fallback: Compare state names if GST numbers are not available
+        $companyState = strtolower(trim((string) ($company?->state ?? '')));
+        $customerState = strtolower(trim((string) ($customer->billing_state ?? $customer->state ?? '')));
+        if (!empty($companyState) && !empty($customerState)) {
+            return ($companyState === $customerState) ? 'cgst_sgst' : 'igst';
+        }
+
+        return 'cgst_sgst';
     }
 }

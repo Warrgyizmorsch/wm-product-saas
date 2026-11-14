@@ -258,7 +258,8 @@ class OperatorScreenExecutionTest extends TestCase
         // Aligned Toolbar Buttons
         $response->assertSee('LOG PROGRESS');
         $response->assertSee('MATERIAL DISPOSITION');
-        $response->assertSee('QC CHECK');
+        // QC CHECK button should NOT appear when pending QC is 0
+        $response->assertDontSee('QC CHECK');
 
         // Operation Output & Completion Progress Card & Autofill
         $response->assertSee('Operation Output and Completion Progress');
@@ -273,6 +274,21 @@ class OperatorScreenExecutionTest extends TestCase
 
         // REWORK / SCRAP disposition button should NOT appear when rejected quantity is 0
         $response->assertDontSee('REWORK / SCRAP');
+
+        // Now log 10 units progress and verify QC CHECK button appears with badge 10
+        \App\Domains\Production\Models\ProductionOrderProgressLog::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'operation_id' => $op->id,
+            'quantity_produced' => 10,
+            'recorded_at' => now(),
+        ]);
+        $responseWithPendingQc = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.mes.operator.execution', $op->id));
+        $responseWithPendingQc->assertSee('QC CHECK');
+        $responseWithPendingQc->assertSee('10');
 
         // Now set rejected quantity to 5 and verify REWORK / SCRAP button appears
         $op->update(['quantity_rejected' => 5]);
@@ -430,6 +446,15 @@ class OperatorScreenExecutionTest extends TestCase
         $order = $this->createTestOrder(20, true);
         $op = $order->operations->first();
 
+        // Log 20 units progress so pending QC is 20
+        \App\Domains\Production\Models\ProductionOrderProgressLog::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'operation_id' => $op->id,
+            'quantity_produced' => 20,
+            'recorded_at' => now(),
+        ]);
+
         // Perform QC with 15 accepted and 5 rejected
         app(QualityInspectionService::class)->processShopfloorInspection($this->tenant->id, [
             'production_order_operation_id' => $op->id,
@@ -485,6 +510,15 @@ class OperatorScreenExecutionTest extends TestCase
     {
         $order = $this->createTestOrder(20, true);
         $op = $order->operations->first();
+
+        // Log 20 units progress so pending QC is 20
+        \App\Domains\Production\Models\ProductionOrderProgressLog::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'operation_id' => $op->id,
+            'quantity_produced' => 20,
+            'recorded_at' => now(),
+        ]);
 
         // Perform QC with 17 accepted and 3 rejected
         app(QualityInspectionService::class)->processShopfloorInspection($this->tenant->id, [

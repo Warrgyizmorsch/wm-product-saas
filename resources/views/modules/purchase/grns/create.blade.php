@@ -298,7 +298,7 @@
                         <x-ui.odoo-form-ui type="input" :label="__('purchase.pan_number')" name="pan_number" placeholder="e.g. ABCDE1234F" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('purchase.phone_mobile')" name="phone" :placeholder="__('purchase.phone_mobile')" />
+                        <x-ui.odoo-form-ui type="input" inputType="tel" :label="__('purchase.phone_mobile')" name="phone" :placeholder="__('purchase.phone_mobile')" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
                     </div>
                     <div class="col-md-6">
                         <x-ui.odoo-form-ui type="input" inputType="email" :label="__('purchase.email_address')" name="email" placeholder="dispatch@transporter.com" />
@@ -343,13 +343,31 @@
     // Quick Transporter AJAX Store
     $(document).on('submit', '#quickTransporterForm', function(e) {
         e.preventDefault();
+        const form = $(this);
         const $btn = $('#saveQuickTransporterBtn');
+
+        // Clear previous errors
+        form.find('.is-invalid').removeClass('is-invalid');
+        form.find('.invalid-feedback.ajax-feedback').remove();
+        form.find('.transporter-alert-error').remove();
+
+        // Client-side email validation check
+        const emailInput = form.find('input[name="email"]');
+        const emailVal = emailInput.val().trim();
+        if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+            emailInput.addClass('is-invalid');
+            emailInput.parent().find('.invalid-feedback.ajax-feedback').remove();
+            emailInput.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+            emailInput.focus();
+            return false;
+        }
+
         $btn.prop('disabled', true).text('Saving...');
 
         $.ajax({
             url: "{{ route('platform.transporters.quick-create') }}",
             type: "POST",
-            data: $(this).serialize(),
+            data: form.serialize(),
             success: function(response) {
                 $btn.prop('disabled', false).text('Save Transporter');
                 if (response.success && response.transporter) {
@@ -361,14 +379,53 @@
                     const modalEl = document.getElementById('quickTransporterModal');
                     const modalInstance = bootstrap.Modal.getInstance(modalEl);
                     if (modalInstance) modalInstance.hide();
-                    $('#quickTransporterForm')[0].reset();
+                    form[0].reset();
+                    form.find('.is-invalid').removeClass('is-invalid');
+                    form.find('.invalid-feedback.ajax-feedback').remove();
                 }
             },
             error: function(err) {
                 $btn.prop('disabled', false).text('Save Transporter');
-                alert('Error saving transporter: ' + (err.responseJSON?.message || 'Invalid data'));
+                if (err.status === 422 && err.responseJSON && err.responseJSON.errors) {
+                    const errors = err.responseJSON.errors;
+                    let firstField = null;
+                    $.each(errors, function(field, messages) {
+                        const $input = form.find('[name="' + field + '"]');
+                        if ($input.length) {
+                            $input.addClass('is-invalid');
+                            $input.parent().find('.invalid-feedback.ajax-feedback').remove();
+                            $input.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">' + messages[0] + '</div>');
+                            if (!firstField) firstField = $input;
+                        } else {
+                            form.find('.p-1').prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + messages[0] + '</div>');
+                        }
+                    });
+                    if (firstField) {
+                        firstField.focus();
+                    }
+                } else {
+                    const msg = err.responseJSON?.message || 'Error saving transporter. Please check the details and try again.';
+                    form.find('.p-1').prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + msg + '</div>');
+                }
             }
         });
+    });
+
+    // Realtime clear invalid feedback on input/change
+    $(document).on('input change', '#quickTransporterForm input, #quickTransporterForm select', function() {
+        $(this).removeClass('is-invalid');
+        $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+        $('#quickTransporterForm').find('.transporter-alert-error').remove();
+    });
+
+    // Email blur validation for quick transporter form
+    $(document).on('blur', '#quickTransporterForm input[name="email"]', function() {
+        const val = $(this).val().trim();
+        if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+            $(this).addClass('is-invalid');
+            $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+            $(this).after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+        }
     });
 
     function showWarningModal(title, message, callback) {
@@ -513,8 +570,10 @@
                                     </span>
                                     <button type="button" class="btn btn-xs btn-soft-primary fw-semibold btn-auto-serial" 
                                             data-idx="${idx}" 
+                                            data-product-id="${item.product_id}"
                                             data-product="${item.product_name}"
                                             data-prefix="${defaultPrefix}"
+                                            data-start="${item.next_serial_start || 1001}"
                                             data-count="${Math.round(defaultAcc)}">
                                         <i class="feather-zap me-1"></i>Auto-Generate
                                     </button>
@@ -525,8 +584,10 @@
                                       name="items[${idx}][serial_numbers]" 
                                       id="serial_input_${idx}" 
                                       data-idx="${idx}"
+                                      data-product-id="${item.product_id}"
                                       rows="2"
                                       placeholder="Scan barcodes or enter serial numbers separated by comma or new line..."></textarea>
+                            <div id="serial_dup_msg_${idx}" class="mt-1" style="display: none;"></div>
                             <span class="fs-10 text-muted">Each scanned barcode or comma/newline registers 1 unique Serial Number.</span>
                         </div>
                     `;
@@ -749,8 +810,8 @@
                     <td colspan="${poSelected ? 10 : 7}" class="py-2 px-3 border-top-0 remark-colspan">
                         <div class="p-3 rounded-3 border bg-white shadow-xs">
                             <div class="row g-3">
-                                <div class="col-md-12 tracking-section-container" id="tracking_container_${idx}"></div>
-                                <div class="col-md-12">
+                                <div class="col-md-7 tracking-section-container" id="tracking_container_${idx}" style="display: none;"></div>
+                                <div class="col-md-12" id="remarks_container_${idx}">
                                     <label class="form-label fs-11 fw-bold text-uppercase text-muted mb-1.5">
                                         <i class="feather-message-square me-1"></i>{{ __('purchase.rejection_reason_remarks') }}
                                     </label>
@@ -795,45 +856,59 @@
 
             if (!prodId) {
                 $('#prod_info_' + idx).html('');
-                $('#tracking_container_' + idx).html('');
+                $('#tracking_container_' + idx).html('').hide();
+                $('#remarks_container_' + idx).removeClass('col-md-5').addClass('col-md-12');
                 return;
             }
 
-            var code = selectedOpt.data('code') || '';
-            var hsn = selectedOpt.data('hsn') || '';
-            var uom = selectedOpt.data('uom') || 'Pcs';
-            var rate = parseFloat(selectedOpt.data('rate')) || 0;
-            var isSerial = selectedOpt.data('serial') == 1;
-            var isBatch = selectedOpt.data('batch') == 1;
-            var prodName = selectedOpt.text();
+            var prodObj = availableProducts.find(function(p) { return String(p.id) === String(prodId); });
 
-            $('#prod_info_' + idx).html(`HSN: <strong>${hsn || code || 'N/A'}</strong> | UOM: <strong>${uom}</strong>`);
+            var code = prodObj ? (prodObj.code || '') : (selectedOpt.data('code') || selectedOpt.attr('data-code') || '');
+            var hsn = prodObj ? (prodObj.hsn_sac || '') : (selectedOpt.data('hsn') || selectedOpt.attr('data-hsn') || '');
+            var uom = prodObj ? (prodObj.uom_name || 'Pcs') : (selectedOpt.data('uom') || selectedOpt.attr('data-uom') || 'Pcs');
+            var rate = prodObj ? (parseFloat(prodObj.cost_price) || 0) : (parseFloat(selectedOpt.data('rate') || selectedOpt.attr('data-rate')) || 0);
+            var isSerial = prodObj ? (prodObj.track_serial_number === true || prodObj.track_serial_number == 1) : (selectedOpt.attr('data-serial') == '1');
+            var isBatch = prodObj ? (prodObj.track_batch === true || prodObj.track_batch == 1) : (selectedOpt.attr('data-batch') == '1');
+            var prodName = prodObj ? prodObj.name : selectedOpt.text();
+
+            var trackingBadgeHtml = '';
+            if (isSerial) {
+                trackingBadgeHtml = `<span class="badge bg-soft-primary text-primary fs-10 px-2 py-0.5 ms-2"><i class="feather-hash me-1"></i>Serial Tracked</span>`;
+            } else if (isBatch) {
+                trackingBadgeHtml = `<span class="badge bg-soft-warning text-warning fs-10 px-2 py-0.5 ms-2"><i class="feather-layers me-1"></i>Batch Tracked</span>`;
+            }
+
+            $('#prod_info_' + idx).html(`HSN: <strong>${hsn || code || 'N/A'}</strong> | UOM: <strong>${uom}</strong>${trackingBadgeHtml}`);
 
             var row = $('tr.grn-item-row[data-idx="' + idx + '"]');
             var rateInput = row.find('.input-unit-rate');
             rateInput.val(rate.toFixed(2));
-            recalculateTotals();
+
+            var currentAcc = Math.max(1, Math.round(parseFloat(row.find('.cell-accepted').text()) || parseFloat(row.find('.input-receive').val()) || 1));
 
             var trackingHtml = '';
             var defaultPrefix = (code || 'SN-').replace(/[^a-zA-Z0-9]/g, '').toUpperCase() + '-';
 
             if (isSerial) {
+                var nextStart = prodObj ? (prodObj.next_serial_start || 1001) : 1001;
                 trackingHtml = `
                     <div class="d-flex align-items-center justify-content-between mb-1.5">
                         <label class="form-label fs-11 fw-bold text-uppercase text-primary mb-0">
                             <i class="feather-hash me-1"></i>Serial Numbers (Scan / Manual)
                         </label>
                         <div class="d-flex align-items-center gap-2">
-                            <span class="badge bg-soft-warning text-warning fs-11 serial-count-badge" id="serial_count_badge_${idx}">0 Serials</span>
+                            <span class="badge bg-soft-warning text-warning fs-11 serial-count-badge" id="serial_count_badge_${idx}">0 / ${currentAcc} Serials</span>
                             <button type="button" class="btn btn-xs btn-soft-primary fw-semibold btn-auto-serial" 
-                                    data-idx="${idx}" data-product="${prodName}" data-prefix="${defaultPrefix}" data-count="1">
+                                    data-idx="${idx}" data-product-id="${prodId}" data-product="${prodName}" data-prefix="${defaultPrefix}" data-start="${nextStart}" data-count="${currentAcc}">
                                 <i class="feather-zap me-1"></i>Auto-Generate
                             </button>
                         </div>
                     </div>
                     <textarea class="form-control form-control-sm fs-12 text-dark font-monospace serial-textarea" 
-                              name="items[${idx}][serial_numbers]" id="serial_input_${idx}" data-idx="${idx}" rows="2"
+                              name="items[${idx}][serial_numbers]" id="serial_input_${idx}" data-idx="${idx}" data-product-id="${prodId}" rows="2"
                               placeholder="Scan barcodes or enter serial numbers separated by comma or new line..."></textarea>
+                    <div id="serial_dup_msg_${idx}" class="mt-1" style="display: none;"></div>
+                    <span class="fs-10 text-muted">Each scanned barcode or comma/newline registers 1 unique Serial Number.</span>
                 `;
             } else if (isBatch) {
                 var defaultBatchNo = 'BAT-' + (code || 'LOT').replace(/[^a-zA-Z0-9]/g, '') + '-01';
@@ -848,7 +923,7 @@
                             <i class="feather-layers me-1"></i>Batch / Lot Inward Allocation
                         </label>
                         <button type="button" class="btn btn-xs btn-outline-warning fw-semibold btn-add-batch-row" data-idx="${idx}" data-code="${code || 'LOT'}">
-                            <i class="feather-plus me-1"></i>+ Add Another Batch
+                            <i class="feather-plus me-1"></i>+ Add Another Batch / Lot
                         </button>
                     </div>
                     <div id="batch_rows_container_${idx}" class="d-grid gap-2">
@@ -860,7 +935,7 @@
                                 </div>
                                 <div class="col-md-2">
                                     <label class="fs-10 text-muted mb-0 fw-semibold">Qty Rec. <span class="text-danger">*</span></label>
-                                    <input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm text-center font-monospace fw-bold text-primary batch-qty-input" data-idx="${idx}" name="items[${idx}][batches][0][received_qty]" value="1.00" required>
+                                    <input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm text-center font-monospace fw-bold text-primary batch-qty-input" data-idx="${idx}" name="items[${idx}][batches][0][received_qty]" value="${currentAcc.toFixed(2)}" required>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="fs-10 text-muted mb-0 fw-semibold">Mfg Date</label>
@@ -877,19 +952,26 @@
                 `;
             }
 
-            $('#tracking_container_' + idx).html(trackingHtml);
+            var trackingContainer = $('#tracking_container_' + idx);
+            var remarksContainer = $('#remarks_container_' + idx);
+            var remarkRow = $('#remark_row_' + idx);
+            var toggleBtn = row.find('.btn-toggle-remark');
 
             if (isSerial || isBatch) {
-                var remarkRow = $('#remark_row_' + idx);
-                var toggleBtn = row.find('.btn-toggle-remark');
+                trackingContainer.html(trackingHtml).show();
+                remarksContainer.removeClass('col-md-12').addClass('col-md-5');
                 if (!remarkRow.is(':visible')) {
                     remarkRow.slideDown(150);
                     toggleBtn.find('i').removeClass('feather-plus').addClass('feather-minus');
                     toggleBtn.removeClass('bg-soft-primary text-primary').addClass('bg-soft-danger text-danger');
                     toggleBtn.find('.btn-lbl').text('{{ __('purchase.hide_lbl') }}');
                 }
+            } else {
+                trackingContainer.html('').hide();
+                remarksContainer.removeClass('col-md-5').addClass('col-md-12');
             }
 
+            recalculateTotals();
             row.find('.input-receive').trigger('input');
         });
 
@@ -937,20 +1019,76 @@
             }
         });
 
+        function updateAutoSerialPreview() {
+            var prefix = $('#auto_serial_prefix').val().trim();
+            var startNo = parseInt($('#auto_serial_start').val()) || 1001;
+            var count = parseInt($('#auto_serial_count').val()) || 1;
+            if (count <= 0) count = 1;
+
+            var endNo = startNo + count - 1;
+            if (count === 1) {
+                $('#auto_serial_preview_text').text(prefix + startNo + ' (1 serial)');
+            } else if (count === 2) {
+                $('#auto_serial_preview_text').text(prefix + startNo + ', ' + prefix + endNo + ' (2 serials)');
+            } else {
+                $('#auto_serial_preview_text').text(prefix + startNo + ' ... ' + prefix + endNo + ' (' + count + ' serials)');
+            }
+        }
+
+        $(document).on('input change', '#auto_serial_prefix, #auto_serial_start, #auto_serial_count', function() {
+            updateAutoSerialPreview();
+        });
+
+        $(document).on('change', '#auto_serial_prefix', function() {
+            var prodId = $('#auto_serial_prod_id').val();
+            var prefix = $(this).val().trim();
+            if (prodId) {
+                $.ajax({
+                    url: "{{ route('grns.next-serial-sequence') }}",
+                    type: 'GET',
+                    data: { product_id: prodId, prefix: prefix },
+                    success: function(res) {
+                        if (res.success && res.next_number) {
+                            $('#auto_serial_start').val(res.next_number);
+                            updateAutoSerialPreview();
+                        }
+                    }
+                });
+            }
+        });
+
         $(document).on('click', '.btn-auto-serial', function() {
             var idx = $(this).data('idx');
+            var prodId = $(this).data('product-id') || $('tr.grn-item-row[data-idx="' + idx + '"]').find('.product-select-dropdown').val() || $('tr.grn-item-row[data-idx="' + idx + '"]').find('input[name$="[product_id]"]').val();
             var product = $(this).data('product');
             var prefix = $(this).data('prefix') || 'SN-';
             var count = parseInt($(this).data('count')) || 1;
+            var suggestedStart = parseInt($(this).data('start')) || 1001;
 
             var row = $('tr.grn-item-row[data-idx="' + idx + '"]');
             var acc = Math.round(parseFloat(row.find('.cell-accepted').text()) || count);
 
             $('#auto_serial_target_idx').val(idx);
+            $('#auto_serial_prod_id').val(prodId);
             $('#autoSerialModalTitle').html('<i class="feather-zap me-1"></i>Auto-Generate Serials (' + product + ')');
             $('#auto_serial_prefix').val(prefix);
-            $('#auto_serial_start').val('1001');
+            $('#auto_serial_start').val(suggestedStart);
             $('#auto_serial_count').val(acc > 0 ? acc : 1);
+            updateAutoSerialPreview();
+
+            if (prodId) {
+                $.ajax({
+                    url: "{{ route('grns.next-serial-sequence') }}",
+                    type: 'GET',
+                    data: { product_id: prodId, prefix: prefix },
+                    success: function(res) {
+                        if (res.success && res.next_number) {
+                            $('#auto_serial_start').val(res.next_number);
+                            updateAutoSerialPreview();
+                        }
+                    }
+                });
+            }
 
             var modal = new bootstrap.Modal(document.getElementById('autoSerialModal'));
             modal.show();
@@ -1133,31 +1271,212 @@
                 );
                 return false;
             }
+
+            var firstDupErrorIdx = null;
+            var hasDupSerialError = false;
+            var dupErrorDetails = '';
+
+            $('.grn-item-row').each(function() {
+                var row = $(this);
+                var idx = row.data('idx');
+                var accVal = Math.round(parseFloat(row.find('.cell-accepted').text()) || 0);
+                var serialTextarea = $('#serial_input_' + idx);
+                var prodId = serialTextarea.data('product-id') || row.find('.product-select-dropdown').val() || row.find('input[name$="[product_id]"]').val();
+
+                if (serialTextarea.length && accVal > 0) {
+                    var text = serialTextarea.val() || '';
+                    var items = text.split(/[\r\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+                    
+                    var counts = {};
+                    var internalDups = [];
+                    items.forEach(function(s) {
+                        counts[s] = (counts[s] || 0) + 1;
+                        if (counts[s] === 2) internalDups.push(s);
+                    });
+
+                    var prodObj = availableProducts.find(p => String(p.id) === String(prodId));
+                    var existingDb = prodObj && prodObj.existing_serials ? prodObj.existing_serials : [];
+                    var dbDups = items.filter(s => existingDb.includes(s));
+
+                    var combinedDups = [...new Set([...internalDups, ...dbDups])];
+                    if (combinedDups.length > 0) {
+                        hasDupSerialError = true;
+                        if (firstDupErrorIdx === null) {
+                            firstDupErrorIdx = idx;
+                            dupErrorDetails = combinedDups.slice(0, 3).join(', ') + (combinedDups.length > 3 ? '...' : '');
+                        }
+                    }
+                }
+            });
+
+            if (hasDupSerialError) {
+                e.preventDefault();
+                showWarningModal(
+                    'Duplicate Serial Numbers',
+                    'One or more serial numbers already exist in inventory or are duplicated (' + dupErrorDetails + '). Serial numbers must be globally unique per product.',
+                    function() {
+                        if (firstDupErrorIdx !== null) {
+                            var remarkRow = $('#remark_row_' + firstDupErrorIdx);
+                            var toggleBtn = $('tr.grn-item-row[data-idx="' + firstDupErrorIdx + '"]').find('.btn-toggle-remark');
+                            
+                            if (remarkRow.length && !remarkRow.is(':visible')) {
+                                remarkRow.slideDown(150);
+                                toggleBtn.find('i').removeClass('feather-plus').addClass('feather-minus');
+                                toggleBtn.removeClass('bg-soft-primary text-primary').addClass('bg-soft-danger text-danger');
+                                toggleBtn.find('.btn-lbl').text('{{ __('purchase.hide_lbl') }}');
+                            }
+
+                            var targetSerial = $('#serial_input_' + firstDupErrorIdx);
+                            if (targetSerial.length) {
+                                $('html, body').animate({
+                                    scrollTop: targetSerial.offset().top - 180
+                                }, 450, function() {
+                                    targetSerial.focus();
+                                });
+                            }
+                        }
+                    }
+                );
+                return false;
+            }
+
+            var firstSerialErrorIdx = null;
+            var hasSerialError = false;
+            var serialRequiredCount = 0;
+            var serialEnteredCount = 0;
+
+            $('.grn-item-row').each(function() {
+                var row = $(this);
+                var idx = row.data('idx');
+                var accVal = Math.round(parseFloat(row.find('.cell-accepted').text()) || 0);
+                var serialTextarea = $('#serial_input_' + idx);
+                
+                if (serialTextarea.length && accVal > 0) {
+                    var text = serialTextarea.val() || '';
+                    var items = text.split(/[\r\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+                    var uniqueSerials = [...new Set(items)];
+                    if (uniqueSerials.length < accVal) {
+                        hasSerialError = true;
+                        if (firstSerialErrorIdx === null) {
+                            firstSerialErrorIdx = idx;
+                            serialRequiredCount = accVal;
+                            serialEnteredCount = uniqueSerials.length;
+                        }
+                    }
+                }
+            });
+
+            if (hasSerialError) {
+                e.preventDefault();
+                showWarningModal(
+                    'Serial Numbers Required',
+                    'One or more serial-tracked items require serial numbers (' + serialEnteredCount + ' of ' + serialRequiredCount + ' entered). Please provide all required serials or use Auto-Generate before saving.',
+                    function() {
+                        if (firstSerialErrorIdx !== null) {
+                            var remarkRow = $('#remark_row_' + firstSerialErrorIdx);
+                            var toggleBtn = $('tr.grn-item-row[data-idx="' + firstSerialErrorIdx + '"]').find('.btn-toggle-remark');
+                            
+                            if (remarkRow.length && !remarkRow.is(':visible')) {
+                                remarkRow.slideDown(150);
+                                toggleBtn.find('i').removeClass('feather-plus').addClass('feather-minus');
+                                toggleBtn.removeClass('bg-soft-primary text-primary').addClass('bg-soft-danger text-danger');
+                                toggleBtn.find('.btn-lbl').text('{{ __('purchase.hide_lbl') }}');
+                            }
+
+                            var targetSerial = $('#serial_input_' + firstSerialErrorIdx);
+                            if (targetSerial.length) {
+                                $('html, body').animate({
+                                    scrollTop: targetSerial.offset().top - 180
+                                }, 450, function() {
+                                    targetSerial.focus();
+                                });
+                            }
+                        }
+                    }
+                );
+                return false;
+            }
         });
 
+        var serialCheckTimers = {};
+
         $(document).on('input change', '.serial-textarea', function() {
-            var idx = $(this).data('idx');
-            var text = $(this).val();
+            var textarea = $(this);
+            var idx = textarea.data('idx');
             var row = $('tr.grn-item-row[data-idx="' + idx + '"]');
+            var prodId = textarea.data('product-id') || row.find('.product-select-dropdown').val() || row.find('input[name$="[product_id]"]').val();
+            var text = textarea.val();
             var accVal = Math.round(parseFloat(row.find('.cell-accepted').text()) || 0);
 
             var items = text.split(/[\r\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
             var uniqueSerials = [...new Set(items)];
             var count = uniqueSerials.length;
 
+            var internalDups = [];
+            var seen = {};
+            items.forEach(function(s) {
+                if (seen[s]) internalDups.push(s);
+                else seen[s] = true;
+            });
+            internalDups = [...new Set(internalDups)];
+
             var badge = $('#serial_count_badge_' + idx);
-            if (accVal > 0 && count === accVal) {
-                badge.removeClass('bg-soft-warning text-warning bg-soft-danger text-danger')
-                     .addClass('bg-soft-success text-success')
-                     .html('<i class="feather-check-circle me-1"></i>' + count + ' / ' + accVal + ' Serials Verified');
-            } else if (count > 0) {
-                badge.removeClass('bg-soft-success text-success bg-soft-danger text-danger')
-                     .addClass('bg-soft-warning text-warning')
-                     .text(count + ' / ' + accVal + ' Serials Entered');
-            } else {
-                badge.removeClass('bg-soft-success text-success bg-soft-danger text-danger')
-                     .addClass('bg-soft-warning text-warning')
-                     .text('0 / ' + accVal + ' Serials');
+            var errorBox = $('#serial_dup_msg_' + idx);
+
+            var prodObj = availableProducts.find(p => String(p.id) === String(prodId));
+            var existingDb = prodObj && prodObj.existing_serials ? prodObj.existing_serials : [];
+            var dbDups = uniqueSerials.filter(s => existingDb.includes(s));
+
+            function renderErrors(allDups) {
+                if (allDups.length > 0) {
+                    textarea.addClass('border-danger text-danger');
+                    badge.removeClass('bg-soft-success text-success bg-soft-warning text-warning')
+                         .addClass('bg-soft-danger text-danger')
+                         .html('<i class="feather-alert-triangle me-1"></i>Duplicates Found (' + allDups.length + ')');
+                    errorBox.show().html(`
+                        <div class="alert alert-danger py-1 px-2.5 fs-11 mb-0 border-0 rounded-2 shadow-xs">
+                            <i class="feather-alert-triangle me-1"></i><strong>Duplicate Serial Detected:</strong> ${allDups.slice(0, 5).join(', ')}${allDups.length > 5 ? '... (+' + (allDups.length - 5) + ' more)' : ''} already exists in inventory or is duplicated. Each serial number must be globally unique!
+                        </div>
+                    `);
+                } else {
+                    textarea.removeClass('border-danger text-danger');
+                    errorBox.hide().html('');
+                    if (accVal > 0 && count === accVal) {
+                        badge.removeClass('bg-soft-warning text-warning bg-soft-danger text-danger')
+                             .addClass('bg-soft-success text-success')
+                             .html('<i class="feather-check-circle me-1"></i>' + count + ' / ' + accVal + ' Serials Verified');
+                    } else if (count > 0) {
+                        badge.removeClass('bg-soft-success text-success bg-soft-danger text-danger')
+                             .addClass('bg-soft-warning text-warning')
+                             .text(count + ' / ' + accVal + ' Serials Entered');
+                    } else {
+                        badge.removeClass('bg-soft-success text-success bg-soft-danger text-danger')
+                             .addClass('bg-soft-warning text-warning')
+                             .text('0 / ' + accVal + ' Serials');
+                    }
+                }
+            }
+
+            var currentDups = [...new Set([...internalDups, ...dbDups])];
+            renderErrors(currentDups);
+
+            clearTimeout(serialCheckTimers[idx]);
+            if (prodId && uniqueSerials.length > 0) {
+                serialCheckTimers[idx] = setTimeout(function() {
+                    $.ajax({
+                        url: "{{ route('grns.validate-serials') }}",
+                        type: 'POST',
+                        data: {
+                            _token: "{{ csrf_token() }}",
+                            product_id: prodId,
+                            serials: uniqueSerials
+                        },
+                        success: function(res) {
+                            var combined = [...new Set([...internalDups, ...(res.all_duplicates || [])])];
+                            renderErrors(combined);
+                        }
+                    });
+                }, 350);
             }
         });
 
@@ -1204,6 +1523,9 @@
             row.find('.cell-accepted').text(accVal.toFixed(2));
             row.find('.cell-total').text(totalAmt.toFixed(2));
 
+            // Sync auto-generate serial count
+            row.find('.btn-auto-serial').attr('data-count', Math.max(1, Math.round(accVal)));
+
             $('#serial_input_' + idx).trigger('input');
             recalculateTotals();
         });
@@ -1245,17 +1567,24 @@
             </div>
             <div class="modal-body p-3">
                 <input type="hidden" id="auto_serial_target_idx" value="">
+                <input type="hidden" id="auto_serial_prod_id" value="">
                 <div class="mb-2">
                     <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Prefix</label>
                     <input type="text" id="auto_serial_prefix" class="form-control form-control-sm font-monospace" placeholder="e.g. SN-LAP-">
                 </div>
                 <div class="mb-2">
-                    <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Start Number</label>
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-0">Start Number</label>
+                        <span class="fs-10 text-success fw-bold"><i class="feather-check me-0.5"></i>Next Available</span>
+                    </div>
                     <input type="number" id="auto_serial_start" class="form-control form-control-sm font-monospace" value="1001" min="1">
                 </div>
-                <div class="mb-3">
+                <div class="mb-2">
                     <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Quantity</label>
                     <input type="number" id="auto_serial_count" class="form-control form-control-sm font-monospace" value="1" min="1">
+                </div>
+                <div class="p-2 rounded bg-light border fs-11 text-muted mb-3 font-monospace" id="auto_serial_preview_box" style="word-break: break-all;">
+                    Preview: <span class="fw-bold text-dark" id="auto_serial_preview_text">...</span>
                 </div>
                 <div class="d-grid">
                     <button type="button" class="btn btn-sm btn-primary fw-semibold" id="btn_confirm_auto_serial">
@@ -1280,6 +1609,20 @@
             .then(data => {
                 if (data.success && data.product) {
                     const prod = data.product;
+                    let existing = availableProducts.find(p => String(p.id) === String(prod.id));
+                    if (!existing) {
+                        availableProducts.push({
+                            id: prod.id,
+                            name: prod.name,
+                            code: prod.sku || prod.barcode || '',
+                            hsn_sac: prod.hsn_sac || '',
+                            uom_name: prod.uom || 'Pcs',
+                            cost_price: prod.cost_price || 0,
+                            track_serial_number: !!prod.track_serial_number,
+                            track_batch: !!prod.track_batch
+                        });
+                    }
+
                     let foundMatch = false;
                     
                     document.querySelectorAll('#grnItemsTbody tr.grn-item-row').forEach(row => {
@@ -1293,6 +1636,19 @@
                                 rxInput.value = (parseFloat(rxInput.value) || 0) + 1;
                                 $(rxInput).trigger('input');
                                 foundMatch = true;
+
+                                if (data.is_serial && data.serial_number) {
+                                    const rowIdx = row.getAttribute('data-idx');
+                                    const serialArea = document.querySelector(`#serial_input_${rowIdx}`);
+                                    if (serialArea) {
+                                        let currentVals = serialArea.value.split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean);
+                                        if (!currentVals.includes(data.serial_number)) {
+                                            currentVals.push(data.serial_number);
+                                            serialArea.value = currentVals.join(', ');
+                                            $(serialArea).trigger('input');
+                                        }
+                                    }
+                                }
                             }
                         }
                     });
@@ -1302,6 +1658,17 @@
                         if (!poSelected) {
                             addManualItemRow(prod.id);
                             foundMatch = true;
+
+                            if (data.is_serial && data.serial_number) {
+                                setTimeout(function() {
+                                    const lastRow = $('#grnItemsTbody tr.manual-item-row').last();
+                                    const lastIdx = lastRow.data('idx');
+                                    const sInput = $('#serial_input_' + lastIdx);
+                                    if (sInput.length) {
+                                        sInput.val(data.serial_number).trigger('input');
+                                    }
+                                }, 150);
+                            }
                         } else {
                             alert('Scanned item (' + prod.name + ') is not present in the selected Purchase Order items.');
                         }

@@ -17,6 +17,11 @@ A visual and audible lean manufacturing signaling system used on the shopfloor t
 ### Available-to-Promise (ATP)
 The uncommitted portion of a company's inventory and planned production, calculated by subtracting active reservations from on-hand physical stock.
 
+### Aggregate Yield Threshold
+The mathematical validation condition evaluated across all sibling production orders linked to a project task (`project_task_id = $task->id`):
+$$\sum \text{produced\_quantity} \ge \left( \sum \text{quantity} - 0.0001 \right)$$
+Evaluated by `SyncProductionTaskCompletionListener` upon receiving `ProductionOrderCompleted`. Includes a floating-point tolerance of `0.0001` to prevent rounding discrepancies from blocking automated task completion when all sibling orders are finished.
+
 ---
 
 ## B
@@ -108,6 +113,16 @@ Scheduled inspection, servicing, and component replacement conducted at predeter
 ### Production Order
 A discrete, authorized manufacturing shopfloor job defining the quantity of finished goods to produce, target delivery dates, material reservations, and required routing operations.
 
+### Production Completion Synchronization
+The automated cross-domain event workflow where completing a production order dispatches `ProductionOrderCompleted`, triggering `SyncProductionTaskCompletionListener` to verify sibling order statuses and aggregate yield, transitioning the parent project task to `Completed` and calling `MilestoneService::recalculateProgress()`.
+
+### Production Model vs Production Mode
+* **Production Model (`production_model`):** Defines the sourcing and subcontracting operational strategy for manufacturing an item (e.g., `in_house` / `pure_manufacturing`, `subcontract_company_material`, `subcontract_vendor_material` / `complete_subcontracting`, or `hybrid`). Configured on `products.default_production_model` and snapshotted to `production_orders.production_model`.
+* **Production Mode (`production_mode`):** Defines the shopfloor tracking and execution granularity for an order (e.g., `discrete` / `standard`, `batch`, `serial`, or `batch_and_serial`), governing whether lot numbers and serial identifiers are required during operation logging.
+
+### Project-Linked Production Order
+A discrete `ProductionOrder` record explicitly linked to the Project Management domain via `project_id`, `project_milestone_id`, and `project_task_id`, strictly constrained to the same `tenant_id`, `company_id`, and `branch_id`.
+
 ---
 
 ## R
@@ -130,6 +145,9 @@ The sequential roadmap of manufacturing operations, standard runtimes, setup dur
 
 ### Stock Inflow / Outflow
 The canonical inventory transactions executed via `StockService` that increment or decrement warehouse `on_hand` inventory balances while preserving an immutable ledger audit trail.
+
+### Store Requisition Slip
+An authorized internal store request document (`ProductionRequisitionSlip` / `store_requisition_slips`) created when production orders, rework operations, or maintenance work orders require raw materials or spare parts, allowing storekeepers to review demand in `/inventory/material-requests`, select picking warehouses, reserve inventory, and issue stock.
 
 ### Subcontracting
 The outsourcing of specific intermediate routing operations (e.g., heat treatment, electroplating, painting) to an external specialist vendor.

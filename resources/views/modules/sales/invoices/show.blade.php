@@ -27,7 +27,11 @@
             </a>
         @endif
 
-        @if ($invoice->status !== 'Draft')
+        @php
+            $isCancelled = in_array(strtolower((string)$invoice->status), ['cancelled', 'void']);
+        @endphp
+
+        @if (!$isCancelled && $invoice->status !== 'Draft')
             <!-- E-Invoice Action Buttons -->
             @if ($invoice->einvoice_status === 'Generated')
                 <div class="dropdown d-inline-flex align-items-center">
@@ -98,6 +102,39 @@
             <a href="{{ route('sales.invoices.einvoice.export-json', $invoice->id) }}" class="btn btn-sm btn-outline-success fw-bold px-3 d-inline-flex align-items-center" title="Download Official Government GEPP JSON">
                 <i class="feather-code me-1.5"></i>Export JSON
             </a>
+        @elseif ($isCancelled)
+            {{-- When invoice is cancelled, only allow viewing existing E-Invoice/E-Way Bill if they were generated before cancellation --}}
+            @if ($invoice->einvoice_status === 'Generated')
+                <div class="dropdown d-inline-flex align-items-center">
+                    <button class="btn btn-sm btn-soft-secondary text-secondary border fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="feather-check-circle me-1.5"></i>E-Invoice (IRN)
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 290px;">
+                        <li><span class="dropdown-header fs-10 text-uppercase fw-bold text-muted px-3 py-1 font-monospace text-truncate d-block">IRN: {{ substr($invoice->irn, 0, 18) }}...</span></li>
+                        <li>
+                            <button type="button" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-nowrap" data-bs-toggle="modal" data-bs-target="#viewEInvoiceQrModal">
+                                <i class="feather-maximize me-2.5 text-primary fs-14"></i>View / Scan Signed QR
+                            </button>
+                        </li>
+                        <li>
+                            <a href="{{ route('sales.invoices.einvoice.export-json', $invoice->id) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-success text-nowrap">
+                                <i class="feather-code me-2.5 text-success fs-14"></i>Export NIC JSON (Govt Schema)
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            @endif
+
+            @if ($invoice->eway_bill_status === 'Generated')
+                <div class="dropdown d-inline-flex align-items-center">
+                    <button class="btn btn-sm btn-soft-secondary text-secondary border fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="feather-truck me-1.5"></i>EWB: {{ $invoice->eway_bill_no }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 290px;">
+                        <li><span class="dropdown-header fs-10 text-uppercase fw-bold text-muted px-3 py-1 text-nowrap d-block">Valid Till: {{ $invoice->eway_bill_valid_till ? date('d-M-Y H:i', strtotime($invoice->eway_bill_valid_till)) : '—' }}</span></li>
+                    </ul>
+                </div>
+            @endif
         @endif
 
         <a href="{{ route('sales.invoices.download', $invoice->id) }}" class="btn btn-sm btn-outline-danger fw-bold px-3 d-inline-flex align-items-center" title="Download PDF Document">
@@ -105,8 +142,21 @@
         </a>
 
         @php
-            $clientPhone = $invoice->customer?->phone ?: ($invoice->salesOrder?->customer?->phone ?: '');
-            $clientEmail = $invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: '');
+            $hasAvailableAdvances = (!empty($availableAdvances) && $availableAdvances->isNotEmpty()) || (!empty($unallocatedPayments) && $unallocatedPayments->isNotEmpty());
+            $totalAvailAdvance = (!empty($availableAdvances) ? $availableAdvances->sum('allocated_amount') : 0) + (!empty($unallocatedPayments) ? $unallocatedPayments->sum('allocated_amount') : 0);
+        @endphp
+
+        @php
+            $clientPhone = $invoice->customer?->phone 
+                ?: ($invoice->salesOrder?->customer?->phone 
+                ?: ($invoice->customer?->crmAccount?->phone 
+                ?: ($invoice->salesOrder?->quotation?->phone 
+                ?: ($invoice->salesOrder?->quotation?->prepared_for_phone !== '—' ? $invoice->salesOrder?->quotation?->prepared_for_phone : ''))));
+            $clientEmail = $invoice->customer?->email 
+                ?: ($invoice->salesOrder?->customer?->email 
+                ?: ($invoice->customer?->crmAccount?->email 
+                ?: ($invoice->salesOrder?->quotation?->email 
+                ?: ($invoice->salesOrder?->quotation?->prepared_for_email !== '—' ? $invoice->salesOrder?->quotation?->prepared_for_email : ''))));
         @endphp
 
         <!-- MORE Dropdown Button -->
@@ -114,7 +164,7 @@
             <button class="btn btn-sm btn-light border fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More Invoice Actions">
                 <i class="feather-more-horizontal me-1"></i>MORE
             </button>
-            <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 290px;">
+            <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 220px;">
                 <li>
                     <button type="button" 
                             class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium btn-open-send-invoice-wa-modal d-flex align-items-center text-nowrap" 
@@ -123,7 +173,7 @@
                             data-client-phone="{{ $clientPhone }}" 
                             data-total-amount="{{ format_currency($invoice->total_amount) }}"
                             data-balance-due="{{ format_currency($invoice->balance_due) }}">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="me-2.5"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
+                        <i class="feather-message-circle me-2.5 text-success fs-14"></i>
                         Send via WhatsApp
                     </button>
                 </li>
@@ -148,7 +198,7 @@
                 <li>
                     <a href="{{ route('sales.invoices.einvoice.export-json', $invoice->id) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-success text-nowrap">
                         <i class="feather-code me-2.5 text-success fs-14"></i>
-                        Export NIC JSON (Govt Schema)
+                        Export NIC JSON
                     </a>
                 </li>
                 <li><hr class="dropdown-divider my-1"></li>
@@ -158,6 +208,40 @@
                         Print Invoice
                     </a>
                 </li>
+
+                @if ($invoice->status !== 'Cancelled')
+                    <li><hr class="dropdown-divider my-1"></li>
+                    @if (!empty($hasDispatched))
+                        {{-- Goods WERE Dispatched -> Show Sales Return --}}
+                        <li>
+                            <a href="{{ route('sales.returns.create', ['invoice_id' => $invoice->id, 'sales_order_id' => $invoice->sales_order_id]) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium text-warning d-flex align-items-center text-nowrap">
+                                <i class="feather-rotate-ccw me-2.5 text-warning fs-14"></i>
+                                <span>{{ __('crm.create_sales_return') }}</span>
+                            </a>
+                        </li>
+                    @else
+                        {{-- Goods NOT Dispatched -> Show Direct Financial Credit Note --}}
+                        <li>
+                            <button type="button" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium text-danger d-flex align-items-center text-nowrap" data-bs-toggle="modal" data-bs-target="#createCreditNoteModal">
+                                <i class="feather-file-minus me-2.5 text-danger fs-14"></i>
+                                <span>{{ __('crm.create_credit_note') }}</span>
+                            </button>
+                        </li>
+                    @endif
+                @endif
+
+                @if (!empty($linkedCreditNotes) && $linkedCreditNotes->isNotEmpty())
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><span class="dropdown-header fs-10 text-uppercase fw-bold text-muted px-3 py-1 font-monospace">Linked Credit Notes</span></li>
+                    @foreach ($linkedCreditNotes as $cn)
+                        <li>
+                            <a href="{{ route('accounting.vouchers.credit_note.show', $cn->id) }}" class="dropdown-item py-1.5 px-3 pe-4 fs-12 fw-medium text-danger d-flex align-items-center text-nowrap">
+                                <i class="feather-file-text me-2 text-danger fs-13"></i>
+                                <span>{{ $cn->journal_number }} ({{ format_currency($cn->total_amount ?? $cn->entries->where('debit', '>', 0)->sum('debit')) }})</span>
+                            </a>
+                        </li>
+                    @endforeach
+                @endif
             </ul>
         </div>
     </div>
@@ -245,6 +329,158 @@
         .summary-table td {
             padding: 4px 10px;
             font-size: 12px;
+        }
+
+        .invoice-main-title {
+            color: #1e40af;
+        }
+
+        .invoice-avatar-box {
+            background-color: #1e40af !important;
+        }
+
+        /* ==================== DARK MODE SUPPORT FOR INVOICE SHEET ==================== */
+        html.app-skin-dark .invoice-sheet {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .invoice-main-title {
+            color: #60a5fa !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .invoice-avatar-box {
+            background-color: #2563eb !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .text-dark,
+        html.app-skin-dark .invoice-sheet h2,
+        html.app-skin-dark .invoice-sheet h4,
+        html.app-skin-dark .invoice-sheet h6,
+        html.app-skin-dark .invoice-sheet strong {
+            color: #f8fafc !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .text-secondary {
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .border,
+        html.app-skin-dark .invoice-sheet .border-bottom,
+        html.app-skin-dark .invoice-sheet .border-top,
+        html.app-skin-dark .invoice-sheet .border-start,
+        html.app-skin-dark .invoice-sheet .border-end {
+            border-color: #334155 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet hr,
+        html.app-skin-dark .invoice-sheet hr.border-slate {
+            border-color: #334155 !important;
+            opacity: 1 !important;
+        }
+
+        /* Customer Box, Dispatch Box, Bank Box, Terms Box, Summary Box */
+        html.app-skin-dark .invoice-sheet .bg-light,
+        html.app-skin-dark .invoice-sheet div[style*="background-color: #f8fafc"],
+        html.app-skin-dark .invoice-sheet .bank-details-box,
+        html.app-skin-dark .invoice-sheet .terms-box {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #e2e8f0 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .summary-table-box > div {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #e2e8f0 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .summary-table-box .text-dark {
+            color: #ffffff !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .summary-table-box .text-primary {
+            color: #60a5fa !important;
+        }
+
+        /* Line Items Table */
+        html.app-skin-dark .invoice-table th {
+            background-color: #1e293b !important;
+            color: #cbd5e1 !important;
+            border-top-color: #334155 !important;
+            border-bottom-color: #475569 !important;
+        }
+
+        html.app-skin-dark .invoice-table td {
+            background-color: transparent !important;
+            border-bottom-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
+        html.app-skin-dark .invoice-table td strong {
+            color: #ffffff !important;
+        }
+
+        /* GST Analysis Box & Allocations Table */
+        html.app-skin-dark .invoice-sheet .gst-summary-box,
+        html.app-skin-dark .invoice-sheet .card {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .gst-summary-box table,
+        html.app-skin-dark .invoice-sheet .card table {
+            color: #e2e8f0 !important;
+            border-color: #334155 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .gst-summary-box table th,
+        html.app-skin-dark .invoice-sheet .gst-summary-box table td,
+        html.app-skin-dark .invoice-sheet .card table th,
+        html.app-skin-dark .invoice-sheet .card table td {
+            border-color: #334155 !important;
+            color: #e2e8f0 !important;
+            background-color: transparent !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .gst-summary-box thead,
+        html.app-skin-dark .invoice-sheet .card thead {
+            background-color: #0b1329 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .gst-summary-box thead th,
+        html.app-skin-dark .invoice-sheet .card thead th {
+            background-color: #0b1329 !important;
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .gst-summary-box tfoot,
+        html.app-skin-dark .invoice-sheet .gst-summary-box tfoot td {
+            background-color: #0b1329 !important;
+            color: #ffffff !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .table-light td {
+            background-color: rgba(30, 41, 59, 0.7) !important;
+            color: #93c5fd !important;
+        }
+
+        /* E-Invoice / E-Way Bill Stripe QR Container */
+        html.app-skin-dark .invoice-sheet .bg-white {
+            background-color: #0f172a !important;
+            border-color: #334155 !important;
+        }
+
+        /* Advance Reconcile Card outside sheet */
+        html.app-skin-dark .card[style*="border-left: 5px solid #10b981"] {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
         }
 
         @media print {
@@ -498,6 +734,77 @@
     <div class="row text-dark">
         <div class="col-12">
 
+            @if ($invoice->status === 'Cancelled')
+                <div class="alert alert-soft-danger border border-danger-subtle d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm d-print-none" style="max-width: 900px; margin: 0 auto 1.5rem auto;">
+                    <div class="d-flex align-items-center">
+                        <div class="avatar avatar-md bg-danger text-white rounded-circle me-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 42px; height: 42px;">
+                            <i class="feather-slash fs-18"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold text-danger mb-0.5 fs-14">{{ __('crm.invoice_cancelled_title') }}</h6>
+                            <p class="text-muted fs-12 mb-0">
+                                {{ __('crm.invoice_cancelled_desc') }}
+                                @if (!empty($linkedCreditNotes) && $linkedCreditNotes->isNotEmpty())
+                                    <span class="ms-1 fw-bold text-dark">
+                                        (Credit Note: 
+                                        @foreach ($linkedCreditNotes as $cn)
+                                            <a href="{{ route('accounting.vouchers.credit_note.show', $cn->id) }}" class="text-danger text-decoration-underline">{{ $cn->journal_number }}</a>{{ !$loop->last ? ', ' : '' }}
+                                        @endforeach
+                                        )
+                                    </span>
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    @if (!empty($linkedCreditNotes) && $linkedCreditNotes->first())
+                        <a href="{{ route('accounting.vouchers.credit_note.show', $linkedCreditNotes->first()->id) }}" class="btn btn-sm btn-danger fw-bold px-3 ms-2 flex-shrink-0">
+                            <i class="feather-file-text me-1.5"></i>{{ __('crm.view_credit_note') }}
+                        </a>
+                    @endif
+                </div>
+            @endif
+
+            @if ($hasAvailableAdvances && $invoice->balance_due > 0 && !in_array(strtolower((string)$invoice->status), ['cancelled', 'void']))
+                <!-- Premium Odoo-Style Advance Payment Reconcile Card -->
+                <div class="card border-0 shadow-sm rounded-3 mb-3 d-print-none" style="max-width: 900px; margin: 0 auto 1.25rem auto; background: #ffffff; border: 1px solid #e2e8f0 !important; border-left: 5px solid #10b981 !important;">
+                    <div class="card-body p-3.5">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-2xs" style="width: 44px; height: 44px; background: rgba(16, 185, 129, 0.12); color: #059669;">
+                                    <i class="feather-credit-card fs-20"></i>
+                                </div>
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 fs-10 fw-bold text-uppercase">
+                                            <i class="feather-zap me-1"></i>Advance Credit Available
+                                        </span>
+                                        @if($invoice->salesOrder)
+                                            <span class="fs-12 text-muted">
+                                                Sales Order: <strong class="text-dark">{{ $invoice->salesOrder->sales_order_number }}</strong>
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="d-flex align-items-baseline gap-2">
+                                        <span class="fs-13 text-secondary">Available Advance:</span>
+                                        <span class="fs-18 fw-bold text-success font-monospace">{{ format_currency($totalAvailAdvance) }}</span>
+                                        <span class="fs-12 text-muted d-none d-md-inline">| Balance Due: <strong class="text-danger font-monospace">{{ format_currency($invoice->balance_due) }}</strong></span>
+                                    </div>
+                                    <div class="fs-11 text-muted mt-0.5">
+                                        You can reconcile/apply this advance to this invoice now, or keep it for future orders.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0 ms-auto ms-sm-0">
+                                <button type="button" class="btn btn-success fw-bold px-3.5 py-2 shadow-sm d-inline-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#applyAdvanceModal" style="border-radius: 6px;">
+                                    <i class="feather-check-circle fs-15"></i>
+                                    <span>Apply Advance ({{ format_currency(min($totalAvailAdvance, $invoice->balance_due)) }})</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Standard ERP Customer Tax Invoice Sheet -->
             <div class="invoice-sheet print-area mb-5">
                 <!-- Status Corner Ribbon Tag Patti -->
@@ -506,6 +813,8 @@
                         $ribbonClass = match($invoice->status) {
                             'Paid' => 'ribbon-paid',
                             'Partially Paid' => 'ribbon-partially-paid',
+                            'Credited' => 'ribbon-cancelled',
+                            'Partially Credited' => 'ribbon-partially-paid',
                             'Posted' => 'ribbon-posted',
                             'Sent' => 'ribbon-posted',
                             'Cancelled' => 'ribbon-cancelled',
@@ -513,12 +822,14 @@
                         };
 
                         $statusLabel = match($invoice->status) {
-                            'Paid' => __('crm.status_paid'),
-                            'Partially Paid' => __('crm.status_partially_paid'),
-                            'Posted' => __('crm.status_posted'),
-                            'Sent' => __('crm.status_posted'),
-                            'Cancelled' => __('crm.status_cancelled'),
-                            default => __('crm.status_draft'),
+                            'Paid' => __('crm.status_paid') ?: 'Paid',
+                            'Partially Paid' => __('crm.status_partially_paid') ?: 'Partially Paid',
+                            'Credited' => 'Credited',
+                            'Partially Credited' => 'Partially Credited',
+                            'Posted' => __('crm.status_posted') ?: 'Posted',
+                            'Sent' => __('crm.status_posted') ?: 'Sent',
+                            'Cancelled' => __('crm.status_cancelled') ?: 'Cancelled',
+                            default => __('crm.status_draft') ?: 'Draft',
                         };
                     @endphp
                     <div class="ribbon-inner {{ $ribbonClass }}">
@@ -528,7 +839,7 @@
 
                 @if ($invoice->einvoice_status === 'Generated')
                     <!-- Official NIC E-Invoice Header Stripe / QR Banner -->
-                    <div class="p-2.5 mb-3 rounded border bg-light d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-left: 4px solid #16a34a !important; background-color: #f8fafc !important;">
+                    <div class="p-2.5 mb-3 rounded border bg-light einvoice-header-stripe d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-left: 4px solid #16a34a !important;">
                         <div class="d-flex align-items-center gap-3">
                             <div class="bg-white p-1 rounded border shadow-2xs" role="button" data-bs-toggle="modal" data-bs-target="#viewEInvoiceQrModal" title="Click to View Full Size QR Code">
                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={{ urlencode($invoice->signed_qrcode ?: $invoice->irn) }}" alt="E-Invoice QR" style="width: 78px; height: 78px; display: block;">
@@ -567,75 +878,115 @@
                 <!-- 1. Invoice Document Header -->
                 <div class="row align-items-start pb-4 border-bottom mb-4">
                     <div class="col-7">
+                        @php
+                            $sellerOrg = billing_organization_details($invoice);
+                        @endphp
                         <div class="d-flex align-items-center mb-3">
-                            <div class="avatar-text bg-primary text-white fs-2 fw-bold me-3 shadow-sm d-flex align-items-center justify-content-center" style="border-radius: 8px; width: 50px; height: 50px; flex-shrink: 0; background-color: #1e40af !important;">
-                                {{ strtoupper(substr(tenant() ? tenant()->name : 'ERP', 0, 1)) }}
+                            <div class="avatar-text invoice-avatar-box text-white fs-2 fw-bold me-3 shadow-sm d-flex align-items-center justify-content-center" style="border-radius: 8px; width: 50px; height: 50px; flex-shrink: 0;">
+                                {{ $sellerOrg['avatar_char'] }}
                             </div>
                             <div>
-                                <h4 class="fw-bold text-dark mb-0 fs-17">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</h4>
-                                <span class="fs-11 text-muted">{{ __('crm.official_corporate_billing_unit') }}</span>
+                                <h4 class="fw-bold text-dark mb-0 fs-17">{{ $sellerOrg['name'] }}</h4>
+                                <span class="fs-11 text-muted">{{ $sellerOrg['unit_subtext'] }}</span>
                             </div>
                         </div>
                         <div class="fs-12 text-secondary leading-relaxed">
-                            <div>H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India</div>
-                            <div><strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)</div>
-                            <div><strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'billing@sasserp.com' }} &nbsp;|&nbsp; <strong>Phone:</strong> +91 294 2440230</div>
+                            <div>{{ $sellerOrg['address'] }}</div>
+                            <div><strong>GSTIN:</strong> {{ $sellerOrg['gstin'] }} &nbsp;|&nbsp; <strong>State Code:</strong> {{ $sellerOrg['state_code'] }} ({{ $sellerOrg['state_name'] }})</div>
+                            <div>
+                                @if($sellerOrg['email'])
+                                    <strong>Email:</strong> {{ $sellerOrg['email'] }}
+                                @endif
+                                @if($sellerOrg['email'] && $sellerOrg['phone'])
+                                    &nbsp;|&nbsp;
+                                @endif
+                                @if($sellerOrg['phone'])
+                                    <strong>Phone:</strong> {{ $sellerOrg['phone'] }}
+                                @endif
+                            </div>
                         </div>
                     </div>
 
                     <div class="col-5 text-end">
-                        <h2 class="fw-black text-uppercase tracking-wide mb-1" style="color: #1e40af; font-size: 22px; letter-spacing: 1px;">{{ __('crm.tax_invoice') }}</h2>
+                        <h2 class="invoice-main-title fw-black text-uppercase tracking-wide mb-1" style="font-size: 22px; letter-spacing: 1px;">{{ __('crm.tax_invoice') }}</h2>
                         <div class="fs-14 fw-bold text-dark"># {{ $invoice->invoice_number }}</div>
                         
                         <div class="mt-3 fs-12 text-secondary">
                             <div class="d-flex justify-content-end gap-2 mb-1">
-                                <span class="text-muted">{{ __('crm.invoice_date') }}:</span>
+                                <span class="text-muted">{{ rtrim(__('crm.invoice_date'), ':') }}:</span>
                                 <strong class="text-dark">{{ date('d-M-Y', strtotime($invoice->invoice_date)) }}</strong>
                             </div>
                             <div class="d-flex justify-content-end gap-2 mb-1">
-                                <span class="text-muted">{{ __('crm.due_date') }}:</span>
+                                <span class="text-muted">{{ rtrim(__('crm.due_date'), ':') }}:</span>
                                 <strong class="text-dark">{{ $invoice->due_date ? date('d-M-Y', strtotime($invoice->due_date)) : '—' }}</strong>
                             </div>
                             <div class="d-flex justify-content-end gap-2">
-                                <span class="text-muted">{{ __('crm.payment_terms') }}:</span>
+                                <span class="text-muted">{{ rtrim(__('crm.payment_terms'), ':') }}:</span>
                                 <strong class="text-dark">{{ \App\Domains\Platform\Models\PaymentTerm::getLabel($invoice->payment_terms ?: $invoice->salesOrder?->payment_terms) }}</strong>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. Address & Order Details Section -->
+                <!-- 2. Customer & Order References Section (Standard 2-Box ERP Layout) -->
                 <div class="row g-4 mb-4 fs-12 text-dark">
-                    <!-- Left: Customer Details -->
+                    @php
+                        $customerGstin = $invoice->customer?->gstin ?: ($invoice->salesOrder?->customer?->gstin ?: null);
+                        $acc = $invoice->customer?->crmAccount;
+                        $accAddress = $acc ? implode(', ', array_filter([$acc->street, $acc->city, $acc->state ? ($acc->state . ($acc->zip_code ? ' - ' . $acc->zip_code : '')) : $acc->zip_code, $acc->country])) : null;
+                        $displayBilling = $invoice->billing_address ?: ($invoice->salesOrder?->billing_address ?: ($invoice->customer?->billing_address ?: $accAddress));
+                        $displayShipping = $invoice->shipping_address ?: ($invoice->salesOrder?->shipping_address ?: ($invoice->customer?->shipping_address ?: null));
+                        $isSameAddress = empty($displayShipping) || trim($displayShipping) === trim($displayBilling);
+                        $supply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class)->supplyFor($invoice->customer ?? $invoice->salesOrder?->customer);
+                        $placeOfSupplyStr = $supply['pos'] ? \App\Domains\Accounting\Support\GstStates::name($supply['pos']) . ' (' . $supply['pos'] . ')' : null;
+                    @endphp
+
+                    <!-- Box 1 (Left 50%): Billed To (Customer) -->
                     <div class="col-6">
                         <div class="p-3 bg-light bg-opacity-40 rounded border h-100">
-                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ __('crm.billed_to_customer') }}</span>
+                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ rtrim(__('crm.billed_to_customer'), ':') }}</span>
                             <h6 class="fw-bold text-dark mb-1 fs-14">{{ $invoice->customer?->name ?: ($invoice->salesOrder?->customer?->name ?: '—') }}</h6>
                             @if($invoice->customer?->company_name)
-                                <div class="text-muted fw-semibold mb-1">{{ $invoice->customer->company_name }}</div>
+                                <div class="text-muted fw-semibold mb-1 fs-11">{{ $invoice->customer->company_name }}</div>
                             @endif
-                            <div class="text-secondary mb-1">
-                                <i class="feather-mail me-1 fs-11 text-muted"></i>{{ $invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: '—') }}
-                                &nbsp;|&nbsp;
-                                <i class="feather-phone me-1 fs-11 text-muted"></i>{{ $invoice->customer?->phone ?: ($invoice->salesOrder?->customer?->phone ?: '—') }}
-                            </div>
-                            @if ($invoice->salesOrder?->billing_address)
-                                <div class="mt-2 pt-2 border-top text-secondary fs-11" style="white-space: pre-wrap;">
-                                    <strong>{{ __('crm.billing_address') }}:</strong><br>{{ $invoice->salesOrder->billing_address }}
+                            @if($customerGstin)
+                                <div class="text-dark mb-1 fs-11">
+                                    <strong>GSTIN / Tax ID:</strong> <span class="font-monospace fw-bold text-primary">{{ $customerGstin }}</span>
                                 </div>
                             @endif
+                            @if($invoice->customer?->email || $invoice->customer?->phone || $invoice->salesOrder?->customer?->phone)
+                                <div class="text-secondary mb-2 fs-11">
+                                    @if($invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: null))
+                                        <span class="me-3"><i class="feather-mail me-1 fs-11 text-muted"></i>{{ $invoice->customer?->email ?: $invoice->salesOrder?->customer?->email }}</span>
+                                    @endif
+                                    @if($invoice->customer?->phone ?: ($invoice->salesOrder?->customer?->phone ?: null))
+                                        <span><i class="feather-phone me-1 fs-11 text-muted"></i>{{ $invoice->customer?->phone ?: $invoice->salesOrder?->customer?->phone }}</span>
+                                    @endif
+                                </div>
+                            @endif
+
+                            <div class="row g-2 mt-2 pt-2 border-top text-secondary fs-11">
+                                <div class="col-sm-6">
+                                    <strong class="text-dark d-block mb-1">{{ __('crm.billing_address') }}:</strong>
+                                    <div style="white-space: pre-wrap;">{{ $displayBilling ?: '—' }}</div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <strong class="text-dark d-block mb-1">Shipping Address:</strong>
+                                    <div style="white-space: pre-wrap;">{{ $displayShipping ?: ($displayBilling ?: '—') }}</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Right: Order References & Dispatch Info -->
+                    <!-- Box 2 (Right 50%): Order & Dispatch References -->
                     <div class="col-6">
                         <div class="p-3 bg-light bg-opacity-40 rounded border h-100">
-                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ __('crm.order_dispatch_references') }}</span>
+                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ rtrim(__('crm.order_dispatch_references'), ':') }}</span>
                             
                             @if ($invoice->salesOrder)
                                 <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                    <span class="text-muted">{{ __('crm.sales_order_reference') }}:</span>
-                                    <a href="{{ route('sales.orders.show', $invoice->sales_order_id) }}" class="fw-bold text-primary">
+                                    <span class="text-muted">{{ rtrim(__('crm.sales_order_reference'), ':') }}:</span>
+                                    <a href="{{ route('sales.orders.show', $invoice->sales_order_id) }}" class="fw-bold text-primary font-monospace">
                                         {{ $invoice->salesOrder->sales_order_number }}
                                     </a>
                                 </div>
@@ -643,40 +994,45 @@
 
                             @if ($invoice->materialRequirement)
                                 <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                    <span class="text-muted">{{ __('crm.dispatch_order_reference') }}:</span>
-                                    <a href="{{ route('inventory.material-requirements.show', $invoice->material_requirement_id) }}" class="fw-bold text-info">
+                                    <span class="text-muted">{{ rtrim(__('crm.dispatch_order_reference'), ':') }}:</span>
+                                    <a href="{{ route('inventory.material-requirements.show', $invoice->material_requirement_id) }}" class="fw-bold text-info font-monospace">
                                         {{ $invoice->materialRequirement->requirement_number }}
                                     </a>
                                 </div>
                             @endif
 
-                            @if ($invoice->eway_bill_status === 'Generated')
+                            @if($invoice->salesOrder?->order_date)
+                                <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                    <span class="text-muted">Order Date:</span>
+                                    <span class="fw-semibold text-dark">{{ date('d-M-Y', strtotime($invoice->salesOrder->order_date)) }}</span>
+                                </div>
+                            @endif
+
+                            @if($placeOfSupplyStr)
+                                <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                    <span class="text-muted">{{ rtrim(__('crm.place_of_supply'), ':') }}:</span>
+                                    <span class="fw-semibold text-dark">{{ $placeOfSupplyStr }}</span>
+                                </div>
+                            @endif
+
+                            @if ($invoice->eway_bill_status === 'Generated' || $invoice->eway_bill_no)
                                 <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
                                     <span class="text-muted">E-Way Bill No:</span>
-                                    <span class="fw-bold text-dark font-monospace">{{ $invoice->eway_bill_no }} ({{ $invoice->vehicle_no ?: 'Road' }})</span>
+                                    <span class="fw-bold text-dark font-monospace">{{ $invoice->eway_bill_no }}</span>
                                 </div>
-                                @if($invoice->transporter_name)
+                                @if($invoice->vehicle_no || $invoice->transport_mode)
                                     <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                        <span class="text-muted">Vehicle / Mode:</span>
+                                        <span class="fw-semibold text-dark font-monospace">{{ $invoice->vehicle_no ?: ($invoice->transport_mode ?: 'Road') }}</span>
+                                    </div>
+                                @endif
+                                @if($invoice->transporter_name)
+                                    <div class="d-flex justify-content-between">
                                         <span class="text-muted">Transporter:</span>
-                                        <span class="fw-semibold text-dark">{{ $invoice->transporter_name }} @if($invoice->transporter_id)({{ $invoice->transporter_id }})@endif</span>
+                                        <span class="fw-semibold text-dark">{{ $invoice->transporter_name }}</span>
                                     </div>
                                 @endif
                             @endif
-
-                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                <span class="text-muted">{{ __('crm.place_of_supply') }}</span>
-                                <span class="fw-semibold text-dark">Rajasthan (08)</span>
-                            </div>
-
-                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                <span class="text-muted">{{ __('crm.gst_option') }}</span>
-                                <span class="fw-bold text-dark">{{ $invoice->gst_type === 'igst' ? __('crm.inter_state_gst') : __('crm.intra_state_gst') }}</span>
-                            </div>
-
-                            <div class="d-flex justify-content-between">
-                                <span class="text-muted">{{ __('crm.payment_status') }}</span>
-                                <span class="fw-bold {{ $balanceDue > 0 ? 'text-danger' : 'text-success' }}">{{ $balanceDue > 0 ? __('crm.balance_outstanding') : __('crm.fully_paid') }}</span>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -727,96 +1083,76 @@
                 </div>
 
                 <!-- 4. Summary & Calculations Row -->
-                <div class="row pt-2 fs-13 text-dark mb-4">
-                    <!-- Left: GST Tax Rate Summary, Bank Details & Terms -->
-                    <div class="col-7">
-                        @php
-                            $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
-                        @endphp
-                        @if ($taxGroups->count() > 0 && $invoice->tax_amount > 0)
-                            <div class="card border shadow-none mb-3 gst-summary-box" style="border-radius: 6px; overflow: hidden; border-color: #cbd5e1 !important;">
-                                <div class="py-1 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
-                                    <span><i class="feather-pie-chart me-1 text-primary"></i>{{ __('crm.gst_tax_summary') }}</span>
-                                    <span class="badge bg-soft-primary text-primary fs-10" style="font-size: 10px;">{{ $invoice->gst_type === 'igst' ? 'IGST' : 'CGST + SGST' }}</span>
-                                </div>
-                                <div class="table-responsive" style="overflow-x: visible;">
-                                    <table class="table table-sm table-bordered align-middle text-center fs-11 mb-0 w-100">
-                                        <thead class="bg-light text-secondary fw-bold">
-                                            @if($invoice->gst_type === 'igst')
-                                                <tr>
-                                                    <th class="py-1" style="width: 30%;">{{ __('crm.tax_rate') }}</th>
-                                                    <th class="py-1 text-end" style="width: 35%;">{{ __('crm.total_amount') }}</th>
-                                                    <th class="py-1 text-end" style="width: 35%;">IGST</th>
-                                                </tr>
-                                            @else
-                                                <tr>
-                                                    <th class="py-1" style="width: 25%;">{{ __('crm.tax_rate') }}</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">{{ __('crm.total_amount') }}</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">CGST</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">SGST</th>
-                                                </tr>
-                                            @endif
-                                        </thead>
-                                        <tbody>
-                                            @php
-                                                $totCgst = 0;
-                                                $totSgst = 0;
-                                                $totIgst = 0;
-                                                $totTax = 0;
-                                            @endphp
-                                            @foreach($taxGroups as $rateStr => $gItems)
-                                                @php
-                                                    $rate = floatval($rateStr);
-                                                    $grpTax = $gItems->sum('tax_amount');
-                                                    $totTax += $grpTax;
-                                                @endphp
-                                                @if($invoice->gst_type === 'igst')
-                                                    @php
-                                                        $grpIgst = $gItems->sum('igst_amount') > 0 ? $gItems->sum('igst_amount') : $grpTax;
-                                                        $totIgst += $grpIgst;
-                                                    @endphp
-                                                    <tr>
-                                                        <td class="py-1 fw-bold">GST {{ $rate }}%</td>
-                                                        <td class="py-1 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
-                                                        <td class="py-1 text-end">{{ format_currency($grpIgst) }}</td>
-                                                    </tr>
-                                                @else
-                                                    @php
-                                                        $grpCgst = $gItems->sum('cgst_amount') > 0 ? $gItems->sum('cgst_amount') : round($grpTax / 2, 2);
-                                                        $grpSgst = $gItems->sum('sgst_amount') > 0 ? $gItems->sum('sgst_amount') : round($grpTax - $grpCgst, 2);
-                                                        $totCgst += $grpCgst;
-                                                        $totSgst += $grpSgst;
-                                                    @endphp
-                                                    <tr>
-                                                        <td class="py-1 fw-bold">GST {{ $rate }}%</td>
-                                                        <td class="py-1 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
-                                                        <td class="py-1 text-end">{{ format_currency($grpCgst) }}</td>
-                                                        <td class="py-1 text-end">{{ format_currency($grpSgst) }}</td>
-                                                    </tr>
-                                                @endif
-                                            @endforeach
-                                        </tbody>
-                                        <tfoot class="bg-light fw-bold text-dark">
-                                            @if($invoice->gst_type === 'igst')
-                                                <tr>
-                                                    <td class="py-1">Total</td>
-                                                    <td class="py-1 text-end text-primary">{{ format_currency($totTax) }}</td>
-                                                    <td class="py-1 text-end">{{ format_currency($totIgst) }}</td>
-                                                </tr>
-                                            @else
-                                                <tr>
-                                                    <td class="py-1">Total</td>
-                                                    <td class="py-1 text-end text-primary">{{ format_currency($totTax) }}</td>
-                                                    <td class="py-1 text-end">{{ format_currency($totCgst) }}</td>
-                                                    <td class="py-1 text-end">{{ format_currency($totSgst) }}</td>
-                                                </tr>
-                                            @endif
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-                        @endif
+                @php
+                    $taxMode = $invoice->effective_tax_mode ?? 'exclusive';
+                    $grossSubtotal = 0;
+                    $totalItemDiscount = 0;
+                    $itemsTaxAmount = 0;
+                    $maxItemTaxRate = 0;
+                    foreach($invoice->items as $it) {
+                        $grossSubtotal += ($it->quantity * $it->unit_price);
+                        $totalItemDiscount += $it->discount;
+                        if ($invoice->tax_type === 'item_wise_tax') {
+                            $lineNet = max(0, ($it->quantity * $it->unit_price) - $it->discount);
+                            if ($taxMode === 'inclusive') {
+                                $lineBase = ($it->tax_rate > 0) ? round($lineNet / (1 + ($it->tax_rate / 100)), 4) : $lineNet;
+                                $lineTax = $lineNet - $lineBase;
+                            } else {
+                                $lineTax = ($lineNet * ($it->tax_rate / 100));
+                            }
+                            $itemsTaxAmount += $lineTax;
+                            if ($it->tax_rate > $maxItemTaxRate) $maxItemTaxRate = $it->tax_rate;
+                        }
+                    }
+                    $effectiveDiscount = ($invoice->discount_type === 'order_wise') ? (float)$invoice->discount_amount : $totalItemDiscount;
+                    $itemsNet = max(0, $grossSubtotal - $effectiveDiscount);
 
+                    if ($invoice->tax_type === 'order_wise_tax') {
+                        $orderTaxRate = (float)($invoice->order_tax_rate ?: 18);
+                        if ($taxMode === 'inclusive') {
+                            $itemsTaxAmount = ($orderTaxRate > 0) ? ($itemsNet - ($itemsNet / (1 + ($orderTaxRate / 100)))) : 0;
+                        } else {
+                            $itemsTaxAmount = $itemsNet * ($orderTaxRate / 100);
+                        }
+                    } elseif ($invoice->tax_type === 'without_tax') {
+                        $itemsTaxAmount = 0;
+                    }
+
+                    if ($taxMode === 'inclusive') {
+                        $taxableBase = max(0, $itemsNet - $itemsTaxAmount);
+                        $itemsTotalInclGst = $itemsNet;
+                    } else {
+                        $taxableBase = $itemsNet;
+                        $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
+                    }
+
+                    $freightAmount = ($invoice->freight_terms === 'To Be Billed') ? (float)($invoice->freight_amount ?: 0) : 0;
+
+                    $freightTaxRateOpt = $invoice->freight_tax_rate ?? 'highest';
+                    $freightTaxRatePercent = 18;
+                    if ($freightTaxRateOpt === 'highest') {
+                        if ($invoice->tax_type === 'order_wise_tax') {
+                            $freightTaxRatePercent = $invoice->order_tax_rate > 0 ? $invoice->order_tax_rate : 18;
+                        } else {
+                            $freightTaxRatePercent = ($maxItemTaxRate > 0) ? $maxItemTaxRate : 18;
+                        }
+                    } else {
+                        $freightTaxRatePercent = floatval($freightTaxRateOpt);
+                    }
+
+                    $freightTax = ($freightAmount > 0 && $invoice->tax_type !== 'without_tax') ? round($freightAmount * ($freightTaxRatePercent / 100), 2) : 0;
+                    $totalFreightInclGst = $freightAmount + $freightTax;
+                    $totalInvoiceTaxAmount = $itemsTaxAmount + $freightTax;
+                    $adjustment = (float)($invoice->adjustment ?? 0);
+                    $grandTotal = (float)($invoice->total_amount ?: ($taxMode === 'inclusive' ? ($itemsTotalInclGst + $freightAmount + $adjustment) : (($taxableBase + $freightAmount) + $totalInvoiceTaxAmount + $adjustment)));
+                    $gstType = $invoice->gst_type ?? 'cgst_sgst';
+                    $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
+                    $hasFreightTax = ($freightAmount > 0 && $freightTax > 0);
+                @endphp
+
+                <div class="row pt-2 fs-13 text-dark mb-4">
+                    <!-- Left: Bank Details & Terms -->
+                    <div class="col-7">
                         <div class="p-3 bg-light bg-opacity-30 rounded border mb-3 bank-details-box" style="border-color: #cbd5e1 !important;">
                             <h6 class="fw-bold text-dark fs-11 text-uppercase mb-2" style="letter-spacing: 0.5px;">{{ __('crm.bank_payment_details') }}</h6>
                             <div class="row fs-11 text-secondary g-2">
@@ -837,56 +1173,11 @@
 
                     <!-- Right: Subtotal Calculations -->
                     <div class="col-5 summary-table-box ms-auto">
-                        <div class="p-3 rounded-3 border bg-light text-dark" style="border-color: #cbd5e1 !important; background-color: #f8fafc !important;">
-                            @php
-                                $grossSubtotal = 0;
-                                $totalItemDiscount = 0;
-                                $itemsTaxAmount = 0;
-                                $maxItemTaxRate = 0;
-                                foreach($invoice->items as $it) {
-                                    $grossSubtotal += ($it->quantity * $it->unit_price);
-                                    $totalItemDiscount += $it->discount;
-                                    if ($invoice->tax_type === 'item_wise_tax') {
-                                        $lineTaxable = max(0, ($it->quantity * $it->unit_price) - $it->discount);
-                                        $itemsTaxAmount += ($lineTaxable * ($it->tax_rate / 100));
-                                        if ($it->tax_rate > $maxItemTaxRate) $maxItemTaxRate = $it->tax_rate;
-                                    }
-                                }
-                                $effectiveDiscount = ($invoice->discount_type === 'order_wise') ? (float)$invoice->discount_amount : $totalItemDiscount;
-                                $taxableBase = max(0, $grossSubtotal - $effectiveDiscount);
+                        <div class="p-3 rounded-3 border bg-light text-dark">
 
-                                if ($invoice->tax_type === 'order_wise_tax') {
-                                    $itemsTaxAmount = $taxableBase * (($invoice->order_tax_rate ?: 18) / 100);
-                                } elseif ($invoice->tax_type === 'without_tax') {
-                                    $itemsTaxAmount = 0;
-                                }
-
-                                $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
-                                $freightAmount = ($invoice->freight_terms === 'To Be Billed') ? (float)($invoice->freight_amount ?: 0) : 0;
-
-                                $freightTaxRateOpt = $invoice->freight_tax_rate ?? 'highest';
-                                $freightTaxRatePercent = 18;
-                                if ($freightTaxRateOpt === 'highest') {
-                                    if ($invoice->tax_type === 'order_wise_tax') {
-                                        $freightTaxRatePercent = $invoice->order_tax_rate > 0 ? $invoice->order_tax_rate : 18;
-                                    } else {
-                                        $freightTaxRatePercent = ($maxItemTaxRate > 0) ? $maxItemTaxRate : 18;
-                                    }
-                                } else {
-                                    $freightTaxRatePercent = floatval($freightTaxRateOpt);
-                                }
-
-                                $freightTax = ($freightAmount > 0 && $invoice->tax_type !== 'without_tax') ? round($freightAmount * ($freightTaxRatePercent / 100), 2) : 0;
-                                $totalFreightInclGst = $freightAmount + $freightTax;
-                                $totalInvoiceTaxAmount = $itemsTaxAmount + $freightTax;
-                                $adjustment = (float)($invoice->adjustment ?? 0);
-                                $grandTotal = $itemsTotalInclGst + $totalFreightInclGst + $adjustment;
-                                $gstType = $invoice->gst_type ?? 'cgst_sgst';
-                            @endphp
-
-                            <!-- 1. Subtotal (Excl. Tax) -->
+                            <!-- 1. Subtotal -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                <span class="text-muted fw-semibold">{{ __('crm.subtotal_excl_tax') }}</span>
+                                <span class="text-muted fw-semibold">{{ $taxMode === 'inclusive' ? __('crm.subtotal_incl_tax') : __('crm.subtotal_excl_tax') }}</span>
                                 <span class="fw-bold text-dark">{{ format_currency($grossSubtotal) }}</span>
                             </div>
 
@@ -900,40 +1191,19 @@
 
                             <!-- 3. Items Taxable Value -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                <span class="text-muted fw-semibold">{{ __('crm.items_taxable_value') }}</span>
+                                <span class="text-muted fw-semibold">{{ $taxMode === 'inclusive' ? __('crm.taxable_value_excl_tax') : __('crm.items_taxable_value') }}</span>
                                 <span class="fw-bold text-dark">{{ format_currency($taxableBase) }}</span>
                             </div>
 
-                            <!-- 4. Add: Items GST Tax -->
-                            @if($invoice->tax_type !== 'without_tax' && $itemsTaxAmount > 0)
-                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                    <span class="text-muted fw-medium">{{ __('crm.add_items_gst_tax') }}</span>
-                                    <span class="text-muted font-monospace">+{{ format_currency($itemsTaxAmount) }}</span>
-                                </div>
-                            @endif
-
-                            <!-- 5. Billed Items Total (Incl. GST) -->
-                            <div class="d-flex justify-content-between align-items-center my-2 py-1.5 px-2.5 rounded bg-white border fs-12 fw-bold text-dark" style="border-color: #e2e8f0 !important;">
-                                <span>{{ __('crm.billed_items_total') }}</span>
-                                <span>{{ format_currency($itemsTotalInclGst) }}</span>
-                            </div>
-
-                            <!-- 6. Freight Charges -->
+                            <!-- 4. Freight Charges -->
                             @if($freightAmount > 0)
-                                <hr class="my-2 border-slate">
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                     <span class="text-muted fw-semibold">{{ __('crm.freight_charges') }}</span>
                                     <span class="fw-bold text-primary">{{ format_currency($freightAmount) }}</span>
                                 </div>
-                                @if($freightTax > 0)
-                                    <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-semibold">{{ __('crm.add_freight_gst_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($freightTax) }}</span>
-                                    </div>
-                                @endif
-                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12 fw-bold text-primary">
-                                    <span>{{ __('crm.total_freight_incl_gst') }}</span>
-                                    <span>{{ format_currency($totalFreightInclGst) }}</span>
+                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12 fw-bold text-dark">
+                                    <span>Total Taxable Value</span>
+                                    <span>{{ format_currency($taxableBase + $freightAmount) }}</span>
                                 </div>
                             @endif
 
@@ -942,17 +1212,17 @@
                                 <hr class="my-2 border-slate">
                                 @if($gstType === 'cgst_sgst')
                                     <div class="d-flex justify-content-between align-items-center mb-1.5 fs-12">
-                                        <span class="text-muted fw-medium">{{ __('crm.cgst_central_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount / 2) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.cgst_central_tax') }} {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}</span>
+                                        <span class="text-muted font-monospace">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount / 2) }}</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-medium">{{ __('crm.sgst_state_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount / 2) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.sgst_state_tax') }} {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}</span>
+                                        <span class="text-muted font-monospace">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount / 2) }}</span>
                                     </div>
                                 @else
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-medium">{{ __('crm.igst_integrated_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.igst_integrated_tax') }} {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}</span>
+                                        <span class="text-muted font-monospace">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount) }}</span>
                                     </div>
                                 @endif
                             @endif
@@ -986,9 +1256,187 @@
                                     <span class="fw-bold">{{ format_currency($balDue) }}</span>
                                 </div>
                             @endif
+
+                            @if($invoice->allocations->isNotEmpty())
+                                <div class="mt-2 pt-2 border-top fs-11 text-muted">
+                                    <span class="fw-bold text-dark d-block mb-1">Applied Payments / Advances:</span>
+                                    @foreach($invoice->allocations as $alloc)
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span>
+                                                <i class="feather-check text-success me-1"></i>
+                                                {{ $alloc->payment?->payment_number ?? 'Advance' }}
+                                                @if($alloc->payment?->payment_date)
+                                                    <span class="text-secondary">({{ date('d-M', strtotime($alloc->payment->payment_date)) }})</span>
+                                                @endif
+                                            </span>
+                                            <span class="fw-semibold text-dark">{{ format_currency($alloc->allocated_amount) }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
+
+                <!-- 5. Full-Width GST Tax Summary / Tax Analysis (A4 Optimized) -->
+                @if (($taxGroups->count() > 0 && $invoice->tax_amount > 0) || $hasFreightTax)
+                    <div class="card border shadow-none mb-4 gst-summary-box" style="border-radius: 6px; overflow: hidden; border-color: #cbd5e1 !important;">
+                        <div class="py-1.5 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
+                            <span><i class="feather-pie-chart me-1 text-primary"></i>{{ __('crm.gst_tax_summary') }} / TAX ANALYSIS</span>
+                            <span class="badge bg-soft-primary text-primary fs-10" style="font-size: 10px;">{{ $gstType === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)' }}</span>
+                        </div>
+                        <div class="table-responsive" style="overflow-x: visible;">
+                            <table class="table table-sm table-bordered align-middle text-center fs-11 mb-0 w-100">
+                                <thead class="bg-light text-secondary fw-bold">
+                                    @if($gstType === 'igst')
+                                        <tr>
+                                            <th class="py-1.5 text-start ps-3" style="width: 35%;">Tax Rate / Description</th>
+                                            <th class="py-1.5 text-end" style="width: 25%;">Taxable Value</th>
+                                            <th class="py-1.5 text-end" style="width: 20%;">Total Tax</th>
+                                            <th class="py-1.5 text-end pe-3" style="width: 20%;">IGST Amount</th>
+                                        </tr>
+                                    @else
+                                        <tr>
+                                            <th class="py-1.5 text-start ps-3" style="width: 32%;">Tax Rate / Description</th>
+                                            <th class="py-1.5 text-end" style="width: 20%;">Taxable Value</th>
+                                            <th class="py-1.5 text-end" style="width: 16%;">Total Tax</th>
+                                            <th class="py-1.5 text-end" style="width: 16%;">CGST Amount</th>
+                                            <th class="py-1.5 text-end pe-3" style="width: 16%;">SGST Amount</th>
+                                        </tr>
+                                    @endif
+                                </thead>
+                                <tbody>
+                                    @php
+                                        $totTaxable = 0;
+                                        $totCgst = 0;
+                                        $totSgst = 0;
+                                        $totIgst = 0;
+                                        $totTax = 0;
+                                    @endphp
+                                    @if($invoice->tax_type === 'order_wise_tax')
+                                        @php
+                                            $orderTaxRate = $invoice->order_tax_rate ?: 18;
+                                            $totTaxable += $taxableBase;
+                                            $totTax += $itemsTaxAmount;
+                                        @endphp
+                                        @if($gstType === 'igst')
+                                            @php $totIgst += $itemsTaxAmount; @endphp
+                                            <tr>
+                                                <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $orderTaxRate }}% (Order Level)</td>
+                                                <td class="py-1.5 text-end">{{ format_currency($taxableBase) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($itemsTaxAmount) }}</td>
+                                                <td class="py-1.5 text-end pe-3">{{ format_currency($itemsTaxAmount) }}</td>
+                                            </tr>
+                                        @else
+                                            @php
+                                                $oCgst = round($itemsTaxAmount / 2, 2);
+                                                $oSgst = round($itemsTaxAmount - $oCgst, 2);
+                                                $totCgst += $oCgst;
+                                                $totSgst += $oSgst;
+                                            @endphp
+                                            <tr>
+                                                <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $orderTaxRate }}% (Order Level)</td>
+                                                <td class="py-1.5 text-end">{{ format_currency($taxableBase) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($itemsTaxAmount) }}</td>
+                                                <td class="py-1.5 text-end">{{ format_currency($oCgst) }}</td>
+                                                <td class="py-1.5 text-end pe-3">{{ format_currency($oSgst) }}</td>
+                                            </tr>
+                                        @endif
+                                    @else
+                                        {{-- 1. Pure Items-wise Tax Rows (No freight mixed in) --}}
+                                        @foreach($taxGroups as $rateStr => $gItems)
+                                            @php
+                                                $rate = floatval($rateStr);
+                                                $grpTaxable = $gItems->sum(function($it) use ($taxMode) {
+                                                    $lineNet = max(0, ($it->quantity * $it->unit_price) - $it->discount);
+                                                    return $taxMode === 'inclusive' ? max(0, $lineNet - $it->tax_amount) : $lineNet;
+                                                });
+                                                $grpTax = $gItems->sum('tax_amount');
+                                                $totTaxable += $grpTaxable;
+                                                $totTax += $grpTax;
+                                            @endphp
+                                            @if($gstType === 'igst')
+                                                @php
+                                                    $grpIgst = $gItems->sum('igst_amount') > 0 ? $gItems->sum('igst_amount') : $grpTax;
+                                                    $totIgst += $grpIgst;
+                                                @endphp
+                                                <tr>
+                                                    <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $rate }}%</td>
+                                                    <td class="py-1.5 text-end">{{ format_currency($grpTaxable) }}</td>
+                                                    <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
+                                                    <td class="py-1.5 text-end pe-3">{{ format_currency($grpIgst) }}</td>
+                                                </tr>
+                                            @else
+                                                @php
+                                                    $grpCgst = $gItems->sum('cgst_amount') > 0 ? $gItems->sum('cgst_amount') : round($grpTax / 2, 2);
+                                                    $grpSgst = $gItems->sum('sgst_amount') > 0 ? $gItems->sum('sgst_amount') : round($grpTax - $grpCgst, 2);
+                                                    $totCgst += $grpCgst;
+                                                    $totSgst += $grpSgst;
+                                                @endphp
+                                                <tr>
+                                                    <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $rate }}%</td>
+                                                    <td class="py-1.5 text-end">{{ format_currency($grpTaxable) }}</td>
+                                                    <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
+                                                    <td class="py-1.5 text-end">{{ format_currency($grpCgst) }}</td>
+                                                    <td class="py-1.5 text-end pe-3">{{ format_currency($grpSgst) }}</td>
+                                                </tr>
+                                            @endif
+                                        @endforeach
+                                    @endif
+
+                                    {{-- 2. Dedicated Freight Tax Row (Separate & Clean) --}}
+                                    @if($hasFreightTax)
+                                        @php
+                                            $totTaxable += $freightAmount;
+                                            $totTax += $freightTax;
+                                        @endphp
+                                        @if($gstType === 'igst')
+                                            @php $totIgst += $freightTax; @endphp
+                                            <tr class="table-light">
+                                                <td class="py-1.5 text-start ps-3 fw-bold text-primary"><i class="feather-truck me-1"></i>Freight / Shipping ({{ $freightTaxRatePercent }}%)</td>
+                                                <td class="py-1.5 text-end text-primary">{{ format_currency($freightAmount) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-primary">{{ format_currency($freightTax) }}</td>
+                                                <td class="py-1.5 text-end pe-3 text-primary">{{ format_currency($freightTax) }}</td>
+                                            </tr>
+                                        @else
+                                            @php
+                                                $fCgst = round($freightTax / 2, 2);
+                                                $fSgst = round($freightTax - $fCgst, 2);
+                                                $totCgst += $fCgst;
+                                                $totSgst += $fSgst;
+                                            @endphp
+                                            <tr class="table-light">
+                                                <td class="py-1.5 text-start ps-3 fw-bold text-primary"><i class="feather-truck me-1"></i>Freight / Shipping ({{ $freightTaxRatePercent }}%)</td>
+                                                <td class="py-1.5 text-end text-primary">{{ format_currency($freightAmount) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-primary">{{ format_currency($freightTax) }}</td>
+                                                <td class="py-1.5 text-end text-primary">{{ format_currency($fCgst) }}</td>
+                                                <td class="py-1.5 text-end pe-3 text-primary">{{ format_currency($fSgst) }}</td>
+                                            </tr>
+                                        @endif
+                                    @endif
+                                </tbody>
+                                <tfoot class="bg-light fw-bold text-dark">
+                                    @if($gstType === 'igst')
+                                        <tr>
+                                            <td class="py-1.5 text-start ps-3">Total</td>
+                                            <td class="py-1.5 text-end">{{ format_currency($totTaxable) }}</td>
+                                            <td class="py-1.5 text-end text-primary">{{ format_currency($totTax) }}</td>
+                                            <td class="py-1.5 text-end pe-3">{{ format_currency($totIgst) }}</td>
+                                        </tr>
+                                    @else
+                                        <tr>
+                                            <td class="py-1.5 text-start ps-3">Total</td>
+                                            <td class="py-1.5 text-end">{{ format_currency($totTaxable) }}</td>
+                                            <td class="py-1.5 text-end text-primary">{{ format_currency($totTax) }}</td>
+                                            <td class="py-1.5 text-end">{{ format_currency($totCgst) }}</td>
+                                            <td class="py-1.5 text-end pe-3">{{ format_currency($totSgst) }}</td>
+                                        </tr>
+                                    @endif
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                @endif
 
                 <!-- 5. Signature Footer Block -->
                 <div class="row pt-4 border-top fs-11 text-muted align-items-end mt-4 signature-footer-block">
@@ -1001,6 +1449,57 @@
                         <div class="border-top d-inline-block pt-1 px-4 text-muted fw-semibold">{{ __('crm.authorized_signatory') }}</div>
                     </div>
                 </div>
+
+                <!-- Settled Payments & Advance Adjustments Table (Screen view only) -->
+                @if($invoice->allocations->isNotEmpty())
+                    <div class="card border shadow-none mt-4 d-print-none" style="border-radius: 6px; border-color: #cbd5e1 !important;">
+                        <div class="py-2 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
+                            <span><i class="feather-check-circle me-1 text-success"></i>Settled Payments / Advance Adjustments</span>
+                            <span class="badge bg-soft-success text-success fs-10">{{ $invoice->allocations->count() }} Entry(s)</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle text-center fs-11 mb-0 w-100">
+                                <thead class="bg-light text-secondary fw-bold">
+                                    <tr>
+                                        <th class="py-1.5 text-start ps-3">Payment #</th>
+                                        <th class="py-1.5">Date</th>
+                                        <th class="py-1.5">Method</th>
+                                        <th class="py-1.5">Ref / Notes</th>
+                                        <th class="py-1.5 text-end">Applied Amount</th>
+                                        <th class="py-1.5 text-center pe-3">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($invoice->allocations as $alloc)
+                                        <tr>
+                                            <td class="py-1.5 text-start ps-3 fw-bold">
+                                                @if($alloc->customer_payment_id)
+                                                    <a href="{{ route('sales.payments.show', $alloc->customer_payment_id) }}" class="text-primary">
+                                                        {{ $alloc->payment?->payment_number ?? 'Payment #' . $alloc->customer_payment_id }}
+                                                    </a>
+                                                @else
+                                                    {{ $alloc->payment?->payment_number ?? 'Advance' }}
+                                                @endif
+                                            </td>
+                                            <td class="py-1.5">{{ $alloc->payment?->payment_date ? date('d-M-Y', strtotime($alloc->payment->payment_date)) : '—' }}</td>
+                                            <td class="py-1.5">{{ $alloc->payment?->payment_method ?? 'Bank/Cash' }}</td>
+                                            <td class="py-1.5 text-muted">{{ $alloc->payment?->reference_no ?: ($alloc->payment?->notes ?: '—') }}</td>
+                                            <td class="py-1.5 text-end fw-bold text-success">{{ format_currency($alloc->allocated_amount) }}</td>
+                                            <td class="py-1.5 text-center pe-3">
+                                                <form action="{{ route('sales.invoices.remove-advance', [$invoice->id, $alloc->id]) }}" method="POST" onsubmit="return confirm('Unlink this payment from invoice? It will return to available advances.');" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-xs btn-outline-danger py-0.5 px-2 fs-10" title="Unlink / Return to Advance">
+                                                        <i class="feather-rotate-ccw me-1"></i>Unlink
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
@@ -1011,7 +1510,10 @@
     <form id="sendInvoiceEmailForm" action="" method="POST" enctype="multipart/form-data">
         @csrf
         @php
-            $availableSmtps = \App\Models\EmailConfiguration::where('is_active', true)->orderByDesc('is_default')->get();
+            $availableSmtps = \App\Models\EmailConfiguration::forCurrentContext()->where('is_active', true)->orderByDesc('is_default')->get();
+            if ($availableSmtps->isEmpty()) {
+                $availableSmtps = \App\Models\EmailConfiguration::where('is_active', true)->orderByDesc('is_default')->get();
+            }
         @endphp
         @if($availableSmtps->isNotEmpty())
             <div class="mb-3">
@@ -1170,6 +1672,7 @@
     </form>
 </x-ui.modal>
 
+@if (!$isCancelled)
 <!-- GENERATE E-WAY BILL MODAL -->
 <x-ui.modal id="generateEWayBillModal" title="<i class='feather-truck text-info me-1.5'></i>Generate GST E-Way Bill (EWB)" size="lg" :centered="true" :showFooter="false">
     <form action="{{ route('sales.invoices.ewaybill.generate', $invoice->id) }}" method="POST">
@@ -1258,6 +1761,7 @@
         </div>
     </form>
 </x-ui.modal>
+@endif
 
 <!-- QUICK ADD TRANSPORTER MODAL -->
 <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>Add New Transporter Master" size="lg" :centered="true" :showFooter="false">
@@ -1298,7 +1802,7 @@
                     <x-ui.modal-form-ui type="input" label="PAN Number" name="pan_number" placeholder="e.g. ABCDE1234F" class="text-uppercase font-monospace" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.modal-form-ui type="input" label="Primary Phone" name="phone" placeholder="Contact number" />
+                    <x-ui.modal-form-ui type="input" inputType="tel" label="Primary Phone" name="phone" placeholder="Contact number" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
                 </div>
                 <div class="col-md-6">
                     <x-ui.modal-form-ui type="input" inputType="email" label="Official Email Address" name="email" placeholder="dispatch@transporter.com" />
@@ -1355,7 +1859,7 @@
                         <tbody>
                             <tr>
                                 <td class="text-muted py-0.5" style="width: 38%;">Seller GSTIN:</td>
-                                <td class="fw-bold text-dark py-0.5 font-monospace">{{ $qrDecoded['sellerGstin'] ?? (tenant()?->gstin ?: '08AAFCS1234E1Z0') }}</td>
+                                <td class="fw-bold text-dark py-0.5 font-monospace">{{ $qrDecoded['sellerGstin'] ?? ($sellerOrg['gstin'] ?? (tenant()?->gstin ?: '—')) }}</td>
                             </tr>
                             <tr>
                                 <td class="text-muted py-0.5">Buyer GSTIN:</td>
@@ -1494,6 +1998,130 @@
     </div>
 </x-ui.modal>
 
+<!-- CREATE FINANCIAL CREDIT NOTE MODAL (Enterprise ERP Style) -->
+<x-ui.modal id="createCreditNoteModal" title="<i class='feather-file-minus text-danger me-1.5'></i>{{ __('crm.issue_financial_credit_note') }}" size="lg" :centered="true" :showFooter="false">
+    <form action="{{ route('sales.invoices.credit-note', $invoice->id) }}" method="POST" id="createCreditNoteForm">
+        @csrf
+
+        <!-- Informational Banner: Stock Integrity Safe -->
+        <div class="alert alert-soft-success border border-success-subtle py-2.5 px-3 fs-12 mb-3 d-flex align-items-center rounded-3">
+            <i class="feather-shield text-success fs-20 me-2.5 flex-shrink-0"></i>
+            <div>
+                <strong class="text-success d-block mb-0.5">{{ __('crm.credit_note_safe_title') }}</strong>
+                <span class="text-muted">{{ __('crm.credit_note_safe_desc') }}</span>
+            </div>
+        </div>
+
+        <!-- Invoice Financial Breakdown Summary Card -->
+        <div class="card bg-light border mb-3 rounded-3">
+            <div class="card-body p-3">
+                <div class="row g-2 fs-12">
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">{{ __('crm.invoice_number') }}</span>
+                        <strong class="text-dark font-monospace fs-13">{{ $invoice->invoice_number }}</strong>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">{{ __('crm.customer') }}</span>
+                        <strong class="text-dark text-truncate d-block fs-13">{{ $invoice->customer?->name ?: ($invoice->salesOrder?->customer?->name ?: 'Customer') }}</strong>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">Total Invoice Value</span>
+                        <strong class="text-dark fs-13">{{ format_currency($invoice->total_amount) }}</strong>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">Amount Paid</span>
+                        <strong class="{{ $invoice->amount_paid > 0 ? 'text-success' : 'text-muted' }} fs-13">{{ format_currency($invoice->amount_paid) }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label class="form-label fs-12 fw-bold text-dark">{{ __('crm.cancellation_reason') }} <span class="text-danger">*</span></label>
+                <select name="reason" class="form-select form-select-sm" required>
+                    <option value="Order Cancelled before Dispatch" selected>{{ __('crm.order_cancelled_before_dispatch') }}</option>
+                    <option value="Customer Requested Cancellation">{{ __('crm.customer_requested_cancellation') }}</option>
+                    <option value="Billing / Quantity Mistake">{{ __('crm.billing_mistake') }}</option>
+                    <option value="Duplicate Invoice">{{ __('crm.duplicate_invoice') }}</option>
+                    <option value="Other Reason">{{ __('crm.other_reason') }}</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fs-12 fw-bold text-dark">{{ __('crm.credit_note_date') }} <span class="text-danger">*</span></label>
+                <input type="date" name="credit_note_date" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" required>
+            </div>
+        </div>
+
+        <!-- Payment Handling Section (if invoice has any payment) -->
+        @if ($invoice->amount_paid > 0)
+            <div class="card border border-warning-subtle bg-soft-warning mb-3 rounded-3">
+                <div class="card-body p-3">
+                    <label class="form-label fs-12 fw-bold text-dark d-flex align-items-center mb-1">
+                        <i class="feather-dollar-sign text-warning me-1.5 fs-15"></i>
+                        {{ __('crm.settle_received_payment') }} ({{ format_currency($invoice->amount_paid) }})
+                    </label>
+                    <p class="fs-11 text-muted mb-2.5">
+                        {{ __('crm.payment_received_notice') }}
+                    </p>
+
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="refund_action" id="refundActionCredit" value="credit_balance" checked onchange="$('#bankRefundSelectWrapper').slideUp(150);">
+                        <label class="form-check-label fs-12 fw-semibold text-dark" for="refundActionCredit">
+                            {{ __('crm.retain_as_customer_credit') }}
+                            <span class="d-block fs-11 text-muted fw-normal">{{ __('crm.retain_as_customer_credit_desc') }}</span>
+                        </label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="refund_action" id="refundActionBank" value="bank_refund" onchange="$('#bankRefundSelectWrapper').slideDown(150);">
+                        <label class="form-check-label fs-12 fw-semibold text-dark" for="refundActionBank">
+                            {{ __('crm.refund_via_bank') }}
+                            <span class="d-block fs-11 text-muted fw-normal">{{ __('crm.refund_via_bank_desc') }}</span>
+                        </label>
+                    </div>
+
+                    <div id="bankRefundSelectWrapper" class="mt-2.5 pt-2 border-top border-warning-subtle" style="display: none;">
+                        <label class="form-label fs-11 fw-bold text-dark mb-1">{{ __('crm.select_refund_bank_account') }} <span class="text-danger">*</span></label>
+                        <select name="refund_bank_account_id" class="form-select form-select-sm">
+                            <option value="">-- {{ __('crm.choose_bank_or_cash_account') }} --</option>
+                            @foreach ($cashBankAccounts as $acc)
+                                <option value="{{ $acc->id }}">{{ $acc->name }} ({{ $acc->code }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+            </div>
+        @else
+            <input type="hidden" name="refund_action" value="credit_balance">
+        @endif
+
+        <div class="mb-3">
+            <label class="form-label fs-12 fw-bold text-dark">{{ __('crm.notes_remarks') }} <span class="text-muted fw-normal">({{ __('crm.optional') }})</span></label>
+            <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="{{ __('crm.credit_note_remarks_placeholder') }}"></textarea>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">{{ __('crm.close') }}</button>
+            <button type="submit" class="btn btn-sm btn-danger fw-bold px-3 d-inline-flex align-items-center" onclick="return confirm('{{ __('crm.confirm_issue_credit_note') }}');">
+                <i class="feather-file-minus me-1.5"></i>{{ __('crm.issue_credit_note_btn') }}
+            </button>
+        </div>
+    </form>
+</x-ui.modal>
+
+<!-- RESULT NOTIFICATION MODAL (MATCHING CRM QUOTATION) -->
+<x-ui.modal id="waResultModal" title="<i class='feather-info me-1.5 text-primary'></i>System Notification" size="lg" :centered="true" :showFooter="false">
+    <div class="py-4 px-3 text-center">
+        <div id="waResultIcon" class="mb-3 d-flex justify-content-center"></div>
+        <h4 id="waResultTitle" class="fw-bold text-dark mb-3 fs-18"></h4>
+        <div id="waResultMessage" class="alert alert-light border text-center fs-13 mb-4 font-monospace p-3.5 text-break shadow-2xs rounded-3 mx-auto" style="max-width: 520px; background-color: #f8fafc; border-color: #e2e8f0 !important; color: #334155; line-height: 1.6;"></div>
+        <div class="d-flex justify-content-center mt-3">
+            <button type="button" class="btn btn-primary fw-bold px-5 py-2 fs-13 shadow-2xs rounded-3" data-bs-dismiss="modal" style="min-width: 140px;">OK</button>
+        </div>
+    </div>
+</x-ui.modal>
+
 @push('scripts')
 <script>
     const defaultInvoicePdfUrl = "{{ route('sales.invoices.previewPdf', $invoice->id) }}";
@@ -1501,7 +2129,7 @@
     let customWaPdfFile = null;
     let customEmailPdfFile = null;
 
-    function showNotificationModal(isSuccess, title, message) {
+    function showNotificationModal(isSuccess, title, message, reloadOnClose = false) {
         const iconHtml = isSuccess 
             ? '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>'
             : '<div class="avatar avatar-xl bg-soft-danger text-danger rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(239, 68, 68, 0.2);"><i class="feather-alert-triangle fs-32"></i></div>';
@@ -1511,8 +2139,21 @@
         $('#waResultMessage').text(message);
         
         const modalEl = document.getElementById('waResultModal');
-        const modal = new bootstrap.Modal(modalEl);
-        modal.show();
+        if (modalEl) {
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+
+            if (isSuccess && reloadOnClose) {
+                $(modalEl).one('hidden.bs.modal', function () {
+                    window.location.reload();
+                });
+                setTimeout(function () {
+                    window.location.reload();
+                }, 2000);
+            }
+        } else {
+            alert((isSuccess ? 'Success: ' : 'Error: ') + message);
+        }
     }
 
     function checkWhatsAppStatus() {
@@ -1660,7 +2301,7 @@
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
 
-                showNotificationModal(true, "WhatsApp Message Delivered!", res.message);
+                showNotificationModal(true, "WhatsApp Message Delivered!", res.message, true);
             },
             error: function (xhr) {
                 btn.prop('disabled', false).html(origHtml);
@@ -1765,7 +2406,7 @@
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
 
-                showNotificationModal(true, "Invoice Email Dispatched!", res.message);
+                showNotificationModal(true, "Invoice Email Dispatched!", res.message, true);
             },
             error: function (xhr) {
                 btn.prop('disabled', false).html(origHtml);
@@ -1825,6 +2466,22 @@
         const btn = $('#saveQuickTransporterBtn');
         const origHtml = btn.html();
 
+        // Clear previous errors
+        form.find('.is-invalid').removeClass('is-invalid');
+        form.find('.invalid-feedback.ajax-feedback').remove();
+        form.find('.transporter-alert-error').remove();
+
+        // Client-side email validation check
+        const emailInput = form.find('input[name="email"]');
+        const emailVal = emailInput.val().trim();
+        if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+            emailInput.addClass('is-invalid');
+            emailInput.parent().find('.invalid-feedback.ajax-feedback').remove();
+            emailInput.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+            emailInput.focus();
+            return false;
+        }
+
         btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Saving...');
 
         $.ajax({
@@ -1858,18 +2515,160 @@
                     const modalInstance = bootstrap.Modal.getInstance(modalEl);
                     if (modalInstance) modalInstance.hide();
                     form[0].reset();
+                    form.find('.is-invalid').removeClass('is-invalid');
+                    form.find('.invalid-feedback.ajax-feedback').remove();
                 } else {
-                    alert(res.message || 'Could not create transporter.');
+                    form.prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + (res.message || 'Could not create transporter.') + '</div>');
                 }
             },
             error: function (xhr) {
                 btn.prop('disabled', false).html(origHtml);
-                const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to save transporter.';
-                alert('Error: ' + errMsg);
+                if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                    const errors = xhr.responseJSON.errors;
+                    let firstField = null;
+                    $.each(errors, function(field, messages) {
+                        const $input = form.find('[name="' + field + '"]');
+                        if ($input.length) {
+                            $input.addClass('is-invalid');
+                            $input.parent().find('.invalid-feedback.ajax-feedback').remove();
+                            $input.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">' + messages[0] + '</div>');
+                            if (!firstField) firstField = $input;
+                        } else {
+                            form.prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + messages[0] + '</div>');
+                        }
+                    });
+                    if (firstField) {
+                        firstField.focus();
+                    }
+                } else {
+                    const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to save transporter.';
+                    form.prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + errMsg + '</div>');
+                }
             }
         });
     });
+
+    // Realtime clear invalid feedback on input/change
+    $(document).on('input change', '#quickTransporterForm input, #quickTransporterForm select', function() {
+        $(this).removeClass('is-invalid');
+        $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+        $('#quickTransporterForm').find('.transporter-alert-error').remove();
+    });
+
+    // Email blur validation for quick transporter form
+    $(document).on('blur', '#quickTransporterForm input[name="email"]', function() {
+        const val = $(this).val().trim();
+        if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+            $(this).addClass('is-invalid');
+            $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+            $(this).after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+        }
+    });
+
+    // Handle Odoo-style Advance Settlement Modal
+    function updateAdvanceModalFields() {
+        const $sel = $('#advanceSourceSelect');
+        const val = $sel.val();
+        if (!val) return;
+        const parts = val.split(':');
+        const type = parts[0];
+        const id = parts[1];
+        $('#advSourceType').val(type);
+        if (type === 'allocation') {
+            $('#advAllocId').val(id);
+            $('#advCustPayId').val('');
+        } else {
+            $('#advAllocId').val('');
+            $('#advCustPayId').val(id);
+        }
+        const avail = parseFloat($sel.find('option:selected').data('avail') || 0);
+        const balDue = parseFloat("{{ (float)$invoice->balance_due }}");
+        const defaultAmt = Math.min(avail, balDue);
+        $('#advanceApplyAmountInput').val(defaultAmt.toFixed(2)).attr('max', defaultAmt.toFixed(2));
+        $('#advAvailBadge').text('₹ ' + avail.toFixed(2));
+    }
+
+    $(document).on('change', '#advanceSourceSelect', updateAdvanceModalFields);
+    $('#applyAdvanceModal').on('shown.bs.modal', function () {
+        updateAdvanceModalFields();
+        $('#advanceApplyAmountInput').focus().select();
+    });
 </script>
+
+<!-- APPLY ADVANCE / RECONCILE PAYMENT MODAL -->
+@if ($hasAvailableAdvances)
+<div class="modal fade" id="applyAdvanceModal" tabindex="-1" aria-labelledby="applyAdvanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5 px-3 border-bottom">
+                <h6 class="modal-title fw-bold text-dark fs-14" id="applyAdvanceModalLabel">
+                    <i class="feather-check-circle text-success me-1.5"></i>{{ __('crm.apply_advance_reconcile') }}
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('sales.invoices.apply-advance', $invoice->id) }}" method="POST">
+                @csrf
+                <div class="modal-body p-3 fs-12">
+                    <div class="p-2.5 bg-light rounded border mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">{{ __('crm.invoice_total_label') }}:</span>
+                            <strong class="text-dark">{{ format_currency($invoice->total_amount) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">{{ __('crm.already_paid_label') }}:</span>
+                            <span class="text-success fw-bold">{{ format_currency($invoice->amount_paid) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between pt-1 border-top">
+                            <span class="text-muted fw-bold">{{ __('crm.current_balance_due') }}:</span>
+                            <strong class="text-danger fs-14 font-monospace">{{ format_currency($invoice->balance_due) }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label fw-bold text-dark fs-12 mb-0">{{ __('crm.select_advance_payment') }}</label>
+                            <span class="badge bg-soft-primary text-primary fs-11" id="advAvailBadge">{{ __('crm.available_label') }}: {{ format_currency($totalAvailAdvance) }}</span>
+                        </div>
+                        <select name="selected_source" id="advanceSourceSelect" class="form-select form-select-sm" required>
+                            @if(!empty($availableAdvances))
+                                @foreach($availableAdvances as $adv)
+                                    <option value="allocation:{{ $adv->id }}" data-avail="{{ (float)$adv->allocated_amount }}">
+                                        {{ __('crm.sales_order_advance') }}: {{ $adv->payment?->payment_number ?? 'Payment' }} ({{ __('crm.available_label') }}: {{ format_currency($adv->allocated_amount) }})
+                                    </option>
+                                @endforeach
+                            @endif
+                            @if(!empty($unallocatedPayments))
+                                @foreach($unallocatedPayments as $up)
+                                    <option value="payment:{{ $up->customer_payment_id }}" data-avail="{{ (float)$up->allocated_amount }}">
+                                        {{ __('crm.customer_credit') }}: {{ $up->payment?->payment_number ?? 'Payment' }} ({{ __('crm.available_label') }}: {{ format_currency($up->allocated_amount) }})
+                                    </option>
+                                @endforeach
+                            @endif
+                        </select>
+                        <input type="hidden" name="source_type" id="advSourceType" value="allocation">
+                        <input type="hidden" name="payment_allocation_id" id="advAllocId" value="{{ !empty($availableAdvances) ? $availableAdvances->first()?->id : '' }}">
+                        <input type="hidden" name="customer_payment_id" id="advCustPayId" value="">
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-dark fs-12">{{ __('crm.amount_to_apply') }} ({{ active_currency_symbol() }})</label>
+                        <input type="number" step="0.01" min="0.01" name="amount" id="advanceApplyAmountInput" class="form-control form-control-sm font-monospace fw-bold" required>
+                        <div class="form-text fs-11 text-muted">
+                            {{ __('crm.advance_apply_help') }}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light border-top">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
+                    <button type="submit" class="btn btn-sm btn-success fw-bold px-3">
+                        <i class="feather-check me-1"></i>{{ __('crm.confirm_apply') }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
 @endpush
 
 @if(request()->has('print'))

@@ -36,9 +36,17 @@ class DocumentController extends Controller
             'file'                => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
+        $user = auth()->user();
+        $currentEmployee = $user ? app(\App\Domains\HRMS\Services\HrmsScopeService::class)->resolveEmployee($user) : null;
+        $canSelfManage = $this->canSelfManage($user, $currentEmployee);
+
+        if ($currentEmployee && (int) $validated['employee_id'] === (int) $currentEmployee->id && !$canSelfManage) {
+            return redirect()->back()->with('error', __('hrms.documents.error_hierarchy_upload'));
+        }
+
         $this->documentRepository->storeDocument($validated, $request, auth()->user());
 
-        return redirect()->back()->with('success', 'Document uploaded successfully.');
+        return redirect()->back()->with('success', __('hrms.documents.upload_success'));
     }
 
     public function update(Request $request, Document $document): RedirectResponse
@@ -53,7 +61,7 @@ class DocumentController extends Controller
 
         $this->documentRepository->updateDocument($document, $validated, $request);
 
-        return redirect()->back()->with('success', 'Document updated successfully.');
+        return redirect()->back()->with('success', __('hrms.documents.update_success'));
     }
 
     public function updateStatus(Request $request, Document $document): RedirectResponse
@@ -65,9 +73,17 @@ class DocumentController extends Controller
             'rejection_reason' => 'required_if:status,rejected|nullable|string|max:500',
         ]);
 
+        $user = auth()->user();
+        $currentEmployee = $user ? app(\App\Domains\HRMS\Services\HrmsScopeService::class)->resolveEmployee($user) : null;
+        $canSelfManage = $this->canSelfManage($user, $currentEmployee, $document);
+
+        if ($currentEmployee && (int) $document->documentable_id === (int) $currentEmployee->id && !$canSelfManage) {
+            return redirect()->back()->with('error', __('hrms.documents.error_hierarchy_approve'));
+        }
+
         $this->documentRepository->updateStatus($document, $validated['status'], $validated['rejection_reason'] ?? null, auth()->user());
 
-        return redirect()->back()->with('success', "Document status updated to {$validated['status']}.");
+        return redirect()->back()->with('success', __('hrms.documents.status_updated', ['status' => $validated['status']]));
     }
 
     public function destroy(Document $document): RedirectResponse
@@ -76,7 +92,7 @@ class DocumentController extends Controller
 
         $this->documentRepository->deleteDocument($document);
 
-        return redirect()->back()->with('success', 'Document deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.documents.delete_success'));
     }
 
     public function bulkApprove(Request $request): RedirectResponse
@@ -88,9 +104,23 @@ class DocumentController extends Controller
             'document_ids.*' => 'exists:documents,id',
         ]);
 
+        $user = auth()->user();
+        $currentEmployee = $user ? app(\App\Domains\HRMS\Services\HrmsScopeService::class)->resolveEmployee($user) : null;
+        $canSelfManage = $this->canSelfManage($user, $currentEmployee);
+
+        if ($currentEmployee && !$canSelfManage) {
+            $hasOwn = Document::whereIn('id', $validated['document_ids'])
+                ->where('documentable_type', Employee::class)
+                ->where('documentable_id', $currentEmployee->id)
+                ->exists();
+            if ($hasOwn) {
+                return redirect()->back()->with('error', __('hrms.documents.error_hierarchy_approve'));
+            }
+        }
+
         $count = $this->documentRepository->bulkApprove($validated['document_ids'], auth()->user());
 
-        return redirect()->back()->with('success', "Successfully approved {$count} documents.");
+        return redirect()->back()->with('success', __('hrms.documents.bulk_approve_success', ['count' => $count]));
     }
 
     public function bulkReject(Request $request): RedirectResponse
@@ -103,9 +133,23 @@ class DocumentController extends Controller
             'rejection_reason' => 'nullable|string|max:500',
         ]);
 
+        $user = auth()->user();
+        $currentEmployee = $user ? app(\App\Domains\HRMS\Services\HrmsScopeService::class)->resolveEmployee($user) : null;
+        $canSelfManage = $this->canSelfManage($user, $currentEmployee);
+
+        if ($currentEmployee && !$canSelfManage) {
+            $hasOwn = Document::whereIn('id', $validated['document_ids'])
+                ->where('documentable_type', Employee::class)
+                ->where('documentable_id', $currentEmployee->id)
+                ->exists();
+            if ($hasOwn) {
+                return redirect()->back()->with('error', __('hrms.documents.error_hierarchy_approve'));
+            }
+        }
+
         $count = $this->documentRepository->bulkReject($validated['document_ids'], $validated['rejection_reason'] ?? null, auth()->user());
 
-        return redirect()->back()->with('success', "Successfully rejected {$count} documents.");
+        return redirect()->back()->with('success', __('hrms.documents.bulk_reject_success', ['count' => $count]));
     }
 
     public function bulkDelete(Request $request): RedirectResponse
@@ -119,7 +163,7 @@ class DocumentController extends Controller
 
         $count = $this->documentRepository->bulkDelete($validated['document_ids']);
 
-        return redirect()->back()->with('success', "Successfully deleted {$count} documents.");
+        return redirect()->back()->with('success', __('hrms.documents.bulk_delete_success', ['count' => $count]));
     }
 
     /**
@@ -140,29 +184,40 @@ class DocumentController extends Controller
             $request->validate([
                 'employee_id'        => 'required|string',
                 'document_master_id' => 'required|exists:document_masters,id',
-                'file'               => 'required|file|max:10240',
+                'file'               => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
                 'expiry_date'        => 'nullable|date',
             ]);
         }
+
+        $user = auth()->user();
+        $currentEmployee = $user ? app(\App\Domains\HRMS\Services\HrmsScopeService::class)->resolveEmployee($user) : null;
+        $canSelfManage = $this->canSelfManage($user, $currentEmployee);
 
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
 
         // Resolve target employee IDs
         $employeeId = $request->input('employee_id');
         if ($employeeId === 'all') {
-            $targetEmployeeIds = Employee::pluck('id')->toArray();
+            $targetQuery = Employee::query();
+            if ($currentEmployee && !$canSelfManage) {
+                $targetQuery->where('id', '!=', $currentEmployee->id);
+            }
+            $targetEmployeeIds = $targetQuery->pluck('id')->toArray();
         } else {
+            if ($currentEmployee && (int) $employeeId === (int) $currentEmployee->id && !$canSelfManage) {
+                return redirect()->back()->with('error', __('hrms.documents.error_hierarchy_generate'));
+            }
             $targetEmployeeIds = [$employeeId];
         }
 
         if (empty($targetEmployeeIds)) {
-            return redirect()->back()->with('error', 'No employees found for this upload target.');
+            return redirect()->back()->with('error', __('hrms.documents.error_no_employees_target'));
         }
 
         if (in_array($uploadMode, ['generate', 'generate_template'], true)) {
             $docTemplate = \App\Domains\HRMS\Models\DocumentTemplate::find($request->integer('document_template_id'));
             if (!$docTemplate) {
-                return redirect()->back()->with('error', 'Document template not found.');
+                return redirect()->back()->with('error', __('hrms.documents.error_template_not_found'));
             }
 
             $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
@@ -174,7 +229,7 @@ class DocumentController extends Controller
             $hrSigUrl = null;
             if ($request->hasFile('hr_signature_file') && $request->file('hr_signature_file')->isValid()) {
                 $file = $request->file('hr_signature_file');
-                $hrSigPath = $file->store("signatures/hr_tenant_{$tenantId}", 'public');
+                $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'public');
                 $hrSigUrl = asset('storage/' . $hrSigPath);
             } elseif ($request->filled('hr_signature_data')) {
                 $hrSigData = $request->input('hr_signature_data');
@@ -182,7 +237,7 @@ class DocumentController extends Controller
                     $image = str_replace(' ', '+', preg_replace('/^data:image\/\w+;base64,/', '', $hrSigData));
                     $imageName = 'hr_sig_' . time() . '_' . \Illuminate\Support\Str::random(6) . '.png';
                     $hrSigPath = "signatures/hr_tenant_{$tenantId}/{$imageName}";
-                    \Illuminate\Support\Facades\Storage::disk('public')->put($hrSigPath, base64_decode($image));
+                    tenant_storage()->put('public', $hrSigPath, base64_decode($image));
                     $hrSigUrl = asset('storage/' . $hrSigPath);
                 } else {
                     $hrSigUrl = $hrSigData;
@@ -217,11 +272,11 @@ class DocumentController extends Controller
                         ->setPaper('a4', 'portrait')
                         ->setWarnings(false);
                     $pdfContent = $pdf->output();
-                    \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdfContent);
+                    tenant_storage()->put('public', $path, $pdfContent);
                 } catch (\Throwable $e) {
                     // Fallback to storing standalone HTML if DomPDF is unavailable
                     $htmlPath = "documents/tenant_{$tenantId}/employee_{$employee->id}/" . \Illuminate\Support\Str::slug($docTemplate->name . '-' . $employee->full_name) . '-' . time() . '.html';
-                    \Illuminate\Support\Facades\Storage::disk('public')->put($htmlPath, $templateService->toPrintableDocument($renderedContent, $title));
+                    tenant_storage()->put('public', $htmlPath, $templateService->toPrintableDocument($renderedContent, $title));
                     $path = $htmlPath;
                 }
 
@@ -280,15 +335,36 @@ class DocumentController extends Controller
                     'requested_by_id'       => auth()->id(),
                 ]);
 
+                if ($docTemplate->requires_signature) {
+                    \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.signature_requested', [
+                        'employee_name'  => $employee->full_name,
+                        'document_title' => $title,
+                        'due_date'       => now()->addDays(7)->format('d M Y'),
+                    ]);
+                }
+
                 $count++;
             }
 
-            return redirect()->back()->with('success', "Successfully generated {$count} document(s) from template.");
+            return redirect()->back()->with('success', __('hrms.documents.bulk_generate_success', ['count' => $count]));
         }
 
         // Standard bulk upload mode
         $file = $request->file('file');
         $docMaster = \App\Domains\HRMS\Models\DocumentMaster::find($request->input('document_master_id'));
+
+        if ($docMaster?->expiry_applicable && !$request->filled('expiry_date')) {
+            return redirect()->back()->withErrors(['expiry_date' => __('hrms.documents.error_expiry_required')])->withInput();
+        }
+
+        $baseStoredPath = $file->storeTenantFile("documents/tenant_{$tenantId}/bulk_temp", 'public');
+        $originalName = $file->getClientOriginalName();
+        $originalExt = $file->getClientOriginalExtension();
+        $fileSize = $file->getSize();
+        $status = ($docMaster?->requires_signature) ? 'pending_signature' : 'approved';
+        $hasExpiry = (bool) ($docMaster?->expiry_applicable ?? false);
+        $expiryDate = $hasExpiry && $request->filled('expiry_date') ? $request->date('expiry_date') : null;
+
         $count = 0;
 
         foreach ($targetEmployeeIds as $empId) {
@@ -297,26 +373,53 @@ class DocumentController extends Controller
                 continue;
             }
 
-            $storedPath = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $empPath = "documents/tenant_{$tenantId}/employee_{$employee->id}/" . time() . '_' . \Illuminate\Support\Str::random(6) . '.' . $originalExt;
+            \Illuminate\Support\Facades\Storage::disk('public')->copy($baseStoredPath, $empPath);
 
             Document::create([
                 'tenant_id'          => $tenantId,
                 'documentable_type'  => Employee::class,
                 'documentable_id'    => $employee->id,
                 'document_master_id' => $docMaster?->id,
-                'name'               => $docMaster?->name ?: $file->getClientOriginalName(),
-                'file_path'          => $storedPath,
-                'file_type'          => $file->getClientOriginalExtension(),
-                'file_size'          => $file->getSize(),
-                'expiry_date'        => $request->input('expiry_date'),
-                'status'             => 'approved',
+                'name'               => $docMaster?->name ?: $originalName,
+                'file_name'          => $originalName,
+                'file_path'          => $empPath,
+                'file_type'          => $originalExt,
+                'file_size'          => $fileSize,
+                'has_expiry'         => $hasExpiry,
+                'expiry_date'        => $expiryDate,
+                'status'             => $status,
                 'requires_signature' => (bool) ($docMaster?->requires_signature ?? false),
                 'requested_by_id'    => auth()->id(),
             ]);
 
+            if ($status === 'pending_signature') {
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.signature_requested', [
+                    'employee_name'  => $employee->full_name,
+                    'document_title' => $docMaster?->name ?: $originalName,
+                    'due_date'       => now()->addDays(7)->format('d M Y'),
+                ]);
+            }
+
             $count++;
         }
 
-        return redirect()->back()->with('success', "Successfully uploaded document for {$count} employee(s).");
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($baseStoredPath)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($baseStoredPath);
+        }
+
+        return redirect()->back()->with('success', __('hrms.documents.bulk_upload_success', ['count' => $count]));
+    }
+
+    /**
+     * Check if the authenticated user has self-management / top-tier administrative privileges.
+     */
+    private function canSelfManage(?\App\Models\User $user, ?\App\Domains\HRMS\Models\Employee $currentEmployee, mixed $targetModel = null): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        return app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->allowsSelfApproval($user, $targetModel, 'hrms.documents.manage');
     }
 }

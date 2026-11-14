@@ -24,6 +24,7 @@ class CrmSettingsApiController extends Controller
             'data'    => [
                 'quotation_approval_policy' => $settings['quotation_approval_policy'] ?? 'approval_required',
                 'invoicing_policy'          => $settings['invoicing_policy'] ?? 'sales_order',
+                'field_visit_verification'  => !empty($settings['field_visit_verification']),
                 'raw_settings'              => $settings,
             ],
         ]);
@@ -39,6 +40,7 @@ class CrmSettingsApiController extends Controller
         $validator = Validator::make($request->all(), [
             'quotation_approval_policy' => 'nullable|string|in:approval_required,auto_approve',
             'invoicing_policy'          => 'nullable|string|in:sales_order,dispatch_order,both',
+            'field_visit_verification'  => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -61,6 +63,9 @@ class CrmSettingsApiController extends Controller
         if ($request->has('invoicing_policy')) {
             $currentSettings['invoicing_policy'] = $request->input('invoicing_policy');
         }
+        if ($request->has('field_visit_verification')) {
+            $currentSettings['field_visit_verification'] = $request->boolean('field_visit_verification');
+        }
 
         $tenant->update(['settings' => $currentSettings]);
 
@@ -70,6 +75,7 @@ class CrmSettingsApiController extends Controller
             'data'    => [
                 'quotation_approval_policy' => $currentSettings['quotation_approval_policy'] ?? 'approval_required',
                 'invoicing_policy'          => $currentSettings['invoicing_policy'] ?? 'sales_order',
+                'field_visit_verification'  => !empty($currentSettings['field_visit_verification']),
             ],
         ]);
     }

@@ -240,11 +240,16 @@ class HrmsDemoSeeder extends Seeder
 
         foreach ($tablesToTruncate as $tbl) {
             if (Schema::hasTable($tbl)) {
-                DB::table($tbl)->truncate();
+                try {
+                    DB::table($tbl)->truncate();
+                } catch (\Throwable) {
+                    DB::table($tbl)->delete();
+                }
             }
         }
 
-        DB::transaction(function () {
+        try {
+            DB::transaction(function () {
             // 2. Fetch or Create Tenant & establish context
         $tenantSlug = config('tenancy.local_fallback_slug') ?: 'demo';
         $tenant = Tenant::where('slug', $tenantSlug)->first()
@@ -502,156 +507,106 @@ class HrmsDemoSeeder extends Seeder
             ]
         );
 
-        // Salary Components
-        // 1. Basic Salary
-        $compBasic = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'BASIC'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+        // Salary Components - defined per pay group
+        $componentDefs = [
+            'BASIC' => [
                 'name' => 'Basic Salary',
                 'type' => 'earning',
                 'calculation_type' => 'percentage_of_ctc',
                 'default_value' => '40',
-                'description' => 'Primary taxable base earnings (50% of Annual CTC)',
+                'description' => 'Primary taxable base earnings (40-50% of Annual CTC)',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 2. House Rent Allowance
-        $compHra = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'HRA'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'HRA' => [
                 'name' => 'House Rent Allowance',
                 'type' => 'earning',
                 'calculation_type' => 'percentage_of_basic',
                 'default_value' => '40',
                 'description' => 'Housing allowance (50% of Basic for Metros, 40% for Non-Metros)',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 3. Special Allowance
-        $compSpl = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'SPL'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'SPL' => [
                 'name' => 'Special Allowance',
                 'type' => 'earning',
                 'calculation_type' => 'balancing',
                 'default_value' => '0',
                 'description' => 'Balancing flexible component to match gross CTC',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 4. Conveyance Allowance
-        $compConv = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'CONV'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'CONV' => [
                 'name' => 'Conveyance Allowance',
                 'type' => 'earning',
                 'calculation_type' => 'percentage_of_basic',
                 'default_value' => '10',
-                'description' => 'Standard travel and commute support (10% of Basic)',
+                'description' => 'Standard travel and commute support',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 5. Medical Allowance
-        $compMed = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'MED'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'MED' => [
                 'name' => 'Medical Allowance',
                 'type' => 'earning',
                 'calculation_type' => 'percentage_of_basic',
                 'default_value' => '5',
-                'description' => 'Health and medical benefit (5% of Basic)',
+                'description' => 'Health and medical benefit',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 6. Performance Bonus (Adhoc Earning)
-        $compBonus = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'PERF_BONUS'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'PERF_BONUS' => [
                 'name' => 'Performance Incentive / Bonus',
                 'type' => 'earning',
                 'calculation_type' => 'fixed',
                 'default_value' => '0',
                 'description' => 'Discretionary adhoc bonus payout',
                 'is_adhoc' => true,
-                'status' => true,
-            ]
-        );
-
-        // 7. Provident Fund Deduction
-        $compPf = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'PF'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'PF' => [
                 'name' => 'Provident Fund (EPF)',
                 'type' => 'deduction',
                 'calculation_type' => 'percentage_of_basic',
                 'default_value' => '12',
-                'description' => 'Employee Provident Fund statutory deduction (12% of Basic)',
+                'description' => 'Employee Provident Fund statutory deduction',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 8. ESI Deduction
-        $compEsi = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'ESI'],
-            [
-                'pay_group_id' => $payGroupStaff->id,
+            ],
+            'ESI' => [
                 'name' => 'Employee State Insurance (ESIC)',
                 'type' => 'deduction',
                 'calculation_type' => 'percentage_of_basic',
                 'default_value' => '0.75',
-                'description' => 'ESIC statutory deduction (0.75% of Basic/Gross)',
+                'description' => 'ESIC statutory deduction',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 9. Professional Tax
-        $compPt = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'PT'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'PT' => [
                 'name' => 'Professional Tax',
                 'type' => 'deduction',
                 'calculation_type' => 'fixed',
                 'default_value' => '2400',
-                'description' => 'State Professional Tax (₹200/month)',
+                'description' => 'State Professional Tax',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 10. TDS / Tax Deduction
-        $compTds = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'TDS'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'TDS' => [
                 'name' => 'Tax Deducted at Source (TDS)',
                 'type' => 'deduction',
                 'calculation_type' => 'fixed',
                 'default_value' => '0',
                 'description' => 'Income Tax TDS Deduction',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
+            ],
+        ];
+
+        $seededComponents = [];
+        $payGroupsList = [$payGroupExec, $payGroupTech, $payGroupStaff];
+
+        foreach ($payGroupsList as $pg) {
+            foreach ($componentDefs as $code => $def) {
+                $seededComponents[$pg->id][$code] = SalaryComponent::firstOrCreate(
+                    [
+                        'tenant_id' => $tenant->id,
+                        'company_id' => $company->id,
+                        'pay_group_id' => $pg->id,
+                        'code' => $code,
+                    ],
+                    array_merge($def, ['status' => true])
+                );
+            }
+        }
 
         // Salary Structures
         // Structure A: Executive Leadership Package (CTC 15L - 36L)
@@ -665,13 +620,13 @@ class HrmsDemoSeeder extends Seeder
             ]
         );
 
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compBasic->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 50.00, 'sort_order' => 1]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compHra->id], ['calculation_type' => 'percentage_of_basic', 'value' => 50.00, 'sort_order' => 2]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compConv->id], ['calculation_type' => 'percentage_of_basic', 'value' => 10.00, 'sort_order' => 3]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compMed->id], ['calculation_type' => 'percentage_of_basic', 'value' => 5.00, 'sort_order' => 4]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compSpl->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 5]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compPf->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 6]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compPt->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['BASIC']->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 50.00, 'sort_order' => 1]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['HRA']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 50.00, 'sort_order' => 2]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['CONV']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 10.00, 'sort_order' => 3]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['MED']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 5.00, 'sort_order' => 4]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['SPL']->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 5]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['PF']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 6]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['PT']->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
 
         // Structure B: Senior Tech & Management Package (CTC 8L - 15L)
         $structTech = SalaryStructure::firstOrCreate(
@@ -684,13 +639,13 @@ class HrmsDemoSeeder extends Seeder
             ]
         );
 
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compBasic->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 50.00, 'sort_order' => 1]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compHra->id], ['calculation_type' => 'percentage_of_basic', 'value' => 50.00, 'sort_order' => 2]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compConv->id], ['calculation_type' => 'percentage_of_basic', 'value' => 10.00, 'sort_order' => 3]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compMed->id], ['calculation_type' => 'percentage_of_basic', 'value' => 5.00, 'sort_order' => 4]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compSpl->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 5]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compPf->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 6]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compPt->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['BASIC']->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 50.00, 'sort_order' => 1]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['HRA']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 50.00, 'sort_order' => 2]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['CONV']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 10.00, 'sort_order' => 3]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['MED']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 5.00, 'sort_order' => 4]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['SPL']->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 5]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['PF']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 6]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['PT']->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
 
         // Structure C: Standard Staff & Operations Package (CTC 3.6L - 8L)
         $structStaff = SalaryStructure::firstOrCreate(
@@ -703,13 +658,13 @@ class HrmsDemoSeeder extends Seeder
             ]
         );
 
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compBasic->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 40.00, 'sort_order' => 1]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compHra->id], ['calculation_type' => 'percentage_of_basic', 'value' => 40.00, 'sort_order' => 2]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compConv->id], ['calculation_type' => 'fixed', 'value' => 19200.00, 'sort_order' => 3]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compSpl->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 4]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compPf->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 5]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compEsi->id], ['calculation_type' => 'percentage_of_basic', 'value' => 0.75, 'sort_order' => 6]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compPt->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['BASIC']->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 40.00, 'sort_order' => 1]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['HRA']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 40.00, 'sort_order' => 2]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['CONV']->id], ['calculation_type' => 'fixed', 'value' => 19200.00, 'sort_order' => 3]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['SPL']->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 4]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['PF']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 5]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['ESI']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 0.75, 'sort_order' => 6]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['PT']->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
 
         // 5. Leave Structure & Leave Plans
         $leavePlanExec = LeavePlan::firstOrCreate(
@@ -1325,13 +1280,21 @@ class HrmsDemoSeeder extends Seeder
         $employees = [];
         $defaultPassword = Hash::make('password');
 
-        foreach ($employeeDefinitions as $index => $def) {
-            $roleModel = $rolesBySlug->get($def['role_slug']);
+        $usersByIndex = [];
+        $usersByRole = [];
 
-            // Create or update User
-            $user = User::updateOrCreate(
-                ['tenant_id' => $tenant->id, 'email' => $def['email']],
-                [
+        foreach ($employeeDefinitions as $index => $def) {
+            $roleModel = $rolesBySlug->get($def['role_slug'])
+                ?? Role::firstOrCreate(
+                    ['slug' => $def['role_slug']],
+                    ['name' => ucfirst(str_replace('_', ' ', $def['role_slug'])), 'level' => 50, 'is_system' => true]
+                );
+
+            // Create or update User safely without global scope or cross-tenant unique index collision
+            $user = User::withoutGlobalScopes()->where('email', $def['email'])->first();
+            if ($user) {
+                $user->update([
+                    'tenant_id' => $tenant->id,
                     'company_id' => $company->id,
                     'branch_id' => $def['branch'],
                     'department_id' => $def['dept'],
@@ -1340,8 +1303,24 @@ class HrmsDemoSeeder extends Seeder
                     'phone' => $def['mobile'],
                     'password' => $defaultPassword,
                     'role' => $def['role_slug'],
-                ]
-            );
+                ]);
+            } else {
+                $user = User::create([
+                    'tenant_id' => $tenant->id,
+                    'company_id' => $company->id,
+                    'branch_id' => $def['branch'],
+                    'department_id' => $def['dept'],
+                    'role_id' => $roleModel?->id,
+                    'name' => $def['first'] . ' ' . $def['last'],
+                    'email' => $def['email'],
+                    'phone' => $def['mobile'],
+                    'password' => $defaultPassword,
+                    'role' => $def['role_slug'],
+                ]);
+            }
+
+            $usersByIndex[$index] = $user;
+            $usersByRole[$def['role_slug']] = $user;
 
             // Assign UserRole mapping
             if ($roleModel) {
@@ -1578,12 +1557,12 @@ class HrmsDemoSeeder extends Seeder
         }
 
         // Seed HR Uploaded & Issued Documents for employees (Official letters, NDAs, Policies, Appraisals)
-        $superAdminUser = $employees[0]->user ?? User::withoutGlobalScopes()->where('tenant_id', $tenant->id)->first();
-        $companyAdminUser = $employees[0]->user ?? $superAdminUser;
-        $hrHeadUser = $employees[2]->user ?? $companyAdminUser;
-        $hrManagerUser = $employees[9]->user ?? $hrHeadUser;
-        $salesManagerUser = $employees[5]->user ?? $companyAdminUser;
-        $techLeadUser = $employees[13]->user ?? $companyAdminUser;
+        $superAdminUser = $usersByIndex[0] ?? $employees[0]->user ?? User::withoutGlobalScopes()->where('tenant_id', $tenant->id)->first();
+        $companyAdminUser = $usersByIndex[0] ?? $superAdminUser;
+        $hrHeadUser = $usersByIndex[2] ?? $employees[2]->user ?? $companyAdminUser;
+        $hrManagerUser = $usersByIndex[9] ?? $employees[9]->user ?? $hrHeadUser;
+        $salesManagerUser = $usersByIndex[5] ?? $employees[5]->user ?? $companyAdminUser;
+        $techLeadUser = $usersByIndex[13] ?? $employees[13]->user ?? $companyAdminUser;
         $hrManagerUserId = $hrManagerUser?->id ?? $companyAdminUser->id;
 
         $users = [
@@ -1900,7 +1879,7 @@ class HrmsDemoSeeder extends Seeder
             }
         }
 
-        foreach (array_chunk($rosterRecords, 500) as $chunk) {
+        foreach (array_chunk($rosterRecords, 100) as $chunk) {
             DB::table('shift_rosters')->insert($chunk);
         }
 
@@ -2108,8 +2087,9 @@ class HrmsDemoSeeder extends Seeder
                     $totalWorkHours = 10.95;
                 }
 
-                // Live dynamic scenarios for TODAY (2026-09-24 afternoon)
+                // Live dynamic scenarios for TODAY
                 if ($isToday) {
+                    $isRealToday = ($dateStr === Carbon::now()->format('Y-m-d'));
                     if ($status === 'half_day') {
                         // Half day shift is completed
                         $checkInTime = '08:50:00';
@@ -2117,23 +2097,23 @@ class HrmsDemoSeeder extends Seeder
                         $totalWorkHours = 4.33;
                         $breakDuration = 0;
                     } elseif ($status === 'late') {
-                        // Late arrival today, currently working
+                        // Late arrival today, currently working if real today, else completed
                         $checkInTime = '09:42:00';
-                        $checkOutTime = null;
+                        $checkOutTime = $isRealToday ? null : '18:15:00';
                         $totalWorkHours = 6.97;
                     } elseif ($status === 'wfh') {
-                        // WFH today, currently working
+                        // WFH today, currently working if real today, else completed
                         $checkInTime = '08:55:00';
-                        $checkOutTime = null;
+                        $checkOutTime = $isRealToday ? null : '18:10:00';
                         $totalWorkHours = 7.75;
                     } else {
-                        // Regular present today, currently working
+                        // Regular present today, currently working if real today, else completed
                         $checkInTime = '08:50:00';
-                        $checkOutTime = null;
+                        $checkOutTime = $isRealToday ? null : '18:12:00';
                         $totalWorkHours = 7.83;
 
                         // Deepak Joshi is currently on active lunch break today
-                        if ($emp->id === $employees[8]->id) {
+                        if ($emp->id === $employees[8]->id && $isRealToday) {
                             $hasActiveBreakToday = true;
                         }
                     }
@@ -2266,10 +2246,10 @@ class HrmsDemoSeeder extends Seeder
             }
         }
 
-        foreach (array_chunk($breaksBatch, 500) as $chunk) {
+        foreach (array_chunk($breaksBatch, 100) as $chunk) {
             DB::table('attendance_breaks')->insert($chunk);
         }
-        foreach (array_chunk($locationLogsBatch, 500) as $chunk) {
+        foreach (array_chunk($locationLogsBatch, 100) as $chunk) {
             DB::table('attendance_location_logs')->insert($chunk);
         }
 
@@ -3111,14 +3091,19 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         // Employee Adhoc Component (Bonus for Q2 sprint delivery)
-        EmployeeAdhocComponent::create([
-            'employee_id' => $employees[14]->id,
-            'salary_component_id' => $compBonus->id,
-            'amount' => 25000.00,
-            'payroll_month' => '2026-08',
-            'status' => 'processed',
-            'remarks' => 'Q2 Outstanding Sprint Delivery & Zero-Defect Release Award',
-        ]);
+        $compBonus = $seededComponents[$payGroupTech->id]['PERF_BONUS']
+            ?? SalaryComponent::where('company_id', $company->id)->where('code', 'PERF_BONUS')->first();
+
+        if ($compBonus) {
+            EmployeeAdhocComponent::create([
+                'employee_id' => $employees[14]->id,
+                'salary_component_id' => $compBonus->id,
+                'amount' => 25000.00,
+                'payroll_month' => '2026-08',
+                'status' => 'processed',
+                'remarks' => 'Q2 Outstanding Sprint Delivery & Zero-Defect Release Award',
+            ]);
+        }
 
         // 24. Employee Lifecycle: Probation Evaluations & Exit / FnF
         EmployeeProbationEvaluation::create([
@@ -3154,14 +3139,11 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $clearanceChecklist = [
-            ['department' => 'it', 'item_name' => 'Hardware Asset Recovery (Laptop, Docks, Keys)', 'status' => 'pending'],
-            ['department' => 'it', 'item_name' => 'Email, ERP & Jira System Logins Revocation', 'status' => 'pending'],
-            ['department' => 'admin', 'item_name' => 'Company Physical ID Badge & Plant Entry Pass Handover', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
-            ['department' => 'admin', 'item_name' => 'Plant Locker & Tool Storage Key Handover', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
-            ['department' => 'finance', 'item_name' => 'Verify Open Cash Advances & Expense Claims Reconciliation', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
-            ['department' => 'finance', 'item_name' => 'Notice Period Shortfall / Gratuity Verification', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
-            ['department' => 'hr', 'item_name' => 'Exit Interview & Knowledge Transfer Feedback Completed', 'status' => 'cleared', 'cleared_by' => $hrManagerUser->id, 'cleared_at' => now()],
-            ['department' => 'manager', 'item_name' => 'Production SOPs, Blueprints & Tooling Handover Sign-off', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
+            ['department' => 'it_assets', 'item_name' => 'System & Email Access Deactivation', 'status' => 'pending'],
+            ['department' => 'facilities_admin', 'item_name' => 'Building Access Badge & Office Keys Handover', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
+            ['department' => 'finance_payroll', 'item_name' => 'Expense Claims & Financial Dues Clearance', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
+            ['department' => 'hr_operations', 'item_name' => 'Exit Formalities & Benefits De-enrollment', 'status' => 'cleared', 'cleared_by' => $hrManagerUser->id, 'cleared_at' => now()],
+            ['department' => 'reporting_manager', 'item_name' => 'Knowledge Transfer & Project Handover', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
         ];
 
         foreach ($clearanceChecklist as $item) {
@@ -3740,7 +3722,7 @@ class HrmsDemoSeeder extends Seeder
                 'updated_at' => $now,
             ];
         }
-        foreach (array_chunk($sopAssignments, 500) as $chunk) {
+        foreach (array_chunk($sopAssignments, 100) as $chunk) {
             DB::table('sop_assignments')->insert($chunk);
         }
 
@@ -3962,68 +3944,45 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         // 30. 360° Multi-Rater Feedback Reviews & Real Scores
-        $feedbackCycle = Feedback360Cycle::create([
-            'tenant_id'                   => $tenant->id,
-            'company_id'                  => $company->id,
-            'name'                        => 'Q3-Q4 360° Leadership & Peer Performance Review 2026',
-            'code'                        => '360-REV-2026-H2',
-            'description'                 => 'Comprehensive multi-rater appraisal evaluating core technical excellence, cross-functional collaboration, ownership, and client empathy.',
-            'start_date'                  => Carbon::parse('2026-10-01'),
-            'end_date'                    => Carbon::parse('2026-12-31'),
-            'nomination_deadline'         => Carbon::parse('2026-10-25'),
-            'submission_deadline'         => Carbon::parse('2026-11-30'),
-            'status'                      => 'in_progress',
-            'is_peer_anonymous'           => true,
-            'is_direct_report_anonymous'  => true,
-            'min_peer_nominations'        => 2,
-            'max_peer_nominations'        => 5,
-            'allow_self_nomination'       => true,
-            'require_manager_approval'    => true,
-            'created_by'                  => $users['company_admin']->id,
-        ]);
-
-        // Competencies
+        // Seed Competencies without obsolete columns (cycle_id, code, category, weightage)
         $compTech = Feedback360Competency::create([
             'tenant_id'   => $tenant->id,
             'company_id'  => $company->id,
-            'cycle_id'    => $feedbackCycle->id,
-            'name'        => 'SaaS Architecture & Technical Excellence',
-            'code'        => 'COMP-TECH',
-            'category'    => 'Technical Excellence',
+            'name'        => 'Technical Architecture & Code Quality',
             'description' => 'Clean code standards, multi-tenant safety, performance optimization, and architectural reliability.',
-            'weightage'   => 100.00,
             'is_active'   => true,
         ]);
 
         $compTeam = Feedback360Competency::create([
             'tenant_id'   => $tenant->id,
             'company_id'  => $company->id,
-            'cycle_id'    => $feedbackCycle->id,
             'name'        => 'Team Collaboration & Mentorship',
-            'code'        => 'COMP-TEAM',
-            'category'    => 'Interpersonal',
             'description' => 'Active knowledge sharing, constructive PR code reviews, empathy, and supporting junior teammates.',
-            'weightage'   => 100.00,
             'is_active'   => true,
         ]);
 
         $compOwner = Feedback360Competency::create([
             'tenant_id'   => $tenant->id,
             'company_id'  => $company->id,
-            'cycle_id'    => $feedbackCycle->id,
             'name'        => 'Ownership & Delivery Discipline',
-            'code'        => 'COMP-OWN',
-            'category'    => 'Operational Excellence',
             'description' => 'Proactive problem resolution, taking accountability for releases, and adhering to sprint commitments.',
-            'weightage'   => 100.00,
             'is_active'   => true,
         ]);
 
-        // Questions
+        $compComm = Feedback360Competency::create([
+            'tenant_id'   => $tenant->id,
+            'company_id'  => $company->id,
+            'name'        => 'Strategic Communication & Alignment',
+            'description' => 'Clear cross-functional stakeholder communication, transparency on blockers, and aligning with business goals.',
+            'is_active'   => true,
+        ]);
+
+        $competencyIds = [$compTech->id, $compTeam->id, $compOwner->id, $compComm->id];
+
+        // Seed Questions linked to competencies (without obsolete cycle_id column)
         $qTech1 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
             'competency_id'        => $compTech->id,
-            'cycle_id'             => $feedbackCycle->id,
             'question_text'        => 'How effectively does this employee write scalable, clean, and well-tested backend code?',
             'question_type'        => 'rating_scale',
             'target_reviewer_type' => 'all',
@@ -4034,7 +3993,6 @@ class HrmsDemoSeeder extends Seeder
         $qTech2 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
             'competency_id'        => $compTech->id,
-            'cycle_id'             => $feedbackCycle->id,
             'question_text'        => 'Does the employee follow multi-tenant data isolation and security best practices?',
             'question_type'        => 'rating_scale',
             'target_reviewer_type' => 'all',
@@ -4045,7 +4003,6 @@ class HrmsDemoSeeder extends Seeder
         $qTeam1 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
             'competency_id'        => $compTeam->id,
-            'cycle_id'             => $feedbackCycle->id,
             'question_text'        => 'How constructively does this person conduct peer code reviews and offer helpful guidance?',
             'question_type'        => 'rating_scale',
             'target_reviewer_type' => 'all',
@@ -4056,7 +4013,6 @@ class HrmsDemoSeeder extends Seeder
         $qOwner1 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
             'competency_id'        => $compOwner->id,
-            'cycle_id'             => $feedbackCycle->id,
             'question_text'        => 'Takes complete ownership of assigned sub-modules and proactively communicates blockers.',
             'question_type'        => 'rating_scale',
             'target_reviewer_type' => 'all',
@@ -4064,111 +4020,236 @@ class HrmsDemoSeeder extends Seeder
             'sort_order'           => 4,
         ]);
 
-        $qOpen1 = Feedback360Question::create([
+        $qComm1 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
-            'competency_id'        => null,
-            'cycle_id'             => $feedbackCycle->id,
-            'question_text'        => 'What is this individual\'s greatest strength and standout contribution to the team?',
-            'description'          => 'Highlight key achievements, qualities, and positive behaviors.',
-            'question_type'        => 'text',
+            'competency_id'        => $compComm->id,
+            'question_text'        => 'Communicates complex technical concepts with clarity across cross-functional teams.',
+            'question_type'        => 'rating_scale',
             'target_reviewer_type' => 'all',
-            'is_required'          => false,
+            'is_required'          => true,
             'sort_order'           => 5,
         ]);
 
-        $qOpen2 = Feedback360Question::create([
+        $qOpen1 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
-            'competency_id'        => null,
-            'cycle_id'             => $feedbackCycle->id,
-            'question_text'        => 'What are 1-2 actionable growth areas where this person can level up?',
-            'description'          => 'Provide constructive, forward-looking advice for technical or leadership growth.',
+            'competency_id'        => $compTeam->id,
+            'question_text'        => 'What is this individual\'s greatest strength and standout contribution to the team?',
+            'description'          => 'Highlight key achievements, qualities, and positive behaviors.',
             'question_type'        => 'text',
             'target_reviewer_type' => 'all',
             'is_required'          => false,
             'sort_order'           => 6,
         ]);
 
-        // Target Participant: Rahul Sharma (Software Engineer)
-        $targetEmployee = $employees[14] ?? $employees[0];
-        $managerEmployee = $employees[13] ?? $employees[1];
-        $peerEmployee1 = $employees[15] ?? $employees[2];
-        $peerEmployee2 = $employees[10] ?? $employees[3];
-
-        $participant = Feedback360Participant::create([
+        $qOpen2 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
-            'cycle_id'             => $feedbackCycle->id,
-            'employee_id'          => $targetEmployee->id,
-            'manager_id'           => $managerEmployee->id,
-            'status'               => 'in_progress',
-            'self_score'           => 4.5,
-            'manager_score'        => 4.6,
-            'peer_score'           => 4.4,
-            'direct_report_score'  => null,
-            'overall_score'        => 4.5,
-            'manager_summary'      => 'Rahul has shown stellar progress in backend API architecture and high sprint velocity.',
-            'development_plan'     => 'Focus on distributed cache invalidation strategies and end-to-end integration test coverage.',
+            'competency_id'        => $compComm->id,
+            'question_text'        => 'What are 1-2 actionable growth areas where this person can level up?',
+            'description'          => 'Provide constructive, forward-looking advice for technical or leadership growth.',
+            'question_type'        => 'text',
+            'target_reviewer_type' => 'all',
+            'is_required'          => false,
+            'sort_order'           => 7,
         ]);
 
-        // Reviewer Nominations & Completed Responses
-        // 1. Self Review
-        $nomSelf = Feedback360Nomination::create([
-            'tenant_id'      => $tenant->id,
-            'cycle_id'       => $feedbackCycle->id,
-            'participant_id' => $participant->id,
-            'employee_id'    => $targetEmployee->id,
-            'reviewer_id'    => $targetEmployee->id,
-            'reviewer_type'  => 'self',
-            'status'         => 'completed',
-            'submitted_at'   => Carbon::now()->subDays(5),
+        // Feedback Cycle 1: Active In Progress 360 Review
+        $feedbackCycle = Feedback360Cycle::create([
+            'tenant_id'                   => $tenant->id,
+            'company_id'                  => $company->id,
+            'name'                        => 'Q3-Q4 360° Leadership & Peer Performance Review 2026',
+            'code'                        => '360-REV-2026-H2',
+            'description'                 => 'Comprehensive multi-rater appraisal evaluating core technical excellence, cross-functional collaboration, ownership, and client empathy.',
+            'start_date'                  => Carbon::now()->subDays(20),
+            'end_date'                    => Carbon::now()->addDays(40),
+            'nomination_deadline'         => Carbon::now()->subDays(5),
+            'submission_deadline'         => Carbon::now()->addDays(25),
+            'status'                      => 'in_progress',
+            'is_peer_anonymous'           => true,
+            'is_direct_report_anonymous'  => true,
+            'min_peer_nominations'        => 2,
+            'max_peer_nominations'        => 5,
+            'allow_self_nomination'       => true,
+            'require_manager_approval'    => true,
+            'competency_ids'              => $competencyIds,
+            'created_by'                  => $users['company_admin']->id ?? null,
         ]);
 
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech2->id, 'rating_value' => 5.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTeam1->id, 'rating_value' => 4.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOpen1->id, 'text_response' => 'Successfully refactored HRMS repository layer and improved database query execution times by 40%.']);
+        // Safely resolve participants with zero hardcoded dependency
+        $allTenantEmployees = Employee::where('tenant_id', $tenant->id)->orderBy('id')->get();
 
-        // 2. Manager Review
-        $nomManager = Feedback360Nomination::create([
-            'tenant_id'      => $tenant->id,
-            'cycle_id'       => $feedbackCycle->id,
-            'participant_id' => $participant->id,
-            'employee_id'    => $targetEmployee->id,
-            'reviewer_id'    => $managerEmployee->id,
-            'reviewer_type'  => 'manager',
-            'status'         => 'completed',
-            'submitted_at'   => Carbon::now()->subDays(2),
-        ]);
+        $targetEmployee = Employee::where('tenant_id', $tenant->id)
+            ->where(fn($q) => $q->where('office_email', 'rahul@warrg.com')->orWhere('personal_email', 'rahul@warrg.com'))
+            ->first() ?? $allTenantEmployees->get(14) ?? $allTenantEmployees->first();
 
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech1->id, 'rating_value' => 5.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech2->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTeam1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen1->id, 'text_response' => 'Rahul exhibits exceptional technical grit, consistently delivering zero-defect pull requests.']);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen2->id, 'text_response' => 'Encouraged to take on lead architecture roles in upcoming cross-module services.']);
+        $managerEmployee = Employee::where('tenant_id', $tenant->id)
+            ->where(fn($q) => $q->where('office_email', 'priya@warrg.com')->orWhere('personal_email', 'priya@warrg.com'))
+            ->first() ?? $allTenantEmployees->get(13) ?? $allTenantEmployees->get(1) ?? $targetEmployee;
 
-        // 3. Peer Review 1
-        $nomPeer1 = Feedback360Nomination::create([
-            'tenant_id'      => $tenant->id,
-            'cycle_id'       => $feedbackCycle->id,
-            'participant_id' => $participant->id,
-            'employee_id'    => $targetEmployee->id,
-            'reviewer_id'    => $peerEmployee1->id,
-            'reviewer_type'  => 'peer',
-            'status'         => 'completed',
-            'submitted_at'   => Carbon::now()->subDay(),
-        ]);
+        $peerEmployee1 = Employee::where('tenant_id', $tenant->id)
+            ->where(fn($q) => $q->where('office_email', 'accountant@warrg.com')->orWhere('office_email', 'amit@warrg.com'))
+            ->first() ?? $allTenantEmployees->get(10) ?? $allTenantEmployees->get(2) ?? $targetEmployee;
 
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech2->id, 'rating_value' => 4.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTeam1->id, 'rating_value' => 5.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOpen1->id, 'text_response' => 'Always approachable, provides thorough and respectful code review feedback.']);
+        $peerEmployee2 = Employee::where('tenant_id', $tenant->id)
+            ->where(fn($q) => $q->where('office_email', 'hr.manager@warrg.com')->orWhere('office_email', 'sneha@warrg.com'))
+            ->first() ?? $allTenantEmployees->get(9) ?? $allTenantEmployees->get(3) ?? $targetEmployee;
 
-        $participant->recalculateScores();
-        });
+        $directReportEmployee = Employee::where('tenant_id', $tenant->id)
+            ->where(fn($q) => $q->where('office_email', 'readonly@warrg.com')->orWhere('office_email', 'karan@warrg.com'))
+            ->first() ?? $allTenantEmployees->get(12) ?? $allTenantEmployees->get(4) ?? $targetEmployee;
 
-        Schema::enableForeignKeyConstraints();
+        // Ensure user accounts can access 360 reviews immediately when logged in
+        $adminUser = User::where('tenant_id', $tenant->id)->where('email', 'admin@example.com')->first();
+        if ($adminUser && $targetEmployee && empty($targetEmployee->user_id)) {
+            $targetEmployee->update(['user_id' => $adminUser->id]);
+        }
+
+        // Establish manager-subordinate relationships if needed
+        if ($targetEmployee && $managerEmployee && $targetEmployee->id !== $managerEmployee->id) {
+            $targetEmployee->update(['reporting_manager_id' => $managerEmployee->id]);
+        }
+        if ($directReportEmployee && $targetEmployee && $directReportEmployee->id !== $targetEmployee->id) {
+            $directReportEmployee->update(['reporting_manager_id' => $targetEmployee->id]);
+        }
+
+        if ($targetEmployee && $managerEmployee) {
+            $participant = Feedback360Participant::create([
+                'tenant_id'            => $tenant->id,
+                'cycle_id'             => $feedbackCycle->id,
+                'employee_id'          => $targetEmployee->id,
+                'manager_id'           => $managerEmployee->id,
+                'status'               => 'in_progress',
+                'manager_summary'      => 'Rahul has shown stellar progress in backend API architecture, clean system abstractions, and high sprint velocity.',
+                'development_plan'     => 'Focus on distributed cache invalidation strategies, cross-team architecture alignment, and end-to-end integration test coverage.',
+            ]);
+
+            // 1. Self Review (Completed)
+            $nomSelf = Feedback360Nomination::create([
+                'tenant_id'      => $tenant->id,
+                'cycle_id'       => $feedbackCycle->id,
+                'participant_id' => $participant->id,
+                'employee_id'    => $targetEmployee->id,
+                'reviewer_id'    => $targetEmployee->id,
+                'reviewer_type'  => 'self',
+                'status'         => 'completed',
+                'submitted_at'   => Carbon::now()->subDays(5),
+            ]);
+
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech1->id, 'competency_id' => $compTech->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech2->id, 'competency_id' => $compTech->id, 'rating_value' => 5.0]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTeam1->id, 'competency_id' => $compTeam->id, 'rating_value' => 4.0]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOwner1->id, 'competency_id' => $compOwner->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qComm1->id, 'competency_id' => $compComm->id, 'rating_value' => 4.0]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOpen1->id, 'competency_id' => $compTeam->id, 'text_response' => 'Successfully refactored HRMS repository layer and improved database query execution times by 40%.']);
+
+            // 2. Manager Review (Completed)
+            $nomManager = Feedback360Nomination::create([
+                'tenant_id'      => $tenant->id,
+                'cycle_id'       => $feedbackCycle->id,
+                'participant_id' => $participant->id,
+                'employee_id'    => $targetEmployee->id,
+                'reviewer_id'    => $managerEmployee->id,
+                'reviewer_type'  => 'manager',
+                'status'         => 'completed',
+                'submitted_at'   => Carbon::now()->subDays(2),
+            ]);
+
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech1->id, 'competency_id' => $compTech->id, 'rating_value' => 5.0]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech2->id, 'competency_id' => $compTech->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTeam1->id, 'competency_id' => $compTeam->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOwner1->id, 'competency_id' => $compOwner->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qComm1->id, 'competency_id' => $compComm->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen1->id, 'competency_id' => $compTeam->id, 'text_response' => 'Rahul exhibits exceptional technical grit, consistently delivering zero-defect pull requests.']);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen2->id, 'competency_id' => $compComm->id, 'text_response' => 'Encouraged to take on lead architecture roles in upcoming cross-module services.']);
+
+            // 3. Peer Review 1 (Completed)
+            if ($peerEmployee1 && $peerEmployee1->id !== $targetEmployee->id) {
+                $nomPeer1 = Feedback360Nomination::create([
+                    'tenant_id'      => $tenant->id,
+                    'cycle_id'       => $feedbackCycle->id,
+                    'participant_id' => $participant->id,
+                    'employee_id'    => $targetEmployee->id,
+                    'reviewer_id'    => $peerEmployee1->id,
+                    'reviewer_type'  => 'peer',
+                    'status'         => 'completed',
+                    'is_anonymous'   => true,
+                    'submitted_at'   => Carbon::now()->subDay(),
+                ]);
+
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech1->id, 'competency_id' => $compTech->id, 'rating_value' => 4.5]);
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech2->id, 'competency_id' => $compTech->id, 'rating_value' => 4.0]);
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTeam1->id, 'competency_id' => $compTeam->id, 'rating_value' => 5.0]);
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOwner1->id, 'competency_id' => $compOwner->id, 'rating_value' => 4.0]);
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qComm1->id, 'competency_id' => $compComm->id, 'rating_value' => 4.5]);
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOpen1->id, 'competency_id' => $compTeam->id, 'text_response' => 'Always approachable, provides thorough and respectful code review feedback.']);
+            }
+
+            // 4. Peer Review 2 (Pending - shows actionable item under "My Reviews to Complete")
+            if ($peerEmployee2 && $peerEmployee2->id !== $targetEmployee->id) {
+                Feedback360Nomination::create([
+                    'tenant_id'      => $tenant->id,
+                    'cycle_id'       => $feedbackCycle->id,
+                    'participant_id' => $participant->id,
+                    'employee_id'    => $targetEmployee->id,
+                    'reviewer_id'    => $peerEmployee2->id,
+                    'reviewer_type'  => 'peer',
+                    'status'         => 'approved',
+                    'is_anonymous'   => true,
+                ]);
+            }
+
+            // 5. Direct Report Upward Review (Pending)
+            if ($directReportEmployee && $directReportEmployee->id !== $targetEmployee->id) {
+                Feedback360Nomination::create([
+                    'tenant_id'      => $tenant->id,
+                    'cycle_id'       => $feedbackCycle->id,
+                    'participant_id' => $participant->id,
+                    'employee_id'    => $targetEmployee->id,
+                    'reviewer_id'    => $directReportEmployee->id,
+                    'reviewer_type'  => 'direct_report',
+                    'status'         => 'approved',
+                    'is_anonymous'   => true,
+                ]);
+            }
+
+            // 6. Actionable Review assigned to Target Employee (evaluating Manager Priya)
+            $participantManager = Feedback360Participant::create([
+                'tenant_id'   => $tenant->id,
+                'cycle_id'    => $feedbackCycle->id,
+                'employee_id' => $managerEmployee->id,
+                'manager_id'  => null,
+                'status'      => 'in_progress',
+            ]);
+
+            Feedback360Nomination::create([
+                'tenant_id'      => $tenant->id,
+                'cycle_id'       => $feedbackCycle->id,
+                'participant_id' => $participantManager->id,
+                'employee_id'    => $managerEmployee->id,
+                'reviewer_id'    => $targetEmployee->id,
+                'reviewer_type'  => 'direct_report',
+                'status'         => 'approved',
+                'is_anonymous'   => true,
+            ]);
+
+            // 7. Pending Peer Nomination (shows under "Nomination Approvals" tab)
+            Feedback360Nomination::create([
+                'tenant_id'         => $tenant->id,
+                'cycle_id'          => $feedbackCycle->id,
+                'participant_id'    => $participant->id,
+                'employee_id'       => $targetEmployee->id,
+                'reviewer_id'       => $directReportEmployee->id,
+                'reviewer_type'     => 'peer',
+                'status'            => 'pending_approval',
+                'nominated_by'      => $targetEmployee->id,
+                'nomination_reason' => 'Collaborated closely on frontend integration.',
+            ]);
+
+            $participant->recalculateScores();
+        }
+            });
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
 
         $this->command?->info('HrmsDemoSeeder successfully completed! All 13 roles, complete employee forms, attendance history, salary structures, leave plans, fixed assets, recruitment, helpdesk, PIP, broadcasts, KRA/KPI scorecards, 360° Multi-Rater Feedback, exit clearances, SOP management, travel expenses, and Goals & OKRs are seeded with real-world data.');
     }

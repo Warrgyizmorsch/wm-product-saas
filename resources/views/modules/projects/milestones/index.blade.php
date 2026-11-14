@@ -165,11 +165,14 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        <x-ui.pagination
-            :currentPage="$milestones->currentPage()"
-            :totalPages="$milestones->lastPage()"
-            :totalResults="$milestones->total()"
-            :perPage="$milestones->perPage()" />
+        <div class="mt-3">
+            <x-ui.pagination
+                :paginator="$milestones"
+                :currentPage="$milestones->currentPage()"
+                :totalPages="$milestones->lastPage()"
+                :totalResults="$milestones->total()"
+                :perPage="$milestones->perPage()" />
+        </div>
     </div>
 
     @include('modules.projects.milestones._modal')

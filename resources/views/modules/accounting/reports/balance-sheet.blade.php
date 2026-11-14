@@ -9,6 +9,8 @@
 @endsection
 
 @section('content')
+    @include('modules.accounting.reports.partials.opening-difference-alert')
+
     <x-ui.card class="mb-4">
         <x-ui.filter-toolbar :resetUrl="route('accounting.reports.balance-sheet')" searchLabel="View">
             <x-ui.filter-field label="As of Accounting Period" col="col-md-6">
@@ -39,7 +41,9 @@
             $liabilityGroups = [
                 [
                     'label' => 'Capital Account',
-                    'total' => $totals['equity'],
+                    // $totals['equity'] already includes the period's profit, which
+                    // has its own row above; show only the capital accounts here.
+                    'total' => $totals['equity'] - $netIncome,
                     'rows' => $sections['equity']->map($mapRow)->all(),
                 ],
             ];

@@ -59,6 +59,11 @@ class MaterialRequirement extends BaseModel
         return (float) $this->items->sum('dispatched_qty');
     }
 
+    public function getTotalDeliveredQtyAttribute(): float
+    {
+        return (float) $this->items->sum('delivered_qty');
+    }
+
     public function getTotalPendingQtyAttribute(): float
     {
         return max(0.0, $this->total_ordered_qty - $this->total_dispatched_qty - $this->total_reserved_qty);

@@ -1,6 +1,6 @@
 # WM Product SaaS ERP
 
-Laravel 12 modular monolith starter for a multi-tenant SaaS ERP. The foundation follows the structure in `skills.md`: tenant-first request handling, row-based tenant isolation, domain modules, service/repository layers, and a Duralux Blade admin shell.
+Laravel 12 modular monolith starter for a multi-tenant SaaS ERP. The foundation follows the structure in `prompt.md`: tenant-first request handling, row-based tenant isolation, domain modules, service/repository layers, and a Duralux Blade admin shell.
 
 ## Architecture
 

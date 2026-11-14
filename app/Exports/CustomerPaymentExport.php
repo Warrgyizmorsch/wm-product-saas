@@ -20,6 +20,14 @@ class CustomerPaymentExport implements FromCollection, WithHeadings, WithMapping
         $query = CustomerPayment::where('tenant_id', $this->tenantId)
             ->with(['customer', 'allocations.invoice']);
 
+        $currentUser = auth()->user();
+        if ($currentUser && !app(\App\Services\Access\AccessService::class)->allows($currentUser, 'sales.payments.view', ['tenant_id' => $this->tenantId])) {
+            $query->where(function ($q) use ($currentUser) {
+                $q->whereHas('customer.crmAccount', fn($caq) => $caq->where('owner_id', $currentUser->id))
+                  ->orWhereHas('allocations.salesOrder', fn($soq) => $soq->where('sales_person_id', $currentUser->id));
+            });
+        }
+
         // 1. Status Filter
         if (!empty($this->filters['status']) && $this->filters['status'] !== 'all') {
             $query->where('status', $this->filters['status']);

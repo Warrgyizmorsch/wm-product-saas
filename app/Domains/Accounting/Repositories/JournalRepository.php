@@ -140,17 +140,23 @@ class JournalRepository implements JournalRepositoryInterface
      * so the count-based sequence and the unique (tenant_id, journal_number)
      * constraint stay consistent under concurrent posting.
      */
-    public function nextJournalNumber(int $tenantId, string $prefix = 'JNL'): string
+    public function nextJournalNumber(int $tenantId, string $prefix = 'JNL', ?\DateTimeInterface $journalDate = null): string
     {
-        $yearMonth = now()->format('Ym');
+        // Numbered by the month the entry belongs to, so a 1 April opening
+        // balance reads JNL-202604-… whenever it is typed in.
+        $yearMonth = ($journalDate ?? now())->format('Ym');
 
-        $count = Journal::withoutGlobalScopes()
+        // Highest sequence rather than a count, so a gap (e.g. a deleted
+        // draft) can never hand out a number that is already taken.
+        $last = Journal::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('journal_number', 'like', "{$prefix}-{$yearMonth}-%")
             ->lockForUpdate()
-            ->count();
+            ->pluck('journal_number')
+            ->map(fn ($number) => (int) substr((string) $number, strrpos((string) $number, '-') + 1))
+            ->max() ?? 0;
 
-        $sequence = str_pad((string) ($count + 1), 5, '0', STR_PAD_LEFT);
+        $sequence = str_pad((string) ($last + 1), 5, '0', STR_PAD_LEFT);
 
         return "{$prefix}-{$yearMonth}-{$sequence}";
     }
@@ -198,11 +204,43 @@ class JournalRepository implements JournalRepositoryInterface
             ->get();
     }
 
-    public function ledgerEntries(int $chartOfAccountId, int $periodId): Collection
+    public function partyBalancesUpTo(int $tenantId, int $chartOfAccountId, \DateTimeInterface $asOfDate): Collection
+    {
+        return JournalEntry::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('chart_of_account_id', $chartOfAccountId)
+            ->whereNotNull('party_id')
+            ->whereHas('journal', fn ($q) => $q->withoutGlobalScopes()
+                ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->whereDate('journal_date', '<=', $asOfDate))
+            ->groupBy('party_type', 'party_id')
+            ->selectRaw('party_type, party_id, SUM(debit) - SUM(credit) as balance')
+            ->get();
+    }
+
+    public function trialBalanceUpTo(\DateTimeInterface $asOfDate, ?int $costCenterId = null, ?int $projectId = null): Collection
     {
         return JournalEntry::query()
+            ->select('chart_of_account_id')
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->whereDate('journal_date', '<=', $asOfDate))
+            ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId))
+            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
+            ->groupBy('chart_of_account_id')
+            ->with('account')
+            ->get();
+    }
+
+    public function ledgerEntries(int $chartOfAccountId, int $periodId): Collection
+    {
+        $periodStart = \App\Domains\Accounting\Models\AccountingPeriod::query()->whereKey($periodId)->value('start_date');
+
+        return JournalEntry::query()
             ->where('chart_of_account_id', $chartOfAccountId)
-            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('accounting_period_id', $periodId))
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('accounting_period_id', $periodId)
+                // Shown as the opening balance instead (see openingBalance()).
+                ->when($periodStart, fn ($q) => $q->whereNot(fn ($o) => $this->isOpeningOn($o, \Illuminate\Support\Carbon::parse($periodStart)))))
             ->with('journal')
             ->get()
             ->sortBy(fn ($entry) => $entry->journal->journal_date)
@@ -213,7 +251,8 @@ class JournalRepository implements JournalRepositoryInterface
     {
         $totals = JournalEntry::query()
             ->where('chart_of_account_id', $chartOfAccountId)
-            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('journal_date', '<', $before))
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->where(fn ($w) => $w->where('journal_date', '<', $before)->orWhere(fn ($o) => $this->isOpeningOn($o, $before))))
             ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
             ->first();
 
@@ -228,7 +267,8 @@ class JournalRepository implements JournalRepositoryInterface
         $totals = JournalEntry::query()
             ->where('party_type', $partyType)
             ->where('party_id', $partyId)
-            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('journal_date', '<', $before))
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->where(fn ($w) => $w->where('journal_date', '<', $before)->orWhere(fn ($o) => $this->isOpeningOn($o, $before))))
             ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
             ->first();
 
@@ -245,7 +285,8 @@ class JournalRepository implements JournalRepositoryInterface
             ->where('party_id', $partyId)
             ->whereHas('journal', fn ($q) => $q
                 ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
-                ->whereBetween('journal_date', [$from, $to]))
+                ->whereBetween('journal_date', [$from, $to])
+                ->whereNot(fn ($o) => $this->isOpeningOn($o, $from)))
             ->with('journal', 'account')
             ->get()
             ->sortBy(fn ($entry) => $entry->journal->journal_date)
@@ -289,7 +330,8 @@ class JournalRepository implements JournalRepositoryInterface
             ->where('chart_of_account_id', $chartOfAccountId)
             ->whereHas('journal', fn ($q) => $q
                 ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
-                ->whereBetween('journal_date', [$from, $to]))
+                ->whereBetween('journal_date', [$from, $to])
+                ->whereNot(fn ($o) => $this->isOpeningOn($o, $from)))
             ->with(['journal.voucherDetail', 'account'])
             ->get()
             ->sortBy(fn ($entry) => $entry->journal->journal_date)
@@ -311,5 +353,19 @@ class JournalRepository implements JournalRepositoryInterface
             ->groupBy('journal_entries.chart_of_account_id', 'journals.journal_date')
             ->with('account')
             ->get();
+    }
+
+    /**
+     * Opening-balance journals are dated on the books' first day. Statements
+     * starting that day must show them as the opening, not as a movement.
+     */
+    private function isOpeningOn(\Illuminate\Database\Eloquent\Builder $journal, \DateTimeInterface $date): \Illuminate\Database\Eloquent\Builder
+    {
+        // whereNotNull keeps this a plain true/false: under whereNot(), a NULL
+        // reference_type would make the test NULL and silently drop an
+        // ordinary journal dated on the statement's first day.
+        return $journal->whereDate('journal_date', \Illuminate\Support\Carbon::parse($date)->toDateString())
+            ->whereNotNull('reference_type')
+            ->where('reference_type', 'like', '%_opening_balance');
     }
 }

@@ -15,42 +15,66 @@ class GoodsReceiptNotePolicy
     public function viewAny(User $user): bool
     {
         return $this->access->allows($user, 'grns.view', [
-            'tenant_id' => $user->tenant_id,
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
         ]);
     }
 
     public function view(User $user, GoodsReceiptNote $grn): bool
     {
         return $this->access->allows($user, 'grns.view', [
-            'tenant_id' => $grn->tenant_id,
+            'tenant_id'     => $grn->tenant_id,
+            'owner_id'      => $grn->created_by ?? $user->id,
+            'branch_id'     => $grn->branch_id ?? $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $grn->company_id ?? $user->company_id,
         ]);
     }
 
     public function create(User $user): bool
     {
         return $this->access->allows($user, 'grns.create', [
-            'tenant_id' => $user->tenant_id,
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
         ]);
     }
 
     public function update(User $user, GoodsReceiptNote $grn): bool
     {
         return $this->access->allows($user, 'grns.update', [
-            'tenant_id' => $grn->tenant_id,
+            'tenant_id'     => $grn->tenant_id,
+            'owner_id'      => $grn->created_by ?? $user->id,
+            'branch_id'     => $grn->branch_id ?? $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $grn->company_id ?? $user->company_id,
         ]);
     }
 
     public function delete(User $user, GoodsReceiptNote $grn): bool
     {
         return $this->access->allows($user, 'grns.delete', [
-            'tenant_id' => $grn->tenant_id,
+            'tenant_id'     => $grn->tenant_id,
+            'owner_id'      => $grn->created_by ?? $user->id,
+            'branch_id'     => $grn->branch_id ?? $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $grn->company_id ?? $user->company_id,
         ]);
     }
 
     public function approve(User $user, GoodsReceiptNote $grn): bool
     {
         return $this->access->allows($user, 'grns.approve', [
-            'tenant_id' => $grn->tenant_id,
+            'tenant_id'     => $grn->tenant_id,
+            'owner_id'      => $grn->created_by ?? $user->id,
+            'branch_id'     => $grn->branch_id ?? $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $grn->company_id ?? $user->company_id,
         ]);
     }
 }

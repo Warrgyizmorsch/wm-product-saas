@@ -20,7 +20,7 @@ Route::prefix('crm')
     ->as('crm.')
     ->group(function (): void {
         // CRM Executive Dashboard Routes
-        Route::get('/', fn () => redirect()->route('crm.dashboard'));
+        Route::get('/', fn() => redirect()->route('crm.dashboard'));
         Route::get('dashboard', [CrmDashboardController::class, 'index'])->name('dashboard');
         Route::get('dashboard/export/{format}', [CrmDashboardController::class, 'export'])->name('dashboard.export');
 
@@ -32,6 +32,7 @@ Route::prefix('crm')
         Route::get('settings', [CrmSettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/quotation-approval-policy', [CrmSettingsController::class, 'updateQuotationApprovalPolicy'])->name('settings.update-quotation-approval-policy');
         Route::post('settings/lead-assignment', [CrmSettingsController::class, 'updateLeadAssignment'])->name('settings.update-lead-assignment');
+        Route::post('settings/field-visit-verification', [CrmSettingsController::class, 'updateFieldVisitVerification'])->name('settings.update-field-visit-verification');
         // CRM Masters Routes
         Route::prefix('masters')->as('masters.')->group(function (): void {
             Route::get('lead-statuses', [LeadStatusController::class, 'index'])->name('lead-statuses.index');
@@ -113,6 +114,17 @@ Route::prefix('crm')
             ->name('leads.callAi.analyze');
         Route::post('leads/{lead}/call-ai/confirm', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'confirmCallFollowup'])
             ->name('leads.callAi.confirm');
+
+        // My Meetings (Executive Suite for Lead & Deal Scheduled Meetings)
+        Route::get('meetings', [LeadFollowupController::class, 'meetingsIndex'])
+            ->name('meetings.index');
+        Route::match(['put', 'patch', 'post'], 'meetings/{followup}/status', [LeadFollowupController::class, 'updateMeetingStatus'])
+            ->name('meetings.status');
+        Route::match(['put', 'patch', 'post'], 'meetings/{followup}/reschedule', [LeadFollowupController::class, 'rescheduleMeeting'])
+            ->name('meetings.reschedule');
+        Route::match(['put', 'patch', 'post'], 'meetings/{followup}/assign', [LeadFollowupController::class, 'assignMeeting'])
+            ->name('meetings.assign');
+
         Route::get('activities', [LeadActivityController::class, 'index'])
             ->name('activities.index');
         Route::post('google-calendar/schedule-event', [GoogleCalendarController::class, 'scheduleEvent'])
@@ -205,6 +217,10 @@ Route::prefix('crm')
             ->name('customers.quick-create');
         Route::get('customers/{customer}', [CustomerController::class, 'show'])
             ->name('customers.show');
+        Route::get('customers/{customer}/edit', [CustomerController::class, 'edit'])
+            ->name('customers.edit');
+        Route::put('customers/{customer}', [CustomerController::class, 'update'])
+            ->name('customers.update');
         Route::patch('customers/{customer}/status', [CustomerController::class, 'updateStatus'])
             ->name('customers.updateStatus');
         Route::get('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus'])

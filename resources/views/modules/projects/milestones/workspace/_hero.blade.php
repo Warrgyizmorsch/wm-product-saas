@@ -11,9 +11,9 @@
     // hero's percentage never drifts from the "X of Y tasks completed" caption
     // next to it. $milestone->completion_percentage is only a manually-set value
     // (see the edit modal) and isn't kept in sync with actual task completion.
-    $heroTaskProgress = $totalTasks > 0
+    $heroTaskProgress = $milestoneProgress ?? ($totalTasks > 0
         ? (int) round(($completedTasks / $totalTasks) * 100)
-        : (int) ($milestone->completion_percentage ?? 0);
+        : (int) ($milestone->completion_percentage ?? 0));
 
     // This bar tracks task completion, not milestone health, so it always reads
     // as green progress regardless of health_state (health has its own metadata tile).

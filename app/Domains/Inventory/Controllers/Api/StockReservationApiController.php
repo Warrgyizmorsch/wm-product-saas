@@ -14,8 +14,8 @@ class StockReservationApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -25,6 +25,7 @@ class StockReservationApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', StockReservation::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = StockReservation::query()
@@ -77,6 +78,8 @@ class StockReservationApiController extends Controller
                 'message' => 'Stock Reservation not found',
             ], 404);
         }
+
+        $this->authorize('update', $reservation);
 
         if ($reservation->status !== 'Active') {
             return response()->json([

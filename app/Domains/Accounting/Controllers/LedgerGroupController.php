@@ -72,7 +72,7 @@ class LedgerGroupController extends Controller
             ],
             'name' => ['required', 'string', 'max:255'],
             'nature' => ['required', 'string', 'in:' . implode(',', ChartOfAccount::TYPES)],
-            'parent_id' => ['nullable', 'integer', 'exists:ledger_groups,id'],
+            'parent_id' => ['nullable', 'integer', tenant_exists('ledger_groups')],
         ]);
     }
 }

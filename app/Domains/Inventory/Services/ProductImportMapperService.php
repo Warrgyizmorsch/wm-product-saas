@@ -332,8 +332,8 @@ class ProductImportMapperService
         $dryRun = !empty($options['dry_run']);
         
         // Resolve tenant, company, and branch context
-        $resolvedCompanyId = $companyId ?? (company_id() ?? auth()->user()?->company_id ?? \App\Models\Company::where('tenant_id', $tenantId)->value('id') ?? 1);
-        $resolvedBranchId = $branchId ?? (branch_id() ?? auth()->user()?->branch_id ?? \App\Models\Branch::where('company_id', $resolvedCompanyId)->value('id') ?? null);
+        $resolvedCompanyId = $companyId ?? (company_id() ?? auth()->user()?->company_id ?? \App\Domains\HRMS\Models\Company::where('tenant_id', $tenantId)->value('id'));
+        $resolvedBranchId = $branchId ?? (branch_id() ?? auth()->user()?->branch_id ?? ($resolvedCompanyId ? \App\Domains\HRMS\Models\Branch::where('company_id', $resolvedCompanyId)->value('id') : null));
 
         $defaultWarehouseId = Warehouse::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
@@ -646,15 +646,6 @@ class ProductImportMapperService
                     }
                 }
 
-                $planningTypeRaw = $getValue($row, 'planning_type');
-                $planningType = 'stock';
-                if (!empty($planningTypeRaw)) {
-                    $cleanPlan = strtolower(trim($planningTypeRaw));
-                    if (in_array($cleanPlan, ['stock', 'manufacture', 'purchase', 'manual'], true)) {
-                        $planningType = $cleanPlan;
-                    }
-                }
-
                 $defaultProdModelRaw = $getValue($row, 'default_production_model');
                 $defaultProdModel = !empty($defaultProdModelRaw) ? trim($defaultProdModelRaw) : 'pure_manufacturing';
 
@@ -761,7 +752,6 @@ class ProductImportMapperService
                     'type' => $type,
                     'item_type' => $itemType,
                     'supplier_method' => $supplierMethod,
-                    'planning_type' => $planningType,
                     'default_production_model' => $defaultProdModel,
                     'variation_type' => $variationType,
                     'parent_id' => $parentId,

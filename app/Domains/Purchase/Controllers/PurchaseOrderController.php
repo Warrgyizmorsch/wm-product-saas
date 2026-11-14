@@ -22,7 +22,8 @@ class PurchaseOrderController extends Controller
     public function __construct(
         protected PurchaseOrderRepository $orderRepo,
         protected PurchaseOrderService $orderService
-    ) {}
+    ) {
+    }
 
     public function index(Request $request)
     {
@@ -95,7 +96,7 @@ class PurchaseOrderController extends Controller
                     ->where('product_id', $prItem->product_id)
                     ->whereHas('order', function ($q) use ($prItem) {
                         $q->where('purchase_requisition_id', $prItem->purchase_requisition_id)
-                          ->where('status', 'Approved');
+                            ->where('status', 'Approved');
                     })
                     ->sum('quantity');
 
@@ -106,21 +107,21 @@ class PurchaseOrderController extends Controller
                 }
 
                 $productId = $prItem->product_id;
-                $product   = $prItem->product;
-                $costRate  = convert_from_base((float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00))));
+                $product = $prItem->product;
+                $costRate = convert_from_base((float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00))));
 
                 if (isset($mergedItems[$productId])) {
                     $mergedItems[$productId]['quantity'] += $pendingQty;
                     $mergedItems[$productId]['requisition_item_ids'][] = $prItem->id;
                 } else {
                     $mergedItems[$productId] = [
-                        'requisition_item_id'  => $prItem->id,
+                        'requisition_item_id' => $prItem->id,
                         'requisition_item_ids' => [$prItem->id],
-                        'product_id'           => $productId,
-                        'product_name'         => $product?->name ?? 'Product #' . $productId,
-                        'quantity'             => $pendingQty,
-                        'rate'                 => $costRate,
-                        'warehouse_id'         => $prItem->warehouse_id,
+                        'product_id' => $productId,
+                        'product_name' => $product?->name ?? 'Product #' . $productId,
+                        'quantity' => $pendingQty,
+                        'rate' => $costRate,
+                        'warehouse_id' => $prItem->warehouse_id,
                     ];
                 }
             }
@@ -138,7 +139,7 @@ class PurchaseOrderController extends Controller
                     ->where('product_id', $prItem->product_id)
                     ->whereHas('order', function ($q) use ($prItem) {
                         $q->where('purchase_requisition_id', $prItem->purchase_requisition_id)
-                          ->where('status', 'Approved');
+                            ->where('status', 'Approved');
                     })
                     ->sum('quantity');
 
@@ -149,21 +150,21 @@ class PurchaseOrderController extends Controller
                 }
 
                 $productId = $prItem->product_id;
-                $product   = $prItem->product;
-                $costRate  = convert_from_base((float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00))));
+                $product = $prItem->product;
+                $costRate = convert_from_base((float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00))));
 
                 if (isset($mergedItems[$productId])) {
                     $mergedItems[$productId]['quantity'] += $pendingQty;
                     $mergedItems[$productId]['requisition_item_ids'][] = $prItem->id;
                 } else {
                     $mergedItems[$productId] = [
-                        'requisition_item_id'  => $prItem->id,
+                        'requisition_item_id' => $prItem->id,
                         'requisition_item_ids' => [$prItem->id],
-                        'product_id'           => $productId,
-                        'product_name'         => $product?->name ?? 'Product #' . $productId,
-                        'quantity'             => $pendingQty,
-                        'rate'                 => $costRate,
-                        'warehouse_id'         => $prItem->warehouse_id,
+                        'product_id' => $productId,
+                        'product_name' => $product?->name ?? 'Product #' . $productId,
+                        'quantity' => $pendingQty,
+                        'rate' => $costRate,
+                        'warehouse_id' => $prItem->warehouse_id,
                     ];
                 }
 
@@ -185,6 +186,125 @@ class PurchaseOrderController extends Controller
             ->orderBy('code')
             ->get();
 
+        // RFQ Prefill Handling
+        $selectedRfqId = $request->input('rfq_id');
+        $selectedVendorId = $request->input('vendor_id');
+        $prefilledReference = null;
+        $prefilledSupplierQuoteNo = null;
+        $prefilledNotes = null;
+
+        if ($selectedRfqId) {
+            $rfq = \App\Domains\Purchase\Models\PurchaseRfq::where('tenant_id', $tenantId)
+                ->with(['items.product', 'rfqVendors.rates'])
+                ->find($selectedRfqId);
+
+            if ($rfq) {
+                if (!$selectedRequisitionId && $rfq->purchase_requisition_id) {
+                    $selectedRequisitionId = $rfq->purchase_requisition_id;
+                }
+
+                $prefilledReference = $rfq->rfq_number;
+
+                $rfqVendor = null;
+                if ($selectedVendorId) {
+                    $rfqVendor = $rfq->rfqVendors->firstWhere('vendor_id', (int) $selectedVendorId);
+                } elseif ($rfq->rfqVendors->isNotEmpty()) {
+                    $rfqVendor = $rfq->rfqVendors->first();
+                    $selectedVendorId = $rfqVendor->vendor_id;
+                }
+
+                if ($rfqVendor) {
+                    $prefilledSupplierQuoteNo = $rfqVendor->quotation_number;
+                    $prefilledNotes = $rfqVendor->terms_conditions;
+                    if (!$prefilledExpectedDate && $rfqVendor->delivery_date) {
+                        $prefilledExpectedDate = $rfqVendor->delivery_date->format('Y-m-d');
+                    } elseif (!$prefilledExpectedDate && $rfqVendor->rates->whereNotNull('delivery_date')->first()) {
+                        $prefilledExpectedDate = \Carbon\Carbon::parse($rfqVendor->rates->whereNotNull('delivery_date')->first()->delivery_date)->format('Y-m-d');
+                    }
+                }
+
+                // If items were passed from request (e.g. checked items from matrix)
+                $requestItems = (array) $request->input('items', []);
+                if (!empty($requestItems)) {
+                    $prefilledItems = [];
+                    foreach ($requestItems as $reqItem) {
+                        $pId = (int) ($reqItem['product_id'] ?? 0);
+                        if (!$pId) continue;
+                        $product = $products->firstWhere('id', $pId);
+                        $qty = (float) ($reqItem['quantity'] ?? 1);
+                        $rate = (float) ($reqItem['rate'] ?? 0);
+                        if ($rate <= 0 && $rfqVendor) {
+                            $vRate = $rfqVendor->rates->firstWhere('product_id', $pId);
+                            if ($vRate && $vRate->rate > 0) {
+                                $rate = convert_from_base((float) $vRate->rate);
+                            }
+                        }
+                        if ($rate <= 0 && $product) {
+                            $rate = convert_from_base((float) ($product->cost_price ?: ($product->unit_cost ?: 0)));
+                        }
+
+                        $prefilledItems[] = [
+                            'product_id' => $pId,
+                            'product_name' => $product?->name ?? 'Product #' . $pId,
+                            'quantity' => $qty,
+                            'rate' => $rate,
+                            'warehouse_id' => $rfq->items->firstWhere('product_id', $pId)?->warehouse_id ?? null,
+                            'line_type' => 'stock',
+                        ];
+                    }
+                } else {
+                    $prefilledItems = [];
+                    $linkedPos = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+                        ->where('source_type', 'rfq')
+                        ->where(function ($q) use ($rfq) {
+                            $q->where('reference', $rfq->rfq_number)
+                              ->orWhere('reference', 'RFQ: ' . $rfq->rfq_number);
+                        })
+                        ->where('status', '!=', 'Cancelled')
+                        ->with('items')
+                        ->get();
+
+                    foreach ($rfq->items as $rfqItem) {
+                        $pId = $rfqItem->product_id;
+                        $alreadyOrderedQty = 0;
+                        foreach ($linkedPos as $lpo) {
+                            foreach ($lpo->items as $lpoItem) {
+                                if ($lpoItem->product_id == $pId) {
+                                    $alreadyOrderedQty += (float) $lpoItem->quantity;
+                                }
+                            }
+                        }
+
+                        $pendingQty = max(0.0, (float) $rfqItem->quantity - $alreadyOrderedQty);
+                        if ($pendingQty <= 0) {
+                            continue;
+                        }
+
+                        $product = $rfqItem->product;
+                        $rate = 0;
+                        if ($rfqVendor) {
+                            $vRate = $rfqVendor->rates->firstWhere('product_id', $pId);
+                            if ($vRate && $vRate->rate > 0) {
+                                $rate = convert_from_base((float) $vRate->rate);
+                            }
+                        }
+                        if ($rate <= 0 && $product) {
+                            $rate = convert_from_base((float) ($product->cost_price ?: ($product->unit_cost ?: 0)));
+                        }
+
+                        $prefilledItems[] = [
+                            'product_id' => $pId,
+                            'product_name' => $product?->name ?? 'Product #' . $pId,
+                            'quantity' => $pendingQty,
+                            'rate' => $rate,
+                            'warehouse_id' => $rfqItem->warehouse_id,
+                            'line_type' => 'stock',
+                        ];
+                    }
+                }
+            }
+        }
+
         return view('modules.purchase.orders.create', compact(
             'vendors',
             'products',
@@ -195,7 +315,12 @@ class PurchaseOrderController extends Controller
             'prefilledItems',
             'prefilledExpectedDate',
             'assetCategories',
-            'expenseAccounts'
+            'expenseAccounts',
+            'selectedRfqId',
+            'selectedVendorId',
+            'prefilledReference',
+            'prefilledSupplierQuoteNo',
+            'prefilledNotes'
         ));
     }
 
@@ -215,6 +340,7 @@ class PurchaseOrderController extends Controller
             'reference' => 'nullable|string',
             'supplier_quotation_number' => 'nullable|string',
             'purchase_requisition_id' => 'nullable|integer',
+            'rfq_id' => 'nullable|integer',
             'payment_terms' => 'nullable|string|max:255',
             'discount_type' => 'nullable|string',
             'tax_type' => 'nullable|string',
@@ -261,9 +387,11 @@ class PurchaseOrderController extends Controller
         // still be picked for a capital/expense line without retyping its name.
         foreach ($validated['items'] as $idx => $item) {
             $lineType = $item['line_type'] ?? 'stock';
-            if (in_array($lineType, ['asset', 'expense'], true)
+            if (
+                in_array($lineType, ['asset', 'expense'], true)
                 && empty($item['product_id'])
-                && trim((string) ($item['description'] ?? '')) === '') {
+                && trim((string) ($item['description'] ?? '')) === ''
+            ) {
                 return back()->withInput()->withErrors([
                     "items.{$idx}.description" => 'Select a product or enter a description for this line.',
                 ]);
@@ -272,12 +400,52 @@ class PurchaseOrderController extends Controller
 
         $po = $this->orderService->storeOrder($validated, $tenantId);
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.order.created', [
-            'po_no' => $po->purchase_order_number ?? $po->po_number ?? 'PO-NEW',
-            'vendor_name' => $po->vendor?->name ?? 'Vendor',
-            'amount' => format_currency((float)($po->grand_total ?? $po->total_amount ?? 0)),
-            'created_by' => auth()->user()?->name ?? 'User',
-        ], route('purchase.orders.show', $po->id), $po);
+        if ($request->filled('rfq_id')) {
+            $rfq = \App\Domains\Purchase\Models\PurchaseRfq::where('tenant_id', $tenantId)->find($request->input('rfq_id'));
+            if ($rfq) {
+                $poUpdates = ['source_type' => 'rfq'];
+                if (empty($po->reference)) {
+                    $poUpdates['reference'] = $rfq->rfq_number;
+                }
+                if (empty($po->purchase_requisition_id) && $rfq->purchase_requisition_id) {
+                    $poUpdates['purchase_requisition_id'] = $rfq->purchase_requisition_id;
+                }
+                $po->update($poUpdates);
+
+                // Check whether all RFQ items are now ordered across all linked POs
+                $rfq->load('items');
+                $linkedOrders = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+                    ->where('source_type', 'rfq')
+                    ->where(function ($q) use ($rfq) {
+                        $q->where('reference', $rfq->rfq_number)
+                          ->orWhere('reference', 'RFQ: ' . $rfq->rfq_number);
+                    })
+                    ->where('status', '!=', 'Cancelled')
+                    ->with('items')
+                    ->get();
+
+                $allFullyOrdered = $rfq->items->isNotEmpty();
+                foreach ($rfq->items as $rfqItem) {
+                    $itemOrderedQty = 0;
+                    foreach ($linkedOrders as $lo) {
+                        foreach ($lo->items as $loItem) {
+                            if ($loItem->product_id == $rfqItem->product_id) {
+                                $itemOrderedQty += (float) $loItem->quantity;
+                            }
+                        }
+                    }
+                    if ($itemOrderedQty < (float) $rfqItem->quantity) {
+                        $allFullyOrdered = false;
+                        break;
+                    }
+                }
+
+                $newRfqStatus = $allFullyOrdered ? 'Confirmed' : 'Partially Ordered';
+                $rfq->update(['status' => $newRfqStatus]);
+            }
+        }
+
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyOrderCreated($po);
 
         return redirect()->route('purchase.orders.show', $po->id)
             ->with('success', "Purchase Order {$po->po_number} created successfully.");
@@ -319,7 +487,8 @@ class PurchaseOrderController extends Controller
     public function update(Request $request, int $id)
     {
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404);
+        if (!$order)
+            abort(404);
         $this->authorize('update', $order);
 
         if ($order->status !== 'Draft') {
@@ -332,11 +501,50 @@ class PurchaseOrderController extends Controller
             'po_date' => 'nullable|date',
             'date' => 'nullable|date',
             'expected_delivery_date' => 'nullable|date',
+            'delivery_date' => 'nullable|date',
             'payment_terms' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
+            'location' => 'nullable|string',
+            'reference' => 'nullable|string|max:255',
+            'supplier_quotation_number' => 'nullable|string|max:255',
+            'purchase_requisition_id' => 'nullable|integer|exists:purchase_requisitions,id',
+            'discount_type' => 'nullable|string|in:without_discount,item_wise,order_wise',
+            'discount_amount' => 'nullable|numeric|min:0',
+            'tax_type' => 'nullable|string|in:without_tax,item_wise_tax,order_wise_tax',
+            'gst_type' => 'nullable|string|in:cgst_sgst,igst',
+            'freight_terms' => 'nullable|string|in:to_pay,to_be_billed,prepaid,customer_pickup',
+            'freight_amount' => 'nullable|numeric|min:0',
+            'items' => 'nullable|array',
+            'items.*.product_id' => 'nullable|integer|exists:products,id',
+            'items.*.description' => 'nullable|string',
+            'items.*.line_type' => 'nullable|string|in:stock,asset,expense',
+            'items.*.chart_of_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
+            'items.*.asset_category_id' => 'nullable|integer|exists:asset_categories,id',
+            'items.*.warehouse_id' => 'nullable|integer|exists:warehouses,id',
+            'items.*.quantity' => 'nullable|numeric|min:0.0001',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.rate' => 'nullable|numeric|min:0',
+            'items.*.amount' => 'nullable|numeric|min:0',
+            'items.*.discount' => 'nullable|numeric|min:0',
+            'items.*.discount_percent' => 'nullable|numeric|min:0',
+            'items.*.discount_amount' => 'nullable|numeric|min:0',
+            'items.*.tax_rate' => 'nullable|numeric|min:0',
+            'items.*.tax_percent' => 'nullable|numeric|min:0',
+            'items.*.cgst_percent' => 'nullable|numeric|min:0',
+            'items.*.sgst_percent' => 'nullable|numeric|min:0',
+            'items.*.igst_percent' => 'nullable|numeric|min:0',
+            'items.*.cgst_amount' => 'nullable|numeric|min:0',
+            'items.*.sgst_amount' => 'nullable|numeric|min:0',
+            'items.*.igst_amount' => 'nullable|numeric|min:0',
+            'items.*.tax_amount' => 'nullable|numeric|min:0',
+            'items.*.total_amount' => 'nullable|numeric|min:0',
         ]);
 
-        $this->orderRepo->update($order, $validated);
+        if (!empty($validated['items'])) {
+            $this->orderService->updateOrder($order, $validated);
+        } else {
+            $this->orderRepo->update($order, $validated);
+        }
 
         return redirect()->route('purchase.orders.show', $id)
             ->with('success', 'Purchase Order updated successfully.');
@@ -345,7 +553,8 @@ class PurchaseOrderController extends Controller
     public function confirm(int $id)
     {
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404);
+        if (!$order)
+            abort(404);
         $this->authorize('approve', $order);
 
         if ($order->status !== 'Draft') {
@@ -354,12 +563,7 @@ class PurchaseOrderController extends Controller
 
         $this->orderService->confirmOrder($order);
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.order.approved', [
-            'po_no' => $order->purchase_order_number ?? $order->po_number ?? 'PO',
-            'vendor_name' => $order->vendor?->name ?? 'Vendor',
-            'amount' => format_currency((float)($order->grand_total ?? $order->total_amount ?? 0)),
-            'approved_by' => auth()->user()?->name ?? 'Approver',
-        ], route('purchase.orders.show', $order->id), $order);
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyOrderApproved($order);
 
         return redirect()->back()->with('success', "Purchase Order {$order->purchase_order_number} has been approved successfully.");
     }
@@ -377,7 +581,8 @@ class PurchaseOrderController extends Controller
     public function cancel(Request $request, int $id)
     {
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404);
+        if (!$order)
+            abort(404);
         $this->authorize('reject', $order);
 
         if (in_array($order->status, ['Completed', 'Cancelled'])) {
@@ -393,6 +598,8 @@ class PurchaseOrderController extends Controller
             'rejection_reason' => $validated['rejection_reason'],
         ]);
 
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyOrderRejected($order, $validated['rejection_reason']);
+
         return redirect()->back()->with('success', "Purchase Order {$order->purchase_order_number} has been rejected/cancelled.");
     }
 
@@ -401,13 +608,15 @@ class PurchaseOrderController extends Controller
         $order = $this->orderRepo->findWithDetails($id);
         $this->authorize('view', $order);
         $pdf = Pdf::loadView('modules.purchase.orders.pdf', compact('order'));
-        return $pdf->download("PO_{$order->po_number}.pdf");
+        $poNum = $order->purchase_order_number ?: ($order->po_number ?: "PO-{$order->id}");
+        return $pdf->download("PO_{$poNum}.pdf");
     }
 
     public function destroy(int $id)
     {
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404);
+        if (!$order)
+            abort(404);
         $this->authorize('delete', $order);
 
         if ($order->status !== 'Draft') {
@@ -438,8 +647,8 @@ class PurchaseOrderController extends Controller
             $items[] = [
                 'product_id' => $item->product_id,
                 'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
-                'quantity' => (float)$item->quantity,
-                'estimated_cost' => (float)$item->estimated_cost,
+                'quantity' => (float) $item->quantity,
+                'estimated_cost' => (float) $item->estimated_cost,
             ];
         }
 
@@ -454,7 +663,8 @@ class PurchaseOrderController extends Controller
     public function remind(Request $request, int $id)
     {
         $order = $this->orderRepo->find($id);
-        if (!$order) abort(404);
+        if (!$order)
+            abort(404);
         $this->authorize('view', $order);
 
         if ($order->status !== 'Draft') {
@@ -464,10 +674,10 @@ class PurchaseOrderController extends Controller
         if ($order->last_reminded_at && $order->last_reminded_at->diffInSeconds(now()) < 900) {
             $secondsLeft = 900 - $order->last_reminded_at->diffInSeconds(now());
             if ($secondsLeft >= 60) {
-                $mins = (int)ceil($secondsLeft / 60);
+                $mins = (int) ceil($secondsLeft / 60);
                 $timeStr = "{$mins} minute" . ($mins > 1 ? 's' : '');
             } else {
-                $secs = max(1, (int)$secondsLeft);
+                $secs = max(1, (int) $secondsLeft);
                 $timeStr = "{$secs} second" . ($secs > 1 ? 's' : '');
             }
             return redirect()->back()->with('error', "Reminder already sent recently! Please wait {$timeStr} before sending another reminder.");

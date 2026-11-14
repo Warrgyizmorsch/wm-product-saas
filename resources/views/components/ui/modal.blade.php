@@ -9,6 +9,7 @@
     'closeText' => 'Close',
     'formAction' => null,
     'formMethod' => 'POST',
+    'formEnctype' => null,
     'showFooter' => true
 ])
 
@@ -16,7 +17,7 @@
     <div class="modal-dialog {{ $centered ? 'modal-dialog-centered' : '' }} {{ $scrollable ? 'modal-dialog-scrollable' : '' }} {{ $size ? 'modal-' . $size : '' }}">
         <div class="modal-content">
             @if($formAction)
-                <form method="{{ in_array(strtoupper($formMethod), ['GET', 'POST']) ? $formMethod : 'POST' }}" action="{{ $formAction }}" class="d-flex flex-column h-100 min-vh-0 overflow-hidden">
+                <form method="{{ in_array(strtoupper($formMethod), ['GET', 'POST']) ? $formMethod : 'POST' }}" action="{{ $formAction }}" @if($formEnctype) enctype="{{ $formEnctype }}" @endif class="d-flex flex-column h-100 min-vh-0 overflow-hidden">
                     @csrf
                     @if(!in_array(strtoupper($formMethod), ['GET', 'POST']))
                         @method($formMethod)

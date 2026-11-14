@@ -39,6 +39,8 @@ class Journal extends BaseModel
     // Reserves & Surplus. It's in the ledger (Balance Sheet, GL) but kept out
     // of P&L-style reports, or the closed year's profit would read as zero.
     public const SOURCE_YEAR_END_CLOSE = 'year_end_close';
+    // Came from external books through the integration kit (Tally etc.).
+    public const SOURCE_INTEGRATION = 'integration';
 
     // What kind of accounting document this journal represents — orthogonal to
     // `source` (which module triggered it). Null means a plain manual journal.
@@ -78,9 +80,11 @@ class Journal extends BaseModel
         'rejected_by',
         'rejected_at',
         'rejection_reason',
+        'bill_allocation_hints',
     ];
 
     protected $casts = [
+        'bill_allocation_hints' => 'array',
         'journal_date' => 'date',
         'total_debit' => 'float',
         'total_credit' => 'float',

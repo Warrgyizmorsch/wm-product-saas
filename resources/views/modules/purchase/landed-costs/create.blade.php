@@ -133,7 +133,7 @@
                                 </td>
                                 <td>
                                     <x-ui.odoo-form-ui type="select" name="expenses[0][tax_rate]" class="tax-rate-select">
-                                        <option value="0" selected>0% ({{ __('purchase.no_tax') }})</option>
+                                        <option value="0" selected>{{ __('purchase.no_tax') }}</option>
                                         <option value="5">5% GST</option>
                                         <option value="12">12% GST</option>
                                         <option value="18">18% GST</option>
@@ -279,7 +279,7 @@
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="expenses[${expenseRowIndex}][tax_rate]" class="tax-rate-select">
-                                <option value="0" selected>0% ({{ __('purchase.no_tax') }})</option>
+                                <option value="0" selected>{{ __('purchase.no_tax') }}</option>
                                 <option value="5">5% GST</option>
                                 <option value="12">12% GST</option>
                                 <option value="18">18% GST</option>

@@ -13,10 +13,22 @@ use App\Domains\CRM\Models\CrmAccount;
 use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\Sales\Models\SalesOrder;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 class CrmDeal extends BaseModel
 {
     use HasFactory, SoftDeletes, BelongsToCompany, BelongsToBranch;
+
+    protected ?string $rbacPermission = 'crm.deals.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->where(function (Builder $sub) use ($user) {
+            $sub->where('crm_deals.owner_id', $user->id)
+                ->orWhereHas('account', fn($aq) => $aq->where('owner_id', $user->id));
+        });
+    }
 
     protected $table = 'crm_deals';
 
@@ -126,10 +138,16 @@ class CrmDeal extends BaseModel
 
     public function getActualValueAttribute(): float
     {
-        $acceptedQuote = $this->quotations()->where('status', 'Accepted')->first();
-        if ($acceptedQuote) {
+        $so = $this->salesOrders()->whereNotIn('status', ['Cancelled'])->orderByDesc('id')->first();
+        if ($so && (float)$so->total_amount > 0) {
+            return (float) $so->total_amount;
+        }
+
+        $acceptedQuote = $this->quotations()->whereIn('status', ['Accepted', 'Converted', 'Won'])->orderByDesc('id')->first();
+        if ($acceptedQuote && (float)$acceptedQuote->total_amount > 0) {
             return (float) $acceptedQuote->total_amount;
         }
+
         return (float) $this->estimated_value;
     }
 

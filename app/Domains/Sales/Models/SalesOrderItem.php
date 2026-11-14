@@ -27,6 +27,11 @@ class SalesOrderItem extends Model
         'item_name',
         'description',
         'quantity',
+        'allocated_qty',
+        'dispatched_qty',
+        'invoiced_qty',
+        'cancelled_qty',
+        'status',
         'unit_price',
         'tax_rate',
         'discount',
@@ -34,13 +39,17 @@ class SalesOrderItem extends Model
     ];
 
     protected $casts = [
-        'product_id' => 'integer',
-        'warehouse_id' => 'integer',
-        'quantity' => 'integer',
-        'unit_price' => 'decimal:2',
-        'tax_rate' => 'decimal:2',
-        'discount' => 'decimal:2',
-        'amount' => 'decimal:2',
+        'product_id'     => 'integer',
+        'warehouse_id'   => 'integer',
+        'quantity'       => 'decimal:4',
+        'allocated_qty'  => 'decimal:4',
+        'dispatched_qty' => 'decimal:4',
+        'invoiced_qty'   => 'decimal:4',
+        'cancelled_qty'  => 'decimal:4',
+        'unit_price'     => 'decimal:2',
+        'tax_rate'       => 'decimal:2',
+        'discount'       => 'decimal:2',
+        'amount'         => 'decimal:2',
     ];
 
     public function salesOrder(): BelongsTo
@@ -58,9 +67,85 @@ class SalesOrderItem extends Model
         return $this->belongsTo(Warehouse::class, 'warehouse_id');
     }
 
+    public function dispatchItems(): HasMany
+    {
+        return $this->hasMany(DispatchOrderItem::class, 'sales_order_item_id');
+    }
+
+    public function getRemainingQtyAttribute(): float
+    {
+        return max(0.0, (float) $this->quantity - ((float) $this->dispatched_qty + (float) $this->cancelled_qty));
+    }
+
+    public function getOpenAllocatableQtyAttribute(): float
+    {
+        return max(0.0, (float) $this->quantity - ((float) $this->dispatched_qty + (float) $this->allocated_qty + (float) $this->cancelled_qty));
+    }
+
+    public function refreshStatus(): string
+    {
+        $ordered = (float) $this->quantity;
+        $cancelled = (float) $this->cancelled_qty;
+        $dispatched = (float) $this->dispatched_qty;
+        $allocated = (float) $this->allocated_qty;
+
+        if ($this->isService()) {
+            if ($cancelled >= $ordered && $ordered > 0) {
+                $newStatus = 'Cancelled';
+            } else {
+                $invoicedQty = (float) \App\Domains\Sales\Models\InvoiceItem::where('sales_order_item_id', $this->id)
+                    ->whereHas('invoice', fn($q) => $q->where('status', '!=', 'Cancelled'))
+                    ->sum('quantity');
+                if ($invoicedQty >= $ordered && $ordered > 0) {
+                    $newStatus = 'Fulfilled';
+                } elseif ($invoicedQty > 0) {
+                    $newStatus = 'Partially Invoiced';
+                } else {
+                    $newStatus = ($this->salesOrder?->status === 'Draft') ? 'Pending' : 'Confirmed';
+                }
+            }
+
+            if ($this->status !== $newStatus) {
+                $this->update(['status' => $newStatus]);
+            }
+
+            return $newStatus;
+        }
+
+        if ($ordered <= 0) {
+            $newStatus = 'Completed';
+        } elseif ($cancelled >= $ordered) {
+            $newStatus = 'Cancelled';
+        } elseif (($dispatched + $cancelled) >= $ordered) {
+            $newStatus = $cancelled > 0 ? 'Short-Closed' : 'Fulfilled';
+        } elseif ($dispatched > 0) {
+            $newStatus = 'Partially Dispatched';
+        } elseif ($allocated > 0) {
+            $newStatus = 'Allocated';
+        } else {
+            $newStatus = 'Pending';
+        }
+
+        if ($this->status !== $newStatus) {
+            $this->update(['status' => $newStatus]);
+        }
+
+        return $newStatus;
+    }
+
     public function milestones(): HasMany
     {
         return $this->hasMany(\App\Domains\Projects\Models\Milestone::class, 'sales_order_item_id');
+    }
+
+    public function isService(): bool
+    {
+        return $this->product?->isService() ?? false;
+    }
+
+    public function isGoods(): bool
+    {
+        return !$this->isService();
     }
 
     protected static function booted(): void

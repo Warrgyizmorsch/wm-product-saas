@@ -144,17 +144,17 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="billsTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;">{{ __('purchase.bill_number') }}</th>
-                        <th style="min-width: 150px; background-color: #e8ecf1 !important;">{{ __('purchase.vendor_invoice_no') }}</th>
-                        <th style="min-width: 180px; background-color: #e8ecf1 !important;">{{ __('purchase.supplier_vendor') }}</th>
-                        <th style="min-width: 110px; background-color: #e8ecf1 !important;">{{ __('purchase.bill_date') }}</th>
-                        <th style="min-width: 110px; background-color: #e8ecf1 !important;">{{ __('purchase.due_date') }}</th>
-                        <th style="min-width: 100px; background-color: #e8ecf1 !important;" class="text-center">{{ __('purchase.status') }}</th>
-                        <th style="min-width: 120px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.grand_total') }}</th>
-                        <th style="min-width: 120px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.paid_amount') }}</th>
-                        <th style="min-width: 120px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.due_amount') }}</th>
-                        <th style="min-width: 70px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.actions') }}</th>
+                    <tr>
+                        <th style="min-width: 140px;">{{ __('purchase.bill_number') }}</th>
+                        <th style="min-width: 150px;">{{ __('purchase.vendor_invoice_no') }}</th>
+                        <th style="min-width: 180px;">{{ __('purchase.supplier_vendor') }}</th>
+                        <th style="min-width: 110px;">{{ __('purchase.bill_date') }}</th>
+                        <th style="min-width: 110px;">{{ __('purchase.due_date') }}</th>
+                        <th style="min-width: 100px;" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="min-width: 120px;" class="text-end pe-3">{{ __('purchase.grand_total') }}</th>
+                        <th style="min-width: 120px;" class="text-end pe-3">{{ __('purchase.paid_amount') }}</th>
+                        <th style="min-width: 120px;" class="text-end pe-3">{{ __('purchase.due_amount') }}</th>
+                        <th style="min-width: 70px;" class="text-end pe-3">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

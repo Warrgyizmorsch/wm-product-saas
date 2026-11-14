@@ -11,13 +11,27 @@ use App\Domains\CRM\Models\Quotation;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\Concerns\HasRbacScope;
 use App\Models\User;
 use App\Domains\Inventory\Models\Product;
+use App\Models\Concerns\NormalizesTaxIdentity;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 
 class Lead extends Model
 {
-    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes, NormalizesTaxIdentity, HasRbacScope;
+
+    protected ?string $rbacPermission = 'crm.leads.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->where(function (Builder $sub) use ($user) {
+            $sub->where('leads.lead_owner_id', $user->id)
+                ->orWhereHas('crmAccount', fn($aq) => $aq->where('owner_id', $user->id))
+                ->orWhereHas('crmDeal.account', fn($aq) => $aq->where('owner_id', $user->id));
+        });
+    }
 
     protected static function boot()
     {
@@ -64,11 +78,28 @@ class Lead extends Model
                     throw new \InvalidArgumentException('Lead status is Won and permanently locked. Status cannot be changed.');
                 }
 
+                // Permanent lock: Once Dealing, it cannot be changed to another status manually (except to Won when authorized)
+                if ($oldStatus === 'dealing' && !in_array($newStatus, ['dealing', 'won']) && !static::$allowWonTransition) {
+                    throw new \InvalidArgumentException('Lead status in Dealing stage is locked. Status cannot be changed.');
+                }
+
                 // Direct Won transition guard: Cannot manually change status to Won
                 if ($newStatus === 'won' && !static::$allowWonTransition) {
-                    throw new \InvalidArgumentException('Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.');
+                    throw new \InvalidArgumentException('Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal or converted to Customer.');
                 }
             }
+        });
+
+        static::saved(function ($lead) {
+            $tid = $lead->tenant_id ?? (tenant_id() ?? 1);
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_dup_graph");
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_lead_status_counts");
+        });
+
+        static::deleted(function ($lead) {
+            $tid = $lead->tenant_id ?? (tenant_id() ?? 1);
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_dup_graph");
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_lead_status_counts");
         });
     }
 

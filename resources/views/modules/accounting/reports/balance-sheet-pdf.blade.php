@@ -100,11 +100,12 @@
                 <table class="bs-table">
                     <tr><th colspan="2">Liabilities</th></tr>
 
-                    <tr class="group-row"><td>Capital Account</td><td class="amount">{{ number_format($totals['equity'], 2) }}</td></tr>
+                    {{-- $totals['equity'] includes the period's profit, listed on its own row below. --}}
+                    <tr class="group-row"><td>Capital Account</td><td class="amount">{{ number_format($totals['equity'] - $netIncome, 2) }}</td></tr>
                     @foreach ($sections['equity'] as $row)
                         <tr><td class="code">{{ $row['account']->code }}</td><td>{{ $row['account']->name }}<span class="amount" style="float:right">{{ number_format($row['balance'], 2) }}</span></td></tr>
                     @endforeach
-                    <tr><td>Net Profit for the Period</td><td class="amount">{{ number_format($netIncome, 2) }}</td></tr>
+                    <tr class="group-row"><td>{{ $netIncome < 0 ? 'Net Loss for the Period' : 'Net Profit for the Period' }}</td><td class="amount">{{ number_format($netIncome, 2) }}</td></tr>
 
                     @if ($sections['liability']['non_current']->isNotEmpty())
                         <tr class="group-row"><td>Non-Current Liabilities</td><td class="amount">{{ number_format($totals['liability_non_current'], 2) }}</td></tr>

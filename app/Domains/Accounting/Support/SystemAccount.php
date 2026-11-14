@@ -27,6 +27,10 @@ final class SystemAccount
     public const SUSPENSE = 'suspense_account';
     // Where the year-end close moves each year's profit or loss.
     public const RESERVES_AND_SURPLUS = 'reserves_and_surplus';
+    // Offset for every opening balance entered on ledgers and party masters;
+    // nets to zero once all opening balances are in (Tally's "Difference in
+    // opening balances").
+    public const OPENING_BALANCE_DIFFERENCE = 'opening_balance_difference';
 
     // Advances
     public const LOANS_AND_ADVANCES = 'loans_and_advances';
@@ -44,6 +48,8 @@ final class SystemAccount
     public const OUTPUT_SGST = 'output_sgst';
     public const OUTPUT_IGST = 'output_igst';
     public const TDS_PAYABLE = 'tds_payable';
+    // TDS customers withheld from what they paid us.
+    public const TDS_RECEIVABLE = 'tds_receivable';
 
     // Income and expense
     public const SALES_REVENUE = 'sales_revenue';
@@ -77,6 +83,7 @@ final class SystemAccount
         'reserves_and_surplus' => '3020',
         'partners_proprietors_capital' => '3030',
         'drawings' => '3040',
+        'opening_balance_difference' => '3050',
         'revaluation_reserve' => '3200',
         'secured_loans' => '2400',
         'term_loan_bank' => '2401',
@@ -164,6 +171,7 @@ final class SystemAccount
         'packing_material_expense' => '5032',
         'power_and_fuel_production' => '5033',
         'salary_and_wages_staff' => '5100',
+        'employer_statutory_contribution' => '5110',
         'staff_welfare_expenses' => '5500',
         'rent_expense' => '5200',
         'electricity_expense' => '5300',
@@ -198,6 +206,20 @@ final class SystemAccount
     ];
 
     /** The code an account was provisioned with, or null for an unknown key. */
+    /**
+     * Party ledgers kept bill-by-bill by default (Tally's "Maintain balances
+     * bill-by-bill"); any other ledger can be switched on in the chart.
+     */
+    public const BILL_WISE_DEFAULTS = [
+        self::AR,
+        self::AP,
+        'creditors_for_expenses',
+        self::ADVANCE_FROM_CUSTOMERS,
+        self::ADVANCE_TO_SUPPLIERS,
+        self::ADVANCE_TO_EMPLOYEES,
+        'salary_payable',
+    ];
+
     public static function templateCode(string $key): ?string
     {
         return self::TEMPLATE[$key] ?? null;

@@ -19,6 +19,15 @@ class RbacSeeder extends Seeder
 
         $this->grant($roles['super_admin'], $permissions, RolePermission::SCOPE_PLATFORM);
 
+        $platformStaff = [
+            'platform_sales' => ['platform.console.access', 'platform.leads.manage', 'platform.tenants.view'],
+            'platform_support' => ['platform.console.access', 'platform.tenants.view', 'platform.usage.view', 'platform.support.manage'],
+            'platform_finance' => ['platform.console.access', 'platform.tenants.view', 'platform.usage.view', 'platform.subscriptions.manage', 'platform.payments.view', 'platform.payments.refund'],
+        ];
+        foreach ($platformStaff as $roleSlug => $names) {
+            $this->grant($roles[$roleSlug], array_intersect_key($permissions, array_flip($names)), RolePermission::SCOPE_PLATFORM);
+        }
+
         $this->grant($roles['tenant_owner'], $permissions, RolePermission::SCOPE_TENANT);
         $this->grant($roles['company_admin'], $permissions, RolePermission::SCOPE_TENANT);
 
@@ -96,7 +105,6 @@ class RbacSeeder extends Seeder
             'crm.leads.create' => $permissions['crm.leads.create'],
             'crm.deals.create' => $permissions['crm.deals.create'],
             'crm.quotations.create' => $permissions['crm.quotations.create'],
-            'crm.customers.view' => $permissions['crm.customers.view'],
             'crm.customers.create' => $permissions['crm.customers.create'],
         ], RolePermission::SCOPE_TENANT);
 
@@ -106,6 +114,7 @@ class RbacSeeder extends Seeder
             'crm.leads.update' => $permissions['crm.leads.update'],
             'crm.deals.view' => $permissions['crm.deals.view'],
             'crm.deals.update' => $permissions['crm.deals.update'],
+            'crm.customers.view' => $permissions['crm.customers.view'],
             'crm.quotations.view' => $permissions['crm.quotations.view'],
         ], RolePermission::SCOPE_OWN);
 
@@ -116,6 +125,21 @@ class RbacSeeder extends Seeder
             'inventory.products.delete' => $permissions['inventory.products.delete'],
             'inventory.warehouses.manage' => $permissions['inventory.warehouses.manage'],
             'inventory.uoms.manage' => $permissions['inventory.uoms.manage'],
+            'inventory.transfers.view' => $permissions['inventory.transfers.view'],
+            'inventory.transfers.create' => $permissions['inventory.transfers.create'],
+            'inventory.transfers.manage' => $permissions['inventory.transfers.manage'],
+            'inventory.adjustments.view' => $permissions['inventory.adjustments.view'],
+            'inventory.adjustments.create' => $permissions['inventory.adjustments.create'],
+            'inventory.adjustments.manage' => $permissions['inventory.adjustments.manage'],
+            'inventory.batches.view' => $permissions['inventory.batches.view'],
+            'inventory.batches.manage' => $permissions['inventory.batches.manage'],
+            'inventory.serials.view' => $permissions['inventory.serials.view'],
+            'inventory.serials.manage' => $permissions['inventory.serials.manage'],
+            'inventory.transactions.view' => $permissions['inventory.transactions.view'],
+            'inventory.reservations.view' => $permissions['inventory.reservations.view'],
+            'inventory.reservations.manage' => $permissions['inventory.reservations.manage'],
+            'inventory.barcodes.manage' => $permissions['inventory.barcodes.manage'],
+            'inventory.reports.view' => $permissions['inventory.reports.view'],
             'inventory.material_requirements.view' => $permissions['inventory.material_requirements.view'],
             'inventory.material_requirements.ship' => $permissions['inventory.material_requirements.ship'],
             'inventory.dispatches.view' => $permissions['inventory.dispatches.view'],
@@ -156,22 +180,22 @@ class RbacSeeder extends Seeder
             'sales.material_requirements.create' => $permissions['sales.material_requirements.create'],
             'sales.dispatches.view' => $permissions['sales.dispatches.view'],
             'sales.dispatches.create' => $permissions['sales.dispatches.create'],
-            'sales.invoices.view' => $permissions['sales.invoices.view'],
             'sales.invoices.create' => $permissions['sales.invoices.create'],
             'sales.invoices.send' => $permissions['sales.invoices.send'],
-            'sales.payments.view' => $permissions['sales.payments.view'],
             'sales.payments.create' => $permissions['sales.payments.create'],
-            'sales.returns.view' => $permissions['sales.returns.view'],
             'sales.returns.create' => $permissions['sales.returns.create'],
         ], RolePermission::SCOPE_TENANT);
 
-        // Viewing, updating, confirming, and cancelling orders is restricted to
-        // orders this sales rep is assigned as sales_person_id on.
+        // Viewing, updating, confirming, and cancelling orders, invoices, payments, and returns
+        // is restricted to own records or accounts managed.
         $this->grant($roles['sales_executive'], [
             'sales.orders.view' => $permissions['sales.orders.view'],
             'sales.orders.update' => $permissions['sales.orders.update'],
             'sales.orders.confirm' => $permissions['sales.orders.confirm'],
             'sales.orders.cancel' => $permissions['sales.orders.cancel'],
+            'sales.invoices.view' => $permissions['sales.invoices.view'],
+            'sales.payments.view' => $permissions['sales.payments.view'],
+            'sales.returns.view' => $permissions['sales.returns.view'],
         ], RolePermission::SCOPE_OWN);
 
         // Quick-create is an inline "add a missing product/uom while filling out
@@ -180,6 +204,7 @@ class RbacSeeder extends Seeder
         // to any role that references products in its own workflow.
         foreach (['production_manager', 'production_engineer', 'sales_manager', 'sales_executive'] as $roleSlug) {
             $this->grant($roles[$roleSlug], [
+                'inventory.products.view' => $permissions['inventory.products.view'],
                 'inventory.products.create' => $permissions['inventory.products.create'],
                 'inventory.uoms.manage' => $permissions['inventory.uoms.manage'],
             ], RolePermission::SCOPE_TENANT);
@@ -395,6 +420,11 @@ class RbacSeeder extends Seeder
             // Filing GSTR-1 is the accountant's job.
             'accounting.gst_returns.view' => $permissions['accounting.gst_returns.view'],
             'accounting.gst_returns.file' => $permissions['accounting.gst_returns.file'],
+            'accounting.tds.view' => $permissions['accounting.tds.view'],
+            'accounting.tds.configure' => $permissions['accounting.tds.configure'],
+            'accounting.tds.challans.create' => $permissions['accounting.tds.challans.create'],
+            'accounting.tds.returns.view' => $permissions['accounting.tds.returns.view'],
+            'accounting.tds.returns.export' => $permissions['accounting.tds.returns.export'],
             'accounting.budgets.view' => $permissions['accounting.budgets.view'],
             'accounting.budgets.create' => $permissions['accounting.budgets.create'],
             'accounting.budgets.update' => $permissions['accounting.budgets.update'],
@@ -441,6 +471,8 @@ class RbacSeeder extends Seeder
             'accounting.ledger_groups.view' => $permissions['accounting.ledger_groups.view'],
             'accounting.bank_reconciliation.view' => $permissions['accounting.bank_reconciliation.view'],
             'accounting.gst_returns.view' => $permissions['accounting.gst_returns.view'],
+            'accounting.tds.view' => $permissions['accounting.tds.view'],
+            'accounting.tds.returns.view' => $permissions['accounting.tds.returns.view'],
             'accounting.budgets.view' => $permissions['accounting.budgets.view'],
             'accounting.exchange_rates.view' => $permissions['accounting.exchange_rates.view'],
             'fixed_assets.categories.view' => $permissions['fixed_assets.categories.view'],
@@ -496,9 +528,25 @@ class RbacSeeder extends Seeder
             // outside that special-cased prefix so its normal tenant-scoped grant
             // actually takes effect in the sidebar and the policy check.
             ['name' => 'tenant.subscription.manage', 'module' => 'tenant', 'entity' => 'subscription', 'action' => 'manage'],
+            // The workspace's own integration/master settings (SMTP, WhatsApp, GST,
+            // Meta, Twilio, payment terms, notification rules). Same reasoning as
+            // above: per-tenant, so outside the 'platform.' prefix.
+            ['name' => 'tenant.settings.manage', 'module' => 'tenant', 'entity' => 'settings', 'action' => 'manage'],
             ['name' => 'platform.currencies.manage', 'module' => 'platform', 'entity' => 'currencies', 'action' => 'manage'],
             ['name' => 'platform.usage.view', 'module' => 'platform', 'entity' => 'usage', 'action' => 'view'],
             ['name' => 'platform.payment_gateway.manage', 'module' => 'platform', 'entity' => 'payment_gateway', 'action' => 'manage'],
+            // The /admin platform console (EnsurePlatformAdmin) and what staff can do in it.
+            ['name' => 'platform.console.access', 'module' => 'platform', 'entity' => 'console', 'action' => 'access'],
+            ['name' => 'platform.leads.manage', 'module' => 'platform', 'entity' => 'leads', 'action' => 'manage'],
+            ['name' => 'platform.tenants.view', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'view'],
+            ['name' => 'platform.tenants.impersonate', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'impersonate'],
+            ['name' => 'platform.tenants.delete', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'delete'],
+            ['name' => 'platform.subscriptions.manage', 'module' => 'platform', 'entity' => 'subscriptions', 'action' => 'manage'],
+            ['name' => 'platform.payments.view', 'module' => 'platform', 'entity' => 'payments', 'action' => 'view'],
+            ['name' => 'platform.payments.refund', 'module' => 'platform', 'entity' => 'payments', 'action' => 'refund'],
+            ['name' => 'platform.support.manage', 'module' => 'platform', 'entity' => 'support', 'action' => 'manage'],
+            ['name' => 'platform.settings.manage', 'module' => 'platform', 'entity' => 'settings', 'action' => 'manage'],
+            ['name' => 'platform.audit.view', 'module' => 'platform', 'entity' => 'audit', 'action' => 'view'],
             ['name' => 'dashboard.tenant.manage', 'module' => 'dashboard', 'entity' => 'tenant', 'action' => 'manage'],
             ['name' => 'access.roles.manage', 'module' => 'access', 'entity' => 'roles', 'action' => 'manage'],
             ['name' => 'access.permissions.manage', 'module' => 'access', 'entity' => 'permissions', 'action' => 'manage'],
@@ -668,6 +716,21 @@ class RbacSeeder extends Seeder
             ['name' => 'inventory.products.delete', 'module' => 'inventory', 'entity' => 'products', 'action' => 'delete'],
             ['name' => 'inventory.warehouses.manage', 'module' => 'inventory', 'entity' => 'warehouses', 'action' => 'manage'],
             ['name' => 'inventory.uoms.manage', 'module' => 'inventory', 'entity' => 'uoms', 'action' => 'manage'],
+            ['name' => 'inventory.transfers.view', 'module' => 'inventory', 'entity' => 'transfers', 'action' => 'view'],
+            ['name' => 'inventory.transfers.create', 'module' => 'inventory', 'entity' => 'transfers', 'action' => 'create'],
+            ['name' => 'inventory.transfers.manage', 'module' => 'inventory', 'entity' => 'transfers', 'action' => 'manage'],
+            ['name' => 'inventory.adjustments.view', 'module' => 'inventory', 'entity' => 'adjustments', 'action' => 'view'],
+            ['name' => 'inventory.adjustments.create', 'module' => 'inventory', 'entity' => 'adjustments', 'action' => 'create'],
+            ['name' => 'inventory.adjustments.manage', 'module' => 'inventory', 'entity' => 'adjustments', 'action' => 'manage'],
+            ['name' => 'inventory.batches.view', 'module' => 'inventory', 'entity' => 'batches', 'action' => 'view'],
+            ['name' => 'inventory.batches.manage', 'module' => 'inventory', 'entity' => 'batches', 'action' => 'manage'],
+            ['name' => 'inventory.serials.view', 'module' => 'inventory', 'entity' => 'serials', 'action' => 'view'],
+            ['name' => 'inventory.serials.manage', 'module' => 'inventory', 'entity' => 'serials', 'action' => 'manage'],
+            ['name' => 'inventory.transactions.view', 'module' => 'inventory', 'entity' => 'transactions', 'action' => 'view'],
+            ['name' => 'inventory.reservations.view', 'module' => 'inventory', 'entity' => 'reservations', 'action' => 'view'],
+            ['name' => 'inventory.reservations.manage', 'module' => 'inventory', 'entity' => 'reservations', 'action' => 'manage'],
+            ['name' => 'inventory.barcodes.manage', 'module' => 'inventory', 'entity' => 'barcodes', 'action' => 'manage'],
+            ['name' => 'inventory.reports.view', 'module' => 'inventory', 'entity' => 'reports', 'action' => 'view'],
             ['name' => 'grns.view', 'module' => 'grns', 'entity' => 'grns', 'action' => 'view'],
             ['name' => 'grns.create', 'module' => 'grns', 'entity' => 'grns', 'action' => 'create'],
             ['name' => 'grns.update', 'module' => 'grns', 'entity' => 'grns', 'action' => 'update'],
@@ -803,6 +866,11 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.tax_rates.update', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'update'],
             ['name' => 'accounting.tax_rates.delete', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'delete'],
             ['name' => 'accounting.reports.view', 'module' => 'accounting', 'entity' => 'reports', 'action' => 'view'],
+            // Integration kit (Tally etc.): held by owner and admin only.
+            ['name' => 'accounting.integrations.view', 'module' => 'accounting', 'entity' => 'integrations', 'action' => 'view'],
+            ['name' => 'accounting.integrations.manage', 'module' => 'accounting', 'entity' => 'integrations', 'action' => 'manage'],
+            ['name' => 'accounting.integrations.sync', 'module' => 'accounting', 'entity' => 'integrations', 'action' => 'sync'],
+            ['name' => 'accounting.integrations.resolve', 'module' => 'accounting', 'entity' => 'integrations', 'action' => 'resolve'],
             ['name' => 'accounting.vouchers.payment.view', 'module' => 'accounting', 'entity' => 'vouchers_payment', 'action' => 'view'],
             ['name' => 'accounting.vouchers.payment.post', 'module' => 'accounting', 'entity' => 'vouchers_payment', 'action' => 'post'],
             ['name' => 'accounting.vouchers.payment.reverse', 'module' => 'accounting', 'entity' => 'vouchers_payment', 'action' => 'reverse'],
@@ -833,6 +901,11 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.bank_reconciliation.complete', 'module' => 'accounting', 'entity' => 'bank_reconciliation', 'action' => 'complete'],
             ['name' => 'accounting.gst_returns.view', 'module' => 'accounting', 'entity' => 'gst_returns', 'action' => 'view'],
             ['name' => 'accounting.gst_returns.file', 'module' => 'accounting', 'entity' => 'gst_returns', 'action' => 'file'],
+            ['name' => 'accounting.tds.view', 'module' => 'accounting', 'entity' => 'tds', 'action' => 'view'],
+            ['name' => 'accounting.tds.configure', 'module' => 'accounting', 'entity' => 'tds', 'action' => 'configure'],
+            ['name' => 'accounting.tds.challans.create', 'module' => 'accounting', 'entity' => 'tds_challans', 'action' => 'create'],
+            ['name' => 'accounting.tds.returns.view', 'module' => 'accounting', 'entity' => 'tds_returns', 'action' => 'view'],
+            ['name' => 'accounting.tds.returns.export', 'module' => 'accounting', 'entity' => 'tds_returns', 'action' => 'export'],
             ['name' => 'accounting.budgets.view', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'view'],
             ['name' => 'accounting.budgets.create', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'create'],
             ['name' => 'accounting.budgets.update', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'update'],
@@ -895,6 +968,10 @@ class RbacSeeder extends Seeder
     {
         $definitions = [
             ['slug' => 'super_admin', 'name' => 'Super Admin', 'tenant_id' => null, 'level' => 1],
+            // Platform staff (Role::PLATFORM_STAFF_SLUGS) — console only, never assignable to tenant users.
+            ['slug' => 'platform_sales', 'name' => 'Platform Sales', 'tenant_id' => null, 'level' => 2],
+            ['slug' => 'platform_support', 'name' => 'Platform Support', 'tenant_id' => null, 'level' => 2],
+            ['slug' => 'platform_finance', 'name' => 'Platform Finance', 'tenant_id' => null, 'level' => 2],
             ['slug' => 'tenant_owner', 'name' => 'Tenant Owner', 'tenant_id' => null, 'level' => 10],
             ['slug' => 'company_admin', 'name' => 'Company Admin', 'tenant_id' => null, 'level' => 20],
             ['slug' => 'production_manager', 'name' => 'Production Manager', 'tenant_id' => null, 'level' => 40],

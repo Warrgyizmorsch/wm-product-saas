@@ -17,12 +17,12 @@ class VendorApiController extends Controller
 {
     private function resolveTenantContext(): array
     {
-        $user      = auth()->user();
-        $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $user = auth()->user();
+        $tenantId = $user?->tenant_id ?? (tenant_id() ?? 1);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId = branch_id() ?? $user?->branch_id;
 
-        return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
+        return [(int) $tenantId, (int) $companyId, $branchId ? (int) $branchId : null];
     }
 
     /**
@@ -32,9 +32,9 @@ class VendorApiController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data'    => [
-                'statuses'      => ['active', 'inactive', 'blocked'],
-                'gst_types'     => ['Registered', 'Unregistered', 'Composition', 'Overseas', 'SEZ'],
+            'data' => [
+                'statuses' => ['active', 'inactive', 'blocked'],
+                'gst_types' => ['Registered', 'Unregistered', 'Composition', 'Overseas', 'SEZ'],
                 'payment_terms' => ['Immediate', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Due on Receipt'],
             ],
         ]);
@@ -49,15 +49,15 @@ class VendorApiController extends Controller
 
         $query = Vendor::query()
             ->where('tenant_id', $tenantId)
-            ->withCount(['purchaseOrders', 'bills']);
+            ->withCount(['purchaseOrders', 'bills', 'advancePayments']);
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('company_name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('gstin', 'like', "%{$search}%");
+                    ->orWhere('company_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('gstin', 'like', "%{$search}%");
             });
         }
 
@@ -66,7 +66,7 @@ class VendorApiController extends Controller
         }
 
         // Sorting
-        $sortBy  = $request->input('sort_by', 'id');
+        $sortBy = $request->input('sort_by', 'id');
         $sortDir = strtolower($request->input('sort_direction', 'desc')) === 'asc' ? 'asc' : 'desc';
         $allowedSorts = ['id', 'name', 'company_name', 'email', 'phone', 'created_at', 'status', 'opening_balance'];
         if (in_array($sortBy, $allowedSorts, true)) {
@@ -75,17 +75,17 @@ class VendorApiController extends Controller
             $query->orderBy('id', 'desc');
         }
 
-        $perPage = min((int)$request->input('per_page', 15), 100);
+        $perPage = min((int) $request->input('per_page', 15), 100);
         $vendors = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data'    => $vendors->items(),
-            'meta'    => [
+            'data' => $vendors->items(),
+            'meta' => [
                 'current_page' => $vendors->currentPage(),
-                'last_page'    => $vendors->lastPage(),
-                'per_page'     => $vendors->perPage(),
-                'total'        => $vendors->total(),
+                'last_page' => $vendors->lastPage(),
+                'per_page' => $vendors->perPage(),
+                'total' => $vendors->total(),
             ],
         ]);
     }
@@ -99,24 +99,34 @@ class VendorApiController extends Controller
         $uniqueScope = $this->scopeUniqueVendor($tenantId, $companyId, $branchId);
 
         $validator = Validator::make($request->all(), [
-            'name'             => ['required', 'string', 'max:255', Rule::unique('vendors', 'name')->where($uniqueScope)],
-            'company_name'     => ['nullable', 'string', 'max:255'],
-            'email'            => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->where($uniqueScope)],
-            'phone'            => ['nullable', 'string', 'max:50'],
-            'gstin'            => ['nullable', 'string', 'max:50'],
-            'pan'              => ['nullable', 'string', 'max:50'],
-            'status'           => ['nullable', 'in:active,inactive,blocked'],
-            'billing_address'  => ['nullable', 'string'],
+            'name' => ['required', 'string', 'max:255', Rule::unique('vendors', 'name')->where($uniqueScope)],
+            'company_name' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->where($uniqueScope)],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'gstin' => ['nullable', 'string', 'max:50'],
+            'pan' => ['nullable', 'string', 'max:50'],
+            'status' => ['nullable', 'in:active,inactive,blocked'],
+            'address' => ['nullable', 'string'],
+            'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
-            'opening_balance'  => ['nullable', 'numeric'],
-            'payment_terms'    => ['nullable', 'string'],
+            'bank_name' => ['nullable', 'string', 'max:150'],
+            'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
+            'ifsc_code' => ['nullable', 'string', 'max:30'],
+            'opening_balance' => ['nullable', 'numeric'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
+            'payment_terms' => ['nullable', 'string'],
+        ], [
+            'email.email' => 'The email field must be a valid email address.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max' => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error',
-                'errors'  => $validator->errors(),
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -124,26 +134,34 @@ class VendorApiController extends Controller
         $validated = $validator->validated();
 
         $vendor = Vendor::create([
-            'tenant_id'        => $tenantId,
-            'company_id'       => $companyId,
-            'branch_id'        => $branchId,
-            'name'             => $validated['name'],
-            'company_name'     => $validated['company_name'] ?? null,
-            'email'            => $validated['email'] ?? null,
-            'phone'            => $validated['phone'] ?? null,
-            'gstin'            => $validated['gstin'] ?? null,
-            'pan'              => $validated['pan'] ?? null,
-            'status'           => $validated['status'] ?? 'active',
-            'billing_address'  => $validated['billing_address'] ?? null,
+            'tenant_id' => $tenantId,
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'name' => $validated['name'],
+            'company_name' => $validated['company_name'] ?? null,
+            'email' => $validated['email'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'gstin' => $validated['gstin'] ?? null,
+            'pan' => $validated['pan'] ?? null,
+            'status' => $validated['status'] ?? 'active',
+            'address' => $validated['address'] ?? null,
+            'billing_address' => $validated['billing_address'] ?? null,
             'shipping_address' => $validated['shipping_address'] ?? null,
-            'opening_balance'  => $validated['opening_balance'] ?? 0.00,
-            'payment_terms'    => $validated['payment_terms'] ?? null,
+            'bank_name' => $validated['bank_name'] ?? null,
+            'account_number' => $validated['account_number'] ?? null,
+            'ifsc_code' => $validated['ifsc_code'] ?? null,
+            'opening_balance' => isset($validated['opening_balance']) ? convert_to_base((float) $validated['opening_balance']) : 0.00,
+            'opening_balance_type' => $validated['opening_balance_type'] ?? 'credit',
+            'payment_terms' => $validated['payment_terms'] ?? null,
         ]);
+
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor created successfully',
-            'data'    => $vendor,
+            'warning' => $openingWarning,
+            'data' => $vendor,
         ], 201);
     }
 
@@ -157,7 +175,9 @@ class VendorApiController extends Controller
         $vendor = Vendor::where('tenant_id', $tenantId)
             ->with([
                 'purchaseOrders' => fn($q) => $q->latest()->limit(5),
-                'bills'          => fn($q) => $q->latest()->limit(5),
+                'bills' => fn($q) => $q->latest()->limit(5),
+                'payments' => fn($q) => $q->latest()->limit(5),
+                'advancePayments' => fn($q) => $q->with('purchaseOrder')->latest()->limit(5),
             ])
             ->find($id);
 
@@ -168,20 +188,36 @@ class VendorApiController extends Controller
             ], 404);
         }
 
+        $bills = VendorBill::where('tenant_id', $tenantId)->where('vendor_id', $id)->get();
+        $payments = VendorPayment::where('tenant_id', $tenantId)->where('vendor_id', $id)->get();
+        $advances = \App\Domains\Purchase\Models\PurchaseAdvancePayment::where('tenant_id', $tenantId)->where('vendor_id', $id)->get();
+
         $totalPurchased = (float) PurchaseOrder::where('tenant_id', $tenantId)->where('vendor_id', $id)->sum('grand_total');
-        $totalBilled    = (float) VendorBill::where('tenant_id', $tenantId)->where('vendor_id', $id)->sum('grand_total');
-        $totalPaid      = (float) VendorPayment::where('tenant_id', $tenantId)->where('vendor_id', $id)->sum('amount');
-        $balancePayable = max(0, $totalBilled - $totalPaid);
+        $totalBilled = (float) $bills->where('status', '!=', 'cancelled')->sum('total_amount');
+        $totalPaid = (float) $payments
+            ->reject(fn ($p) => in_array(strtolower((string) $p->status), ['cancelled', 'void', 'draft', 'rejected'], true))
+            ->sum('amount');
+        $totalAdvancePaid = (float) $advances->where('status', '!=', 'cancelled')->sum('amount');
+        $availableAdvance = app(\App\Domains\Purchase\Services\VendorBillService::class)->getAvailableVendorAdvance($id, $tenantId);
+
+        $openingBalance = $vendor->signedOpeningBalance();
+        $netOutstanding = $openingBalance + $totalBilled - $totalPaid;
+        $balancePayable = max(0, $netOutstanding);
+        $vendorAdvanceCredit = max($availableAdvance, $netOutstanding < 0 ? abs($netOutstanding) : 0);
 
         return response()->json([
             'success' => true,
-            'data'    => [
+            'data' => [
                 'vendor' => $vendor,
-                'stats'  => [
-                    'total_purchased' => $totalPurchased,
-                    'total_billed'    => $totalBilled,
-                    'total_paid'      => $totalPaid,
-                    'balance_payable' => $balancePayable,
+                'stats' => [
+                    'total_purchased' => round($totalPurchased, 2),
+                    'total_billed' => round($totalBilled, 2),
+                    'total_paid' => round($totalPaid, 2),
+                    'total_advance_paid' => round($totalAdvancePaid, 2),
+                    'available_advance' => round($availableAdvance, 2),
+                    'vendor_advance_credit' => round($vendorAdvanceCredit, 2),
+                    'net_outstanding' => round($netOutstanding, 2),
+                    'balance_payable' => round($balancePayable, 2),
                 ],
             ],
         ]);
@@ -193,7 +229,7 @@ class VendorApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $vendor     = Vendor::where('tenant_id', $tenantId)->find($id);
+        $vendor = Vendor::where('tenant_id', $tenantId)->find($id);
 
         if (!$vendor) {
             return response()->json([
@@ -203,37 +239,56 @@ class VendorApiController extends Controller
         }
 
         $targetCompanyId = $vendor->company_id ?? $companyId;
-        $targetBranchId  = $vendor->branch_id ?? $branchId;
-        $uniqueScope     = $this->scopeUniqueVendor($tenantId, $targetCompanyId, $targetBranchId);
+        $targetBranchId = $vendor->branch_id ?? $branchId;
+        $uniqueScope = $this->scopeUniqueVendor($tenantId, $targetCompanyId, $targetBranchId);
 
         $validator = Validator::make($request->all(), [
-            'name'             => ['sometimes', 'required', 'string', 'max:255', Rule::unique('vendors', 'name')->ignore($vendor->id)->where($uniqueScope)],
-            'company_name'     => ['nullable', 'string', 'max:255'],
-            'email'            => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->ignore($vendor->id)->where($uniqueScope)],
-            'phone'            => ['nullable', 'string', 'max:50'],
-            'gstin'            => ['nullable', 'string', 'max:50'],
-            'pan'              => ['nullable', 'string', 'max:50'],
-            'status'           => ['nullable', 'in:active,inactive,blocked'],
-            'billing_address'  => ['nullable', 'string'],
+            'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('vendors', 'name')->ignore($vendor->id)->where($uniqueScope)],
+            'company_name' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->ignore($vendor->id)->where($uniqueScope)],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'gstin' => ['nullable', 'string', 'max:50'],
+            'pan' => ['nullable', 'string', 'max:50'],
+            'status' => ['nullable', 'in:active,inactive,blocked'],
+            'address' => ['nullable', 'string'],
+            'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
-            'opening_balance'  => ['nullable', 'numeric'],
-            'payment_terms'    => ['nullable', 'string'],
+            'bank_name' => ['nullable', 'string', 'max:150'],
+            'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
+            'ifsc_code' => ['nullable', 'string', 'max:30'],
+            'opening_balance' => ['nullable', 'numeric'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
+            'payment_terms' => ['nullable', 'string'],
+        ], [
+            'email.email' => 'The email field must be a valid email address.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max' => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error',
-                'errors'  => $validator->errors(),
+                'errors' => $validator->errors(),
             ], 422);
         }
 
-        $vendor->update($validator->validated());
+        $data = $validator->validated();
+        if (array_key_exists('opening_balance', $data)) {
+            $data['opening_balance'] = $data['opening_balance'] !== null
+                ? convert_to_base((float) $data['opening_balance'])
+                : 0.00;
+        }
+        $vendor->update($data);
+
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor updated successfully',
-            'data'    => $vendor->fresh(),
+            'warning' => $openingWarning,
+            'data' => $vendor->fresh(),
         ]);
     }
 
@@ -243,7 +298,7 @@ class VendorApiController extends Controller
     public function destroy(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $vendor     = Vendor::where('tenant_id', $tenantId)->find($id);
+        $vendor = Vendor::where('tenant_id', $tenantId)->find($id);
 
         if (!$vendor) {
             return response()->json([
@@ -278,39 +333,43 @@ class VendorApiController extends Controller
         $uniqueScope = $this->scopeUniqueVendor($tenantId, $companyId, $branchId);
 
         $validator = Validator::make($request->all(), [
-            'name'         => ['required', 'string', 'max:255', Rule::unique('vendors', 'name')->where($uniqueScope)],
+            'name' => ['required', 'string', 'max:255', Rule::unique('vendors', 'name')->where($uniqueScope)],
             'company_name' => ['nullable', 'string', 'max:255'],
-            'phone'        => ['nullable', 'string', 'max:50'],
-            'email'        => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->where($uniqueScope)],
-            'gstin'        => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->where($uniqueScope)],
+            'gstin' => ['nullable', 'string', 'max:50'],
+        ], [
+            'email.email' => 'The email field must be a valid email address.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max' => 'Phone number cannot exceed 20 digits.',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error',
-                'errors'  => $validator->errors(),
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         $validated = $validator->validated();
 
         $vendor = Vendor::create([
-            'tenant_id'    => $tenantId,
-            'company_id'   => $companyId,
-            'branch_id'    => $branchId,
-            'name'         => $validated['name'],
+            'tenant_id' => $tenantId,
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'name' => $validated['name'],
             'company_name' => $validated['company_name'] ?? null,
-            'phone'        => $validated['phone'] ?? null,
-            'email'        => $validated['email'] ?? null,
-            'gstin'        => $validated['gstin'] ?? null,
-            'status'       => 'active',
+            'phone' => $validated['phone'] ?? null,
+            'email' => $validated['email'] ?? null,
+            'gstin' => $validated['gstin'] ?? null,
+            'status' => 'active',
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor quick-created successfully',
-            'data'    => $vendor,
+            'data' => $vendor,
         ], 201);
     }
 
@@ -320,7 +379,7 @@ class VendorApiController extends Controller
     public function toggleStatus(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $vendor     = Vendor::where('tenant_id', $tenantId)->find($id);
+        $vendor = Vendor::where('tenant_id', $tenantId)->find($id);
 
         if (!$vendor) {
             return response()->json([
@@ -335,7 +394,7 @@ class VendorApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Vendor status toggled to {$vendor->status}",
-            'data'    => $vendor,
+            'data' => $vendor,
         ]);
     }
 

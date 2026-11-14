@@ -75,7 +75,7 @@
         <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.email') }}" name="email" id="{{ $prefix }}_email" inputType="email" :required="true" placeholder="{{ __('hrms.org.email') }}" :errorText="$errors->first('email')" />
     </div>
     <div class="col-lg-6">
-        <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.phone') }}" name="phone" id="{{ $prefix }}_phone" placeholder="{{ __('hrms.org.phone') }}" :errorText="$errors->first('phone')" />
+        <x-ui.odoo-form-ui type="input" inputType="tel" pattern="(?=.*[0-9])[0-9+().\s-]+" label="{{ __('hrms.org.phone') }}" name="phone" id="{{ $prefix }}_phone" placeholder="{{ __('hrms.org.phone') }}" :errorText="$errors->first('phone')" />
     </div>
     <div class="col-lg-6">
         <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.website') }}" name="website" id="{{ $prefix }}_website" placeholder="{{ __('hrms.org.website') }}" :errorText="$errors->first('website')" />

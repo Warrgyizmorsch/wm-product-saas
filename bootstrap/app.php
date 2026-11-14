@@ -33,10 +33,19 @@ return Application::configure(basePath: dirname(__DIR__))
             'branch' => ResolveBranch::class,
             'module.access' => EnsureTenantModuleAccess::class,
             'billing.active' => \App\Http\Middleware\EnsureBillingActive::class,
+            'permission' => \App\Http\Middleware\RequirePermission::class,
+            'platform.admin' => \App\Http\Middleware\EnsurePlatformAdmin::class,
+            'platform.audit' => \App\Http\Middleware\RecordPlatformAudit::class,
+            'accounting.api.module' => \App\Http\Middleware\EnsureAccountingApiModule::class,
             'production.api.secret' => \App\Http\Middleware\ProductionApiSecretMiddleware::class,
             'production.api.tenant' => \App\Http\Middleware\ProductionTenantEnforcementMiddleware::class,
             'production.api.idempotency' => \App\Http\Middleware\ProductionIdempotencyMiddleware::class,
         ]);
+
+        // The platform console has its own sign-in page.
+        $middleware->redirectGuestsTo(fn (\Illuminate\Http\Request $request) => $request->is('admin', 'admin/*')
+            ? route('admin.login')
+            : route('login'));
 
         $middleware->validateCsrfTokens(except: [
             'purchase/rfq-portal/*/submit',
@@ -45,6 +54,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhooks/razorpay',
             'webhooks/meta-leadgen',
             'api/webhooks/meta-leadgen',
+            'hrms/biometric/webhook',
             'forms/lead-capture',
             'forms/lead-capture/*',
             'api/crm/public/lead-capture',
@@ -76,5 +86,37 @@ return Application::configure(basePath: dirname(__DIR__))
             );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // A plan usage cap (UsageLimitService) hit from any create path: send the
+        // user back to the form with the message instead of a 500.
+        $exceptions->render(function (\App\Domains\Platform\Exceptions\UsageLimitExceededException $e, \Illuminate\Http\Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage(), 'plan_limit' => true], 422);
+            }
+
+            return back()->withInput()->with('error', $e->getMessage());
+        });
+
+        // A 403 caused by the tenant's plan (PlanFeatureGate) says so and points
+        // at the upgrade, instead of a bare "This action is unauthorized."
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, \Illuminate\Http\Request $request) {
+            $gate = app(\App\Domains\Platform\Services\PlanFeatureGate::class);
+            $feature = $e->getStatusCode() === 403 ? $gate->lastBlocked() : null;
+
+            if ($feature === null) {
+                return null;
+            }
+
+            $label = $gate->label($feature) ?? 'This feature';
+            $message = "{$label} isn't included in your plan. You can still view existing records — upgrade to create or change them.";
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message, 'plan_feature' => $feature], 403);
+            }
+
+            return response()->view('errors.plan-feature', [
+                'label' => $label,
+                'message' => $message,
+                'canUpgrade' => tenant() !== null && ($request->user()?->can('updateSubscription', tenant()) ?? false),
+            ], 403);
+        });
     })->create();

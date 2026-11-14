@@ -116,17 +116,64 @@
 
         /* Recipient Option Switch Tiles */
         .switch-tile {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 14px 16px;
-            transition: all 0.2s ease;
+            background: #ffffff;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px 18px;
+            transition: all 0.25s ease;
             height: 100%;
+            cursor: pointer;
+            position: relative;
+            user-select: none;
         }
 
         .switch-tile:hover {
             border-color: #cbd5e1;
-            background: #f1f5f9;
+            background: #f8fafc;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .switch-tile.is-active {
+            border-color: #4f46e5;
+            background: #f5f7ff;
+            box-shadow: 0 0 0 1px #4f46e5, 0 4px 12px rgba(79, 70, 229, 0.08);
+        }
+
+        .switch-tile .form-check {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding-left: 0;
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+
+        .switch-tile .form-check-input {
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            appearance: none !important;
+            width: 46px !important;
+            min-width: 46px !important;
+            height: 26px !important;
+            border-radius: 26px !important;
+            cursor: pointer !important;
+            background-color: #cbd5e1 !important;
+            border: 1.5px solid #94a3b8 !important;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e") !important;
+            background-size: 20px 20px !important;
+            background-position: 2px center !important;
+            background-repeat: no-repeat !important;
+            transition: all .2s ease-in-out !important;
+            flex-shrink: 0;
+            margin: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }
+
+        .switch-tile .form-check-input:checked {
+            background-color: #4f46e5 !important;
+            border-color: #4f46e5 !important;
+            background-position: calc(100% - 2px) center !important;
         }
 
         /* Live Bell Preview Card */
@@ -194,6 +241,8 @@
                                                 data-icon="{{ $event['icon'] }}"
                                                 data-route="{{ $event['action_route'] }}"
                                                 data-vars="{{ json_encode($event['variables'] ?? []) }}"
+                                                data-notify-assigned="{{ !empty($event['notify_assigned_user']) ? '1' : '0' }}"
+                                                data-notify-creator="{{ !empty($event['notify_creator']) ? '1' : '0' }}"
                                                 {{ (old('event_key', $notificationRule->event_key) === $eKey) ? 'selected' : '' }}>
                                                 {{ $event['label'] }} ({{ $eKey }})
                                             </option>
@@ -278,24 +327,28 @@
 
                         <div class="row g-3 pt-2">
                             <div class="col-md-6">
-                                <div class="switch-tile">
+                                <div class="switch-tile {{ old('notify_creator', $notificationRule->notify_creator) ? 'is-active' : '' }}" id="tile_notify_creator">
                                     <div class="form-check form-switch mb-0">
                                         <input class="form-check-input ms-0 me-2" type="checkbox" name="notify_creator" id="notify_creator" value="1" {{ old('notify_creator', $notificationRule->notify_creator) ? 'checked' : '' }}>
-                                        <label class="form-check-label fw-bold text-dark fs-13" for="notify_creator">
-                                            {{ __('notifications.notify_creator') }}
-                                        </label>
-                                        <small class="text-muted d-block fs-11 mt-1">{{ __('notifications.notify_creator_desc') }}</small>
+                                        <div>
+                                            <label class="form-check-label fw-bold text-dark fs-13 d-block" for="notify_creator" style="cursor: pointer;">
+                                                {{ __('notifications.notify_creator') }}
+                                            </label>
+                                            <small class="text-muted d-block fs-11 mt-1">{{ __('notifications.notify_creator_desc') }}</small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <div class="switch-tile">
+                                <div class="switch-tile {{ old('notify_assigned_user', $notificationRule->notify_assigned_user) ? 'is-active' : '' }}" id="tile_notify_assigned_user">
                                     <div class="form-check form-switch mb-0">
                                         <input class="form-check-input ms-0 me-2" type="checkbox" name="notify_assigned_user" id="notify_assigned_user" value="1" {{ old('notify_assigned_user', $notificationRule->notify_assigned_user) ? 'checked' : '' }}>
-                                        <label class="form-check-label fw-bold text-dark fs-13" for="notify_assigned_user">
-                                            {{ __('notifications.notify_assigned_user') }}
-                                        </label>
-                                        <small class="text-muted d-block fs-11 mt-1">{{ __('notifications.notify_assigned_user_desc') }}</small>
+                                        <div>
+                                            <label class="form-check-label fw-bold text-dark fs-13 d-block" for="notify_assigned_user" style="cursor: pointer;">
+                                                {{ __('notifications.notify_assigned_user') }}
+                                            </label>
+                                            <small class="text-muted d-block fs-11 mt-1">{{ __('notifications.notify_assigned_user_desc') }}</small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -469,6 +522,36 @@
         if (titleInput) titleInput.addEventListener('input', updatePreview);
         if (bodyInput) bodyInput.addEventListener('input', updatePreview);
         if (iconInput) iconInput.addEventListener('input', updatePreview);
+
+        function syncSwitchTiles() {
+            ['notify_creator', 'notify_assigned_user'].forEach(function (id) {
+                const inp = document.getElementById(id);
+                const tile = document.getElementById('tile_' + id);
+                if (inp && tile) {
+                    if (inp.checked) {
+                        tile.classList.add('is-active');
+                    } else {
+                        tile.classList.remove('is-active');
+                    }
+                }
+            });
+        }
+
+        // Click on entire switch-tile to toggle switch
+        document.querySelectorAll('.switch-tile').forEach(function (tile) {
+            tile.addEventListener('click', function (e) {
+                if (e.target.tagName.toLowerCase() !== 'input' && e.target.tagName.toLowerCase() !== 'label') {
+                    const inp = tile.querySelector('input[type="checkbox"]');
+                    if (inp) {
+                        inp.checked = !inp.checked;
+                        $(inp).trigger('change');
+                    }
+                }
+            });
+        });
+
+        $('#notify_creator, #notify_assigned_user').on('change', syncSwitchTiles);
+        syncSwitchTiles();
 
         // When Event Trigger Changes
         $('#event_key').on('change', function () {

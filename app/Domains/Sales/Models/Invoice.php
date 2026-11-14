@@ -6,6 +6,8 @@ use App\Core\Database\BaseModel;
 use App\Domains\CRM\Models\Customer;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -13,11 +15,23 @@ class Invoice extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch;
 
+    protected ?string $rbacPermission = 'sales.invoices.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->where(function (Builder $sub) use ($user) {
+            $sub->whereHas('salesOrder', fn($soq) => $soq->where('sales_orders.sales_person_id', $user->id))
+                ->orWhereHas('customer.crmAccount', fn($caq) => $caq->where('crm_accounts.owner_id', $user->id));
+        });
+    }
+
     protected $fillable = [
         'tenant_id',
         'company_id',
         'branch_id',
         'customer_id',
+        'billing_address',
+        'shipping_address',
         'project_id',
         'sales_order_id',
         'material_requirement_id',
@@ -29,6 +43,7 @@ class Invoice extends BaseModel
         'subtotal',
         'tax_amount',
         'tax_type',
+        'tax_mode',
         'discount_type',
         'order_tax_rate',
         'gst_type',
@@ -135,5 +150,32 @@ class Invoice extends BaseModel
     public function allocations(): HasMany
     {
         return $this->hasMany(PaymentAllocation::class);
+    }
+
+    public function getEffectiveTaxModeAttribute(): string
+    {
+        if (!empty($this->attributes['tax_mode'])) {
+            return $this->attributes['tax_mode'];
+        }
+
+        if ($this->salesOrder && !empty($this->salesOrder->effective_tax_mode)) {
+            return $this->salesOrder->effective_tax_mode;
+        }
+
+        return 'exclusive';
+    }
+
+    public function getTaxableAmountAttribute(): float
+    {
+        $subtotal = (float)($this->subtotal ?? 0);
+        $discount = (float)($this->discount_amount ?? 0);
+        $net = max(0, $subtotal - $discount);
+
+        if ($this->effective_tax_mode === 'inclusive') {
+            $tax = (float)($this->tax_amount ?? 0);
+            return round(max(0, $net - $tax), 2);
+        }
+
+        return round($net, 2);
     }
 }

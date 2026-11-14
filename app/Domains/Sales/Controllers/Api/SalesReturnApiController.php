@@ -32,8 +32,8 @@ class SalesReturnApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -153,6 +153,16 @@ class SalesReturnApiController extends Controller
         }
 
         $validated = $validator->validated();
+
+        foreach ($validated['items'] as $item) {
+            $product = Product::find($item['product_id']);
+            if ($product && $product->isService()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "{$product->name} is a Service product and cannot be physically returned to inventory. Services require a Credit Note instead.",
+                ], 422);
+            }
+        }
 
         $defaultWhId = Warehouse::where('tenant_id', $tenantId)->orderByDesc('is_default')->first()?->id ?? 1;
 

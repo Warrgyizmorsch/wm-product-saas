@@ -14,7 +14,9 @@ use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class HelpdeskApiController extends Controller
 {
@@ -72,6 +74,18 @@ class HelpdeskApiController extends Controller
     }
 
     /**
+     * Resolve the active tenant ID dynamically without hardcoding.
+     */
+    private function resolveTenantId(): int
+    {
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        if (!$tenantId) {
+            abort(400, 'Unable to identify tenant context.');
+        }
+        return (int) $tenantId;
+    }
+
+    /**
      * Check if user is HR Admin / Support Manager.
      */
     private function isHrAdmin(): bool
@@ -81,7 +95,7 @@ class HelpdeskApiController extends Controller
             return false;
         }
 
-        $tenantId = tenant_id() ?? $user->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
 
         return (bool) (
             $user->is_admin ||
@@ -201,13 +215,14 @@ class HelpdeskApiController extends Controller
             return $authError;
         }
 
+        $tenantId = $this->resolveTenantId();
         $validated = $request->validate([
-            'category_id'     => 'required|exists:helpdesk_categories,id',
+            'category_id'     => ['required', Rule::exists('helpdesk_categories', 'id')->where('tenant_id', $tenantId)],
             'subject'         => 'required|string|max:255',
             'description'     => 'required|string',
             'priority'        => 'required|in:low,medium,high,urgent',
             'is_confidential' => 'nullable|boolean',
-            'attachments.*'   => 'nullable|file|max:10240',
+            'attachments.*'   => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
         $files = $request->file('attachments');
@@ -235,7 +250,7 @@ class HelpdeskApiController extends Controller
             return $authError;
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)
             ->with(['employee', 'category', 'assignedAgent', 'replies.sender', 'replies.attachments', 'attachments', 'rating'])
             ->find($id);
@@ -247,8 +262,8 @@ class HelpdeskApiController extends Controller
         $isHrAdmin = $this->isHrAdmin();
         $currentEmployee = $this->getAuthenticatedEmployee();
 
-        if (!$isHrAdmin && $currentEmployee) {
-            if ((int)$currentEmployee->id !== (int)$ticket->employee_id && (int)$currentEmployee->id !== (int)$ticket->assigned_to) {
+        if (!$isHrAdmin) {
+            if (!$currentEmployee || ((int)$currentEmployee->id !== (int)$ticket->employee_id && (int)$currentEmployee->id !== (int)$ticket->assigned_to)) {
                 return $this->sendError('Unauthorized access to this support ticket.', 403);
             }
         }
@@ -266,20 +281,32 @@ class HelpdeskApiController extends Controller
             return $authError;
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->find($id);
 
         if (!$ticket) {
             return $this->sendError("Helpdesk ticket with ID '{$id}' not found.", 404);
         }
 
+        if ($ticket->status === 'closed') {
+            return $this->sendError('Cannot reply to a closed ticket.', 422);
+        }
+
         $validated = $request->validate([
             'message'          => 'required|string',
             'is_internal_note' => 'nullable|boolean',
-            'attachments.*'    => 'nullable|file|max:10240',
+            'attachments.*'    => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
         $isHrAdmin = $this->isHrAdmin();
+        $currentEmployee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin) {
+            if (!$currentEmployee || ((int)$currentEmployee->id !== (int)$ticket->employee_id && (int)$currentEmployee->id !== (int)$ticket->assigned_to)) {
+                return $this->sendError('Unauthorized access to this support ticket.', 403);
+            }
+        }
+
         if (!empty($validated['is_internal_note']) && !$isHrAdmin) {
             return $this->sendError('Only authorized HR staff can post internal notes.', 403);
         }
@@ -323,7 +350,7 @@ class HelpdeskApiController extends Controller
             return $authError;
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->find($id);
 
         if (!$ticket) {
@@ -334,7 +361,7 @@ class HelpdeskApiController extends Controller
 
         $validated = $request->validate([
             'status'      => 'required|in:open,in_progress,pending_employee,resolved,closed',
-            'assigned_to' => 'nullable|exists:employees,id',
+            'assigned_to' => ['nullable', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'priority'    => 'nullable|in:low,medium,high,urgent',
         ]);
 
@@ -370,17 +397,26 @@ class HelpdeskApiController extends Controller
             return $authError;
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->find($id);
 
         if (!$ticket) {
             return $this->sendError("Helpdesk ticket with ID '{$id}' not found.", 404);
         }
 
+        if (!in_array($ticket->status, ['resolved', 'closed'])) {
+            return $this->sendError('Feedback can only be submitted for resolved or closed tickets.', 422);
+        }
+
         $validated = $request->validate([
             'rating'   => 'required|integer|min:1|max:5',
             'feedback' => 'nullable|string|max:1000',
         ]);
+
+        $currentEmployee = $this->getAuthenticatedEmployee();
+        if (!$currentEmployee || (int)$currentEmployee->id !== (int)$ticket->employee_id) {
+            return $this->sendError('Only the employee who raised the ticket can submit satisfaction feedback.', 403);
+        }
 
         $rating = HelpdeskSatisfactionRating::updateOrCreate(
             ['ticket_id' => $ticket->id],
@@ -406,7 +442,7 @@ class HelpdeskApiController extends Controller
             return $authError;
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
 
         $categories = HelpdeskCategory::where('tenant_id', $tenantId)
             ->with(['defaultAgent'])
@@ -447,12 +483,12 @@ class HelpdeskApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to create categories.', 403);
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
 
         $validated = $request->validate([
             'name'              => 'required|string|max:255',
             'description'       => 'nullable|string',
-            'default_agent_id'  => 'nullable|exists:employees,id',
+            'default_agent_id'  => ['nullable', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'default_sla_hours' => 'required|integer|min:1',
             'is_confidential'   => 'nullable|boolean',
         ]);
@@ -486,7 +522,7 @@ class HelpdeskApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to update categories.', 403);
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $category = HelpdeskCategory::where('tenant_id', $tenantId)->find($id);
 
         if (!$category) {
@@ -496,7 +532,7 @@ class HelpdeskApiController extends Controller
         $validated = $request->validate([
             'name'              => 'required|string|max:255',
             'description'       => 'nullable|string',
-            'default_agent_id'  => 'nullable|exists:employees,id',
+            'default_agent_id'  => ['nullable', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'default_sla_hours' => 'required|integer|min:1',
             'is_confidential'   => 'nullable|boolean',
             'is_active'         => 'nullable|boolean',
@@ -527,7 +563,7 @@ class HelpdeskApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to delete categories.', 403);
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $category = HelpdeskCategory::where('tenant_id', $tenantId)->find($id);
 
         if (!$category) {
@@ -556,7 +592,7 @@ class HelpdeskApiController extends Controller
             return $authError;
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $isHrAdmin = $this->isHrAdmin();
         $search = $request->input('search');
         $categoryId = $request->input('category_id');
@@ -609,7 +645,7 @@ class HelpdeskApiController extends Controller
             return $authError;
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $query = $request->input('q', '');
 
         if (strlen($query) < 2) {
@@ -637,7 +673,7 @@ class HelpdeskApiController extends Controller
             return $authError;
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $article = HelpdeskKbArticle::where('tenant_id', $tenantId)
             ->with('category')
             ->where(function ($q) use ($id) {
@@ -645,6 +681,10 @@ class HelpdeskApiController extends Controller
             })->first();
 
         if (!$article) {
+            return $this->sendError("Knowledge Base article with ID/slug '{$id}' not found.", 404);
+        }
+
+        if (!$this->isHrAdmin() && !$article->is_published) {
             return $this->sendError("Knowledge Base article with ID/slug '{$id}' not found.", 404);
         }
 
@@ -678,11 +718,11 @@ class HelpdeskApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required.', 403);
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
 
         $validated = $request->validate([
             'title'        => 'required|string|max:255',
-            'category_id'  => 'nullable|exists:helpdesk_categories,id',
+            'category_id'  => ['nullable', Rule::exists('helpdesk_categories', 'id')->where('tenant_id', $tenantId)],
             'content'      => 'required|string',
             'is_published' => 'nullable|boolean',
         ]);
@@ -714,7 +754,7 @@ class HelpdeskApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required.', 403);
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $article = HelpdeskKbArticle::where('tenant_id', $tenantId)->find($id);
 
         if (!$article) {
@@ -723,7 +763,7 @@ class HelpdeskApiController extends Controller
 
         $validated = $request->validate([
             'title'        => 'required|string|max:255',
-            'category_id'  => 'nullable|exists:helpdesk_categories,id',
+            'category_id'  => ['nullable', Rule::exists('helpdesk_categories', 'id')->where('tenant_id', $tenantId)],
             'content'      => 'required|string',
             'is_published' => 'nullable|boolean',
         ]);
@@ -751,7 +791,7 @@ class HelpdeskApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required.', 403);
         }
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->resolveTenantId();
         $article = HelpdeskKbArticle::where('tenant_id', $tenantId)->find($id);
 
         if (!$article) {
@@ -769,6 +809,12 @@ class HelpdeskApiController extends Controller
     private function formatTicketDetail(HelpdeskTicket $ticket): array
     {
         $ticket->loadMissing(['employee', 'category', 'assignedAgent', 'replies.sender', 'replies.attachments', 'attachments', 'rating']);
+
+        $isHrAdmin = $this->isHrAdmin();
+        $replies = $ticket->replies;
+        if (!$isHrAdmin && $replies) {
+            $replies = $replies->filter(fn ($r) => !$r->is_internal_note)->values();
+        }
 
         return [
             'id'              => $ticket->id,
@@ -800,16 +846,16 @@ class HelpdeskApiController extends Controller
                 'rating'   => $ticket->rating->rating,
                 'feedback' => $ticket->rating->feedback,
             ] : null,
-            'attachments'     => $ticket->attachments ? $ticket->attachments->map(function ($att) {
+            'attachments'     => $ticket->attachments ? $ticket->attachments->map(function ($att) use ($ticket) {
                 return [
                     'id'        => $att->id,
                     'file_name' => $att->file_name,
                     'file_type' => $att->file_type,
                     'file_size' => $att->file_size,
-                    'file_url'  => asset('storage/' . $att->file_path),
+                    'file_url'  => route('api.hrms.helpdesk.tickets.attachment', [$ticket->id, $att->id]),
                 ];
             }) : [],
-            'replies'         => $ticket->replies ? $ticket->replies->map(function ($rep) {
+            'replies'         => $replies ? $replies->map(function ($rep) use ($ticket) {
                 return [
                     'id'               => $rep->id,
                     'message'          => $rep->message,
@@ -818,13 +864,13 @@ class HelpdeskApiController extends Controller
                         'id'   => $rep->sender->id,
                         'name' => trim(($rep->sender->first_name ?? '') . ' ' . ($rep->sender->last_name ?? '')) ?: ($rep->sender->full_name ?? null),
                     ] : null,
-                    'attachments'      => $rep->attachments ? $rep->attachments->map(function ($att) {
+                    'attachments'      => $rep->attachments ? $rep->attachments->map(function ($att) use ($ticket) {
                         return [
                             'id'        => $att->id,
                             'file_name' => $att->file_name,
                             'file_type' => $att->file_type,
                             'file_size' => $att->file_size,
-                            'file_url'  => asset('storage/' . $att->file_path),
+                            'file_url'  => route('api.hrms.helpdesk.tickets.attachment', [$ticket->id, $att->id]),
                         ];
                     }) : [],
                     'created_at'       => $rep->created_at?->toIso8601String(),
@@ -840,5 +886,48 @@ class HelpdeskApiController extends Controller
             ],
             'created_at'      => $ticket->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * GET /api/hrms/helpdesk/tickets/{id}/attachments/{attachmentId}
+     * Authorized attachment download.
+     */
+    public function downloadAttachment(mixed $id, mixed $attachmentId)
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = $this->resolveTenantId();
+        $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->find($id);
+
+        if (!$ticket) {
+            return $this->sendError('Ticket not found.', 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $currentEmployee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin) {
+            if (!$currentEmployee || ((int)$currentEmployee->id !== (int)$ticket->employee_id && (int)$currentEmployee->id !== (int)$ticket->assigned_to)) {
+                return $this->sendError('Unauthorized access to this support ticket attachment.', 403);
+            }
+        }
+
+        $attachment = HelpdeskTicketAttachment::where('ticket_id', $ticket->id)->find($attachmentId);
+
+        if (!$attachment) {
+            return $this->sendError('Attachment not found.', 404);
+        }
+
+        if ($attachment->reply && $attachment->reply->is_internal_note && !$isHrAdmin) {
+            return $this->sendError('Unauthorized access to internal note attachment.', 403);
+        }
+
+        if (!Storage::disk('public')->exists($attachment->file_path)) {
+            return $this->sendError('Attachment file missing on disk.', 404);
+        }
+
+        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
     }
 }

@@ -53,6 +53,26 @@
             border-color: #cbd5e1;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
         }
+        .clearance-modal-avatar {
+            width: 38px;
+            height: 38px;
+            min-width: 38px;
+            min-height: 38px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 16px;
+        }
+        .bg-soft-primary { background-color: rgba(52, 84, 209, 0.1) !important; color: #3454d1 !important; }
+        .bg-soft-secondary { background-color: rgba(100, 116, 139, 0.1) !important; color: #64748b !important; }
+        .bg-soft-success { background-color: rgba(23, 198, 102, 0.1) !important; color: #17c666 !important; }
+        .bg-soft-danger { background-color: rgba(234, 77, 77, 0.1) !important; color: #ea4d4d !important; }
+        .bg-soft-warning { background-color: rgba(255, 162, 29, 0.1) !important; color: #ffa21d !important; }
+        .bg-soft-info { background-color: rgba(61, 199, 190, 0.1) !important; color: #3dc7be !important; }
+        .bg-soft-indigo { background-color: rgba(102, 16, 242, 0.1) !important; color: #6610f2 !important; }
+        .text-indigo { color: #6610f2 !important; }
     </style>
 @endpush
 
@@ -133,6 +153,15 @@
 
             {{-- Right: Actions Toolbar (Search, Sort, Filter) --}}
             <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+                @if($activeTab === 'clearances')
+                    <form method="POST" action="{{ route('hrms.exits.clearances.sync-all') }}" class="d-inline m-0">
+                        @csrf
+                        <x-ui.button variant="light" size="sm" icon="feather-refresh-cw" type="submit" class="border text-dark fw-semibold" title="Sync all active clearance cards with current Offboarding Policies">
+                            Sync All with Policies
+                        </x-ui.button>
+                    </form>
+                @endif
+
                 {{-- Search Form --}}
                 <form method="GET" action="{{ route('hrms.exits.index') }}" class="m-0" id="exitSearchForm" style="width: 220px;">
                     <input type="hidden" name="tab" value="{{ $activeTab }}">
@@ -359,10 +388,22 @@
                                 <div class="card-body p-3">
                                     <div class="row g-2">
                                         @php
-                                            $allCategories = $deptClearances->keys();
-                                            if ($allCategories->isEmpty()) {
-                                                $allCategories = collect(['it_assets', 'facilities_admin', 'finance_payroll', 'hr_operations', 'reporting_manager']);
+                                            $policyCategories = \App\Domains\HRMS\Models\ExitClearanceTemplate::where('tenant_id', $exit->tenant_id)
+                                                ->where(function($q) use ($exit) {
+                                                    $q->whereNull('company_id');
+                                                    if ($exit->employee?->company_id) {
+                                                        $q->orWhere('company_id', $exit->employee->company_id);
+                                                    }
+                                                })
+                                                ->where('status', true)
+                                                ->orderBy('sort_order')
+                                                ->pluck('clearance_category')
+                                                ->unique();
+
+                                            if ($policyCategories->isEmpty()) {
+                                                $policyCategories = collect(['it_assets', 'facilities_admin', 'finance_payroll', 'hr_operations', 'reporting_manager']);
                                             }
+                                            $allCategories = $policyCategories->merge($deptClearances->keys())->unique();
                                         @endphp
                                         @foreach($allCategories as $catKey)
                                             @php
@@ -413,9 +454,17 @@
                                     </div>
                                 </div>
                                 <div class="card-footer bg-light border-top p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                    <x-ui.button variant="primary" size="sm" icon="feather-check-square" data-bs-toggle="modal" data-bs-target="#allClearanceModal_{{ $exit->id }}" class="fw-bold shadow-sm">
-                                        Review All Checklists
-                                    </x-ui.button>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <x-ui.button variant="primary" size="sm" icon="feather-check-square" data-bs-toggle="modal" data-bs-target="#allClearanceModal_{{ $exit->id }}" class="fw-bold shadow-sm">
+                                            Review All Checklists
+                                        </x-ui.button>
+                                        <form method="POST" action="{{ route('hrms.exits.clearances.sync', $exit->id) }}" class="d-inline m-0">
+                                            @csrf
+                                            <x-ui.button variant="light" size="sm" icon="feather-refresh-cw" type="submit" class="border text-dark fw-semibold" title="Sync and refresh checklist points from Offboarding Policies">
+                                                Sync Policies
+                                            </x-ui.button>
+                                        </form>
+                                    </div>
                                     @if($progress === 100)
                                         <span class="text-success fw-bold fs-13"><i class="feather-check-circle me-1"></i> {{ __('hrms.exits.status_ready_settle') }}</span>
                                     @else
@@ -520,6 +569,10 @@
                                             <x-ui.badge soft variant="success" class="fs-11 text-nowrap">
                                                 <i class="feather-check-circle me-1"></i> {{ __('hrms.exits.status_paid') }}
                                             </x-ui.badge>
+                                        @elseif(($fnf->settlement_channel ?? '') === 'monthly_payroll' && ($fnf->status ?? '') === 'approved')
+                                            <x-ui.badge soft variant="info" class="fs-11 text-nowrap" title="Queued for Monthly Payroll Run">
+                                                <i class="feather-calendar me-1"></i> In Monthly Payroll
+                                            </x-ui.badge>
                                         @elseif($fnfProgress === 100)
                                             <x-ui.badge soft variant="primary" class="fs-11 text-nowrap">
                                                 <i class="feather-check me-1"></i> {{ __('hrms.exits.status_ready_settle') }}
@@ -538,8 +591,8 @@
                                             </form>
                                             <x-ui.icon-btn variant="transparent-dark" size="sm" icon="feather-printer" href="{{ route('hrms.exits.fnf-statement.view', $exit->id) }}" target="_blank" title="{{ __('hrms.exits.btn_view_statement') }}" />
                                             @if(($fnf->status ?? '') !== 'paid')
-                                                <x-ui.button variant="{{ $fnfProgress === 100 ? 'success' : 'outline-primary' }}" size="sm" icon="feather-check" data-bs-toggle="modal" data-bs-target="#finalizeFnfModal_{{ $exit->id }}" class="fw-semibold fs-11 py-1 px-2.5 text-nowrap">
-                                                    {{ __('hrms.exits.btn_pay') }}
+                                                <x-ui.button variant="{{ ($fnf->settlement_channel ?? '') === 'monthly_payroll' && ($fnf->status ?? '') === 'approved' ? 'outline-info' : ($fnfProgress === 100 ? 'success' : 'outline-primary') }}" size="sm" icon="feather-check" data-bs-toggle="modal" data-bs-target="#finalizeFnfModal_{{ $exit->id }}" class="fw-semibold fs-11 py-1 px-2.5 text-nowrap">
+                                                    {{ ($fnf->settlement_channel ?? '') === 'monthly_payroll' && ($fnf->status ?? '') === 'approved' ? 'Update Payout' : __('hrms.exits.btn_pay') }}
                                                 </x-ui.button>
                                             @endif
                                         </div>
@@ -791,7 +844,7 @@
         <!-- 2.5 Unified All-in-One Clearance Checklist Sign-off Modal -->
         <x-ui.modal 
             id="allClearanceModal_{{ $exit->id }}" 
-            title="<div class='d-flex align-items-center gap-2'><div class='avatar-text avatar-xs bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center'><i class='feather-shield fs-12'></i></div><div><span class='fw-bold text-dark d-block fs-14'>Clearance & NOC Checklist Sign-Off</span><span class='text-muted fs-11 fw-normal'>{{ __('hrms.exits.employee_label') }}: <strong>{{ $exit->employee->full_name }}</strong> ({{ $exit->employee->employee_id }})</span></div></div>" 
+            title="<div class='d-flex align-items-center gap-2.5'><div class='clearance-modal-avatar bg-soft-primary text-primary'><i class='feather-shield'></i></div><div><span class='fw-bold text-dark d-block fs-15 lh-sm mb-0.5'>Clearance & NOC Checklist Sign-Off</span><span class='text-muted fs-11 fw-normal'>{{ __('hrms.exits.employee_label') }}: <strong class='text-dark'>{{ $exit->employee->full_name }}</strong> ({{ $exit->employee->employee_id }})</span></div></div>" 
             size="xl" 
             formAction="{{ route('hrms.exits.clearances.batch-update-all', $exit->id) }}" 
             formMethod="POST"
@@ -801,6 +854,12 @@
             <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
                 <span class="text-muted fs-12"><i class="feather-info me-1"></i> Review and sign off verification points across all departments. Flags with penalty amounts auto-sync to FnF settlement.</span>
                 <div class="d-flex gap-2">
+                    <form method="POST" action="{{ route('hrms.exits.clearances.sync', $exit->id) }}" class="d-inline m-0">
+                        @csrf
+                        <x-ui.button type="submit" variant="outline-primary" size="xs" class="fw-semibold px-2 py-1 fs-11" title="Reload active checkpoints directly from Offboarding Policies">
+                            <i class="feather-refresh-cw me-1"></i> Reset to Policy Checklist
+                        </x-ui.button>
+                    </form>
                     <x-ui.button type="button" variant="outline-success" size="xs" class="fw-semibold px-2 py-1 fs-11" onclick="setClearanceBatchStatus('allClearanceModal_{{ $exit->id }}', 'cleared')">
                         <i class="feather-check-circle me-1"></i> Mark All Cleared
                     </x-ui.button>
@@ -919,7 +978,7 @@
             @endphp
             <x-ui.modal 
                 id="clearanceModal_{{ $exit->id }}_{{ $deptKey }}" 
-                title="<div class='d-flex align-items-center gap-2'><div class='avatar-text avatar-xs bg-soft-{{ $meta['color'] }} text-{{ $meta['color'] }} rounded-circle d-flex align-items-center justify-content-center'><i class='{{ $meta['icon'] }} fs-12'></i></div><div><span class='fw-bold text-dark d-block fs-14'>{{ __('hrms.exits.clearance_checklist_title', ['department' => $meta['name']]) }}</span><span class='text-muted fs-11 fw-normal'>{{ __('hrms.exits.employee_label') }}: <strong>{{ $exit->employee->full_name }}</strong> ({{ $exit->employee->employee_id }})</span></div></div>" 
+                title="<div class='d-flex align-items-center gap-2.5'><div class='clearance-modal-avatar bg-soft-{{ $meta['color'] }} text-{{ $meta['color'] }}'><i class='{{ $meta['icon'] }}'></i></div><div><span class='fw-bold text-dark d-block fs-15 lh-sm mb-0.5'>{{ __('hrms.exits.clearance_checklist_title', ['department' => $meta['name']]) }}</span><span class='text-muted fs-11 fw-normal'>{{ __('hrms.exits.employee_label') }}: <strong class='text-dark'>{{ $exit->employee->full_name }}</strong> ({{ $exit->employee->employee_id }})</span></div></div>" 
                 size="lg" 
                 formAction="{{ route('hrms.exits.clearances.batch-update', ['exit' => $exit->id, 'department' => $deptKey]) }}" 
                 formMethod="POST"
@@ -1113,14 +1172,27 @@
             @php
                 $progress = $exit->getClearanceProgressPercentage();
                 $isIncomplete = $exit->clearances->where('status', 'pending')->count() > 0;
+                $pendingClearances = $exit->clearances->where('status', 'pending');
                 $pendingDepts = [];
-                foreach(['it' => 'IT & Systems', 'admin' => 'Facilities & Admin', 'finance' => 'Finance & Payroll', 'hr' => 'HR & Operations', 'manager' => 'Reporting Manager'] as $deptKey => $deptLabel) {
-                    $pCount = $exit->clearances->where('department', $deptKey)->where('status', 'pending')->count();
-                    if ($pCount > 0) {
-                        $pendingDepts[] = "$deptLabel ($pCount " . __('hrms.exits.unreviewed_count', ['count' => '']) . ")";
-                    }
+                foreach ($pendingClearances->groupBy('department') as $deptKey => $pItems) {
+                    $meta = \App\Domains\HRMS\Models\ExitClearanceTemplate::getCategoryMetadata($deptKey);
+                    $pendingDepts[] = $meta['name'] . " (" . $pItems->count() . " " . __('hrms.exits.unreviewed_count', ['count' => '']) . ")";
                 }
                 $clearanceDues = $exit->fnfSettlement->asset_damage_recovery ?? 0;
+
+                // Accounting Paying Ledgers & Current Balances
+                $payingLedgers = collect();
+                $ledgerBalances = collect();
+                $defaultPayingLedger = null;
+                try {
+                    $payrollBooks = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
+                    $payingLedgers = $payrollBooks->payingLedgers();
+                    $ledgerBalances = $payingLedgers->mapWithKeys(fn ($ledger) => [$ledger->id => $payrollBooks->balance($ledger)]);
+                    $defaultPayingLedger = $payingLedgers->firstWhere('system_key', \App\Domains\Accounting\Support\SystemAccount::BANK) ?? $payingLedgers->first();
+                } catch (\Throwable $e) {
+                    // Safe fallback if accounting ledgers unavailable
+                }
+                $currentChannel = $exit->fnfSettlement->settlement_channel ?? 'monthly_payroll';
             @endphp
             <x-ui.modal 
                 id="finalizeFnfModal_{{ $exit->id }}" 
@@ -1197,33 +1269,163 @@
                         </div>
                     </div>
                 </div>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <x-ui.modal-form-ui type="select" name="settlement_channel" :label="__('hrms.exits.payout_channel')" :searchable="false">
-                            <option value="monthly_payroll">{{ __('hrms.exits.channel_monthly_payroll') }}</option>
-                            <option value="off_cycle">{{ __('hrms.exits.channel_off_cycle') }}</option>
-                        </x-ui.modal-form-ui>
+                <!-- Channel Selector -->
+                <div class="mb-3">
+                    <x-ui.modal-form-ui 
+                        type="select" 
+                        name="settlement_channel" 
+                        id="settlement_channel_{{ $exit->id }}" 
+                        :label="__('hrms.exits.payout_channel')" 
+                        :required="true" 
+                        :searchable="true"
+                        data-exit-id="{{ $exit->id }}"
+                    >
+                        <option value="monthly_payroll" {{ $currentChannel === 'monthly_payroll' ? 'selected' : '' }}>
+                            {{ __('hrms.exits.channel_monthly_payroll') }}
+                        </option>
+                        <option value="off_cycle" {{ $currentChannel === 'off_cycle' ? 'selected' : '' }}>
+                            {{ __('hrms.exits.channel_off_cycle') }}
+                        </option>
+                    </x-ui.modal-form-ui>
+                </div>
+
+                <!-- Option A: Queued for Monthly Payroll Run -->
+                <div id="monthly_payroll_info_{{ $exit->id }}" class="alert alert-info border border-info border-opacity-25 rounded-3 p-3 mb-3" style="{{ $currentChannel === 'off_cycle' ? 'display: none;' : '' }}">
+                    <div class="d-flex align-items-start gap-2.5">
+                        <div class="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0 bg-info bg-opacity-10 text-info mt-0.5" style="width: 32px; height: 32px;">
+                            <i class="feather-calendar fs-16"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="fw-bold text-dark mb-1 fs-13">Queued for Regular Monthly Payroll Run</h6>
+                            <p class="fs-12 text-muted mb-2 lh-base">
+                                This settlement will be automatically merged into the company's regular monthly payroll cycle. Disbursement and ledger accounting entry will take place when the Accounts team finalizes and releases the payroll run.
+                            </p>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="badge bg-soft-info text-info fs-11 px-2.5 py-1">
+                                    <i class="feather-shield me-1"></i> No bank debit required now
+                                </span>
+                                <span class="badge bg-soft-success text-success fs-11 px-2.5 py-1">
+                                    <i class="feather-check me-1"></i> Net Payout: ${{ number_format($exit->fnfSettlement->net_payable_amount ?? 0, 2) }}
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <x-ui.modal-form-ui type="select" name="payment_method" :label="__('hrms.exits.payment_mode')" :searchable="false">
-                            <option value="Bank Transfer">{{ __('hrms.exits.mode_bank_transfer') }}</option>
-                            <option value="Cheque">{{ __('hrms.exits.mode_cheque') }}</option>
-                            <option value="UPI / Online">{{ __('hrms.exits.mode_upi') }}</option>
-                        </x-ui.modal-form-ui>
+                </div>
+
+                <!-- Option B: Immediate Payout by Accounting -->
+                <div id="offcycle_accounting_wrap_{{ $exit->id }}" class="p-3 bg-light rounded-3 border mb-3" style="{{ $currentChannel === 'off_cycle' ? '' : 'display: none;' }}">
+                    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+                        <i class="feather-dollar-sign text-success fs-16"></i>
+                        <h6 class="fw-bold text-dark mb-0 fs-13">Accounting Immediate Payout Details</h6>
                     </div>
-                    <div class="col-md-12">
-                        <x-ui.modal-form-ui type="input" name="payment_reference" :label="__('hrms.exits.payment_reference')" placeholder="{{ __('hrms.exits.reference_placeholder') }}" />
+                    
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <x-ui.modal-form-ui 
+                                type="select" 
+                                name="bank_account_id" 
+                                id="bank_account_id_{{ $exit->id }}" 
+                                label="Paid From (Cash / Bank Ledger)" 
+                                :required="$currentChannel === 'off_cycle'" 
+                                :searchable="true"
+                                data-exit-id="{{ $exit->id }}"
+                            >
+                                @forelse($payingLedgers as $ledger)
+                                    @php $bal = (float) ($ledgerBalances[$ledger->id] ?? 0); @endphp
+                                    <option 
+                                        value="{{ $ledger->id }}" 
+                                        data-balance="{{ $bal }}"
+                                        @selected(($defaultPayingLedger?->id ?? null) === $ledger->id)
+                                    >
+                                        {{ $ledger->code }} — {{ $ledger->name }} (Balance: ${{ number_format($bal, 2) }})
+                                    </option>
+                                @empty
+                                    <option value="">No Cash or Bank Accounts Found</option>
+                                @endforelse
+                            </x-ui.modal-form-ui>
+                            <div class="form-text fs-11 text-muted mt-1 d-flex align-items-center justify-content-between">
+                                <span>
+                                    <i class="feather-credit-card me-1 text-primary"></i>
+                                    Account Balance: <strong id="ledger_bal_display_{{ $exit->id }}" class="text-dark">${{ number_format($ledgerBalances[$defaultPayingLedger?->id ?? null] ?? 0, 2) }}</strong>
+                                </span>
+                                <span class="text-secondary">(Cash-in-Hand cannot pay more than available cash).</span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <x-ui.modal-form-ui 
+                                type="input" 
+                                inputType="date" 
+                                name="payout_date" 
+                                id="payout_date_{{ $exit->id }}" 
+                                label="Payout Date" 
+                                :value="now()->toDateString()" 
+                                :required="$currentChannel === 'off_cycle'" 
+                            />
+                        </div>
+
+                        <div class="col-md-6">
+                            <x-ui.modal-form-ui 
+                                type="select" 
+                                name="payment_method" 
+                                id="payment_method_{{ $exit->id }}"
+                                :label="__('hrms.exits.payment_mode')" 
+                                :searchable="true"
+                            >
+                                <option value="Bank Transfer">{{ __('hrms.exits.mode_bank_transfer') }}</option>
+                                <option value="Cheque">{{ __('hrms.exits.mode_cheque') }}</option>
+                                <option value="UPI / Online">{{ __('hrms.exits.mode_upi') }}</option>
+                                <option value="Cash">Cash</option>
+                            </x-ui.modal-form-ui>
+                        </div>
+
+                        <div class="col-12">
+                            <x-ui.modal-form-ui 
+                                type="input" 
+                                name="payment_reference" 
+                                id="payment_reference_{{ $exit->id }}"
+                                :label="__('hrms.exits.payment_reference')" 
+                                placeholder="{{ __('hrms.exits.reference_placeholder') }}" 
+                                helperText="Cheque number, bank UTR, transaction ID, or voucher reference"
+                            />
+                        </div>
+
+                        <div class="col-12">
+                            <div class="alert alert-warning border border-warning border-opacity-25 rounded-3 p-2.5 mb-0 fs-11 text-dark">
+                                <i class="feather-alert-circle text-warning me-1"></i>
+                                Double-entry payment journal will immediately post (Dr Salary Payable 2030 / Cr Bank Ledger), the employee profile will be relieved, and exit documents will be issued.
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-12">
-                        <x-ui.modal-form-ui type="textarea" name="notes" :label="__('hrms.exits.settlement_notes')" rows="2" placeholder="{{ __('hrms.exits.notes_placeholder') }}" />
-                    </div>
+                </div>
+
+                <!-- Settlement Notes -->
+                <div class="mb-3">
+                    <x-ui.modal-form-ui 
+                        type="textarea" 
+                        name="notes" 
+                        id="notes_{{ $exit->id }}"
+                        :label="__('hrms.exits.settlement_notes')" 
+                        rows="2" 
+                        placeholder="{{ __('hrms.exits.notes_placeholder') }}" 
+                        :value="$exit->fnfSettlement->notes ?? ''"
+                    />
                 </div>
 
                 <x-slot:footer>
                     <div class="d-flex justify-content-between align-items-center w-100">
                         <x-ui.button variant="light" data-bs-dismiss="modal" class="border px-4 fw-semibold">{{ __('hrms.exits.btn_cancel') }}</x-ui.button>
-                        <x-ui.button variant="success" type="submit" class="px-4 fw-bold">
-                            <i class="feather-check-circle me-1"></i> {{ __('hrms.exits.btn_disburse_complete') }}
+                        <x-ui.button 
+                            id="fnf_submit_btn_{{ $exit->id }}" 
+                            variant="{{ $currentChannel === 'off_cycle' ? 'success' : 'primary' }}" 
+                            type="submit" 
+                            class="px-4 fw-bold"
+                        >
+                            @if($currentChannel === 'off_cycle')
+                                <i class="feather-check-circle me-1"></i> {{ __('hrms.exits.btn_disburse_complete') }}
+                            @else
+                                <i class="feather-calendar me-1"></i> Confirm & Add to Payroll
+                            @endif
                         </x-ui.button>
                     </div>
                 </x-slot:footer>
@@ -1235,6 +1437,86 @@
 
 @push('scripts')
 <script>
+    function toggleFnfPayoutChannel(exitId, channel) {
+        var $monthlyInfo = $('#monthly_payroll_info_' + exitId);
+        var $offcycleWrap = $('#offcycle_accounting_wrap_' + exitId);
+        var $bankSelect = $('#bank_account_id_' + exitId);
+        var $payoutDate = $('#payout_date_' + exitId);
+        var $submitBtn = $('#fnf_submit_btn_' + exitId);
+
+        if (channel === 'off_cycle') {
+            $monthlyInfo.stop(true, true).slideUp(150);
+            $offcycleWrap.stop(true, true).slideDown(150, function() {
+                var $modal = $('#finalizeFnfModal_' + exitId);
+                $offcycleWrap.find('.form-ui-select2').each(function() {
+                    var $sel = $(this);
+                    if ($sel.hasClass('select2-hidden-accessible')) {
+                        $sel.select2('destroy');
+                    }
+                    $sel.select2({
+                        theme: "bootstrap-5",
+                        width: "100%",
+                        dropdownParent: $modal.length ? $modal : $(document.body)
+                    });
+                });
+                updateFnfLedgerBalance(exitId);
+            });
+            $bankSelect.prop('required', true);
+            $payoutDate.prop('required', true);
+            $submitBtn.removeClass('btn-primary').addClass('btn-success');
+            $submitBtn.html('<i class="feather-check-circle me-1"></i> ' + @json(__('hrms.exits.btn_disburse_complete')));
+        } else {
+            $offcycleWrap.stop(true, true).slideUp(150);
+            $monthlyInfo.stop(true, true).slideDown(150);
+            $bankSelect.prop('required', false);
+            $payoutDate.prop('required', false);
+            $submitBtn.removeClass('btn-success').addClass('btn-primary');
+            $submitBtn.html('<i class="feather-calendar me-1"></i> Confirm & Add to Payroll');
+        }
+    }
+
+    function updateFnfLedgerBalance(exitId) {
+        var $bankSelect = $('#bank_account_id_' + exitId);
+        var $selectedOption = $bankSelect.find('option:selected');
+        var balance = parseFloat($selectedOption.data('balance') || 0);
+        var formatted = '$' + balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        $('#ledger_bal_display_' + exitId).text(formatted);
+    }
+
+    $(document).on('change select2:select', 'select[name="settlement_channel"]', function() {
+        var exitId = $(this).data('exit-id') || (this.id ? this.id.replace('settlement_channel_', '') : null);
+        if (exitId) {
+            toggleFnfPayoutChannel(exitId, $(this).val());
+        }
+    });
+
+    $(document).on('change select2:select', 'select[name="bank_account_id"]', function() {
+        var exitId = $(this).data('exit-id') || (this.id ? this.id.replace('bank_account_id_', '') : null);
+        if (exitId) {
+            updateFnfLedgerBalance(exitId);
+        }
+    });
+
+    $(document).on('shown.bs.modal', '.modal[id^="finalizeFnfModal_"]', function() {
+        var $modal = $(this);
+        var modalId = $modal.attr('id') || '';
+        var exitId = modalId.replace('finalizeFnfModal_', '');
+        if (exitId) {
+            updateFnfLedgerBalance(exitId);
+        }
+        $modal.find('.form-ui-select2').each(function() {
+            var $sel = $(this);
+            if ($sel.hasClass('select2-hidden-accessible')) {
+                $sel.select2('destroy');
+            }
+            $sel.select2({
+                theme: "bootstrap-5",
+                width: "100%",
+                dropdownParent: $modal
+            });
+        });
+    });
+
     function togglePenaltyField($select) {
         var itemId = $select.data('item-id');
         if (!itemId) {

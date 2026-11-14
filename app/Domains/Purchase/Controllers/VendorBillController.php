@@ -209,6 +209,9 @@ class VendorBillController extends Controller
             'freight_tax_method'    => 'nullable|string',
             'freight_allocation_method' => 'nullable|string|in:by_amount,by_quantity,none,direct_expense',
             'adjustment'            => 'nullable|numeric',
+            'tds_section_id'        => 'nullable|integer|exists:tds_sections,id',
+            'tds_amount'            => 'nullable|numeric|min:0',
+            'tds_overridden'        => 'nullable|boolean',
             'notes'                 => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|integer',
@@ -231,15 +234,30 @@ class VendorBillController extends Controller
 
         event(new BillPosted($bill));
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.bill.created', [
-            'bill_no' => $bill->bill_number ?? $bill->vendor_bill_number ?? 'BILL',
-            'vendor_name' => $bill->vendor?->name ?? 'Vendor',
-            'amount' => number_format((float)($bill->grand_total ?? $bill->total_amount ?? 0), 2),
-            'due_date' => $bill->due_date ? (is_string($bill->due_date) ? $bill->due_date : $bill->due_date->format('Y-m-d')) : 'N/A',
-        ], route('purchase.bills.show', $bill->id), $bill);
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyBillCreated($bill);
 
         return redirect()->route('purchase.bills.show', $bill->id)
             ->with('success', "Vendor Bill {$bill->bill_number} created successfully.");
+    }
+
+    /** TDS the bill form shows while it is filled in (JSON). */
+    public function tdsPreview(Request $request, \App\Domains\Purchase\Services\VendorBillTdsService $tds)
+    {
+        $this->authorize('create', VendorBill::class);
+
+        $validated = $request->validate([
+            'vendor_id' => 'required|integer',
+            'base' => 'required|numeric|min:0',
+            'bill_date' => 'nullable|date',
+            'tds_section_id' => 'nullable|integer',
+        ]);
+
+        return response()->json($tds->preview(
+            (int) $validated['vendor_id'],
+            (float) $validated['base'],
+            $validated['bill_date'] ?? now()->toDateString(),
+            filled($validated['tds_section_id'] ?? null) ? (int) $validated['tds_section_id'] : null,
+        ));
     }
 
     public function show(int $id)
@@ -249,7 +267,8 @@ class VendorBillController extends Controller
         if ($bill) {
             $this->authorize('view', $bill);
         }
-        $availableAdvance = $bill ? $this->billService->getAvailableVendorAdvance($bill->vendor_id, $tenantId) : 0.0;
+        $poId = $bill ? ($bill->purchase_order_id ?? $bill->goodsReceiptNote?->purchase_order_id) : null;
+        $availableAdvance = $bill ? $this->billService->getAvailableVendorAdvance($bill->vendor_id, $tenantId, $poId) : 0.0;
         return view('modules.purchase.bills.show', compact('bill', 'availableAdvance'));
     }
 
@@ -373,7 +392,7 @@ class VendorBillController extends Controller
                 $prefilledVendorId = $selectedDispatch->transporter_id;
             }
 
-            $prefilledAmount      = $prefilledAmount      ?: $selectedDispatch->freight_amount;
+            $prefilledAmount      = $prefilledAmount      ?: ($selectedDispatch->freight_amount > 0 ? convert_from_base((float) $selectedDispatch->freight_amount) : null);
             $prefilledInvoice     = $prefilledInvoice     ?: ('LR-' . ($selectedDispatch->lr_number ?: ($selectedDispatch->dispatch_number ?? $selectedDispatch->id)));
             $prefilledNotes       = $prefilledNotes       ?: "Freight Obligation Bill for Dispatch #{$selectedDispatch->dispatch_number} | Customer: " . ($selectedDispatch->customer?->name ?? 'N/A') . " | Vehicle: " . ($selectedDispatch->vehicle_number ?: 'N/A');
             $prefilledServiceHead = $prefilledServiceHead ?: 'Freight & Transport';
@@ -453,10 +472,14 @@ class VendorBillController extends Controller
             'bill_date'             => 'required|date',
             'due_date'              => 'required|date|after_or_equal:bill_date',
             'vendor_invoice_number' => 'nullable|string|max:255',
+            'tds_section_id'        => 'nullable|integer|exists:tds_sections,id',
+            'tds_amount'            => 'nullable|numeric|min:0',
+            'tds_overridden'        => 'nullable|boolean',
             'notes'                 => 'nullable|string',
         ]);
 
-        $subtotal   = (float) $validated['amount'];
+        $rawAmount  = (float) $validated['amount'];
+        $subtotal   = convert_to_base($rawAmount);
         $taxRate    = (float) $validated['tax_rate'];
         $gstType    = $validated['gst_type'];
         $isRcm      = in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst']);
@@ -465,9 +488,9 @@ class VendorBillController extends Controller
         $taxAmount  = ($subtotal * $taxRate) / 100;
         $grandTotal = $isRcm ? $subtotal : ($subtotal + $taxAmount);
 
-        $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
-        $sgstAmount = $isIgst ? 0 : round($taxAmount - $cgstAmount, 2);
-        $igstAmount = $isIgst ? round($taxAmount, 2) : 0;
+        $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 4);
+        $sgstAmount = $isIgst ? 0 : round($taxAmount - $cgstAmount, 4);
+        $igstAmount = $isIgst ? round($taxAmount, 4) : 0;
 
         $billNumber = $this->billRepo->getNextBillNumber($tenantId);
 
@@ -480,11 +503,12 @@ class VendorBillController extends Controller
             : null;
 
         $serviceHead = $validated['service_head'];
-        $notesParts = [];
+        // The head always leads the notes: PostPurchaseBillJournal picks the
+        // expense ledger (Insurance, Customs, Loading ...) from it, so user notes
+        // must not replace it.
+        $notesParts = ["{$serviceHead} Service Charge"];
         if (!empty($validated['notes'])) {
             $notesParts[] = $validated['notes'];
-        } else {
-            $notesParts[] = "{$serviceHead} Service Charge";
         }
         if ($dispatchOrder) {
             $notesParts[] = "Dispatch #{$dispatchOrder->dispatch_number}";
@@ -515,7 +539,8 @@ class VendorBillController extends Controller
             'igst_amount'           => $igstAmount,
             'grand_total'           => $grandTotal,
             'paid_amount'           => 0,
-            'due_amount'            => round($grandTotal, 2),
+            'due_amount'            => round($grandTotal, 4),
+            ...\App\Domains\Purchase\Services\VendorBillTdsService::fromInput($validated),
             'notes'                 => $notes,
             'created_by'            => auth()->id() ?: 1,
         ]);
@@ -532,7 +557,22 @@ class VendorBillController extends Controller
         // Dispatch BillPosted event to trigger GL Journal Entry Posting
         event(new \App\Domains\Purchase\Events\BillPosted($bill));
 
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyBillCreated($bill);
+
         return redirect()->route('purchase.bills.show', $bill->id)
             ->with('success', "Service Bill {$bill->bill_number} created successfully.");
+    }
+
+    public function downloadPdf($id)
+    {
+        $tenantId = require_tenant_id();
+        $bill = VendorBill::where('tenant_id', $tenantId)
+            ->with(['vendor', 'purchaseOrder', 'goodsReceiptNote', 'items.product'])
+            ->findOrFail($id);
+
+        $this->authorize('view', $bill);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.purchase.bills.pdf', compact('bill'));
+        return $pdf->download("Bill_{$bill->bill_number}.pdf");
     }
 }

@@ -36,14 +36,14 @@ class DocumentSignatureService
             $filename = "sig_" . Str::random(12) . "_" . time() . ".png";
             $relativePath = "{$folder}/{$filename}";
             
-            Storage::disk('public')->put($relativePath, $imageDecoded);
+            tenant_storage()->put('public', $relativePath, $imageDecoded);
         } elseif (!str_contains($signatureInput, '/') && !str_contains($signatureInput, '\\') && strlen($signatureInput) > 30) {
             // Raw base64 string without data:image scheme
             $imageDecoded = base64_decode($signatureInput);
             if ($imageDecoded !== false) {
                 $filename = "sig_" . Str::random(12) . "_" . time() . ".png";
                 $relativePath = "{$folder}/{$filename}";
-                Storage::disk('public')->put($relativePath, $imageDecoded);
+                tenant_storage()->put('public', $relativePath, $imageDecoded);
             } else {
                 $relativePath = $signatureInput;
             }
@@ -122,7 +122,7 @@ class DocumentSignatureService
                 ->setPaper('a4', 'portrait')
                 ->setWarnings(false);
             
-            Storage::disk('public')->put($pdfStoragePath, $pdf->output());
+            tenant_storage()->put('public', $pdfStoragePath, $pdf->output());
         } catch (\Exception $e) {
             Log::error("Failed to render PDF in DocumentSignatureService: " . $e->getMessage());
         }
@@ -314,7 +314,7 @@ class DocumentSignatureService
 
         try {
             $pdf = Pdf::loadHTML($signedHtml)->setPaper('a4', 'portrait')->setWarnings(false);
-            Storage::disk('public')->put($pdfStoragePath, $pdf->output());
+            tenant_storage()->put('public', $pdfStoragePath, $pdf->output());
         } catch (\Throwable $e) {
             Log::error("Failed to generate signed document PDF: " . $e->getMessage());
             $pdfStoragePath = $originalFilePath;

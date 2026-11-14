@@ -6,6 +6,9 @@ use App\Domains\Accounting\Models\AccountingPeriod;
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Services\FiscalPeriodService;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\OpeningBalanceService;
+use App\Domains\Accounting\Services\SystemAccountService;
+use App\Domains\Accounting\Support\SystemAccount;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -108,6 +111,8 @@ class BalanceSheetController extends Controller
                 }
             }
 
+            $this->reclassifyPartyAdvances($sections, $totals, (int) auth()->user()->tenant_id, $asOfDate);
+
             $netIncome = $incomeTotal - $expenseTotal;
             $totals['equity'] += $netIncome;
 
@@ -128,6 +133,56 @@ class BalanceSheetController extends Controller
             'totals' => $totals,
             'netIncome' => $netIncome,
             'isBalanced' => $isBalanced,
+            'openingDifference' => $period
+                ? app(OpeningBalanceService::class)->differenceBalance((int) auth()->user()->tenant_id, \Illuminate\Support\Carbon::parse($period->end_date))
+                : 0.0,
         ];
+    }
+
+    /**
+     * Schedule III: a customer in credit is an advance received (a liability)
+     * and a supplier in debit an advance paid (an asset); netting them inside
+     * Receivable/Payable would understate both sides. Moves those party
+     * balances to Advance from Customers / Advance to Suppliers; totals still
+     * balance because both sides grow by the same amount.
+     */
+    private function reclassifyPartyAdvances(array &$sections, array &$totals, int $tenantId, \DateTimeInterface $asOf): void
+    {
+        $systemAccounts = app(SystemAccountService::class);
+
+        $moves = [
+            [SystemAccount::AR, SystemAccount::ADVANCE_FROM_CUSTOMERS, 'asset', 'liability', true],
+            [SystemAccount::AP, SystemAccount::ADVANCE_TO_SUPPLIERS, 'liability', 'asset', false],
+        ];
+
+        foreach ($moves as [$controlKey, $advanceKey, $from, $to, $debitNormal]) {
+            $control = $systemAccounts->get($controlKey, $tenantId);
+            $advance = $systemAccounts->get($advanceKey, $tenantId);
+
+            if ($control === null || $advance === null) {
+                continue;
+            }
+
+            $amount = $this->journals->oppositeSidePartyTotal($tenantId, $control->id, $asOf, $debitNormal);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            foreach ([[$from, $control], [$to, $advance]] as [$side, $account]) {
+                $bucket = $sections[$side]['non_current']->contains(fn ($row) => $row['account']->id === $account->id) ? 'non_current' : 'current';
+                $rows = $sections[$side][$bucket];
+                $index = $rows->search(fn ($row) => $row['account']->id === $account->id);
+
+                if ($index === false) {
+                    $rows->push(['account' => $account, 'balance' => $amount]);
+                } else {
+                    $rows->put($index, ['account' => $account, 'balance' => $rows[$index]['balance'] + $amount]);
+                }
+
+                $sections[$side][$bucket] = $rows;
+                $totals[$side] += $amount;
+                $totals["{$side}_{$bucket}"] += $amount;
+            }
+        }
     }
 }

@@ -7,10 +7,11 @@ use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Concerns\NormalizesTaxIdentity;
 
 class Vendor extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch;
+    use HasFactory, BelongsToCompany, BelongsToBranch, NormalizesTaxIdentity;
 
     protected $table = 'vendors';
 
@@ -33,7 +34,27 @@ class Vendor extends BaseModel
         'ifsc_code',
         'payment_terms',
         'opening_balance',
+        'opening_balance_type',
+        'opening_bills',
         'status',
+        // TDS (see App\Domains\Accounting\Services\Tds\TdsCalculator)
+        'tds_applicable',
+        'tds_section_id',
+        'deductee_type',
+        'ldc_number',
+        'ldc_rate',
+        'ldc_valid_from',
+        'ldc_valid_to',
+        'ldc_limit',
+    ];
+
+    protected $casts = [
+        'opening_bills' => 'array',
+        'tds_applicable' => 'boolean',
+        'ldc_rate' => 'float',
+        'ldc_limit' => 'float',
+        'ldc_valid_from' => 'date',
+        'ldc_valid_to' => 'date',
     ];
 
     public function operations(): HasMany
@@ -54,5 +75,20 @@ class Vendor extends BaseModel
     public function purchaseOrders(): HasMany
     {
         return $this->hasMany(\App\Domains\Purchase\Models\PurchaseOrder::class, 'vendor_id');
+    }
+
+    public function advancePayments(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Purchase\Models\PurchaseAdvancePayment::class, 'vendor_id');
+    }
+
+    /**
+     * Opening balance as this party's statements show it: an amount owed to the vendor (credit) is positive; an advance paid (debit) is negative.
+     */
+    public function signedOpeningBalance(): float
+    {
+        $amount = (float) ($this->opening_balance ?? 0);
+
+        return ($this->opening_balance_type ?: 'credit') === 'credit' ? $amount : -$amount;
     }
 }

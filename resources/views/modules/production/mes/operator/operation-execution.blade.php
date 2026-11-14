@@ -114,7 +114,7 @@
                         $opScrapQty = isset($scrapQty) ? (float) $scrapQty : (float) ($op->quantity_scrapped ?? 0.0);
                         $opRejectedQty = isset($rejectedQty) ? (float) $rejectedQty : (float) ($op->quantity_rejected ?? 0.0);
                         $opPendingQcQty = isset($pendingQcQty) ? (float) $pendingQcQty : (float) app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($op->id);
-                        $opRemainingQty = isset($remainingQty) ? (float) $remainingQty : max(0.0, $opTargetQty - ($opDoneQty + $opScrapQty + $opRejectedQty));
+                        $opRemainingQty = isset($remainingQty) ? (float) $remainingQty : max(0.0, $opTargetQty - ($opDoneQty + $opPendingQcQty + $opScrapQty + $opRejectedQty));
                         $opProgressPercent = isset($progressPercent) ? (float) $progressPercent : ($opTargetQty > 0 ? min(100.0, round(($opDoneQty / $opTargetQty) * 100, 1)) : ($op->status === 'completed' ? 100.0 : 0.0));
                         $itemUom = $op->sourceProduct->uom->symbol ?? $order->product->uom->symbol ?? 'PCS';
                         $isQcRequired = (bool) ($op->quality_required || ($op->routingOperation?->quality_required ?? false));
@@ -421,15 +421,13 @@
                                         </x-ui.button>
                                     </div>
 
-                                    @if($isQcRequired)
+                                    @if($isQcRequired && $touchPendingQcQty > 0)
                                         <div class="col">
                                             <x-ui.button variant="warning" icon="feather-shield-check"
                                                 class="btn-touch-large w-100 text-dark btn-badge-container" data-bs-toggle="modal"
                                                 data-bs-target="#quickQcModal">
                                                 QC CHECK
-                                                @if($touchPendingQcQty > 0)
-                                                    <span class="btn-badge-count">{{ number_format($touchPendingQcQty, 0) }}</span>
-                                                @endif
+                                                <span class="btn-badge-count">{{ number_format($touchPendingQcQty, 0) }}</span>
                                             </x-ui.button>
                                         </div>
                                     @endif
@@ -811,10 +809,10 @@
             </div>
 
             <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="Accepted Qty (Good Usable Output)" name="accepted_qty" inputType="number" step="any" value="{{ $touchPendingQcQty }}" :required="true" />
+                <x-ui.odoo-form-ui type="input" label="Accepted Qty (Good Usable Output)" name="accepted_qty" id="operator_qc_accepted_qty" inputType="number" step="any" min="0" max="{{ (float) $touchPendingQcQty }}" value="{{ (float) $touchPendingQcQty }}" :required="true" />
             </div>
             <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="Rejected Qty (Defective Output)" name="rejected_qty" inputType="number" step="any" value="0" :required="true" />
+                <x-ui.odoo-form-ui type="input" label="Rejected Qty (Defective Output)" name="rejected_qty" id="operator_qc_rejected_qty" inputType="number" step="any" min="0" max="{{ (float) $touchPendingQcQty }}" value="0" :required="true" />
             </div>
             <div class="col-md-4">
                 <x-ui.odoo-form-ui type="select" label="Defect Reason (If Rejected)" name="defect_reason">
@@ -1214,6 +1212,56 @@
                             }
                         });
                     });
+                }
+
+                // Operator Quick QC Modal Form Validation
+                const quickQcForm = document.querySelector('#quickQcModal form');
+                if (quickQcForm) {
+                    quickQcForm.addEventListener('submit', function (e) {
+                        const acceptedInput = quickQcForm.querySelector('input[name="accepted_qty"]');
+                        const rejectedInput = quickQcForm.querySelector('input[name="rejected_qty"]');
+                        const accepted = parseFloat(acceptedInput ? acceptedInput.value : 0) || 0;
+                        const rejected = parseFloat(rejectedInput ? rejectedInput.value : 0) || 0;
+                        const total = accepted + rejected;
+                        const maxPending = {{ (float) $touchPendingQcQty }};
+
+                        const showWarning = function (msg) {
+                            if (typeof window.confirmAction === 'function') {
+                                window.confirmAction({
+                                    title: 'Quality Inspection Alert',
+                                    message: msg,
+                                    variant: 'warning',
+                                    confirmButtonText: 'OK',
+                                    hideCancel: true,
+                                    cancelButtonText: ''
+                                });
+                            } else {
+                                alert(msg);
+                            }
+                        };
+
+                        if (maxPending <= 0) {
+                            e.preventDefault();
+                            showWarning('Quality inspection cannot be logged: There are no units pending QC for this operation. Output must be logged first.');
+                            return false;
+                        }
+                        if (accepted < 0 || rejected < 0) {
+                            e.preventDefault();
+                            showWarning('Quantities cannot be negative.');
+                            return false;
+                        }
+                        if (total <= 0) {
+                            e.preventDefault();
+                            showWarning('Total inspected quantity (Accepted + Rejected) must be greater than zero.');
+                            return false;
+                        }
+                        if (total > maxPending + 0.0001) {
+                            e.preventDefault();
+                            showWarning('Total units logged for QC (' + total + ') cannot exceed the pending QC units (' + maxPending + ').');
+                            return false;
+                        }
+                    });
+                }
             });
         </script>
     @endpush

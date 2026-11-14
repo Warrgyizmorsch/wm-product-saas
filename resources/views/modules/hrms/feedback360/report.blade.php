@@ -1,20 +1,20 @@
 @extends('layouts.duralux')
 
-@section('title', '360° Report: ' . $participant->employee?->full_name . ' | HRMS')
-@section('page-title', '360° Assessment Report')
-@section('breadcrumb', 'HRMS / 360° Feedback / Assessment Report')
+@section('title', __('hrms.feedback_360.title_report', ['name' => $participant->employee?->full_name]))
+@section('page-title', __('hrms.feedback_360.page_title_report'))
+@section('breadcrumb', __('hrms.feedback_360.breadcrumb_report'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.feedback360.index', ['active_tab' => 'my_evaluations']) }}" class="border fw-semibold">
-            Back
+            {{ __('hrms.feedback_360.btn_back') }}
         </x-ui.button>
         <x-ui.button variant="light" icon="feather-printer" class="border fw-semibold" onclick="window.print();">
-            Print / PDF
+            {{ __('hrms.feedback_360.btn_print_pdf') }}
         </x-ui.button>
         @if($canPublish && !$isPublished)
             <x-ui.button variant="success" icon="feather-check-circle" class="fw-bold" data-bs-toggle="modal" data-bs-target="#publishReportModal">
-                Publish Report
+                {{ __('hrms.feedback_360.btn_publish_report') }}
             </x-ui.button>
         @endif
     </div>
@@ -143,8 +143,8 @@
         @if($completedRatersCount === 0)
             <x-ui.alert variant="info" icon="feather-info" class="mb-4" dismissible>
                 <div>
-                    <h6 class="fw-bold text-dark mb-1 fs-14">Feedback Collection in Progress ({{ $completedRatersCount }} of {{ $totalRatersCount }} Reviews Submitted)</h6>
-                    <span class="fs-12 text-muted">Assigned raters have not yet submitted their evaluation forms. Once raters complete their evaluations from the <strong>"My Reviews to Complete"</strong> tab, multi-rater scores, radar chart overlays, and perception gap analyses will populate here in real time.</span>
+                    <h6 class="fw-bold text-dark mb-1 fs-14">{{ __('hrms.feedback_360.collection_in_progress_title', ['completed' => $completedRatersCount, 'total' => $totalRatersCount]) }}</h6>
+                    <span class="fs-12 text-muted">{{ __('hrms.feedback_360.collection_in_progress_desc') }}</span>
                 </div>
             </x-ui.alert>
         @endif
@@ -159,13 +159,13 @@
                     <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
                         <h5 class="fw-bold text-dark mb-0 fs-16">{{ $participant->employee?->full_name }}</h5>
                         @if($isPublished)
-                            <x-ui.badge variant="success" soft>Published & Shared</x-ui.badge>
+                            <x-ui.badge variant="success" soft>{{ __('hrms.feedback_360.badge_published_shared') }}</x-ui.badge>
                         @else
-                            <x-ui.badge variant="warning" soft>Manager Calibration Draft</x-ui.badge>
+                            <x-ui.badge variant="warning" soft>{{ __('hrms.feedback_360.badge_manager_calibration_draft') }}</x-ui.badge>
                         @endif
                     </div>
                     <span class="text-muted fs-13">
-                        {{ $participant->employee?->designation->name ?? 'Staff' }} &bull; {{ $participant->employee?->department->name ?? 'General' }} &bull; Manager: <strong class="text-dark">{{ $participant->manager?->full_name ?? 'Unassigned' }}</strong>
+                        {{ $participant->employee?->designation->name ?? 'Staff' }} &bull; {{ $participant->employee?->department->name ?? 'General' }} &bull; {{ __('hrms.feedback_360.th_manager') }}: <strong class="text-dark">{{ $participant->manager?->full_name ?? __('hrms.feedback_360.unassigned') }}</strong>
                     </span>
                 </div>
             </div>
@@ -176,9 +176,9 @@
                     <i class="feather-user {{ $raterCounts['self'] > 0 ? 'text-success' : 'text-warning' }} fs-14"></i>
                     <div>
                         <div class="fw-bold fs-12 {{ $raterCounts['self'] > 0 ? 'text-success' : 'text-dark' }}">
-                            {{ $raterCounts['self'] > 0 ? 'Submitted' : 'Pending' }}
+                            {{ $raterCounts['self'] > 0 ? __('hrms.feedback_360.status_submitted') : __('hrms.feedback_360.status_pending') }}
                         </div>
-                        <div class="text-muted fs-10 text-uppercase fw-semibold" style="letter-spacing: 0.4px;">Self</div>
+                        <div class="text-muted fs-10 text-uppercase fw-semibold" style="letter-spacing: 0.4px;">{{ __('hrms.feedback_360.pill_self') }}</div>
                     </div>
                 </div>
 
@@ -186,9 +186,9 @@
                     <i class="feather-user-check {{ $raterCounts['manager'] > 0 ? 'text-success' : 'text-warning' }} fs-14"></i>
                     <div>
                         <div class="fw-bold fs-12 {{ $raterCounts['manager'] > 0 ? 'text-success' : 'text-dark' }}">
-                            {{ $raterCounts['manager'] > 0 ? 'Submitted' : 'Pending' }}
+                            {{ $raterCounts['manager'] > 0 ? __('hrms.feedback_360.status_submitted') : __('hrms.feedback_360.status_pending') }}
                         </div>
-                        <div class="text-muted fs-10 text-uppercase fw-semibold" style="letter-spacing: 0.4px;">Manager</div>
+                        <div class="text-muted fs-10 text-uppercase fw-semibold" style="letter-spacing: 0.4px;">{{ __('hrms.feedback_360.pill_manager') }}</div>
                     </div>
                 </div>
 
@@ -196,9 +196,9 @@
                     <i class="feather-users {{ $raterCounts['peer'] > 0 ? 'text-success' : 'text-info' }} fs-14"></i>
                     <div>
                         <div class="fw-bold fs-12 {{ $raterCounts['peer'] > 0 ? 'text-success' : 'text-dark' }}">
-                            {{ $raterCounts['peer'] }} Done
+                            {{ __('hrms.feedback_360.done_badge', ['count' => $raterCounts['peer']]) }}
                         </div>
-                        <div class="text-muted fs-10 text-uppercase fw-semibold" style="letter-spacing: 0.4px;">Peers</div>
+                        <div class="text-muted fs-10 text-uppercase fw-semibold" style="letter-spacing: 0.4px;">{{ __('hrms.feedback_360.pill_peers') }}</div>
                     </div>
                 </div>
 
@@ -206,9 +206,9 @@
                     <i class="feather-corner-down-right {{ $raterCounts['direct_report'] > 0 ? 'text-success' : 'text-primary' }} fs-14"></i>
                     <div>
                         <div class="fw-bold fs-12 {{ $raterCounts['direct_report'] > 0 ? 'text-success' : 'text-dark' }}">
-                            {{ $raterCounts['direct_report'] }} Done
+                            {{ __('hrms.feedback_360.done_badge', ['count' => $raterCounts['direct_report']]) }}
                         </div>
-                        <div class="text-muted fs-10 text-uppercase fw-semibold" style="letter-spacing: 0.4px;">Direct Reports</div>
+                        <div class="text-muted fs-10 text-uppercase fw-semibold" style="letter-spacing: 0.4px;">{{ __('hrms.feedback_360.pill_direct_reports') }}</div>
                     </div>
                 </div>
             </div>
@@ -218,7 +218,7 @@
         <div class="row g-3 mb-4">
             <div class="col-xl-3 col-md-6">
                 <div class="score-metric-card">
-                    <span class="metric-label">Overall 360° Rating</span>
+                    <span class="metric-label">{{ __('hrms.feedback_360.overall_360_rating') }}</span>
                     @if($participant->overall_score)
                         <h3 class="fw-bold text-primary mb-0">
                             ★ {{ number_format($participant->overall_score, 1) }}
@@ -226,7 +226,7 @@
                         </h3>
                     @else
                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1.5 fs-12 rounded-2 fw-semibold">
-                            Awaiting Ratings
+                            {{ __('hrms.feedback_360.awaiting_ratings') }}
                         </span>
                     @endif
                 </div>
@@ -234,7 +234,7 @@
 
             <div class="col-xl-3 col-md-6">
                 <div class="score-metric-card">
-                    <span class="metric-label">Self-Assessment</span>
+                    <span class="metric-label">{{ __('hrms.feedback_360.self_assessment') }}</span>
                     @if($participant->self_score)
                         <h3 class="fw-bold text-dark mb-0">
                             ★ {{ number_format($participant->self_score, 1) }}
@@ -242,7 +242,7 @@
                         </h3>
                     @else
                         <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-1.5 fs-12 rounded-2 fw-semibold">
-                            Awaiting Self-Review
+                            {{ __('hrms.feedback_360.awaiting_self_review') }}
                         </span>
                     @endif
                 </div>
@@ -250,7 +250,7 @@
 
             <div class="col-xl-3 col-md-6">
                 <div class="score-metric-card">
-                    <span class="metric-label">Manager Rating</span>
+                    <span class="metric-label">{{ __('hrms.feedback_360.manager_rating') }}</span>
                     @if($participant->manager_score)
                         <h3 class="fw-bold text-info mb-0">
                             ★ {{ number_format($participant->manager_score, 1) }}
@@ -258,7 +258,7 @@
                         </h3>
                     @else
                         <span class="badge bg-info-subtle text-info border border-info-subtle px-3 py-1.5 fs-12 rounded-2 fw-semibold">
-                            Awaiting Manager
+                            {{ __('hrms.feedback_360.awaiting_manager') }}
                         </span>
                     @endif
                 </div>
@@ -266,15 +266,21 @@
 
             <div class="col-xl-3 col-md-6">
                 <div class="score-metric-card">
-                    <span class="metric-label">Peers & Team Average</span>
-                    @if($participant->peer_score)
+                    <span class="metric-label">{{ __('hrms.feedback_360.peers_team_average') }}</span>
+                    @php
+                        $peerVal = $participant->peer_score;
+                        $drVal = $participant->direct_report_score;
+                        $teamScores = array_filter([$peerVal, $drVal], fn($v) => $v !== null);
+                        $teamAvg = !empty($teamScores) ? round(array_sum($teamScores) / count($teamScores), 2) : null;
+                    @endphp
+                    @if($teamAvg !== null)
                         <h3 class="fw-bold text-success mb-0">
-                            ★ {{ number_format($participant->peer_score, 1) }}
+                            ★ {{ number_format($teamAvg, 1) }}
                             <small class="fs-13 text-muted fw-normal">/ 5.0</small>
                         </h3>
                     @else
                         <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1.5 fs-12 rounded-2 fw-semibold">
-                            Awaiting Peer Reviews
+                            {{ __('hrms.feedback_360.awaiting_team_reviews') }}
                         </span>
                     @endif
                 </div>
@@ -285,9 +291,9 @@
         <div class="row g-4 mb-4">
             <!-- Radar Chart Container -->
             <div class="col-xl-7 col-12">
-                <x-ui.card title="360° Competency Radar (Multi-Rater Overlay)" stretch>
+                <x-ui.card :title="__('hrms.feedback_360.radar_chart_title')" stretch>
                     <x-slot:headerAction>
-                        <span class="text-muted fs-11">Self vs Manager vs Peers vs Direct Reports</span>
+                        <span class="text-muted fs-11">{{ __('hrms.feedback_360.radar_chart_subtitle') }}</span>
                     </x-slot:headerAction>
                     <div id="feedback360RadarChart" style="min-height: 380px;"></div>
                 </x-ui.card>
@@ -295,29 +301,29 @@
 
             <!-- Blind Spots & Hidden Strengths Callouts -->
             <div class="col-xl-5 col-12">
-                <x-ui.card title="Perception Gap & Insights" stretch>
+                <x-ui.card :title="__('hrms.feedback_360.perception_gap_title')" stretch>
                     <!-- Blind Spots -->
                     <div class="mb-4">
                         <div class="d-flex align-items-center gap-2 mb-2">
                             <i class="feather-alert-triangle text-warning fs-13"></i>
                             <span class="text-warning fs-11 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
-                                Potential Blind Spots (Self > Others)
+                                {{ __('hrms.feedback_360.blind_spots_heading') }}
                             </span>
                         </div>
                         @forelse($blindSpots as $bs)
                             <div class="blind-spot-card mb-3">
                                 <div class="d-flex justify-content-between align-items-center fw-bold text-dark mb-1 fs-13">
                                     <span>{{ $bs['competency'] }}</span>
-                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle fw-bold fs-11">+{{ number_format($bs['gap'], 1) }} Gap</span>
+                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle fw-bold fs-11">{{ __('hrms.feedback_360.gap_badge', ['gap' => number_format($bs['gap'], 1)]) }}</span>
                                 </div>
                                 <div class="text-muted fs-12">
-                                    Self: <strong class="text-dark">{{ number_format($bs['self_score'], 1) }}</strong> vs Others: <strong class="text-dark">{{ number_format($bs['others_score'], 1) }}</strong>
+                                    {{ __('hrms.feedback_360.self_vs_others_scores', ['self' => number_format($bs['self_score'], 1), 'others' => number_format($bs['others_score'], 1)]) }}
                                 </div>
                             </div>
                         @empty
                             <div class="insight-empty-card mb-2">
                                 <i class="feather-check-circle text-success fs-15 mt-0.5 flex-shrink-0"></i>
-                                <span class="text-muted fs-12 lh-base">No significant blind spots identified. Self-evaluation aligns closely with team feedback.</span>
+                                <span class="text-muted fs-12 lh-base">{{ __('hrms.feedback_360.no_blind_spots') }}</span>
                             </div>
                         @endforelse
                     </div>
@@ -327,23 +333,23 @@
                         <div class="d-flex align-items-center gap-1.5 mb-2">
                             <i class="feather-star text-success fs-13"></i>
                             <span class="text-success fs-11 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
-                                Recognized Hidden Strengths (Others > Self)
+                                {{ __('hrms.feedback_360.hidden_strengths_heading') }}
                             </span>
                         </div>
                         @forelse($hiddenStrengths as $hs)
                             <div class="strength-card mb-3">
                                 <div class="d-flex justify-content-between align-items-center fw-bold text-dark mb-1 fs-13">
                                     <span>{{ $hs['competency'] }}</span>
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle fw-bold fs-11">+{{ number_format($hs['gap'], 1) }} Superpower</span>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle fw-bold fs-11">{{ __('hrms.feedback_360.superpower_badge', ['gap' => number_format($hs['gap'], 1)]) }}</span>
                                 </div>
                                 <div class="text-muted fs-12">
-                                    Self: <strong class="text-dark">{{ number_format($hs['self_score'], 1) }}</strong> vs Others: <strong class="text-dark">{{ number_format($hs['others_score'], 1) }}</strong>
+                                    {{ __('hrms.feedback_360.self_vs_others_scores', ['self' => number_format($hs['self_score'], 1), 'others' => number_format($hs['others_score'], 1)]) }}
                                 </div>
                             </div>
                         @empty
                             <div class="insight-empty-card">
                                 <i class="feather-info text-primary fs-15 mt-0.5 flex-shrink-0"></i>
-                                <span class="text-muted fs-12 lh-base">No significant unperceived hidden strengths identified.</span>
+                                <span class="text-muted fs-12 lh-base">{{ __('hrms.feedback_360.no_hidden_strengths') }}</span>
                             </div>
                         @endforelse
                     </div>
@@ -357,26 +363,26 @@
                 <div class="d-flex align-items-center gap-2">
                     <i class="feather-grid text-primary fs-15"></i>
                     <h6 class="fw-bold text-dark mb-0 fs-14">
-                        Detailed Competency Scores & Perception Gap Matrix
+                        {{ __('hrms.feedback_360.detailed_breakdown_title') }}
                     </h6>
                 </div>
-                <span class="text-muted fs-12">Scored on a 1.0 &ndash; 5.0 scale</span>
+                <span class="text-muted fs-12">{{ __('hrms.feedback_360.scored_scale_subtitle') }}</span>
             </div>
             <div class="table-responsive">
                 <table class="table table-bordered table-hover align-middle mb-0 fs-13">
                     <thead style="background: #f8fafc;">
                         <tr>
-                            <th style="width: 38%; min-width: 240px; padding: 12px 16px; border-bottom: 2px solid #e2e8f0;" class="text-uppercase fs-11 fw-bold text-muted">Competency & Category</th>
-                            <th style="width: 10%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0;" class="text-center text-uppercase fs-11 fw-bold text-muted">Self</th>
-                            <th style="width: 10%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0;" class="text-center text-uppercase fs-11 fw-bold text-muted">Manager</th>
-                            <th style="width: 10%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0;" class="text-center text-uppercase fs-11 fw-bold text-muted">Peers</th>
-                            <th style="width: 11%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0;" class="text-center text-uppercase fs-11 fw-bold text-muted">Direct Reports</th>
-                            <th style="width: 10%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0; background: rgba(var(--bs-primary-rgb), 0.05);" class="text-center text-uppercase fs-11 fw-bold text-primary">Others Avg</th>
-                            <th style="width: 11%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0;" class="text-center text-uppercase fs-11 fw-bold text-muted">Perception Gap</th>
+                            <th style="width: 38%; min-width: 240px; padding: 12px 16px; border-bottom: 2px solid #e2e8f0;" class="text-uppercase fs-11 fw-bold text-muted">{{ __('hrms.feedback_360.th_comp_category') }}</th>
+                            <th style="width: 10%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0;" class="text-center text-uppercase fs-11 fw-bold text-muted">{{ __('hrms.feedback_360.th_self') }}</th>
+                            <th style="width: 10%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0;" class="text-center text-uppercase fs-11 fw-bold text-muted">{{ __('hrms.feedback_360.th_manager') }}</th>
+                            <th style="width: 10%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0;" class="text-center text-uppercase fs-11 fw-bold text-muted">{{ __('hrms.feedback_360.th_peers') }}</th>
+                            <th style="width: 11%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0;" class="text-center text-uppercase fs-11 fw-bold text-muted">{{ __('hrms.feedback_360.th_direct_reports') }}</th>
+                            <th style="width: 10%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0; background: rgba(var(--bs-primary-rgb), 0.05);" class="text-center text-uppercase fs-11 fw-bold text-primary">{{ __('hrms.feedback_360.th_others_avg') }}</th>
+                            <th style="width: 11%; padding: 12px 8px; border-bottom: 2px solid #e2e8f0;" class="text-center text-uppercase fs-11 fw-bold text-muted">{{ __('hrms.feedback_360.th_perception_gap') }}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($competencyScores as $cs)
+                        @forelse($competencyScores as $cs)
                             <tr>
                                 <td style="padding: 14px 16px;">
                                     <div class="d-flex align-items-center gap-2 mb-1">
@@ -444,7 +450,13 @@
                                     @endif
                                 </td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted fs-13">
+                                    <i class="feather-info me-1"></i> {{ __('hrms.feedback_360.no_comp_ratings_recorded') }}
+                                </td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
@@ -457,10 +469,10 @@
                     <div class="d-flex align-items-center gap-2">
                         <i class="feather-message-square text-primary fs-15"></i>
                         <h6 class="fw-bold text-dark mb-0 fs-14">
-                            Qualitative Comments & Written Feedback
+                            {{ __('hrms.feedback_360.qualitative_comments_title') }}
                         </h6>
                     </div>
-                    <span class="badge bg-light text-muted border rounded-pill px-2.5 py-1 fs-11">Anonymized Multi-Rater Input</span>
+                    <span class="badge bg-light text-muted border rounded-pill px-2.5 py-1 fs-11">{{ __('hrms.feedback_360.anonymized_input_badge') }}</span>
                 </div>
                 <div class="card-body p-4">
                     @foreach($qualitativeFeedback as $qf)
@@ -473,8 +485,17 @@
                                     <div class="col-md-6">
                                         <div class="p-3 bg-light rounded-3 border h-100 fs-13">
                                             <div class="d-flex justify-content-between align-items-center mb-2">
+                                                @php
+                                                    $reviewerTypeLabel = match($resp['reviewer_type']) {
+                                                        'self'          => __('hrms.feedback_360.pill_self'),
+                                                        'manager'       => __('hrms.feedback_360.pill_manager'),
+                                                        'peer'          => __('hrms.feedback_360.pill_peers'),
+                                                        'direct_report' => __('hrms.feedback_360.pill_direct_reports'),
+                                                        default         => ucfirst(str_replace('_', ' ', $resp['reviewer_type'])),
+                                                    };
+                                                @endphp
                                                 <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-0.5 fs-11">
-                                                    {{ ucfirst(str_replace('_', ' ', $resp['reviewer_type'])) }}
+                                                    {{ $reviewerTypeLabel }}
                                                 </span>
                                                 <span class="text-muted fs-11 fst-italic">{{ $resp['reviewer_name'] }}</span>
                                             </div>
@@ -492,35 +513,35 @@
         <!-- Manager Calibration Commentary & Development Goals -->
         <div class="card border rounded-3 shadow-none p-4 bg-light">
             <h6 class="fw-bold text-dark mb-3 fs-15 d-flex align-items-center gap-2">
-                <i class="feather-file-text text-primary"></i> Executive Summary & Professional Development Plan
+                <i class="feather-file-text text-primary"></i> {{ __('hrms.feedback_360.executive_summary_title') }}
             </h6>
 
             @if($participant->manager_summary || $participant->development_plan)
                 <div class="mb-3">
-                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1.5" style="letter-spacing: 0.5px;">Manager Commentary:</span>
-                    <p class="text-dark fs-13 bg-white p-3 rounded-3 border mb-0 lh-base">{{ $participant->manager_summary ?? 'No manager comments added yet.' }}</p>
+                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1.5" style="letter-spacing: 0.5px;">{{ __('hrms.feedback_360.manager_commentary_label') }}</span>
+                    <p class="text-dark fs-13 bg-white p-3 rounded-3 border mb-0 lh-base">{{ $participant->manager_summary ?? __('hrms.feedback_360.no_manager_comments_yet') }}</p>
                 </div>
                 <div>
-                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1.5" style="letter-spacing: 0.5px;">Key Development Goals:</span>
-                    <p class="text-dark fs-13 bg-white p-3 rounded-3 border mb-0 lh-base">{{ $participant->development_plan ?? 'No specific development plan recorded.' }}</p>
+                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1.5" style="letter-spacing: 0.5px;">{{ __('hrms.feedback_360.key_dev_goals_label') }}</span>
+                    <p class="text-dark fs-13 bg-white p-3 rounded-3 border mb-0 lh-base">{{ $participant->development_plan ?? __('hrms.feedback_360.no_dev_plan_recorded') }}</p>
                 </div>
             @else
                 <p class="text-muted fs-13 mb-3">
-                    Direct managers can record calibration notes and development action items before releasing the report to the employee.
+                    {{ __('hrms.feedback_360.manager_calibration_lead') }}
                 </p>
                 @if($canPublish)
                     <x-ui.button variant="primary" icon="feather-edit-3" class="fw-bold" data-bs-toggle="modal" data-bs-target="#publishReportModal">
-                        Add Manager Summary & Publish Report
+                        {{ __('hrms.feedback_360.btn_add_manager_summary_publish') }}
                     </x-ui.button>
                 @elseif($cycle?->status === 'in_progress')
                     <div class="d-inline-flex align-items-center gap-2 bg-warning-subtle text-warning border border-warning-subtle px-3 py-2 rounded-3 fs-12 fw-semibold">
                         <i class="feather-clock fs-14"></i>
-                        <span>Feedback collection is currently In Progress. Manager calibration and report publishing will unlock in the Manager Review stage.</span>
+                        <span>{{ __('hrms.feedback_360.feedback_collection_in_progress_stage') }}</span>
                     </div>
                 @elseif($cycle?->status === 'draft' || $cycle?->status === 'nomination')
                     <div class="d-inline-flex align-items-center gap-2 bg-light text-muted border px-3 py-2 rounded-3 fs-12">
                         <i class="feather-info fs-14"></i>
-                        <span>Cycle is currently in {{ ucfirst($cycle->status) }} stage. Calibration will open once feedback collection concludes.</span>
+                        <span>{{ __('hrms.feedback_360.cycle_stage_info', ['stage' => ucfirst($cycle->status)]) }}</span>
                     </div>
                 @endif
             @endif
@@ -532,25 +553,27 @@
 <!-- ========================================================================= -->
 <!-- MODAL: CALIBRATE & PUBLISH REPORT -->
 <!-- ========================================================================= -->
-<x-ui.modal id="publishReportModal" title="Calibrate & Publish 360° Report" size="lg" :centered="true" :showFooter="false">
+@if($canPublish && !$isPublished)
+<x-ui.modal id="publishReportModal" :title="__('hrms.feedback_360.modal_calibrate_publish_title')" size="lg" :centered="true" :showFooter="false">
     <form action="{{ route('hrms.feedback360.report.publish', $participant->id) }}" method="POST">
         @csrf
         <p class="fs-13 text-muted mb-3">
-            Once published, this 360 feedback evaluation and radar chart will become visible to <strong>{{ $participant->employee?->full_name }}</strong> on their employee portal.
+            {!! __('hrms.feedback_360.calibrate_publish_msg', ['name' => '<strong>' . e($participant->employee?->full_name) . '</strong>']) !!}
         </p>
 
-        <x-ui.modal-form-ui type="textarea" label="Manager Executive Summary" name="manager_summary" rows="3" placeholder="Highlight key takeaways, performance calibration, and overarching feedback..." :value="$participant->manager_summary" />
+        <x-ui.modal-form-ui type="textarea" :label="__('hrms.feedback_360.field_manager_summary')" name="manager_summary" rows="3" :placeholder="__('hrms.feedback_360.placeholder_manager_summary')" :value="$participant->manager_summary" />
 
-        <x-ui.modal-form-ui type="textarea" label="Professional Development Plan & Action Items" name="development_plan" rows="3" placeholder="Outline 2-3 specific development goals or training focus areas for the upcoming quarter..." :value="$participant->development_plan" />
+        <x-ui.modal-form-ui type="textarea" :label="__('hrms.feedback_360.field_development_plan')" name="development_plan" rows="3" :placeholder="__('hrms.feedback_360.placeholder_development_plan')" :value="$participant->development_plan" />
 
         <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-            <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">Cancel</x-ui.button>
+            <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
             <x-ui.button variant="success" size="sm" type="submit" class="fw-bold" icon="feather-check">
-                Publish & Share Report
+                {{ __('hrms.feedback_360.btn_publish_share_report') }}
             </x-ui.button>
         </div>
     </form>
 </x-ui.modal>
+@endif
 
 @push('scripts')
 <script src="{{ asset('assets/vendors/js/apexcharts.min.js') }}"></script>
@@ -566,15 +589,15 @@
         const options = {
             series: [
                 {
-                    name: 'Self Evaluation',
+                    name: @json(__('hrms.feedback_360.radar_legend_self')),
                     data: selfData
                 },
                 {
-                    name: 'Others Average',
+                    name: @json(__('hrms.feedback_360.radar_legend_others')),
                     data: othersData
                 },
                 {
-                    name: 'Manager Review',
+                    name: @json(__('hrms.feedback_360.radar_legend_manager')),
                     data: managerData
                 }
             ],
@@ -615,8 +638,12 @@
 
         const chartElement = document.querySelector("#feedback360RadarChart");
         if (chartElement && typeof ApexCharts !== 'undefined') {
-            const chart = new ApexCharts(chartElement, options);
-            chart.render();
+            if (radarLabels && radarLabels.length > 0) {
+                const chart = new ApexCharts(chartElement, options);
+                chart.render();
+            } else {
+                chartElement.innerHTML = '<div class="d-flex align-items-center justify-content-center text-muted fs-13 py-5" style="min-height: 380px;"><i class="feather-info me-2 text-primary"></i>' + @json(__('hrms.feedback_360.no_radar_data')) + '</div>';
+            }
         }
     });
 </script>

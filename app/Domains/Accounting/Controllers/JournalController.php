@@ -7,6 +7,7 @@ use App\Domains\Accounting\Models\CostCenter;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Services\ChartOfAccountsService;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Support\BillWiseInput;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class JournalController extends Controller
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountsService $accounts,
+        private readonly BillWiseInput $billWise,
     ) {
     }
 
@@ -66,8 +68,8 @@ class JournalController extends Controller
             'journal_date' => ['required', 'date'],
             'memo' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:2'],
-            'items.*.chart_of_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
-            'items.*.cost_center_id' => ['nullable', 'integer', 'exists:cost_centers,id'],
+            'items.*.chart_of_account_id' => ['required', 'integer', tenant_exists('chart_of_accounts')],
+            'items.*.cost_center_id' => ['nullable', 'integer', tenant_exists('cost_centers')],
             // Tenant-scoped lookup, unlike a bare exists: rule, so another
             // tenant's project id can't be tagged onto a line.
             'items.*.project_id' => ['nullable', 'integer', function (string $attribute, mixed $value, \Closure $fail): void {
@@ -78,15 +80,20 @@ class JournalController extends Controller
             'items.*.debit' => ['nullable', 'numeric', 'min:0'],
             'items.*.credit' => ['nullable', 'numeric', 'min:0'],
             'items.*.description' => ['nullable', 'string', 'max:255'],
+            ...BillWiseInput::rules(),
         ]);
+
+        // Party per line and the bills it settles / opens (the bill-wise box).
+        [$lines, $billHints] = $this->billWise->apply($validated['items']);
 
         try {
             // submit(): posts now, or holds for maker-checker approval.
-            $journal = $this->journals->submit($validated['items'], [
+            $journal = $this->journals->submit($lines, [
                 'journal_date' => $validated['journal_date'],
                 'memo' => $validated['memo'] ?? null,
                 'source' => Journal::SOURCE_MANUAL,
                 'posted_by' => auth()->id(),
+                'bill_allocations' => $billHints,
             ]);
         } catch (InvalidArgumentException $e) {
             return back()->withErrors(['items' => $e->getMessage()])->withInput();

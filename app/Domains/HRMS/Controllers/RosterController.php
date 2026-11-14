@@ -53,8 +53,8 @@ class RosterController extends Controller
                     return $q;
                 }),
             ],
-            'start_time'            => 'required',
-            'end_time'              => 'required',
+            'start_time'            => 'required|date_format:H:i',
+            'end_time'              => 'required|date_format:H:i',
             'break_minutes'         => 'nullable|integer|min:0',
             'grace_period_minutes'  => 'nullable|integer|min:0',
             'overtime_allowed'      => 'nullable|boolean',
@@ -99,8 +99,8 @@ class RosterController extends Controller
                     })
                     ->ignore($shift->id),
             ],
-            'start_time'           => 'required',
-            'end_time'             => 'required',
+            'start_time'           => 'required|date_format:H:i',
+            'end_time'             => 'required|date_format:H:i',
             'break_minutes'        => 'nullable|integer|min:0',
             'grace_period_minutes' => 'nullable|integer|min:0',
             'overtime_allowed'     => 'nullable|boolean',
@@ -202,8 +202,16 @@ class RosterController extends Controller
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'date'        => 'required|date',
-            'shift_id'    => 'nullable',
-            'value'       => 'nullable|string',
+            'shift_id'    => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
+            'value'       => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
         ]);
 
         $value = $validated['value'] ?? null;
@@ -241,7 +249,11 @@ class RosterController extends Controller
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'day_of_week' => 'required|integer|between:0,6',
-            'value'       => 'nullable|string',
+            'value'       => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
         ]);
 
         $employee  = Employee::findOrFail($validated['employee_id']);
@@ -284,8 +296,17 @@ class RosterController extends Controller
             'bulk_designation_ids.*'   => 'exists:designations,id',
             'days'                     => 'nullable|array',
             'days.*'                   => 'integer|between:0,6',
-            'shift_id'                 => 'nullable',
+            'shift_id'                 => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
             'pattern'                  => 'nullable|array',
+            'pattern.*'                => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['', 'default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
         ]);
 
         $employeeIds = $validated['employee_ids'] ?? [];

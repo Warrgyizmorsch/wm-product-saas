@@ -134,7 +134,7 @@ class PurchaseRfqController extends Controller
                         'product_id'           => $productId,
                         'product_name'         => $product?->name ?? 'Product #' . $productId,
                         'quantity'             => $pendingQty,
-                        'estimated_cost'       => round(convert_from_base($costRate), 2),
+                        'estimated_cost'       => round(convert_from_base($costRate), 4),
                         'vendor_id'            => $product?->preferred_vendor_id,
                     ];
                 }
@@ -177,7 +177,7 @@ class PurchaseRfqController extends Controller
                         'product_id'           => $productId,
                         'product_name'         => $product?->name ?? 'Product #' . $productId,
                         'quantity'             => $pendingQty,
-                        'estimated_cost'       => round(convert_from_base($costRate), 2),
+                        'estimated_cost'       => round(convert_from_base($costRate), 4),
                         'vendor_id'            => $product?->preferred_vendor_id,
                     ];
                 }
@@ -220,6 +220,8 @@ class PurchaseRfqController extends Controller
 
         $rfq = $this->rfqService->storeRfq($validated, $tenantId);
 
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyRfqCreated($rfq);
+
         return redirect()->route('purchase.rfqs.show', $rfq->id)
             ->with('success', "RFQ {$rfq->rfq_number} created successfully.");
     }
@@ -232,7 +234,72 @@ class PurchaseRfqController extends Controller
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $paymentTerms = PaymentTerm::where('is_active', true)->orderBy('due_days')->get();
 
-        return view('modules.purchase.rfqs.show', compact('rfq', 'warehouses', 'paymentTerms'));
+        // Load all Purchase Orders generated from this RFQ
+        $linkedOrders = PurchaseOrder::where('tenant_id', $tenantId)
+            ->where('source_type', 'rfq')
+            ->where(function ($q) use ($rfq) {
+                $q->where('reference', $rfq->rfq_number)
+                  ->orWhere('reference', 'RFQ: ' . $rfq->rfq_number);
+            })
+            ->where('status', '!=', 'Cancelled')
+            ->with(['items.product', 'vendor'])
+            ->get();
+
+        $orderedItemsMap = [];
+        $allFullyOrdered = $rfq->items->isNotEmpty();
+        $anyOrdered = false;
+
+        foreach ($rfq->items as $rfqItem) {
+            $pId = $rfqItem->product_id;
+            $orderedQty = 0;
+            $itemPos = [];
+
+            foreach ($linkedOrders as $lo) {
+                foreach ($lo->items as $loItem) {
+                    if ($loItem->product_id == $pId) {
+                        $orderedQty += (float) $loItem->quantity;
+                        $itemPos[] = [
+                            'id' => $lo->id,
+                            'po_number' => $lo->purchase_order_number,
+                            'vendor_name' => $lo->vendor?->name ?? 'Vendor',
+                            'quantity' => (float) $loItem->quantity,
+                        ];
+                    }
+                }
+            }
+
+            $isFullyOrdered = $orderedQty >= (float) $rfqItem->quantity;
+            if (!$isFullyOrdered) {
+                $allFullyOrdered = false;
+            }
+            if ($orderedQty > 0) {
+                $anyOrdered = true;
+            }
+
+            $orderedItemsMap[$pId] = [
+                'ordered_qty' => $orderedQty,
+                'is_fully_ordered' => $isFullyOrdered,
+                'pending_qty' => max(0.0, (float) $rfqItem->quantity - $orderedQty),
+                'orders' => $itemPos,
+            ];
+        }
+
+        // Auto-synchronize RFQ status if needed
+        if ($rfq->status !== 'Cancelled') {
+            if ($allFullyOrdered && $rfq->items->isNotEmpty()) {
+                if ($rfq->status !== 'Confirmed') {
+                    $rfq->update(['status' => 'Confirmed']);
+                    $rfq->status = 'Confirmed';
+                }
+            } elseif ($anyOrdered) {
+                if ($rfq->status !== 'Partially Ordered') {
+                    $rfq->update(['status' => 'Partially Ordered']);
+                    $rfq->status = 'Partially Ordered';
+                }
+            }
+        }
+
+        return view('modules.purchase.rfqs.show', compact('rfq', 'warehouses', 'paymentTerms', 'linkedOrders', 'orderedItemsMap'));
     }
 
     public function edit(int $id)
@@ -485,6 +552,8 @@ class PurchaseRfqController extends Controller
 
         $this->rfqRepo->update($rfq, ['status' => 'Confirmed']);
 
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyRfqConfirmed($rfq);
+
         return redirect()->route('purchase.rfqs.show', $id)
             ->with('success', "RFQ {$rfq->rfq_number} confirmed.");
     }
@@ -522,7 +591,7 @@ class PurchaseRfqController extends Controller
                 }
 
                 if (isset($files[$rvId]['attachment']) && $files[$rvId]['attachment']->isValid()) {
-                    $updateData['attachment_path'] = $files[$rvId]['attachment']->store('rfq_attachments', 'public');
+                    $updateData['attachment_path'] = $files[$rvId]['attachment']->storeTenantFile('rfq_attachments', 'public');
                 }
 
                 $hasRates = false;
@@ -582,7 +651,7 @@ class PurchaseRfqController extends Controller
                 'product_id' => $item->product_id,
                 'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
                 'quantity' => (float)$item->quantity,
-                'estimated_cost' => round(convert_from_base((float)$item->estimated_cost), 2),
+                'estimated_cost' => round(convert_from_base((float)$item->estimated_cost), 4),
             ];
         }
 
@@ -639,6 +708,18 @@ class PurchaseRfqController extends Controller
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|numeric',
             'items.*.rate' => 'required|numeric',
+            'items.*.amount' => 'nullable|numeric',
+            'items.*.discount_percent' => 'nullable|numeric',
+            'items.*.discount_amount' => 'nullable|numeric',
+            'items.*.tax_percent' => 'nullable|numeric',
+            'items.*.cgst_percent' => 'nullable|numeric',
+            'items.*.sgst_percent' => 'nullable|numeric',
+            'items.*.igst_percent' => 'nullable|numeric',
+            'items.*.cgst_amount' => 'nullable|numeric',
+            'items.*.sgst_amount' => 'nullable|numeric',
+            'items.*.igst_amount' => 'nullable|numeric',
+            'items.*.tax_amount' => 'nullable|numeric',
+            'items.*.total_amount' => 'nullable|numeric',
         ]);
 
         $po = $this->rfqService->createPoFromRfq($rfq, $validated, $tenantId);
@@ -707,7 +788,7 @@ class PurchaseRfqController extends Controller
 
         $attachmentPath = $rfqVendor->attachment_path;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('rfq_attachments', 'public');
+            $attachmentPath = $request->file('attachment')->storeTenantFile('rfq_attachments', 'public');
         }
 
         DB::transaction(function () use ($validated, $rfqVendor, $attachmentPath, $rfq) {

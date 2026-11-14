@@ -265,12 +265,30 @@
             transition: all 0.2s ease;
         }
 
+        .odoo-notebook-tabs {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scrollbar-width: none !important; /* Firefox */
+            -ms-overflow-style: none !important; /* IE / Edge */
+            -webkit-overflow-scrolling: touch;
+        }
+        .odoo-notebook-tabs::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+        }
+        .odoo-notebook-tabs .nav-item {
+            flex-shrink: 0 !important;
+        }
         .odoo-notebook-tabs .nav-link {
+            white-space: nowrap !important;
             color: #64748b;
             border: none;
             border-bottom: 2px solid transparent;
             border-radius: 0;
-            padding: 8px 16px;
+            padding: 8px 14px;
             font-weight: 600;
             transition: all 0.2s ease;
         }
@@ -2047,14 +2065,13 @@
                 flex-wrap: nowrap !important;
                 overflow-x: auto !important;
                 -webkit-overflow-scrolling: touch !important;
-                scrollbar-width: thin;
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
             }
             .odoo-notebook-tabs::-webkit-scrollbar {
-                height: 3px;
-            }
-            .odoo-notebook-tabs::-webkit-scrollbar-thumb {
-                background-color: #cbd5e1;
-                border-radius: 3px;
+                display: none !important;
+                width: 0 !important;
+                height: 0 !important;
             }
             .odoo-notebook-tabs .nav-item {
                 flex-shrink: 0 !important;
@@ -4243,7 +4260,7 @@
 
                             <div class="row g-2">
                                 <div class="col-6">
-                                    <x-ui.modal-form-ui type="select" name="next_activity_type" id="offcanvasNextActivityType" :label="__('crm.next_activity_type')" :searchable="true">
+                                    <x-ui.modal-form-ui type="select" name="next_activity_type" id="offcanvasNextActivityType" :label="__('crm.next_activity_type')" :searchable="true" onchange="if(window.crmToggleMeetingLocation) window.crmToggleMeetingLocation(this.value, 'lead_show_next', {{ !empty(tenant()?->settings['field_visit_verification']) ? 'true' : 'false' }});">
                                         <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
                                         <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
                                         <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
@@ -4264,6 +4281,14 @@
                             </div>
 
                             <x-ui.modal-form-ui type="input" inputType="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" :label="__('crm.next_followup_datetime_optional')" />
+
+                            @include('modules.crm.partials.meeting-location-field', [
+                                'idPrefix' => 'lead_show_next',
+                                'label' => 'Next Meeting Venue Location',
+                                'addressFieldName' => 'next_location_address',
+                                'latFieldName' => 'next_latitude',
+                                'lngFieldName' => 'next_longitude'
+                            ])
 
                             <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                                 <div class="row g-2">
@@ -4303,13 +4328,20 @@
                 <div id="sectionDirectSchedule" style="display: none;">
                     <x-ui.modal-form-ui type="input" name="title" id="offcanvasEventTitle" :label="__('crm.event_meeting_title')" :placeholder="__('crm.event_title_placeholder')" value="" />
 
-                    <x-ui.modal-form-ui type="select" name="schedule_type" id="offcanvasScheduleType" :label="__('crm.activity_type')" :searchable="true" onchange="$('#offcanvasFollowupType').val(this.value)">
+                    <x-ui.modal-form-ui type="select" name="schedule_type" id="offcanvasScheduleType" :label="__('crm.activity_type')" :searchable="true" onchange="$('#offcanvasFollowupType').val(this.value); if(window.crmToggleMeetingLocation) window.crmToggleMeetingLocation(this.value, 'lead_show_schedule', {{ !empty(tenant()?->settings['field_visit_verification']) ? 'true' : 'false' }});">
                         <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
                         <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
                         <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
                         <option value="Email">{{ __('crm.interaction_types.Email') }}</option>
                         <option value="WhatsApp">{{ __('crm.activity_types.WhatsApp') }}</option>
                     </x-ui.modal-form-ui>
+
+                    @include('modules.crm.partials.meeting-location-field', [
+                        'idPrefix' => 'lead_show_schedule',
+                        'addressFieldName' => 'location_address',
+                        'latFieldName' => 'latitude',
+                        'lngFieldName' => 'longitude'
+                    ])
 
                     <div class="row g-2">
                         <div class="col-6">

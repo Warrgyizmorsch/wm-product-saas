@@ -100,17 +100,17 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="transportersTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
+                    <tr>
+                        <th style="width: 35px;" class="text-center">
                             <input type="checkbox" class="form-check-input" id="selectAllTransporters">
                         </th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.transporter_name_col') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.transporter_id_col') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.gstin_pan_col') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.phone_mobile_col') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.city_state_col') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
-                        <th style="width: 8%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
+                        <th>{{ __('crm.transporter_name_col') }}</th>
+                        <th>{{ __('crm.transporter_id_col') }}</th>
+                        <th>{{ __('crm.gstin_pan_col') }}</th>
+                        <th>{{ __('crm.phone_mobile_col') }}</th>
+                        <th>{{ __('crm.city_state_col') }}</th>
+                        <th>{{ __('crm.status') }}</th>
+                        <th style="width: 8%;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -179,6 +179,11 @@
                                         </a>
                                     </li>
                                     <li>
+                                        <a href="{{ route('platform.transporters.edit', $transporter) }}" class="dropdown-item fs-12 py-1.5">
+                                            <i class="feather-edit me-2 text-warning"></i>{{ __('crm.edit_transporter_master') }}
+                                        </a>
+                                    </li>
+                                    <li>
                                         <button type="button" class="dropdown-item fs-12 py-1.5" data-bs-toggle="modal" data-bs-target="#editTransporterModal{{ $transporter->id }}">
                                             <i class="feather-edit-2 me-2 text-info"></i>{{ __('crm.edit_quick_master') }}
                                         </button>
@@ -210,7 +215,7 @@
                                         <x-ui.odoo-form-ui type="input" :label="__('crm.gstin_number_field')" name="gstin" :value="$transporter->gstin" placeholder="Optional 15-digit GSTIN" />
                                     </div>
                                     <div class="mb-3">
-                                        <x-ui.odoo-form-ui type="input" :label="__('crm.phone_mobile_col')" name="phone" :value="$transporter->phone" placeholder="Mobile / Landline" />
+                                        <x-ui.odoo-form-ui type="input" inputType="tel" :label="__('crm.phone_mobile_col')" name="phone" :value="$transporter->phone" placeholder="Mobile / Landline" oninput="this.value = this.value.replace(/[^0-9]/g, '')" maxlength="20" />
                                     </div>
                                     <div class="mb-3">
                                         <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.official_email_address')" name="email" :value="$transporter->email" placeholder="email@domain.com" />

@@ -44,6 +44,24 @@
             font-weight: 600 !important;
             padding-left: 12px !important;
         }
+
+        /* Prevent entire page/card horizontal scroll or viewport shifting */
+        .erp-single-panel {
+            min-width: 0 !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+        }
+        .odoo-sheet {
+            min-width: 0 !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+        }
+        .table-responsive {
+            min-width: 0 !important;
+            max-width: 100% !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+        }
     </style>
 @endpush
 
@@ -90,7 +108,7 @@
             </div>
 
             <!-- Metadata Row -->
-            <div class="row g-3 mb-4 fs-13 text-dark pb-3 border-bottom">
+            <div class="row g-3 mb-4 fs-13 text-dark pb-3 border-bottom mx-0">
                 @if($slip->isMaintenance())
                     <div class="col-md-3">
                         <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">{{ __('crm.source_document') ?? 'Source Document' }}</span>
@@ -191,19 +209,19 @@
                 </div>
             </div>
 
-            <div class="table-responsive">
-                <table class="table table-bordered align-middle text-dark mb-0 fs-13">
+            <div class="table-responsive border rounded">
+                <table class="table table-bordered align-middle text-dark mb-0 fs-13" style="width: 100%;">
                     <thead class="bg-soft-light text-uppercase fs-11 fw-semibold text-muted">
                         <tr>
-                            <th class="text-center" style="width: 5%">
+                            <th class="text-center" style="width: 44px; min-width: 44px;">
                                 <input type="checkbox" id="selectAllCheckbox" class="form-check-input" disabled>
                             </th>
-                            <th style="width: 30%">{{ __('crm.component_product') }}</th>
-                            <th class="text-center" style="width: 12%">{{ __('crm.planned_qty') }}</th>
-                            <th class="text-center" style="width: 12%">{{ __('crm.reserved_qty') }}</th>
-                            <th class="text-center" style="width: 12%">{{ __('crm.issued_qty') }}</th>
-                            <th class="text-center" style="width: 16%">{{ __('crm.available_stock') }}</th>
-                            <th style="width: 13%">{{ __('crm.actions') }}</th>
+                            <th style="min-width: 220px;">{{ __('crm.component_product') }}</th>
+                            <th class="text-center" style="white-space: nowrap; width: 12%;">{{ __('crm.planned_qty') }}</th>
+                            <th class="text-center" style="white-space: nowrap; width: 12%;">{{ __('crm.reserved_qty') }}</th>
+                            <th class="text-center" style="white-space: nowrap; width: 12%;">{{ __('crm.issued_qty') }}</th>
+                            <th class="text-center" style="white-space: nowrap; width: 14%;">{{ __('crm.available_stock') }}</th>
+                            <th class="text-center" style="width: 130px; min-width: 130px;">{{ __('crm.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>

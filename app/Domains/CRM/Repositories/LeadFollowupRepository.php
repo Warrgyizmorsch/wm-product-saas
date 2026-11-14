@@ -31,8 +31,12 @@ class LeadFollowupRepository
     /**
      * Recalculate and update the parent lead's next followup date.
      */
-    public function syncLeadNextFollowupDate(Lead $lead): void
+    public function syncLeadNextFollowupDate(?Lead $lead = null): void
     {
+        if (!$lead) {
+            return;
+        }
+
         $lead->unsetRelation('followups');
 
         $nextPending = $lead->followups()

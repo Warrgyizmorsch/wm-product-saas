@@ -94,6 +94,9 @@ erDiagram
     Product ||--o{ Routing : "has_routings"
     Routing ||--o{ RoutingOperation : "has_operations"
     ProductionPlan ||--o{ ProductionOrder : "spawns"
+    Project ||--o{ ProductionOrder : "linked_to"
+    ProjectMilestone ||--o{ ProductionOrder : "linked_to"
+    ProjectTask ||--o{ ProductionOrder : "linked_to"
     ProductionOrder ||--o{ ProductionOrderOperation : "executes"
     ProductionOrder ||--o{ ProductionOrderReservation : "reserves_stock"
     ProductionOrder ||--o{ ProductionOrderIssue : "consumes_material"
@@ -112,7 +115,12 @@ erDiagram
 * **Invariants:** Once a BOM reaches `approved`, it is frozen. Modifications require calling `createRevision()`, which creates a new row with an incremented version number.
 
 #### 2. `ProductionOrder` (`production_orders`)
-* **Key Columns:** `id`, `tenant_id`, `order_number`, `product_id`, `bom_id`, `routing_id`, `sales_order_id`, `quantity_ordered`, `quantity_produced`, `status`, `planned_start_date`, `actual_start_date`, `actual_end_date`.
+* **Key Columns:** `id`, `tenant_id`, `company_id`, `branch_id`, `order_number`, `product_id`, `bom_id`, `routing_id`, `sales_order_id`, `sales_order_item_id`, `project_id`, `project_milestone_id`, `project_task_id`, `quantity_ordered`, `quantity_produced`, `quantity_rejected`, `quantity_scrapped`, `production_model`, `production_mode`, `status`, `planned_start_date`, `actual_start_date`, `actual_end_date`.
+* **Project Associations:**
+  * `project_id` (references `App\Domains\Projects\Models\Project`, nullable, constrained on `projects`, `nullOnDelete`).
+  * `project_milestone_id` (references `App\Domains\Projects\Models\Milestone`, nullable, constrained on `project_milestones`, `nullOnDelete`).
+  * `project_task_id` (references `App\Domains\Projects\Models\Task`, nullable, constrained on `project_tasks`, `nullOnDelete`).
+  * Composite indexes: `production_orders_tenant_project_idx` (`['tenant_id', 'project_id']`), `production_orders_tenant_task_idx` (`['tenant_id', 'project_task_id']`).
 * **Status Enum:**
   `draft` → `planned` → `released` → `in_progress` → `completed` → `closed` (or `cancelled`).
 * **Lifecycle Rules:**
@@ -195,6 +203,28 @@ Enforces strict multi-checkpoint validation before allowing finished goods intak
   * **Journal Source:** `Journal::SOURCE_PRODUCTION` (`'production'`).
 * **Boundaries:** Finished goods inflow (`Production Receipt`) updates stock and weighted-average valuation, but does not auto-dispatch a GL voucher. Operational scrap and maintenance spare transactions are explicitly skipped by this listener.
 
+### 5.7 Project Management Integration & Completion Event Pipeline
+* **Context Ingestion & Validation Pipeline:**
+  When a production order is created in association with a Project Task (`/production/orders/create?project_id={id}&project_task_id={id}`), `StoreProductionOrderRequest` validates:
+  1. Tenancy: `Task`, `Milestone`, and `Project` records belong to the authenticated user's `tenant_id`.
+  2. Structural Hierarchy: `task->project_id === $projectId` and `milestone->project_id === $projectId`.
+  3. Scope Consistency: The order's `company_id` and `branch_id` strictly match the project's company and branch (`projects.company_mismatch_error`, `projects.branch_mismatch_error`).
+  `ProductionOrderService::create()` persists `project_id`, `project_milestone_id`, and `project_task_id`, then calls `ActivityLogService::record()` to log `production.created` on the parent project.
+* **Completion Event Emission:**
+  Upon order completion (`status` transitions to `STATUS_COMPLETED`), the order model or execution service dispatches `App\Domains\Production\Events\ProductionOrderCompleted($order)`.
+* **Listener Evaluation (`SyncProductionTaskCompletionListener`):**
+  Registered in `AppServiceProvider.php` (line 584), `SyncProductionTaskCompletionListener::handle()`:
+  1. Guards against unlinked orders (`!$order->project_task_id`).
+  2. Retrieves all `ProductionOrder` instances sharing `project_task_id` under the active tenant.
+  3. Evaluates whether **all** linked sibling orders have reached `status === ProductionOrder::STATUS_COMPLETED`.
+  4. Evaluates whether aggregate output satisfies total ordered demand within floating-point tolerance:
+     $$\sum \text{quantity\_produced} \ge \left(\sum \text{quantity\_ordered} - 0.0001\right)$$
+  5. If satisfied: Marks `Task.status = Task::STATUS_COMPLETED`, stamps `completed_at = now()`, invokes `MilestoneService::recalculateProgress($task->milestone_id)`, and records an audited `ActivityLog` (`production.completed`).
+  6. If a yield shortfall exists or sibling orders remain open: Safely keeps `Task.status` as `IN_PROGRESS` and records an audited warning in `ActivityLog` (`production.shortfall_warning`).
+* **Automated Test Coverage:**
+  - `tests/Feature/Phase12ProductionSyncTest.php` (10 tests, 31 assertions): Verifies canonical event dispatch, single/multiple order completion sync, shortfall warning logs, QC reject shortfall safety, and unlinked order independence.
+  - `tests/Feature/Phase13ProductionProjectIntegrationTest.php` (12 tests, 66 assertions): Verifies cross-company/branch guards, project context persistence, reverse navigation badges, and manufacturing summary aggregation.
+
 ---
 
 ## 6. REST API Architecture (v1)
@@ -235,13 +265,17 @@ All tests execute using PHPUnit via the Artisan test runner:
 # Run the complete Production test suite
 php artisan test --filter=Production
 
-# Run targeted test suites
+# Run targeted Production test suites
 php artisan test tests/Feature/Production/WorkCenterTest.php
 php artisan test tests/Feature/Production/MaintenanceWorkflowTest.php
 php artisan test tests/Feature/Production/RoutingTest.php
 php artisan test tests/Feature/Production/SubcontractProcurementAutomationWorkflowTest.php
 php artisan test tests/Feature/Production/ProductionMisReportsTest.php
 php artisan test tests/Feature/Production/ShopfloorQcScrapReworkArchitectureTest.php
+
+# Run Project-Production cross-domain integration tests
+php artisan test tests/Feature/Phase12ProductionSyncTest.php
+php artisan test tests/Feature/Phase13ProductionProjectIntegrationTest.php
 ```
 
 ### 7.2 Currency Standards (BOM Canonical Reference)

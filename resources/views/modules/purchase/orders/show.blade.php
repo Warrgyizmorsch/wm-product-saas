@@ -1,707 +1,819 @@
 @extends('layouts.duralux')
 
-@section('title', __('purchase.purchase_orders') . " {$order->purchase_order_number} | SaaS ERP")
-@section('page-title', __('purchase.purchase_order_details'))
+@section('title', 'Purchase Order ' . $order->purchase_order_number . ' | SaaS ERP')
+@section('page-title', __('purchase.purchase_orders') . ' — ' . $order->purchase_order_number)
 @section('breadcrumb')
     <a href="{{ route('purchase.orders.index') }}">{{ __('purchase.purchase_orders') }}</a> &gt; {{ $order->purchase_order_number }}
 @endsection
 
 @section('page-actions')
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
         <!-- Back Button -->
-        <a href="{{ route('purchase.orders.index') }}" class="action-dropdown-btn" title="{{ __('purchase.back') }}" data-bs-toggle="tooltip">
+        <a href="{{ route('purchase.orders.index') }}" class="btn btn-sm btn-light border d-inline-flex align-items-center justify-content-center px-2.5" title="{{ __('purchase.back') }}" data-bs-toggle="tooltip">
             <i class="feather feather-arrow-left"></i>
         </a>
 
-        <!-- Download PDF Icon Button -->
-        <a href="{{ route('purchase.orders.download', $order->id) }}" class="action-dropdown-btn" title="{{ __('purchase.download_pdf') }}" data-bs-toggle="tooltip">
-            <i class="feather feather-download"></i>
-        </a>
 
+        <!-- Advance Payment Button (If Approved & has balance due) -->
+        @if (in_array($order->status, ['Approved', 'Partially Received']))
+            <button type="button" class="btn btn-sm btn-success fw-bold px-3 d-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#advancePaymentModal">
+                <i class="feather-dollar-sign me-1.5"></i>Advance Payment
+            </button>
+        @endif
+
+        <!-- Create Return (If Goods Received) -->
         @if (in_array($order->status, ['Approved', 'Partially Received', 'Received', 'Completed']))
             @php
                 $latestGrn = \App\Domains\Purchase\Models\GoodsReceiptNote::where('purchase_order_id', $order->id)->latest()->first();
             @endphp
-            <x-ui.button href="{{ route('purchase.returns.create', $latestGrn ? ['goods_receipt_note_id' => $latestGrn->id, 'mode' => 'grn'] : ['purchase_order_id' => $order->id, 'mode' => 'grn']) }}" variant="primary" size="sm" class="fw-bold px-3 me-1" icon="feather-corner-up-left">
-                Create Return
-            </x-ui.button>
+            <a href="{{ route('purchase.returns.create', $latestGrn ? ['goods_receipt_note_id' => $latestGrn->id, 'mode' => 'grn'] : ['purchase_order_id' => $order->id, 'mode' => 'grn']) }}" class="btn btn-sm btn-light border fw-bold px-3 d-inline-flex align-items-center">
+                <i class="feather-corner-up-left me-1.5"></i>Create Return
+            </a>
         @endif
 
-        @if($order->status === 'Draft')
-            <!-- Action Dropdown -->
-            <x-ui.action-dropdown id="poDetailsActions-{{ $order->id }}">
-                @if($order->status === 'Draft')
-                    <li>
-                        <button type="button" class="dropdown-item py-2 text-warning fw-semibold" onclick="openRemindModal('{{ route('purchase.orders.remind', $order->id) }}', '{{ $order->purchase_order_number }}')">
-                            <i class="feather-bell me-1.5 text-warning"></i> Send Quick Reminder
-                        </button>
-                    </li>
-                @endif
+        <!-- Direct PDF Download Button -->
+        <a href="{{ route('purchase.orders.download', $order->id) }}" class="btn btn-sm btn-outline-danger fw-bold px-3 d-inline-flex align-items-center" title="Download Official Purchase Order PDF">
+            <i class="feather-download me-1.5"></i>PDF
+        </a>
+
+        @php
+            $vendorPhone = $order->vendor?->phone ?: '';
+            $vendorEmail = $order->vendor?->email ?: '';
+            $vendorName = $order->vendor?->name ?: 'Vendor';
+            $poGrandTotal = format_currency($order->grand_total);
+        @endphp
+
+        <!-- MORE Dropdown Button -->
+        <div class="dropdown d-inline-flex align-items-center">
+            <button class="btn btn-sm btn-light border fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More PO Actions">
+                <i class="feather-more-horizontal me-1"></i>MORE
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 250px;">
                 <li>
-                    <a class="dropdown-item py-2" href="{{ route('purchase.orders.edit', $order->id) }}">
-                        <i class="feather-edit me-1.5 text-muted"></i> {{ __('purchase.edit') }}
+                    <button type="button" 
+                            class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium btn-open-po-wa-modal d-flex align-items-center text-nowrap"
+                            data-po-number="{{ $order->purchase_order_number }}"
+                            data-vendor-name="{{ $vendorName }}"
+                            data-vendor-phone="{{ $vendorPhone }}"
+                            data-total-amount="{{ $poGrandTotal }}">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="me-2.5"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
+                        Send via WhatsApp
+                    </button>
+                </li>
+                <li>
+                    <button type="button" 
+                            class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium btn-open-po-email-modal d-flex align-items-center text-nowrap"
+                            data-po-number="{{ $order->purchase_order_number }}"
+                            data-vendor-name="{{ $vendorName }}"
+                            data-vendor-email="{{ $vendorEmail }}"
+                            data-total-amount="{{ $poGrandTotal }}">
+                        <i class="feather-mail me-2.5 text-primary fs-14"></i>
+                        Send via Email
+                    </button>
+                </li>
+                <li>
+                    <a href="{{ route('purchase.orders.download', $order->id) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-nowrap">
+                        <i class="feather-download me-2.5 text-danger fs-14"></i>
+                        Download PDF Document
                     </a>
                 </li>
+                <li><hr class="dropdown-divider my-1"></li>
                 <li>
-                    <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST" class="d-inline" id="deletePoShowForm">
-                        @csrf
-                        @method('DELETE')
-                        <button type="button" class="dropdown-item py-2 text-danger" onclick="confirmAction({ title: 'Delete Purchase Order', message: '{{ __('purchase.confirm_delete_po') }}', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deletePoShowForm').submit(); })">
-                            <i class="feather-trash-2 me-1.5"></i> {{ __('purchase.delete') }}
-                        </button>
-                    </form>
+                    <a href="javascript:void(0)" onclick="window.print()" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-nowrap">
+                        <i class="feather-printer me-2.5 text-secondary fs-14"></i>
+                        Print Purchase Order
+                    </a>
                 </li>
-            </x-ui.action-dropdown>
-        @endif
+
+                @if ($order->status === 'Draft')
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li>
+                        <button type="button" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium text-warning d-flex align-items-center text-nowrap" onclick="openRemindModal('{{ route('purchase.orders.remind', $order->id) }}', '{{ $order->purchase_order_number }}')">
+                            <i class="feather-bell me-2.5 text-warning fs-14"></i>
+                            Send Quick Reminder
+                        </button>
+                    </li>
+                    <li>
+                        <a href="{{ route('purchase.orders.edit', $order->id) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-nowrap">
+                            <i class="feather-edit me-2.5 text-muted fs-14"></i>
+                            {{ __('purchase.edit') }}
+                        </a>
+                    </li>
+                    <li>
+                        <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST" id="deletePoShowForm" class="m-0">
+                            @csrf
+                            @method('DELETE')
+                            <button type="button" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium text-danger d-flex align-items-center text-nowrap" onclick="confirmAction({ title: 'Delete Purchase Order', message: '{{ __('purchase.confirm_delete_po') }}', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deletePoShowForm').submit(); })">
+                                <i class="feather-trash-2 me-2.5 text-danger fs-14"></i>
+                                {{ __('purchase.delete') }}
+                            </button>
+                        </form>
+                    </li>
+                @endif
+            </ul>
+        </div>
     </div>
 @endsection
 
 @push('styles')
     <style>
-        .po-lines-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
+        .invoice-sheet {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            padding: 40px;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            position: relative;
+            overflow: hidden;
         }
-        .po-lines-table th {
+
+        .invoice-corner-ribbon {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 80px;
+            height: 80px;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .invoice-corner-ribbon .ribbon-inner {
+            position: absolute;
+            top: 16px;
+            right: -24px;
+            width: 105px;
+            transform: rotate(45deg);
+            text-align: center;
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 4px 0;
+            color: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        }
+
+        .ribbon-paid { background-color: #16a34a; }
+        .ribbon-partially-paid { background-color: #d97706; }
+        .ribbon-posted { background-color: #2563eb; }
+        .ribbon-draft { background-color: #64748b; }
+        .ribbon-cancelled { background-color: #dc2626; }
+
+        .po-table th {
             background-color: #f8fafc;
             color: #475569;
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            padding: 10px 14px;
             border-top: 1px solid #e2e8f0;
             border-bottom: 2px solid #cbd5e1;
+            padding: 8px 12px;
         }
-        .po-lines-table td {
-            padding: 12px 14px;
+        .po-table td {
+            padding: 9px 12px;
             border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
-            font-size: 13px;
+            font-size: 12px;
+            color: #1e293b;
         }
-        .po-lines-table tr:hover td {
-            background-color: #f8fafc;
+
+        .summary-table td {
+            padding: 4px 10px;
+            font-size: 12px;
         }
-        .summary-box {
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 16px 20px;
+
+        .po-main-title {
+            color: #1e40af;
         }
-        .summary-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            font-size: 13px;
+
+        .po-avatar-box {
+            background-color: #1e40af !important;
         }
+
+        .po-rich-text {
+            line-height: 1.6;
+        }
+        .po-rich-text ol,
+        .po-rich-text ul {
+            padding-left: 20px;
+            margin-top: 4px;
+            margin-bottom: 4px;
+        }
+        .po-rich-text ol {
+            list-style-type: decimal !important;
+        }
+        .po-rich-text ul {
+            list-style-type: disc !important;
+        }
+        .po-rich-text li {
+            margin-bottom: 5px;
+            color: #334155;
+            padding-left: 3px;
+        }
+        .po-rich-text p {
+            margin-bottom: 6px;
+        }
+
+        /* Dark mode support */
+        html.app-skin-dark .invoice-sheet {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .po-main-title {
+            color: #60a5fa !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .po-avatar-box {
+            background-color: #2563eb !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .text-dark,
+        html.app-skin-dark .invoice-sheet h2,
+        html.app-skin-dark .invoice-sheet h4,
+        html.app-skin-dark .invoice-sheet h6,
+        html.app-skin-dark .invoice-sheet strong {
+            color: #f8fafc !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .text-secondary {
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .border,
+        html.app-skin-dark .invoice-sheet .border-bottom,
+        html.app-skin-dark .invoice-sheet .border-top {
+            border-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .bg-light {
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .po-table th {
+            background-color: #1e293b !important;
+            color: #94a3b8 !important;
+            border-color: #334155 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .po-table td {
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
         @media print {
-            body * { visibility: hidden !important; }
-            #printablePoContent, #printablePoContent * { visibility: visible !important; }
-            #printablePoContent {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                padding: 0 !important;
+            @page {
+                size: A4 portrait;
+                margin: 0 !important;
             }
-            .d-print-none { display: none !important; }
+
+            .nxl-navigation,
+            .nxl-header,
+            .page-header,
+            .page-actions,
+            .action-dropdown-btn,
+            footer,
+            .invoice-corner-ribbon,
+            .d-print-none,
+            .btn {
+                display: none !important;
+            }
+
+            html, body, main, .nxl-container, .nxl-content, .main-content, .row, .col-12 {
+                background: #ffffff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                height: auto !important;
+                overflow: visible !important;
+                font-size: 10px !important;
+            }
+
+            .invoice-sheet {
+                position: static !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 4mm 8mm !important;
+                border: none !important;
+                box-shadow: none !important;
+                background: #ffffff !important;
+            }
         }
     </style>
 @endpush
 
 @section('content')
-    @php
-        $currency = tenant()?->settings['currency'] ?? 'INR';
-        $currencySymbol = active_currency_symbol();
-    @endphp
+    <div class="row text-dark">
+        <div class="col-12">
 
-    <div class="erp-single-panel text-dark">
-        <!-- Toast Notifications -->
-
-        <x-ui.odoo-form-ui type="sheet" class="p-0" id="printablePoContent">
-            <!-- Header bar -->
+            <!-- Subcontract Alert Banner (If Applicable) -->
             @if($order->is_subcontract)
                 @php
                     $firstItemWithMo = $order->items ? $order->items->first(fn($i) => !empty($i->production_order_operation_id)) : null;
                     $linkedMoOp = $firstItemWithMo?->productionOrderOperation;
                     $linkedMo = $linkedMoOp?->order;
                 @endphp
-                <div class="bg-soft-primary border-bottom border-primary px-4 py-2 d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-primary text-white font-monospace fs-11">Subcontract Service PO</span>
-                        <span class="fs-12 text-dark">
-                            Auto-generated for Production Subcontracting Execution
-                            @if($linkedMo)
-                                — <strong>MO:</strong> <a href="{{ route('production.orders.show', $linkedMo->id) }}" class="fw-bold text-primary">{{ $linkedMo->order_number }}</a>
-                                @if($linkedMoOp)
-                                    | <strong>Op:</strong> {{ $linkedMoOp->operation_number }} ({{ $linkedMoOp->name }})
+                <div class="alert alert-soft-primary border border-primary-subtle d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm d-print-none" style="max-width: 900px; margin: 0 auto 1.5rem auto;">
+                    <div class="d-flex align-items-center">
+                        <div class="avatar avatar-md bg-primary text-white rounded-circle me-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                            <i class="feather-truck fs-16"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold text-primary mb-0.5 fs-14">Subcontract Service Purchase Order</h6>
+                            <p class="text-muted fs-12 mb-0">
+                                Purchases vendor service.
+                                @if($linkedMo)
+                                    Linked Manufacturing Order: <a href="{{ route('production.orders.show', $linkedMo->id) }}" class="fw-bold text-primary">{{ $linkedMo->order_number }}</a>
+                                    @if($linkedMoOp) | Op: {{ $linkedMoOp->operation_number }} ({{ $linkedMoOp->name }}) @endif
                                 @endif
-                            @endif
-                        </span>
+                            </p>
+                        </div>
                     </div>
-                    <span class="badge bg-soft-info text-info border font-monospace fs-10">Service Receipt — No Stock Increase</span>
                 </div>
             @endif
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 px-4 pt-4 pb-3 border-bottom bg-white">
-                <div>
-                    <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">
-                        <i class="feather-shopping-bag text-primary me-1"></i>Purchase Order
-                    </span>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ $order->purchase_order_number }}</h3>
-                        @php
-                            $statusVariant = 'warning';
-                            if ($order->status === 'Completed') $statusVariant = 'success';
-                            elseif ($order->status === 'Approved') $statusVariant = 'primary';
-                            elseif ($order->status === 'Partially Received') $statusVariant = 'info';
-                            elseif (in_array($order->status, ['Cancelled', 'Rejected'])) $statusVariant = 'danger';
-                        @endphp
-                        <x-ui.badge :soft="true" :variant="$statusVariant" class="px-2.5 py-1 fs-11 fw-bold">
-                            {{ $order->status }}
-                        </x-ui.badge>
-                        @if($order->is_subcontract)
-                            <x-ui.badge :soft="true" variant="warning" class="px-2.5 py-1 fs-11 fw-bold">
-                                <i class="feather-truck me-1"></i>Subcontract PO
-                            </x-ui.badge>
-                        @endif
-                        @if($order->reminder_count > 0)
-                            @php
-                                $remData = $order->reminders->map(fn($r) => [
-                                    'user' => $r->user->name ?? 'User',
-                                    'time' => $r->created_at->format('d M Y h:i A'),
-                                    'note' => $r->note
-                                ]);
-                            @endphp
-                            <button type="button" class="btn btn-xs btn-soft-danger border border-danger-subtle px-2.5 py-1 fs-11 fw-bold"
-                                    onclick="showReminderHistoryModal('{{ $order->purchase_order_number }}', {{ json_encode($remData) }})">
-                                <i class="feather-bell me-1"></i>Reminded ({{ $order->reminder_count }})
-                            </button>
-                        @endif
+
+            <!-- Cancelled / Rejected Alert Banner -->
+            @if (in_array($order->status, ['Cancelled', 'Rejected']))
+                <div class="alert alert-soft-danger border border-danger-subtle d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm d-print-none" style="max-width: 900px; margin: 0 auto 1.5rem auto;">
+                    <div class="d-flex align-items-center">
+                        <div class="avatar avatar-md bg-danger text-white rounded-circle me-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                            <i class="feather-slash fs-16"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold text-danger mb-0.5 fs-14">Purchase Order Cancelled / Rejected</h6>
+                            <p class="text-muted fs-12 mb-0">
+                                Reason: <strong>{{ $order->rejection_reason ?: 'No rejection reason specified.' }}</strong>
+                            </p>
+                        </div>
                     </div>
-                    <span class="fs-13 text-muted">
-                        Supplier:&nbsp;<strong class="text-dark">{{ $order->vendor->name ?? '—' }}</strong>
-                        &nbsp;·&nbsp;Order Date:&nbsp;<strong class="text-dark">{{ $order->date ? $order->date->format('d-m-Y') : '—' }}</strong>
-                        @if($order->delivery_date)
-                            &nbsp;·&nbsp;Expected Delivery Date:&nbsp;<strong class="text-info">{{ $order->delivery_date->format('d-m-Y') }}</strong>
-                        @endif
-                        @if($order->completed_at)
-                            &nbsp;·&nbsp;Completion Date:&nbsp;<strong class="text-success">{{ $order->completed_at->format('d-m-Y') }}</strong>
-                        @endif
-                    </span>
+                </div>
+            @endif
+
+            <!-- Standard ERP Purchase Order Sheet (Matching Sales Invoice) -->
+            <div class="invoice-sheet print-area mb-5">
+                <!-- Status Corner Ribbon Tag Patti -->
+                <div class="invoice-corner-ribbon">
+                    @php
+                        $ribbonClass = match($order->status) {
+                            'Approved' => 'ribbon-posted',
+                            'Completed' => 'ribbon-paid',
+                            'Received' => 'ribbon-paid',
+                            'Partially Received' => 'ribbon-partially-paid',
+                            'Cancelled', 'Rejected' => 'ribbon-cancelled',
+                            default => 'ribbon-draft',
+                        };
+                    @endphp
+                    <div class="ribbon-inner {{ $ribbonClass }}">
+                        {{ $order->status }}
+                    </div>
                 </div>
 
-                <!-- Grand Total Banner -->
-                <div class="text-end bg-light p-3 rounded-3 border min-w-180">
-                    <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">Grand Total</span>
-                    <h3 class="fw-bold text-primary mb-0 font-monospace">{{ $currencySymbol }}{{ number_format($order->grand_total, 2) }}</h3>
-                </div>
-            </div>
-
-            @if($order->is_subcontract)
-                <div class="alert alert-info border-0 border-start border-4 border-info m-4 mb-0 rounded-3 shadow-sm bg-soft-info">
-                    <div class="d-flex align-items-top justify-content-between flex-wrap gap-2">
-                        <div class="d-flex align-items-top">
-                            <i class="feather-info fs-18 text-info me-3 mt-0.5"></i>
+                <!-- 1. Document Header -->
+                <div class="row align-items-start pb-4 border-bottom mb-4">
+                    <div class="col-7">
+                        @php
+                            $buyerOrg = billing_organization_details($order);
+                            $isItemWiseTax = ($order->tax_type === 'item_wise_tax');
+                            $hasTax = ($order->tax_type !== 'without_tax') && (((float)($order->tax_amount ?? 0) > 0) || $order->items->contains(function($item) {
+                                return (float)($item->tax_amount ?? 0) > 0 || (float)($item->tax_percent ?? 0) > 0;
+                            }));
+                            $hasDiscount = ((float)($order->discount_amount ?? 0) > 0) || $order->items->contains(function($item) {
+                                return (float)($item->discount_amount ?? 0) > 0;
+                            });
+                        @endphp
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="avatar-text po-avatar-box text-white fs-2 fw-bold me-3 shadow-sm d-flex align-items-center justify-content-center" style="border-radius: 8px; width: 50px; height: 50px; flex-shrink: 0;">
+                                {{ $buyerOrg['avatar_char'] ?? strtoupper(substr($buyerOrg['name'] ?? 'P', 0, 1)) }}
+                            </div>
                             <div>
-                                <h6 class="fw-bold text-info mb-1">Subcontract Service Order</h6>
-                                <p class="fs-12 text-dark mb-0">
-                                    This Purchase Order purchases vendor processing/service. Any company-owned material or WIP sent to this vendor is managed separately through <strong>Stock Transfer</strong>.
-                                </p>
+                                <h4 class="fw-bold text-dark mb-0 fs-17">{{ $buyerOrg['name'] }}</h4>
+                                <span class="fs-11 text-muted">{{ $buyerOrg['unit_subtext'] }}</span>
                             </div>
                         </div>
-                        @if($order->production_order_id && \Illuminate\Support\Facades\Route::has('inventory.transfers.index'))
-                            <a href="{{ route('inventory.transfers.index', ['search' => 'MO-' . $order->production_order_id]) }}" class="btn btn-xs btn-outline-primary fw-bold shadow-sm align-self-center">
-                                <i class="feather-arrow-right-circle me-1"></i>View Material Transfers
-                            </a>
-                        @endif
+                        <div class="fs-12 text-secondary leading-relaxed">
+                            <div>{{ $buyerOrg['address'] }}</div>
+                            <div>
+                                @if(!empty($buyerOrg['gstin']))
+                                    <strong>GSTIN:</strong> {{ $buyerOrg['gstin'] }}
+                                @endif
+                                @if(!empty($buyerOrg['state_code']) && !empty($buyerOrg['state_name']))
+                                    @if(!empty($buyerOrg['gstin'])) &nbsp;|&nbsp; @endif
+                                    <strong>State Code:</strong> {{ $buyerOrg['state_code'] }} ({{ $buyerOrg['state_name'] }})
+                                @endif
+                            </div>
+                            <div>
+                                @if(!empty($buyerOrg['email']))
+                                    <strong>Email:</strong> {{ $buyerOrg['email'] }}
+                                @endif
+                                @if(!empty($buyerOrg['email']) && !empty($buyerOrg['phone']))
+                                    &nbsp;|&nbsp;
+                                @endif
+                                @if(!empty($buyerOrg['phone']))
+                                    <strong>Phone:</strong> {{ $buyerOrg['phone'] }}
+                                @endif
+                            </div>
+                        </div>
                     </div>
-                </div>
-            @endif
 
-            @if (in_array($order->status, ['Cancelled', 'Rejected']) && !empty($order->rejection_reason))
-                <div class="alert alert-danger border-0 border-start border-4 border-danger m-4 mb-0 rounded-3 shadow-sm bg-soft-danger">
-                    <div class="d-flex align-items-top">
-                        <i class="feather-x-circle fs-18 text-danger me-3 mt-0.5"></i>
-                        <div>
-                            <h6 class="fw-bold text-danger mb-1">Purchase Order Cancelled / Rejected</h6>
-                            <p class="fs-13 text-dark mb-0"><strong>Rejection Reason:</strong> {{ $order->rejection_reason }}</p>
+                    <div class="col-5 text-end">
+                        <h2 class="po-main-title fw-black text-uppercase tracking-wide mb-1" style="font-size: 22px; letter-spacing: 1px;">PURCHASE ORDER</h2>
+                        <div class="fs-14 fw-bold text-dark"># {{ $order->purchase_order_number }}</div>
+
+                        <div class="mt-3 fs-12 text-secondary">
+                            <div class="d-flex justify-content-end gap-2 mb-1">
+                                <span class="text-muted">PO Date:</span>
+                                <strong class="text-dark">{{ $order->date ? $order->date->format('d-M-Y') : '—' }}</strong>
+                            </div>
+                            @if($order->delivery_date)
+                                <div class="d-flex justify-content-end gap-2 mb-1">
+                                    <span class="text-muted">Expected Delivery:</span>
+                                    <strong class="text-primary">{{ $order->delivery_date->format('d-M-Y') }}</strong>
+                                </div>
+                            @endif
+                            @if($order->payment_terms)
+                                <div class="d-flex justify-content-end gap-2">
+                                    <span class="text-muted">Payment Terms:</span>
+                                    <strong class="text-dark">{{ $order->payment_terms }}</strong>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
-            @endif
 
-            <!-- 3-Column Info Cards Section -->
-            <div class="px-4 py-4 border-bottom bg-light-50">
-                <div class="row g-4 fs-13 text-dark">
-                    <!-- Column 1: Vendor Details -->
-                    <div class="col-md-4 border-end-md">
-                        <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-3">
-                            <i class="feather-truck text-primary me-1.5"></i>{{ __('purchase.supplier_information') }}
-                        </h6>
-                        <table class="table table-borderless table-sm mb-0">
-                            <tbody>
-                                <tr>
-                                    <td class="text-muted ps-0" style="width: 110px;">{{ __('purchase.vendor') }}:</td>
-                                    <td class="fw-bold text-dark fs-14">{{ $order->vendor->name ?? '—' }}</td>
-                                </tr>
-                                @if($order->vendor?->code)
-                                    <tr>
-                                        <td class="text-muted ps-0">{{ __('purchase.supplier_code') }}:</td>
-                                        <td class="fw-semibold text-secondary font-monospace">{{ $order->vendor->code }}</td>
-                                    </tr>
+                <!-- 2. Address & References Section (Standard 2-Box ERP Layout) -->
+                <div class="row g-4 mb-4 fs-12 text-dark">
+                    <!-- Box 1 (Left 50%): Supplier Details (Vendor) -->
+                    <div class="col-6">
+                        <div class="p-3 bg-light bg-opacity-40 rounded border h-100">
+                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">SUPPLIER DETAILS (VENDOR)</span>
+                            <h6 class="fw-bold text-dark mb-1 fs-14">{{ $order->vendor->name ?? '—' }}</h6>
+                            @if($order->vendor?->code)
+                                <div class="text-muted fw-semibold mb-1 fs-11">Code: <span class="font-monospace text-dark">{{ $order->vendor->code }}</span></div>
+                            @endif
+                            @if($order->vendor?->gstin || $order->vendor?->tax_number)
+                                <div class="text-dark mb-1 fs-11">
+                                    <strong>GSTIN / Tax ID:</strong> <span class="font-monospace fw-bold text-primary">{{ $order->vendor?->gstin ?: $order->vendor?->tax_number }}</span>
+                                </div>
+                            @endif
+                            @if($order->vendor?->email || $order->vendor?->phone)
+                                <div class="text-secondary mb-2 fs-11">
+                                    @if($order->vendor?->email)
+                                        <span class="me-3"><i class="feather-mail me-1 fs-11 text-muted"></i>{{ $order->vendor->email }}</span>
+                                    @endif
+                                    @if($order->vendor?->phone)
+                                        <span><i class="feather-phone me-1 fs-11 text-muted"></i>{{ $order->vendor->phone }}</span>
+                                    @endif
+                                </div>
+                            @endif
+
+                            <div class="mt-2 pt-2 border-top text-secondary fs-11">
+                                <strong class="text-dark d-block mb-1">Supplier Registered Address:</strong>
+                                <div style="white-space: pre-wrap;">{{ $order->vendor?->address ?: ($order->vendor?->billing_address ?: '—') }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Box 2 (Right 50%): Delivery & Order References (Ship To) -->
+                    <div class="col-6">
+                        <div class="p-3 bg-light bg-opacity-40 rounded border h-100">
+                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">ORDER &amp; DELIVERY REFERENCES</span>
+                            
+                            <h6 class="fw-bold text-primary mb-1 fs-14">{{ $order->warehouse?->name ?: ($order->location ?: 'Company Central Warehouse') }}</h6>
+                            <div class="text-secondary mb-2 fs-11">
+                                <strong class="text-dark d-block mb-1">Delivery Address:</strong>
+                                <div style="white-space: pre-wrap;">{{ $order->warehouse?->address ?: ($order->location ?: ($buyerOrg['address'] ?? '—')) }}</div>
+                            </div>
+
+                            <div class="mt-2 pt-2 border-top fs-11">
+                                @if ($order->requisition)
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted">Requisition Ref:</span>
+                                        <a href="{{ route('purchase.requisitions.show', $order->purchase_requisition_id) }}" class="fw-bold text-primary font-monospace">
+                                            {{ $order->requisition->requisition_number }}
+                                        </a>
+                                    </div>
                                 @endif
                                 @if($order->supplier_quotation_number)
-                                    <tr>
-                                        <td class="text-muted ps-0">{{ __('purchase.quote_ref') }}:</td>
-                                        <td class="fw-bold text-primary font-monospace">{{ $order->supplier_quotation_number }}</td>
-                                    </tr>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted">Supplier Quote No:</span>
+                                        <span class="fw-semibold text-dark">{{ $order->supplier_quotation_number }}</span>
+                                    </div>
                                 @endif
-                                <tr>
-                                    <td class="text-muted ps-0">{{ __('purchase.address') }}:</td>
-                                    <td class="text-dark" style="line-height: 1.4;">{{ $order->vendor->address ?? '—' }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Column 2: Dates & Warehouse -->
-                    <div class="col-md-4 border-end-md">
-                        <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-3">
-                            <i class="feather-calendar text-primary me-1.5"></i>{{ __('purchase.dates_calc_options') }}
-                        </h6>
-                        <table class="table table-borderless table-sm mb-0">
-                            <tbody>
-                                <tr>
-                                    <td class="text-muted ps-0" style="width: 120px;">{{ __('purchase.order_date') }}:</td>
-                                    <td class="fw-semibold text-dark">{{ $order->date ? $order->date->format('d-m-Y') : '—' }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted ps-0">{{ __('purchase.expected_delivery_date_label') }}:</td>
-                                    <td class="fw-semibold text-info">{{ $order->delivery_date ? $order->delivery_date->format('d-m-Y') : '—' }}</td>
-                                </tr>
-                                @if($order->completed_at)
-                                    <tr>
-                                        <td class="text-muted ps-0">{{ __('purchase.completion_date_label') }}:</td>
-                                        <td class="fw-bold text-success">{{ $order->completed_at->format('d-m-Y H:i') }}</td>
-                                    </tr>
+                                @if($order->reference)
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted">Internal Ref:</span>
+                                        <span class="fw-semibold text-dark">{{ $order->reference }}</span>
+                                    </div>
                                 @endif
-                                <tr>
-                                    <td class="text-muted ps-0">{{ __('purchase.location') }}:</td>
-                                    <td class="fw-semibold text-dark">{{ $order->location ?: __('purchase.main_warehouse') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted ps-0">{{ __('purchase.discount_option_label') }}:</td>
-                                    <td class="fw-semibold text-dark text-capitalize">{{ str_replace('_', ' ', $order->discount_type) }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted ps-0">{{ __('purchase.tax_option_label') }}:</td>
-                                    <td class="fw-semibold text-dark text-capitalize">{{ str_replace('_', ' ', $order->tax_type) }}</td>
-                                </tr>
                                 @if($order->freight_terms)
-                                    <tr>
-                                        <td class="text-muted ps-0">{{ __('purchase.freight_terms') }}:</td>
-                                        <td class="fw-semibold text-dark">
-                                            @if($order->freight_terms === 'to_pay') {{ __('purchase.freight_to_pay') }}
-                                            @elseif($order->freight_terms === 'to_be_billed') {{ __('purchase.freight_to_be_billed') }}
-                                            @elseif($order->freight_terms === 'prepaid') {{ __('purchase.freight_prepaid') }}
-                                            @elseif($order->freight_terms === 'customer_pickup') {{ __('purchase.freight_customer_pickup') }}
-                                            @else {{ str_replace('_', ' ', $order->freight_terms) }}
-                                            @endif
-                                        </td>
-                                    </tr>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted">Freight Terms:</span>
+                                        <span class="fw-semibold text-dark">{{ ucwords(str_replace('_', ' ', $order->freight_terms)) }}</span>
+                                    </div>
                                 @endif
-                                @if($order->freight_amount > 0)
-                                    <tr>
-                                        <td class="text-muted ps-0">{{ __('purchase.freight_amount') }}:</td>
-                                        <td class="fw-bold text-primary">{{ format_currency($order->freight_amount) }}</td>
-                                    </tr>
+                                @if($hasTax)
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted">GST Treatment:</span>
+                                        <span class="fw-semibold text-dark">{{ $order->gst_type === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)' }}</span>
+                                    </div>
                                 @endif
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Column 3: Traceability -->
-                    <div class="col-md-4">
-                        <div class="d-flex align-items-center justify-content-between mb-3">
-                            <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-0">
-                                <i class="feather-link text-primary me-1.5"></i>{{ __('purchase.traceability_audit') }}
-                            </h6>
+                            </div>
                         </div>
-                        <table class="table table-borderless table-sm mb-0">
-                            <tbody>
-                                <tr>
-                                    <td class="text-muted ps-0" style="width: 130px;">{{ __('purchase.source_requisition_label') }}:</td>
-                                    <td class="fw-bold">
-                                        @if($order->requisition)
-                                            <a href="{{ route('purchase.requisitions.show', $order->purchase_requisition_id) }}" class="text-primary hover-underline font-monospace">
-                                                <i class="feather-file-text me-1"></i>{{ $order->requisition->requisition_number }}
-                                            </a>
-                                        @else
-                                            <span class="text-muted">{{ __('purchase.direct_creation') }}</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted ps-0">{{ __('purchase.reference_note_label') }}:</td>
-                                    <td class="fw-semibold text-dark">{{ $order->reference ?: '—' }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted ps-0">{{ __('purchase.created_by_label') }}:</td>
-                                    <td class="fw-semibold text-dark">{{ $order->creator->name ?? __('purchase.system') }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted ps-0">{{ __('purchase.gst_treatment_label') }}:</td>
-                                    <td class="fw-semibold text-dark text-uppercase">{{ $order->gst_type === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)' }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
                     </div>
                 </div>
-            </div>
 
-            <!-- Line Items Table Section -->
-            <div class="px-4 py-4 border-bottom">
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                    <h5 class="fw-bold text-dark mb-0">
-                        <i class="feather-list text-primary me-2"></i>{{ __('purchase.po_line_items_heading') }}
-                    </h5>
-                    <span class="badge bg-light text-dark border px-2.5 py-1 font-monospace fs-12">
-                        {{ $order->items->count() }} Line(s)
-                    </span>
-                </div>
-
-                <div class="table-responsive rounded-3 border">
-                    <table class="po-lines-table">
+                <!-- 3. Line Items Table -->
+                <div class="table-responsive mb-4">
+                    <table class="table po-table mb-0">
                         <thead>
                             <tr>
                                 <th style="width: 4%;">#</th>
-                                <th style="width: 28%;">{{ __('purchase.product_name') }} & SKU</th>
-                                <th class="text-end" style="width: 8%;">{{ __('purchase.qty') }}</th>
-                                <th class="text-end" style="width: 12%;">{{ __('purchase.rate') }} ({{ active_currency_symbol() }})</th>
-                                <th class="text-end" style="width: 12%;">{{ __('purchase.gross_amount') }} ({{ active_currency_symbol() }})</th>
-
-                                @if($order->discount_type === 'item_wise')
-                                    <th class="text-end text-danger" style="width: 10%;">{{ __('purchase.disc_percent') }}</th>
+                                <th style="width: {{ ($hasDiscount && $hasTax && $isItemWiseTax) ? '40%' : (($hasDiscount || ($hasTax && $isItemWiseTax)) ? '48%' : '56%') }};">Item Description &amp; Details</th>
+                                <th style="width: 10%;" class="text-center">Qty</th>
+                                <th style="width: 12%;" class="text-end">Rate</th>
+                                @if($hasDiscount)
+                                    <th style="width: 10%;" class="text-end">Discount</th>
                                 @endif
-
-                                <th class="text-end text-dark" style="width: 13%;">{{ __('purchase.taxable_amt') }} ({{ active_currency_symbol() }})</th>
-
-                                @if($order->tax_type === 'item_wise_tax')
-                                    <th class="text-end text-muted" style="width: 10%;">{{ __('purchase.tax_rate') }}</th>
+                                @if($hasTax && $isItemWiseTax)
+                                    <th style="width: 10%;" class="text-end">Tax</th>
                                 @endif
-
-                                <th class="text-end" style="width: 13%;">{{ __('purchase.total_amount') }} ({{ active_currency_symbol() }})</th>
+                                <th style="width: 14%;" class="text-end">Total Amount</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @php
-                                // Group by product_id + line_type, not product_id alone — otherwise a
-                                // split purchase of the same product (e.g. 8 units to Stock, 2 to Asset)
-                                // would incorrectly merge into a single line.
-                                $groupedItems = $order->items->groupBy(fn ($item) => $item->product_id . '|' . $item->line_type)->map(function($items) {
-                                    $first = $items->first();
-                                    $qty = $items->sum('quantity');
-                                    $rate = $first->rate;
-                                    $grossAmt = $qty * $rate;
-                                    $discAmt = $items->sum('discount_amount');
-                                    $taxableAmt = max(0, $grossAmt - $discAmt);
-                                    $taxAmt = $items->sum('tax_amount');
-                                    $totalAmt = $items->sum('total_amount');
-                                    return (object) [
-                                        'id' => $first->id,
-                                        'product' => $first->product,
-                                        'product_id' => $first->product_id,
-                                        'description' => $first->description,
-                                        'line_type' => $first->line_type,
-                                        'asset_category' => $first->assetCategory ?? null,
-                                        'chart_of_account' => $first->chartOfAccount ?? null,
-                                        'quantity' => $qty,
-                                        'rate' => $rate,
-                                        'gross_amount' => $grossAmt,
-                                        'discount_percent' => $first->discount_percent,
-                                        'discount_amount' => $discAmt,
-                                        'taxable_amount' => $taxableAmt,
-                                        'tax_percent' => $first->tax_percent,
-                                        'cgst_percent' => $first->cgst_percent,
-                                        'sgst_percent' => $first->sgst_percent,
-                                        'igst_percent' => $first->igst_percent,
-                                        'tax_amount' => $taxAmt,
-                                        'total_amount' => $totalAmt,
-                                    ];
-                                })->values();
-                            @endphp
-
-                            @foreach($groupedItems as $index => $item)
+                            @foreach ($order->items as $index => $item)
+                                @php
+                                    $itemQty = (float) $item->quantity;
+                                    $itemRate = (float) $item->rate;
+                                    $itemGross = (float) ($item->amount ?: ($itemQty * $itemRate));
+                                    $itemDiscAmt = (float) ($item->discount_amount ?: 0);
+                                    $itemTaxAmt = $isItemWiseTax ? (float) ($item->tax_amount ?: 0) : 0;
+                                    $itemTotal = (float) ($item->total_amount ?: (max(0, $itemGross - $itemDiscAmt) + $itemTaxAmt));
+                                    if (!$isItemWiseTax) {
+                                        $itemTotal = (float) max(0, $itemGross - $itemDiscAmt);
+                                    }
+                                    $hsnCode = $item->product?->hsn_sac ?: ($item->product?->hsn_code ?: ($item->product?->hsn ?: null));
+                                @endphp
                                 <tr>
-                                    <td class="text-muted fs-12 font-monospace">{{ $index + 1 }}</td>
+                                    <td class="text-muted">{{ $index + 1 }}</td>
                                     <td>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="avatar-sm bg-soft-primary text-primary rounded-2 d-flex align-items-center justify-content-center fw-bold fs-13" style="width:30px; height:30px; flex-shrink:0;">
-                                                <i class="feather-{{ $item->line_type === 'asset' ? 'archive' : ($item->line_type === 'expense' ? 'file-text' : 'box') }}"></i>
-                                            </div>
-                                            <div>
-                                                @if($item->product_id)
-                                                    <a href="{{ route('inventory.products.show', $item->product_id) }}" class="fw-bold text-dark text-decoration-none hover-underline">
-                                                        {{ $item->product->name ?? '—' }}
-                                                    </a>
-                                                    <div class="text-muted fs-11 font-monospace">SKU: {{ $item->product->sku ?: '—' }}</div>
-                                                @elseif($item->line_type === 'asset')
-                                                    <span class="fw-bold text-dark">{{ $item->description ?: ($item->asset_category->name ?? 'Fixed Asset') }}</span>
-                                                    <div class="text-muted fs-11">{{ $item->asset_category->name ?? 'Asset purchase' }} — no stock item</div>
-                                                @elseif($item->line_type === 'expense')
-                                                    <span class="fw-bold text-dark">{{ $item->description ?: ($item->chart_of_account ? $item->chart_of_account->code . ' - ' . $item->chart_of_account->name : 'Expense') }}</span>
-                                                    <div class="text-muted fs-11">{{ $item->chart_of_account ? $item->chart_of_account->code . ' - ' . $item->chart_of_account->name : 'Direct expense' }} — no stock item</div>
-                                                @else
-                                                    <span class="text-muted">—</span>
-                                                @endif
-                                            </div>
+                                        <div class="fw-bold text-dark fs-13">
+                                            {{ $item->product?->name ?: ($item->description ?: 'Purchased Item #' . ($index + 1)) }}
                                         </div>
+                                        <div class="d-flex align-items-center flex-wrap gap-1 mt-1">
+                                            @if($item->product?->sku)
+                                                <span class="badge bg-light text-muted border font-monospace fs-10">SKU: {{ $item->product->sku }}</span>
+                                            @endif
+                                            @if(!empty($hsnCode) && $hsnCode !== '—')
+                                                <span class="badge bg-light text-muted border font-monospace fs-10">HSN: {{ $hsnCode }}</span>
+                                            @endif
+                                            @if($item->line_type && $item->line_type !== 'stock')
+                                                <span class="badge bg-soft-info text-info border font-monospace fs-10 text-uppercase">{{ $item->line_type }}</span>
+                                            @endif
+                                        </div>
+                                        @if($item->description && $item->product && $item->description !== $item->product->name)
+                                            <div class="text-muted fs-11 mt-1">{{ $item->description }}</div>
+                                        @endif
                                     </td>
-                                    <td class="text-end fw-bold text-dark font-monospace fs-14">
-                                        {{ (float)$item->quantity }}
-                                    </td>
-                                    <td class="text-end font-monospace text-muted">
-                                        {{ $currencySymbol }}{{ number_format($item->rate, 2) }}
-                                    </td>
-                                    <td class="text-end font-monospace fw-semibold text-dark">
-                                        {{ $currencySymbol }}{{ number_format($item->gross_amount, 2) }}
-                                    </td>
-
-                                    @if($order->discount_type === 'item_wise')
+                                    <td class="text-center fw-bold font-monospace">{{ rtrim(rtrim(number_format($itemQty, 4), '0'), '.') }}</td>
+                                    <td class="text-end font-monospace">{{ format_currency($itemRate) }}</td>
+                                    
+                                    @if($hasDiscount)
                                         <td class="text-end font-monospace text-danger">
-                                            {{ (float)$item->discount_percent }}%
+                                            @if($itemDiscAmt > 0)
+                                                <div>-{{ format_currency($itemDiscAmt) }}</div>
+                                                @if((float)$item->discount_percent > 0)
+                                                    <div class="fs-10 text-muted">({{ (float)$item->discount_percent }}%)</div>
+                                                @endif
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
                                         </td>
                                     @endif
 
-                                    <td class="text-end font-monospace fw-semibold text-dark">
-                                        {{ $currencySymbol }}{{ number_format($item->taxable_amount, 2) }}
-                                    </td>
-
-                                    @if($order->tax_type === 'item_wise_tax')
-                                        <td class="text-end font-monospace text-muted">
-                                            {{ (float)$item->tax_percent }}%
+                                    @if($hasTax && $isItemWiseTax)
+                                        <td class="text-end font-monospace text-secondary">
+                                            @if($itemTaxAmt > 0)
+                                                +{{ format_currency($itemTaxAmt) }}
+                                                @if($item->tax_percent > 0)
+                                                    <div class="fs-10 text-muted">({{ (float)$item->tax_percent }}%)</div>
+                                                @endif
+                                            @else
+                                                —
+                                            @endif
                                         </td>
                                     @endif
 
-                                    <td class="text-end font-monospace fw-bold text-dark fs-14">
-                                        {{ $currencySymbol }}{{ number_format($item->total_amount, 2) }}
-                                    </td>
+                                    <td class="text-end fw-bold font-monospace text-dark">{{ format_currency($itemTotal) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
-            </div>
 
-            <!-- Financial Summary & Terms Section -->
-            <div class="px-4 py-4 border-bottom bg-white">
-                <div class="row g-4 text-dark fs-13">
-                    <!-- Terms & Notes -->
-                    <div class="col-md-7">
-                        <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-3">
-                            <i class="feather-file-text me-1.5 text-primary"></i>{{ __('purchase.terms_and_notes') }}
-                        </h6>
-                        <div class="bg-light p-3 border rounded-3 text-muted" style="min-height: 90px; white-space: pre-line; line-height: 1.5;">
-                            {!! $order->notes ? e($order->notes) : '<span class="italic"><i class="feather-info me-1"></i>' . __('purchase.no_additional_terms_specified') . '</span>' !!}
-                        </div>
-                    </div>
-
-                    <!-- Financial Calculations Box -->
-                    <div class="col-md-5">
-                        <div class="summary-box">
-                            <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-3 border-bottom pb-2">
-                                {{ __('purchase.financial_summary') }}
-                            </h6>
-
-                            <!-- Subtotal -->
-                            <div class="summary-row">
-                                <span class="text-muted fw-semibold">{{ __('purchase.subtotal') }}:</span>
-                                <span class="fw-bold text-dark font-monospace">{{ format_currency($order->subtotal) }}</span>
-                            </div>
-
-                            <!-- Discount Row (ONLY if discount > 0) -->
-                            @if(($order->discount_type !== 'without_discount' || $order->discount_amount > 0) && $order->discount_amount > 0)
-                                <div class="summary-row text-danger">
-                                    <span class="fw-semibold">{{ __('purchase.discount') }} ({{ str_replace('_', ' ', $order->discount_type) }}):</span>
-                                    <span class="fw-bold font-monospace">-{{ format_currency($order->discount_amount) }}</span>
+                <!-- 4. Summary & Terms Section -->
+                <div class="row g-4 mb-4">
+                    <div class="col-7">
+                        @if($order->notes)
+                            <div class="p-3 bg-light bg-opacity-40 rounded border mb-3">
+                                <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-1">Instructions &amp; Remarks:</span>
+                                <div class="fs-12 text-secondary po-rich-text">
+                                    @if(strip_tags($order->notes) !== $order->notes)
+                                        {!! $order->notes !!}
+                                    @else
+                                        <div style="white-space: pre-wrap;">{{ $order->notes }}</div>
+                                    @endif
                                 </div>
-
-                                <div class="summary-row">
-                                    <span class="text-muted fw-semibold">{{ __('purchase.gross_total_before_tax') }}:</span>
-                                    <span class="fw-bold text-dark font-monospace">{{ format_currency(max(0, $order->subtotal - $order->discount_amount)) }}</span>
-                                </div>
-                            @endif
-
-                            <!-- Tax Breakdown (ONLY if tax > 0) -->
-                            @if(($order->tax_type !== 'without_tax' || $order->tax_amount > 0) && $order->tax_amount > 0)
-                                @php
-                                    $grossTotal = max(0, $order->subtotal - $order->discount_amount);
-                                    $effectiveTaxRate = $grossTotal > 0 ? ($order->tax_amount / $grossTotal) * 100 : 0;
-                                @endphp
-                                @if($order->gst_type === 'cgst_sgst' || ($order->cgst_amount > 0 || $order->sgst_amount > 0))
-                                    @php
-                                        $cgst = $order->cgst_amount > 0 ? $order->cgst_amount : round($order->tax_amount / 2, 2);
-                                        $sgst = $order->sgst_amount > 0 ? $order->sgst_amount : round($order->tax_amount - $cgst, 2);
-                                        $halfRate = round($effectiveTaxRate / 2, 2);
-                                    @endphp
-                                    <div class="summary-row">
-                                        <span class="text-muted fw-semibold">CGST ({{ $halfRate }}%):</span>
-                                        <span class="fw-semibold text-dark font-monospace">+{{ format_currency($cgst) }}</span>
-                                    </div>
-                                    <div class="summary-row">
-                                        <span class="text-muted fw-semibold">SGST ({{ $halfRate }}%):</span>
-                                        <span class="fw-semibold text-dark font-monospace">+{{ format_currency($sgst) }}</span>
-                                    </div>
-                                @elseif($order->gst_type === 'igst' || $order->igst_amount > 0)
-                                    <div class="summary-row">
-                                        <span class="text-muted fw-semibold">IGST ({{ round($effectiveTaxRate, 2) }}%):</span>
-                                        <span class="fw-semibold text-dark font-monospace">+{{ format_currency($order->tax_amount) }}</span>
-                                    </div>
-                                @else
-                                    <div class="summary-row">
-                                        <span class="text-muted fw-semibold">{{ __('purchase.taxes') }} ({{ round($effectiveTaxRate, 2) }}%):</span>
-                                        <span class="fw-semibold text-dark font-monospace">+{{ format_currency($order->tax_amount) }}</span>
-                                    </div>
-                                @endif
-                            @endif
-
-                            <hr class="my-2">
-                            <div class="d-flex justify-content-between align-items-center pt-1">
-                                <span class="fs-14 fw-bold text-dark">{{ __('purchase.grand_total') }}:</span>
-                                <span class="fs-16 fw-bold text-primary font-monospace">{{ format_currency($order->grand_total) }}</span>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Signature Footer -->
-                <div class="row mt-4 pt-3 text-dark">
-                    <div class="col-6 text-start">
-                        <p class="fs-11 text-muted mb-0">
-                            {{ __('purchase.po_queries_fulfillment') }}
-                        </p>
-                    </div>
-                    <div class="col-6 text-end">
-                        <div class="d-inline-block text-center" style="width: 180px;">
-                            <hr class="mb-1 mt-2">
-                            <span class="fs-11 text-muted text-uppercase fw-bold letter-spacing-1">{{ __('purchase.authorized_signature') }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Advance Payments & Accounting Section (if Approved) -->
-            @if($order->status === 'Approved')
-                <div class="px-4 py-4 bg-light-50 d-print-none">
-                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                        <div>
-                            <h6 class="fw-bold text-dark mb-0">
-                                <i class="feather-credit-card text-success me-1.5"></i>{{ __('purchase.vendor_advance_payments_accounting') }}
-                            </h6>
-                            <small class="text-muted fs-12">{{ __('purchase.record_advance_payments_help') }}</small>
-                        </div>
-                        @if($order->balance_due > 0)
-                            <button type="button" class="btn btn-sm btn-success fw-bold px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#advancePaymentModal">
-                                <i class="feather-plus-circle me-1.5"></i>{{ __('purchase.register_advance_payment') }}
-                            </button>
                         @endif
-                    </div>
 
-                    <div class="row g-3 mb-3 text-dark">
-                        <div class="col-md-4">
-                            <div class="bg-white p-3 border rounded-3">
-                                <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">{{ __('purchase.total_po_amount') }}</span>
-                                <h4 class="fw-bold text-dark mb-0 font-monospace">{{ format_currency($order->grand_total) }}</h4>
+                        @if($order->terms_conditions)
+                            <div class="p-3 bg-light bg-opacity-40 rounded border mb-3">
+                                <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-1">Terms &amp; Conditions:</span>
+                                <div class="fs-12 text-secondary po-rich-text">
+                                    @if(strip_tags($order->terms_conditions) !== $order->terms_conditions)
+                                        {!! $order->terms_conditions !!}
+                                    @else
+                                        <div style="white-space: pre-wrap;">{{ $order->terms_conditions }}</div>
+                                    @endif
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="bg-white p-3 border rounded-3">
-                                <span class="fs-11 text-uppercase text-success fw-bold d-block mb-1">{{ __('purchase.advance_paid_posted') }}</span>
-                                <h4 class="fw-bold text-success mb-0 font-monospace">{{ format_currency($order->total_advance_paid) }}</h4>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="bg-white p-3 border rounded-3">
-                                <span class="fs-11 text-uppercase text-primary fw-bold d-block mb-1">{{ __('purchase.balance_due') }}</span>
-                                <h4 class="fw-bold text-primary mb-0 font-monospace">{{ format_currency($order->balance_due) }}</h4>
-                            </div>
+                        @endif
+
+                        <div class="text-muted fs-11">
+                            • Please quote Purchase Order number <strong>{{ $order->purchase_order_number }}</strong> on all delivery challans and invoices.<br>
+                            • Material will be inspected upon receipt at the delivery location before final acceptance.
                         </div>
                     </div>
 
-                    @if($order->advancePayments->count() > 0)
-                        <div class="table-responsive rounded-3 border bg-white">
-                            <table class="table table-sm align-middle fs-13 text-dark mb-0">
-                                <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
-                                    <tr>
-                                        <th class="ps-3">{{ __('purchase.payment_no') }}</th>
-                                        <th>{{ __('purchase.payment_date') }}</th>
-                                        <th>{{ __('purchase.method') }}</th>
-                                        <th>{{ __('purchase.reference_no') }}</th>
-                                        <th class="text-end pe-3">{{ __('purchase.amount') }}</th>
-                                    </tr>
-                                </thead>
+                    <div class="col-5">
+                        <div class="p-3 bg-light bg-opacity-40 rounded border">
+                            <table class="table table-borderless table-sm summary-table mb-0">
                                 <tbody>
-                                    @foreach($order->advancePayments as $adv)
+                                    <tr>
+                                        <td class="text-muted ps-0">Subtotal:</td>
+                                        <td class="text-end fw-bold font-monospace text-dark">{{ format_currency($order->subtotal) }}</td>
+                                    </tr>
+
+                                    @if($order->discount_amount > 0)
                                         <tr>
-                                            <td class="ps-3 fw-bold text-primary font-monospace">{{ $adv->payment_number }}</td>
-                                            <td>{{ $adv->payment_date ? $adv->payment_date->format('d-M-Y') : '—' }}</td>
-                                            <td><span class="badge bg-soft-info text-info fs-11 fw-semibold">{{ $adv->payment_method }}</span></td>
-                                            <td class="font-monospace">{{ $adv->reference_number ?: __('purchase.not_applicable') }}</td>
-                                            <td class="text-end pe-3 font-monospace fw-bold text-success">{{ format_currency($adv->amount) }}</td>
+                                            <td class="text-danger ps-0">Discount:</td>
+                                            <td class="text-end fw-bold font-monospace text-danger">-{{ format_currency($order->discount_amount) }}</td>
                                         </tr>
-                                    @endforeach
+                                    @endif
+
+                                    @if($order->tax_amount > 0)
+                                        @if($order->gst_type === 'igst')
+                                            <tr>
+                                                <td class="text-muted ps-0">IGST:</td>
+                                                <td class="text-end fw-bold font-monospace text-dark">+{{ format_currency($order->igst_amount ?: $order->tax_amount) }}</td>
+                                            </tr>
+                                        @else
+                                            <tr>
+                                                <td class="text-muted ps-0">CGST:</td>
+                                                <td class="text-end fw-bold font-monospace text-dark">+{{ format_currency($order->cgst_amount ?: ($order->tax_amount / 2)) }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted ps-0">SGST:</td>
+                                                <td class="text-end fw-bold font-monospace text-dark">+{{ format_currency($order->sgst_amount ?: ($order->tax_amount / 2)) }}</td>
+                                            </tr>
+                                        @endif
+                                    @endif
+
+                                    @if($order->freight_amount > 0)
+                                        <tr>
+                                            <td class="text-muted ps-0">Freight Charges:</td>
+                                            <td class="text-end fw-bold font-monospace text-dark">+{{ format_currency($order->freight_amount) }}</td>
+                                        </tr>
+                                    @endif
+
+                                    <tr class="border-top">
+                                        <td class="fw-bold text-dark fs-14 ps-0 pt-2">Grand Total:</td>
+                                        <td class="text-end fw-bold font-monospace text-primary fs-16 pt-2">{{ format_currency($order->grand_total) }}</td>
+                                    </tr>
+
+                                    @if($order->advance_paid > 0)
+                                        <tr>
+                                            <td class="text-success ps-0">Advance Paid:</td>
+                                            <td class="text-end fw-bold font-monospace text-success">-{{ format_currency($order->advance_paid) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted ps-0 fw-bold">Balance Due:</td>
+                                            <td class="text-end fw-bold font-monospace text-dark">{{ format_currency($order->balance_due) }}</td>
+                                        </tr>
+                                    @endif
                                 </tbody>
                             </table>
                         </div>
-                    @else
-                        <div class="text-center py-3 text-muted fs-12 bg-white border rounded-3">
-                            <i class="feather-info me-1"></i>{{ __('purchase.no_advance_payments_registered') }}
-                        </div>
-                    @endif
+                    </div>
                 </div>
-            @endif
-        </x-ui.odoo-form-ui>
+
+                <!-- 5. Signatory Block -->
+                <div class="row pt-4 border-top mt-4 align-items-end">
+                    <div class="col-7 fs-11 text-muted">
+                        <div>Computer generated Purchase Order issued by <strong>{{ $buyerOrg['name'] }}</strong>.</div>
+                        <div>Created by: <span class="fw-semibold text-dark">{{ $order->creator?->name ?? 'Purchase Department' }}</span></div>
+                    </div>
+                    <div class="col-5 text-end">
+                        <div class="fs-11 fw-bold text-dark mb-4">For {{ $buyerOrg['name'] }}</div>
+                        <div class="d-inline-block border-top border-secondary pt-1 px-4 fs-11 text-muted fw-bold">
+                            Authorized Signatory
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
 
-    <!-- Reject PO Modal -->
-    @if($order->status === 'Draft')
-        <div class="modal fade" id="rejectPoModal" tabindex="-1" aria-labelledby="rejectPoModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow">
-                    <form action="{{ route('purchase.orders.reject', $order->id) }}" method="POST">
-                        @csrf
-                        <div class="modal-header border-bottom bg-light">
-                            <h5 class="modal-title fw-bold text-danger" id="rejectPoModalLabel">
-                                <i class="feather-x-circle me-1.5"></i>{{ __('purchase.reject_purchase_order') }}
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body p-4">
-                            <p class="fs-13 text-muted mb-3">
-                                {{ __('purchase.reject_po_help_text') }} <strong class="text-dark">{{ $order->purchase_order_number }}</strong>.
-                            </p>
-                            <div class="mb-3">
-                                <label for="rejection_reason" class="form-label fs-12 fw-bold text-dark">{{ __('purchase.rejection_reason_remarks') }} <span class="text-danger">*</span></label>
-                                <textarea name="rejection_reason" id="rejection_reason" rows="3" class="form-control fs-13" placeholder="{{ __('purchase.reject_po_reason_placeholder') }}" required></textarea>
-                            </div>
-                        </div>
-                        <div class="modal-footer border-top bg-light">
-                            <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('ui.cancel') ?? 'Cancel' }}</button>
-                            <button type="submit" class="btn btn-sm btn-danger fw-bold px-3">
-                                <i class="feather-x-circle me-1"></i>{{ __('purchase.confirm_rejection') }}
-                            </button>
-                        </div>
-                    </form>
+    <!-- Send WhatsApp Modal -->
+    <div class="modal fade" id="sendPoWhatsAppModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <div class="modal-header bg-soft-success border-bottom py-3">
+                    <h6 class="modal-title fw-bold text-success fs-14">
+                        <i class="feather-message-circle me-1.5 fs-15"></i> Send Purchase Order via WhatsApp
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Supplier / Vendor Phone (with Country Code):</label>
+                        <input type="text" id="waVendorPhone" class="form-control form-control-sm" placeholder="e.g. 919876543210" value="{{ $vendorPhone }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Message Preview:</label>
+                        <textarea id="waMessageText" class="form-control form-control-sm font-monospace fs-12" rows="6"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                    <a href="{{ route('purchase.orders.download', $order->id) }}" class="btn btn-sm btn-outline-danger fw-semibold">
+                        <i class="feather-download me-1"></i>Download PDF to attach
+                    </a>
+                    <button type="button" class="btn btn-sm btn-success fw-bold px-3 shadow-sm" onclick="sendPoOnWhatsApp()">
+                        <i class="feather-send me-1"></i>Open in WhatsApp
+                    </button>
                 </div>
             </div>
         </div>
-    @endif
+    </div>
+
+    <!-- Send Email Modal -->
+    <div class="modal fade" id="sendPoEmailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <div class="modal-header bg-soft-primary border-bottom py-3">
+                    <h6 class="modal-title fw-bold text-primary fs-14">
+                        <i class="feather-mail me-1.5 fs-15"></i> Send Purchase Order via Email
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Recipient Email:</label>
+                        <input type="email" id="emailVendorRecipient" class="form-control form-control-sm" placeholder="supplier@example.com" value="{{ $vendorEmail }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Subject:</label>
+                        <input type="text" id="emailSubject" class="form-control form-control-sm" value="Purchase Order {{ $order->purchase_order_number }} from {{ $buyerOrg['name'] }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Email Body:</label>
+                        <textarea id="emailBodyText" class="form-control form-control-sm fs-12" rows="5"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                    <a href="{{ route('purchase.orders.download', $order->id) }}" class="btn btn-sm btn-outline-danger fw-semibold">
+                        <i class="feather-download me-1"></i>Download PDF
+                    </a>
+                    <button type="button" class="btn btn-sm btn-primary fw-bold px-3" onclick="sendPoOnEmail()">
+                        <i class="feather-send me-1"></i>Compose Email
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Register Advance Payment Modal -->
-    @if($order->status === 'Approved')
-        <x-ui.modal id="advancePaymentModal" :title="__('purchase.register_vendor_advance_payment')" size="lg">
+    @if(in_array($order->status, ['Approved', 'Partially Received']))
+        @php
+            $activeBalanceDue = round(convert_from_base((float)($order->balance_due ?: $order->grand_total)), 2);
+            $activeGrandTotal = round(convert_from_base((float)$order->grand_total), 2);
+            $defaultAdvanceAmount = min($activeBalanceDue, $activeGrandTotal);
+            $currSymbol = active_currency_symbol();
+        @endphp
+        <x-ui.modal id="advancePaymentModal" :title="__('purchase.register_vendor_advance_payment')" size="lg" :showFooter="false">
             <form action="{{ route('purchase.orders.advance-payments.store') }}" method="POST" class="odoo-sheet">
                 @csrf
                 <input type="hidden" name="purchase_order_id" value="{{ $order->id }}">
@@ -724,7 +836,7 @@
 
                     <div class="row g-2">
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="number" :label="__('purchase.advance_amount')" name="amount" id="advance_amount" value="{{ min($order->balance_due, $order->grand_total) }}" step="0.01" min="0.01" max="{{ $order->balance_due }}" required="true" :placeholder="__('purchase.enter_amount_placeholder')" />
+                            <x-ui.odoo-form-ui type="input" inputType="number" :label="__('purchase.advance_amount') . ' (' . $currSymbol . ')'" name="amount" id="advance_amount" value="{{ number_format($defaultAdvanceAmount, 2, '.', '') }}" step="0.01" min="0.01" max="{{ number_format($activeBalanceDue, 2, '.', '') }}" required="true" :placeholder="__('purchase.enter_amount_placeholder')" />
                         </div>
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="select" :label="__('purchase.payment_method')" name="payment_method" id="payment_method" required="true">
@@ -749,7 +861,7 @@
                 </div>
 
                 <div class="modal-footer border-top px-3 py-2 bg-light d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('ui.cancel') ?? 'Cancel' }}</button>
+                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('purchase.cancel') }}</button>
                     <button type="submit" class="btn btn-sm btn-primary fw-semibold">
                         <i class="feather-check me-1"></i>{{ __('purchase.post_advance_payment') }}
                     </button>
@@ -791,28 +903,6 @@
         </div>
     </div>
 
-    <!-- View Approval Reminders Modal -->
-    <div class="modal fade" id="viewRemindersModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg rounded-3">
-                <div class="modal-header bg-soft-warning border-bottom py-3">
-                    <h6 class="modal-title fw-bold text-dark fs-14">
-                        <i class="feather-bell text-warning me-1.5 fs-15"></i> {{ __('purchase.approval_reminders_log') }} — <span id="reminderModalDocNumber" class="text-primary font-monospace"></span>
-                    </h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body p-3">
-                    <div id="reminderModalList" class="d-flex flex-column gap-2">
-                        <!-- Populated dynamically via JS -->
-                    </div>
-                </div>
-                <div class="modal-footer bg-light py-2 px-3 border-top">
-                    <button type="button" class="btn btn-sm btn-secondary fw-semibold px-3" data-bs-dismiss="modal">{{ __('purchase.close') }}</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     @push('scripts')
     <script>
         function openRemindModal(actionUrl, docNumber) {
@@ -822,30 +912,55 @@
             modal.show();
         }
 
-        function showReminderHistoryModal(docNumber, reminders) {
-            document.getElementById('reminderModalDocNumber').innerText = docNumber || '';
-            const container = document.getElementById('reminderModalList');
-            container.innerHTML = '';
+        // WhatsApp Modal Trigger
+        $(document).on('click', '.btn-open-po-wa-modal', function() {
+            const poNum = $(this).data('po-number');
+            const vendorName = $(this).data('vendor-name');
+            const phone = $(this).data('vendor-phone') || '';
+            const total = $(this).data('total-amount') || '';
+            const company = "{{ $buyerOrg['name'] }}";
 
-            if (!reminders || reminders.length === 0) {
-                container.innerHTML = '<div class="text-muted fs-12 text-center py-3">{{ __('purchase.no_reminder_messages') }}</div>';
-            } else {
-                reminders.forEach(r => {
-                    const item = document.createElement('div');
-                    item.className = 'border rounded-3 p-3 bg-light-50 shadow-2xs';
-                    item.innerHTML = `
-                        <div class="d-flex align-items-center justify-content-between mb-1">
-                            <span class="fw-bold text-dark fs-12"><i class="feather-user text-primary me-1"></i>${r.user}</span>
-                            <span class="text-muted fs-10 font-monospace">${r.time}</span>
-                        </div>
-                        ${r.note ? `<div class="text-dark fst-italic fs-12 bg-white p-2 rounded border border-warning-subtle mt-1"><i class="feather-message-square me-1 text-warning"></i>"${r.note}"</div>` : '<div class="text-muted fs-11 fst-italic mt-1">{{ __('purchase.no_note_provided') }}</div>'}
-                    `;
-                    container.appendChild(item);
-                });
+            $('#waVendorPhone').val(phone);
+            const msg = `Dear ${vendorName},\n\nPlease find Purchase Order *${poNum}* from *${company}*.\n💰 *Order Value:* ${total}\n\nPlease review and confirm receipt.\nThank you!`;
+            $('#waMessageText').val(msg);
+
+            new bootstrap.Modal(document.getElementById('sendPoWhatsAppModal')).show();
+        });
+
+        function sendPoOnWhatsApp() {
+            let phone = $('#waVendorPhone').val().replace(/[^0-9]/g, '');
+            const msg = encodeURIComponent($('#waMessageText').val());
+            if (!phone) {
+                alert('Please enter a valid vendor phone number.');
+                return;
             }
+            window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${msg}`, '_blank');
+        }
 
-            var modal = new bootstrap.Modal(document.getElementById('viewRemindersModal'));
-            modal.show();
+        // Email Modal Trigger
+        $(document).on('click', '.btn-open-po-email-modal', function() {
+            const poNum = $(this).data('po-number');
+            const vendorName = $(this).data('vendor-name');
+            const email = $(this).data('vendor-email') || '';
+            const total = $(this).data('total-amount') || '';
+            const company = "{{ $buyerOrg['name'] }}";
+
+            $('#emailVendorRecipient').val(email);
+            const body = `Dear ${vendorName},\n\nPlease find attached Purchase Order ${poNum} amounting to ${total}.\n\nKindly acknowledge this order and inform us of the expected delivery schedule.\n\nBest Regards,\nPurchase Department\n${company}`;
+            $('#emailBodyText').val(body);
+
+            new bootstrap.Modal(document.getElementById('sendPoEmailModal')).show();
+        });
+
+        function sendPoOnEmail() {
+            const email = $('#emailVendorRecipient').val().trim();
+            const subject = encodeURIComponent($('#emailSubject').val());
+            const body = encodeURIComponent($('#emailBodyText').val());
+            if (!email) {
+                alert('Please enter a valid recipient email.');
+                return;
+            }
+            window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
         }
     </script>
     @endpush

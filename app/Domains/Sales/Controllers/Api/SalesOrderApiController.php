@@ -24,8 +24,8 @@ class SalesOrderApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -35,6 +35,7 @@ class SalesOrderApiController extends Controller
      */
     public function meta(): JsonResponse
     {
+        $this->authorize('viewAny', SalesOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $customers  = Customer::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'company_name', 'email', 'phone', 'gstin']);
@@ -64,6 +65,7 @@ class SalesOrderApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', SalesOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = SalesOrder::query()
@@ -104,13 +106,25 @@ class SalesOrderApiController extends Controller
         }
 
         // Sorting
-        $sortBy  = $request->input('sort_by', 'id');
+        $sortBy  = $request->input('sort_by', 'order_date');
         $sortDir = strtolower($request->input('sort_direction', 'desc')) === 'asc' ? 'asc' : 'desc';
         $allowedSorts = ['id', 'sales_order_number', 'order_date', 'shipment_date', 'status', 'total_amount', 'created_at'];
-        if (in_array($sortBy, $allowedSorts, true)) {
-            $query->orderBy($sortBy, $sortDir);
+        if ($sortBy === 'order_date') {
+            $query->orderBy('order_date', $sortDir)
+                  ->orderBy('sales_order_number', $sortDir === 'asc' ? 'asc' : 'desc')
+                  ->orderBy('id', $sortDir === 'asc' ? 'asc' : 'desc');
+        } elseif ($sortBy === 'sales_order_number') {
+            $query->orderBy('sales_order_number', $sortDir)
+                  ->orderBy('order_date', 'desc')
+                  ->orderBy('id', $sortDir);
+        } elseif (in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDir)
+                  ->orderBy('sales_order_number', 'desc')
+                  ->orderBy('id', 'desc');
         } else {
-            $query->orderBy('id', 'desc');
+            $query->orderBy('order_date', 'desc')
+                  ->orderBy('sales_order_number', 'desc')
+                  ->orderBy('id', 'desc');
         }
 
         $perPage = min((int)$request->input('per_page', 15), 100);
@@ -133,6 +147,8 @@ class SalesOrderApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', SalesOrder::class);
+
         $input = $request->all();
 
         // Support aliases
@@ -245,6 +261,11 @@ class SalesOrderApiController extends Controller
             $adjustment = (float)($validated['adjustment'] ?? 0);
             $grandTotal = $subtotal + $totalTax + $freight + $shipping + $adjustment;
 
+            $resolvedGstType = $validated['gst_type'] ?? null;
+            if (empty($resolvedGstType) && ($validated['tax_type'] ?? '') !== 'without_tax') {
+                $resolvedGstType = app(\App\Domains\Sales\Services\SalesOrderService::class)->resolveGstType((int)$validated['customer_id'], $companyId, $tenantId);
+            }
+
             $so = SalesOrder::create([
                 'tenant_id'          => $tenantId,
                 'company_id'         => $companyId,
@@ -261,7 +282,7 @@ class SalesOrderApiController extends Controller
                 'sales_person_id'    => $validated['sales_person_id'] ?? null,
                 'discount_type'      => $validated['discount_type'] ?? 'fixed',
                 'tax_type'           => $validated['tax_type'] ?? 'exclusive',
-                'gst_type'           => $validated['gst_type'] ?? 'cgst_sgst',
+                'gst_type'           => $resolvedGstType ?? 'cgst_sgst',
                 'subtotal'           => $subtotal,
                 'tax'                => $totalTax,
                 'discount'           => 0,
@@ -313,6 +334,8 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $order);
+
         $invoices   = Invoice::where('tenant_id', $tenantId)->where('sales_order_id', $id)->get();
         $dispatches = DispatchOrder::where('tenant_id', $tenantId)->where('sales_order_id', $id)->get();
 
@@ -339,6 +362,8 @@ class SalesOrderApiController extends Controller
                 'message' => 'Sales Order not found',
             ], 404);
         }
+
+        $this->authorize('update', $order);
 
         $input = $request->all();
 
@@ -481,6 +506,14 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        if ($request->input('status') === 'Confirmed') {
+            $this->authorize('confirm', $order);
+        } elseif (in_array($request->input('status'), ['Cancelled', 'Closed'])) {
+            $this->authorize('cancel', $order);
+        } else {
+            $this->authorize('update', $order);
+        }
+
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Confirmed,Processing,Closed,Cancelled'],
             'notes'  => ['nullable', 'string'],
@@ -521,6 +554,9 @@ class SalesOrderApiController extends Controller
                 'message' => 'Sales Order not found',
             ], 404);
         }
+
+        $this->authorize('view', $order);
+        $this->authorize('create', Invoice::class);
 
         $invoiceNumber = 'INV-' . strtoupper(bin2hex(random_bytes(4)));
 
@@ -611,6 +647,27 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $order);
+        $this->authorize('create', DispatchOrder::class);
+
+        if ($order->hasOnlyServices()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot create dispatch order for service-only Sales Order. Services do not require physical shipping and can be directly converted to Invoice.',
+            ], 422);
+        }
+
+        $mrs = $order->materialRequirements;
+        if ($mrs && $mrs->isNotEmpty()) {
+            $isReleased = $mrs->contains(fn($mr) => in_array($mr->status, ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Dispatched']));
+            if (!$isReleased) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Cannot create dispatch order: Material Requirement {$mrs->first()->requirement_number} has not been released by Store Incharge yet.",
+                ], 422);
+            }
+        }
+
         $dispatchNo = 'DO-' . strtoupper(bin2hex(random_bytes(4)));
 
         $dispatch = DB::transaction(function () use ($order, $dispatchNo, $tenantId, $companyId, $branchId, $request) {
@@ -628,6 +685,10 @@ class SalesOrderApiController extends Controller
             ]);
 
             foreach ($order->items as $item) {
+                if ($item->isService()) {
+                    continue; // Skip service items from physical dispatch orders
+                }
+
                 DispatchOrderItem::create([
                     'tenant_id'         => $tenantId,
                     'company_id'        => $companyId,
@@ -665,6 +726,8 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $order);
+
         $order->delete();
 
         return response()->json([
@@ -688,6 +751,8 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $order);
+
         $order->restore();
 
         return response()->json([
@@ -699,12 +764,12 @@ class SalesOrderApiController extends Controller
 
     /**
      * POST /api/sales/orders/{id}/confirm
-     * Confirm a draft Sales Order.
+     * Confirm a draft Sales Order and generate Material Requirement if physical items exist.
      */
     public function confirm(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+        $order = SalesOrder::where('tenant_id', $tenantId)->with('items')->find($id);
 
         if (!$order) {
             return response()->json([
@@ -713,23 +778,36 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
-        $this->authorize('update', $order);
+        $this->authorize('confirm', $order);
 
-        $order->status = 'Confirmed';
-        $order->save();
+        if ($order->status !== 'Draft') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only Draft Sales Orders can be confirmed.',
+            ], 422);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => "Sales Order {$order->order_number} confirmed successfully.",
-            'data'    => $order->fresh(['customer', 'items.product']),
-        ]);
+        try {
+            app(\App\Domains\Sales\Repositories\SalesOrderRepository::class)->confirmOrder($order);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Sales Order {$order->sales_order_number} confirmed successfully.",
+                'data'    => $order->fresh(['customer', 'items.product', 'materialRequirements']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**
      * POST /api/sales/orders/{id}/cancel
-     * Cancel a Sales Order.
+     * Cancel a Sales Order (with cascading cleanup of open DOs and reservations).
      */
-    public function cancel(int $id): JsonResponse
+    public function cancel(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
         $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
@@ -741,16 +819,94 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
-        $this->authorize('update', $order);
+        $authUser = auth()->user();
+        $ownerId = $order->sales_person_id
+            ?? $order->quotation?->sales_person_id
+            ?? $order->customer?->crmAccount?->owner_id;
 
-        $order->status = 'Cancelled';
-        $order->save();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.orders.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this sales order.'], 403);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => "Sales Order {$order->order_number} cancelled.",
-            'data'    => $order->fresh(),
+        $this->authorize('cancel', $order);
+
+        $reason = $request->input('reason', 'Cancelled via API');
+
+        try {
+            app(\App\Domains\Sales\Repositories\SalesOrderRepository::class)->cancelOrder($order, $reason);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Sales Order {$order->sales_order_number} and associated un-shipped dispatch orders cancelled.",
+                'data'    => $order->fresh(['items']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * POST /api/sales/orders/{id}/short-close
+     * Short-Close a Sales Order (cancel remaining open quantities).
+     */
+    public function shortClose(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found',
+            ], 404);
+        }
+
+        $authUser = auth()->user();
+        $ownerId = $order->sales_person_id
+            ?? $order->quotation?->sales_person_id
+            ?? $order->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.orders.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this sales order.'], 403);
+        }
+
+        $this->authorize('shortClose', $order);
+
+        $validator = Validator::make($request->all(), [
+            'reason' => ['required', 'string', 'max:500'],
         ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            app(\App\Domains\Sales\Repositories\SalesOrderRepository::class)->shortCloseOrder($order, $request->input('reason'));
+
+            return response()->json([
+                'success' => true,
+                'message' => "Sales Order {$order->sales_order_number} has been Short-Closed successfully.",
+                'data'    => $order->fresh(['items.product', 'customer']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**
@@ -765,5 +921,88 @@ class SalesOrderApiController extends Controller
             new \App\Exports\SalesOrderExport($tenantId, $request->all()),
             'sales_orders_export_' . date('Y-m-d_His') . '.xlsx'
         );
+    }
+
+    /**
+     * POST /api/sales/orders/{id}/convert-to-project
+     */
+    public function convertToProject(Request $request, int $id, \App\Domains\Sales\Services\SalesOrderProjectBridgeService $bridgeService): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Sales Order not found'], 404);
+        }
+
+        $this->authorize('view', $order);
+        $this->authorize('create', \App\Domains\Projects\Models\Project::class);
+
+        if (in_array($order->status, ['Draft', 'Cancelled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Draft or Cancelled Sales Orders cannot be converted to a Delivery Project.'
+            ], 422);
+        }
+
+        if ($order->projects()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A Delivery Project has already been created for this Sales Order.'
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'project_name'   => 'nullable|string|max:255',
+            'manager_id'     => 'nullable|integer|exists:users,id',
+            'start_date'     => 'nullable|date',
+            'end_date'       => 'nullable|date|after_or_equal:start_date',
+            'budget_amount'  => 'nullable|numeric|min:0',
+            'cost_center_id' => 'nullable|integer|exists:cost_centers,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Validation error', 'errors' => $validator->errors()], 422);
+        }
+
+        $validated = $validator->validated();
+        $customData = array_filter([
+            'name'           => $validated['project_name'] ?? null,
+            'manager_id'     => $validated['manager_id'] ?? null,
+            'start_date'     => $validated['start_date'] ?? null,
+            'end_date'       => $validated['end_date'] ?? null,
+            'budget_amount'  => $validated['budget_amount'] ?? null,
+            'cost_center_id' => $validated['cost_center_id'] ?? null,
+        ]);
+
+        try {
+            $project = $bridgeService->convertSalesOrderToProject($order, $customData);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Delivery Project {$project->project_code} created successfully from Sales Order {$order->sales_order_number}.",
+                'data'    => $project,
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * GET /api/sales/orders/{id}/download-pdf
+     */
+    public function downloadPdf(int $id)
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Sales Order not found'], 404);
+        }
+
+        $this->authorize('view', $order);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.sales.orders.pdf', compact('order'));
+        return $pdf->download("SalesOrder_{$order->sales_order_number}.pdf");
     }
 }

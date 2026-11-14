@@ -67,12 +67,7 @@ class RosterApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
-            ->first()
-            ?? Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        return Employee::resolveForUser($user);
     }
 
     /**
@@ -388,17 +383,24 @@ class RosterApiController extends Controller
                 break;
         }
 
-        $employees = $query->with(['department', 'designation', 'shift'])->paginate($request->integer('per_page', 10), ['employees.*']);
+        $employees = $query->with(['department', 'designation', 'shift', 'defaultShift'])->paginate($request->integer('per_page', 10), ['employees.*']);
 
-        $rosters = ShiftRoster::query()
+        $rosters = ShiftRoster::with('shift')
             ->whereIn('employee_id', $employees->pluck('id'))
             ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->get();
 
+        $rostersByEmployee = $rosters->groupBy('employee_id');
+
         $rosterMap = [];
-        foreach ($rosters as $roster) {
-            $dateStr = $roster->date->format('Y-m-d');
-            $rosterMap[$roster->employee_id][$dateStr] = $roster;
+        foreach ($employees as $emp) {
+            $empRosters = $rostersByEmployee->get($emp->id, collect());
+            $emp->setRelation('rosters', $empRosters);
+
+            foreach ($empRosters as $roster) {
+                $dateStr = $roster->date->format('Y-m-d');
+                $rosterMap[$emp->id][$dateStr] = $roster;
+            }
         }
 
         return $this->sendSuccess([
@@ -516,8 +518,16 @@ class RosterApiController extends Controller
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'date'        => 'required|date',
-            'shift_id'    => 'nullable',
-            'value'       => 'nullable|string',
+            'shift_id'    => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
+            'value'       => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
         ]);
 
         $employeeId = $validated['employee_id'];
@@ -564,7 +574,11 @@ class RosterApiController extends Controller
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'day_of_week' => 'required|integer|between:0,6',
-            'value'       => 'nullable|string',
+            'value'       => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
         ]);
 
         $employee = Employee::find($validated['employee_id']);
@@ -664,6 +678,11 @@ class RosterApiController extends Controller
             'employee_ids'   => 'required|array|min:1',
             'employee_ids.*' => 'exists:employees,id',
             'pattern'        => 'required|array',
+            'pattern.*'      => ['required', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
         ]);
 
         $updatedCount = 0;

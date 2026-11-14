@@ -15,24 +15,28 @@ class DocumentPolicy
     {
         return $this->access->allows($user, 'hrms.documents.view', ['tenant_id' => $user->tenant_id])
             || $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
+            || $this->access->allows($user, 'hrms.employees.view', ['tenant_id' => $user->tenant_id])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
     }
 
     public function create(User $user): bool
     {
         return $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
+            || $this->access->allows($user, 'hrms.employees.update', ['tenant_id' => $user->tenant_id])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
     }
 
     public function update(User $user, mixed $model = null): bool
     {
         return $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
+            || $this->access->allows($user, 'hrms.employees.update', ['tenant_id' => $user->tenant_id])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
     }
 
     public function delete(User $user, mixed $model = null): bool
     {
         return $this->access->allows($user, 'hrms.documents.manage', ['tenant_id' => $user->tenant_id])
+            || $this->access->allows($user, 'hrms.employees.update', ['tenant_id' => $user->tenant_id])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
     }
 }

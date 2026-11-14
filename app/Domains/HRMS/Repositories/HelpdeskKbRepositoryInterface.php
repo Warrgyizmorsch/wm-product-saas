@@ -15,7 +15,7 @@ interface HelpdeskKbRepositoryInterface
 
     public function getAllCategoriesWithCounts(): Collection;
 
-    public function findArticleBySlug(string $slug): HelpdeskKbArticle;
+    public function findArticleBySlug(string $slug, bool $canManage = false): HelpdeskKbArticle;
 
     public function createArticle(array $data): HelpdeskKbArticle;
 

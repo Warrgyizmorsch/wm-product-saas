@@ -73,12 +73,7 @@ class EmployeeApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
-            ->first()
-            ?? Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        return Employee::resolveForUser($user);
     }
 
     /**
@@ -399,7 +394,7 @@ class EmployeeApiController extends Controller
             $validated['status'] = $request->input('status', '1') === '1' || $request->input('status') === 'true' || $request->input('status') === true;
 
             if ($request->hasFile('photo')) {
-                $validated['photo'] = $request->file('photo')->store('employees', 'public');
+                $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
             }
 
             $employee = Employee::create($validated);
@@ -454,7 +449,7 @@ class EmployeeApiController extends Controller
             }
 
             if ($request->hasFile('photo')) {
-                $validated['photo'] = $request->file('photo')->store('employees', 'public');
+                $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
             } else {
                 unset($validated['photo']);
             }
@@ -519,7 +514,7 @@ class EmployeeApiController extends Controller
 
         $validated = $request->validate([
             'salary_component_id' => 'required|exists:salary_components,id',
-            'amount'              => 'required|numeric|min:0',
+            'amount'              => 'required|numeric|min:0|max:99999999.99',
             'payroll_month'       => 'required|regex:/^\d{4}-\d{2}$/',
             'remarks'             => 'nullable|string|max:500',
         ]);
@@ -669,7 +664,7 @@ class EmployeeApiController extends Controller
         $request->validate([
             'document_id'        => 'nullable|exists:documents,id',
             'document_master_id' => 'required_without:document_id|exists:document_masters,id',
-            'file'               => 'required|file|max:10240', // Max 10MB
+            'file'               => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240', // Max 10MB
             'expiry_date'        => 'nullable|date',
         ]);
 
@@ -696,7 +691,7 @@ class EmployeeApiController extends Controller
                 ]);
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = true;
             if ($document->document_master_id) {
@@ -728,7 +723,7 @@ class EmployeeApiController extends Controller
                 ]);
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = (bool) $documentMaster->approval_required;
             $status = $approvalRequired ? 'uploaded' : 'approved';
@@ -901,11 +896,11 @@ class EmployeeApiController extends Controller
             return $this->sendError('Unauthorized action.', 403);
         }
 
-        $columns = ['full_name', 'personal_email', 'employee_id', 'company_id', 'department_id', 'designation_id', 'date_of_joining', 'gender'];
+        $columns = ['full_name', 'personal_email', 'employee_id', 'company_id', 'department_id', 'designation_id', 'job_title', 'date_of_joining', 'gender'];
         $callback = static function () use ($columns): void {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
-            fputcsv($file, ['Jane Doe', 'jane.doe@example.com', 'EMP-0001', '1', '1', '1', '2026-01-15', 'female']);
+            fputcsv($file, ['Jane Doe', 'jane.doe@example.com', 'EMP-0001', '1', '1', '1', 'Software Engineer', '2026-01-15', 'Female']);
             fclose($file);
         };
 
@@ -947,7 +942,7 @@ class EmployeeApiController extends Controller
 
         $header = array_map(static fn ($value) => strtolower(trim((string) $value)), $header);
         $required = ['full_name', 'company_id', 'department_id', 'designation_id', 'date_of_joining', 'gender'];
-        $optional = ['employee_id', 'personal_email'];
+        $optional = ['employee_id', 'personal_email', 'job_title', 'office_email'];
         $colIndex = [];
         foreach (array_merge($required, $optional) as $column) {
             $colIndex[$column] = array_search($column, $header, true);
@@ -970,6 +965,13 @@ class EmployeeApiController extends Controller
                 continue;
             }
 
+            $rawGender = trim($row[$colIndex['gender']] ?? '');
+            $normalizedGender = ucfirst(strtolower($rawGender));
+            $designationId = trim($row[$colIndex['designation_id']] ?? '');
+            $jobTitle = ($colIndex['job_title'] !== false && !empty($row[$colIndex['job_title']]))
+                ? trim($row[$colIndex['job_title']])
+                : (Designation::find($designationId)?->name ?: 'Employee');
+
             $rowData = [
                 'tenant_id' => $tenantId,
                 'full_name' => trim($row[$colIndex['full_name']] ?? ''),
@@ -977,9 +979,10 @@ class EmployeeApiController extends Controller
                 'employee_id' => $colIndex['employee_id'] !== false ? trim($row[$colIndex['employee_id']] ?? '') : null,
                 'company_id' => trim($row[$colIndex['company_id']] ?? ''),
                 'department_id' => trim($row[$colIndex['department_id']] ?? ''),
-                'designation_id' => trim($row[$colIndex['designation_id']] ?? ''),
+                'designation_id' => $designationId,
+                'job_title' => $jobTitle,
                 'date_of_joining' => trim($row[$colIndex['date_of_joining']] ?? ''),
-                'gender' => trim($row[$colIndex['gender']] ?? ''),
+                'gender' => $normalizedGender,
                 'status' => true,
             ];
 
@@ -992,13 +995,38 @@ class EmployeeApiController extends Controller
                 'company_id' => 'required|exists:companies,id',
                 'department_id' => 'required|exists:departments,id',
                 'designation_id' => 'required|exists:designations,id',
+                'job_title' => 'required|string|max:255',
                 'date_of_joining' => 'required|date',
-                'gender' => 'required|string|max:50',
+                'gender' => ['required', Rule::in(['Male', 'Female', 'Other'])],
             ]);
 
             if ($validator->fails()) {
                 $warnings[] = 'Row ' . $rowNum . ': ' . implode(' ', $validator->errors()->all());
                 continue;
+            }
+
+            // Provision User account so imported employee can log in
+            $userEmail = !empty($rowData['personal_email']) ? $rowData['personal_email'] : null;
+            if (empty($userEmail) && !empty($rowData['employee_id'])) {
+                $appHost = parse_url(config('app.url', 'company.com'), PHP_URL_HOST) ?: 'company.com';
+                $userEmail = strtolower($rowData['employee_id']) . '@' . $appHost;
+            }
+
+            if (!empty($userEmail)) {
+                $existingUser = \App\Models\User::where('tenant_id', $tenantId)->where('email', $userEmail)->first();
+                if ($existingUser) {
+                    $rowData['user_id'] = $existingUser->id;
+                } else {
+                    $newUser = \App\Models\User::create([
+                        'tenant_id'     => $tenantId,
+                        'company_id'    => $rowData['company_id'],
+                        'department_id' => $rowData['department_id'],
+                        'name'          => $rowData['full_name'],
+                        'email'         => $userEmail,
+                        'password'      => \Illuminate\Support\Facades\Hash::make('password123'),
+                    ]);
+                    $rowData['user_id'] = $newUser->id;
+                }
             }
 
             Employee::create($rowData);
@@ -1063,8 +1091,8 @@ class EmployeeApiController extends Controller
             'permanent_address'           => ['nullable', 'string'],
             'city'                        => ['nullable', 'string', 'max:255'],
             'postal_code'                 => ['nullable', 'string', 'max:20'],
-            'personal_mobile_number'      => ['nullable', 'string', 'max:20'],
-            'home_phone'                  => ['nullable', 'string', 'max:20'],
+            'personal_mobile_number'      => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
+            'home_phone'                  => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'personal_email'              => ['nullable', 'email', 'max:255', Rule::unique('employees', 'personal_email')->ignore($employee?->id)],
             'experience'                  => ['nullable', 'numeric', 'min:0'],
             'source_of_hire'              => ['nullable', 'string', 'max:255'],
@@ -1072,7 +1100,7 @@ class EmployeeApiController extends Controller
             'current_salary'              => ['nullable', 'numeric', 'min:0'],
             'qualification'               => ['nullable', 'string', 'max:255'],
             'reporting_manager_id'        => ['nullable', 'integer', 'exists:employees,id'],
-            'date_of_birth'               => ['nullable', 'date'],
+            'date_of_birth'               => ['nullable', 'date', 'before_or_equal:today'],
             'probation_end_date'          => ['nullable', 'date'],
             'confirmation_date'           => ['nullable', 'date'],
             'shift_id'                    => ['nullable', 'integer', 'exists:production_shifts,id'],
@@ -1081,9 +1109,9 @@ class EmployeeApiController extends Controller
             'account_number'              => ['nullable', 'string', 'max:255'],
             'ifsc_code'                   => ['nullable', 'string', 'max:50'],
             'emergency_contact_name'      => ['nullable', 'string', 'max:255'],
-            'emergency_contact_number'    => ['nullable', 'string', 'max:50'],
+            'emergency_contact_number'    => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'emergency_contact_relation'  => ['nullable', 'string', 'max:100'],
-            'status'                      => ['required'],
+            'status'                      => ['required', 'boolean'],
             'weekly_pattern'              => ['nullable', 'array'],
             'weekly_pattern.*'            => ['nullable', 'string'],
         ]);

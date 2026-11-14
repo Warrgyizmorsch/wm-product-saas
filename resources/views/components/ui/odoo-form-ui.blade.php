@@ -221,6 +221,12 @@
                 color: #ffffff !important;
             }
             
+            /* Prevent horizontal scroll jumps when dropdowns or popups appear */
+            .table-responsive,
+            .table-responsive:has(.dropdown.show) {
+                overflow-x: auto !important;
+            }
+
             /* Odoo style Table */
             .odoo-table {
                 width: 100%;
