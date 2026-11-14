@@ -80,6 +80,10 @@ class WorkCenterSectionController extends Controller
         // RT-IMPL-14: figures from the latest section snapshot (+ its id / number), not a live calculation
         $data = $this->calculationService->getSnapshotResourceCosts($section);
 
+        // Short Full Review Point 2: UI JSON boundary — money in the active currency (the snapshot itself stays DB base)
+        $data = \App\Domains\Production\Services\RoutingOperationCostCalculator::resourcesToActiveCurrency($data);
+        $data['currency'] = active_currency();
+
         return response()->json($data);
     }
 

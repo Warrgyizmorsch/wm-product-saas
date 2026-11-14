@@ -45,12 +45,12 @@ class ProductionOrderEngineeringService
 
     // ------------------------------------------------------------------ PO-04
 
-    /** Active standard warehouses of the branch (tenant-wide only when no branch is known). */
+    /** Active internal inventory warehouses of the branch (tenant-wide only when no branch is known). */
     public function branchWarehouseIds(int $tenantId, ?int $branchId): array
     {
         return Warehouse::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->where('type', Warehouse::TYPE_STANDARD)
+            ->whereNotIn('type', [Warehouse::TYPE_SUBCONTRACTOR, Warehouse::TYPE_VIRTUAL])
             ->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'active'))
             ->when($branchId !== null, fn ($q) => $q->where('branch_id', $branchId))
             ->orderByDesc('is_default')

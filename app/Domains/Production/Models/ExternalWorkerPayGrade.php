@@ -69,6 +69,12 @@ class ExternalWorkerPayGrade extends BaseModel
         return $this->hasMany(ExternalWorkerAllocation::class, 'pay_grade_id');
     }
 
+    /** Active allocations only (used by the pay grade edit screen — the view called it but it did not exist → 500). */
+    public function activeAllocations(): HasMany
+    {
+        return $this->allocations()->where('active', true);
+    }
+
     // ─── Scopes & Helpers ─────────────────────────────────────────────────────
 
     public function isActive(): bool

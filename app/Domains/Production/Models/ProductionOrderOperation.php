@@ -47,7 +47,9 @@ class ProductionOrderOperation extends BaseModel
         'operation_number',
         'name',
         'work_center_id',
+        'section_id',
         'machine_id',
+        'section_manual_production_id',
         'status',
         'setup_time_planned',
         'processing_time_planned',
@@ -87,6 +89,8 @@ class ProductionOrderOperation extends BaseModel
     protected $casts = [
         'sequence'                => 'integer',
         'bom_level'               => 'integer',
+        'section_id'              => 'integer',
+        'section_manual_production_id' => 'integer',
         'selected_routing_material_ids' => 'array',
         'target_produced_qty'     => 'float',
         'is_intermediate'         => 'boolean',
@@ -227,6 +231,17 @@ class ProductionOrderOperation extends BaseModel
     public function workCenter(): BelongsTo
     {
         return $this->belongsTo(WorkCenter::class, 'work_center_id');
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(WorkCenterSection::class, 'section_id');
+    }
+
+    /** Manual batch this operation runs on (an operation has a machine OR a manual batch). */
+    public function manualProduction(): BelongsTo
+    {
+        return $this->belongsTo(SectionManualProduction::class, 'section_manual_production_id');
     }
 
     public function reworks(): HasMany

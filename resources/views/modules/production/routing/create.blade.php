@@ -198,7 +198,7 @@
                     {{-- RT-IMPL-10 (RT-12 / RT-17) --}}
                     <div class="alert alert-soft-info border border-info-subtle py-1.5 px-3 fs-12 mb-2 d-flex align-items-center gap-2 routing-one-unit-notice"><i class="feather-info text-info fs-13"></i><span>{{ __('production.routing_one_unit_notice') }}</span></div>
                     <div class="table-responsive mb-3">
-                        <x-ui.odoo-form-ui type="table" style="min-width: 1560px;">
+                        <x-ui.odoo-form-ui type="table" style="min-width: 1700px;">
                             <thead>
                                 <tr>
                                     <th style="width: 45px; min-width: 45px;" class="text-center">{{ __('production.seq') }}</th>
@@ -211,8 +211,12 @@
                                     <th style="width: 85px; min-width: 85px;" class="text-end" title="Setup per piece: repeated for every unit (loading, clamping, positioning). Added to the run time in Cost / Unit.">{{ __('production.setup') }} / piece (m)</th>
                                     <th style="width: 85px; min-width: 85px;" class="text-end">{{ __('production.run') }} (m)</th>
                                     <th style="width: 85px; min-width: 85px;" class="text-end" title="Buffer / wait / cure / cool-down time (minutes)">Wait (m)</th>
-                                    <th style="width: 105px; min-width: 105px;" class="text-end" title="Total Cost Per Unit: includes setup time + cycle run time, machine power/maintenance, and allocated operator labor.">
-                                        Cost / Unit <i class="feather-info text-primary ms-0.5 fs-11" data-bs-toggle="tooltip" data-bs-placement="top" title="Total Cost Per Unit: includes setup time + cycle run time, machine power/maintenance, and allocated operator labor."></i>
+                                    <th style="width: 115px; min-width: 115px;" class="text-end text-nowrap">
+                                        Cost / Unit <i class="feather-info text-primary ms-0.5 fs-11" data-bs-toggle="tooltip" data-bs-placement="top" title="Cost / Unit (recurring, every piece) = (Setup / piece + Run time) × (Labor rate + Machine rate) × (100 ÷ Yield %). One-time setup per run is shown separately in Op Setup Cost."></i>
+                                    </th>
+                                    {{-- Short Full Review Point 1: one-time setup per run gets its own column --}}
+                                    <th style="width: 125px; min-width: 125px;" class="text-end text-nowrap routing-op-setup-cost-head">
+                                        Op Setup Cost <i class="feather-info text-primary ms-0.5 fs-11" data-bs-toggle="tooltip" data-bs-placement="top" title="Operation Setup Cost (per run): one-time setup cost incurred once per production run / batch for machine changeover or tool setting = Setup / run (m) × (Labor rate + Machine rate), yield excluded. Shown separately from Cost / Unit because batch size is decided at Production Order time."></i>
                                     </th>
                                     <th style="width: 45px; min-width: 45px;" class="text-center">{{ __('production.qc_gate') }}</th>
                                     <th style="width: 170px; min-width: 170px;">Type / Alt</th>
@@ -567,11 +571,14 @@
                                         </td>
                                         
                                         <!-- Cost / Unit -->
-                                        <td class="align-middle text-end font-monospace fw-semibold" style="width: 105px; min-width: 105px;">
+                                        <td class="align-middle text-end font-monospace fw-semibold text-nowrap" style="width: 115px; min-width: 115px;">
                                             <span class="fs-12 text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Cost / Unit = (setup per piece + run time) × (labor + machine rate) × (100 ÷ yield)" x-text="'{{ active_currency_symbol() }}' + fmt4(calculateUnitCost(operation))"></span>
-                                            <div class="text-muted fs-10 fw-normal mt-0.5" x-show="parseFloat(calculateSetupCostPerRun(operation)) > 0" title="Setup cost per run = setup per operation × (labor + machine rate) — once per production run, no yield">
-                                                + <span x-text="'{{ active_currency_symbol() }}' + fmt4(calculateSetupCostPerRun(operation))"></span> / run
-                                            </div>
+                                        </td>
+
+                                        <!-- Op Setup Cost (per run) — Short Full Review Point 1 -->
+                                        <td class="align-middle text-end font-monospace text-nowrap routing-op-setup-cost" style="width: 125px; min-width: 125px;" title="Setup cost per run = setup per operation × (labor + machine rate) — once per production run, no yield">
+                                            <span class="fs-12 text-dark" x-show="parseFloat(calculateSetupCostPerRun(operation)) > 0" x-text="'{{ active_currency_symbol() }}' + fmt4(calculateSetupCostPerRun(operation))"></span>
+                                            <span class="text-muted" x-show="!(parseFloat(calculateSetupCostPerRun(operation)) > 0)">—</span>
                                         </td>
                                         
                                         <!-- Quality Required -->
@@ -632,7 +639,7 @@
 
                                      <!-- Subcontract Details Expanded Panel -->
                                      <tr x-show="operation.is_external" class="bg-light-subtle">
-                                         <td colspan="14" class="p-2 border-top-0">
+                                         <td colspan="15" class="p-2 border-top-0">
                                              <div class="row g-2 align-items-center fs-12 px-2 py-2 bg-white rounded border">
                                                  <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="select" label="Vendor *" x-bind:name="'operations['+index+'][vendor_id]'" class="form-select form-select-sm fs-11" x-model="operation.vendor_id" x-bind:required="operation.is_external" x-bind:disabled="!operation.is_external">
@@ -668,7 +675,7 @@
                                                      <x-ui.odoo-form-ui type="input" inputType="number" label="Lead Time (Days)" min="0" x-bind:name="'operations['+index+'][subcontract_lead_time_days]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_lead_time_days" placeholder="0" x-bind:disabled="!operation.is_external" />
                                                  </div>
                                                  <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" label="Cost / Unit" x-bind:name="'operations['+index+'][subcontract_cost_per_unit]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_cost_per_unit" placeholder="0.00" x-bind:disabled="!operation.is_external" />
+                                                     <x-ui.odoo-form-ui type="input" inputType="number" step="any" min="0" label="Cost / Unit" x-bind:name="'operations['+index+'][subcontract_cost_per_unit]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_cost_per_unit" placeholder="0.00" x-bind:disabled="!operation.is_external" />
                                                  </div>
                                                  <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="select" label="Subcontract Service Product" x-bind:name="'operations['+index+'][subcontract_service_product_id]'" class="form-select form-select-sm fs-11" x-model="operation.subcontract_service_product_id" x-bind:disabled="!operation.is_external">

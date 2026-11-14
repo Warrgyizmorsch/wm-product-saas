@@ -800,7 +800,8 @@ class ProductionMasterImportService
                             $machine->update([
                                 'name' => $data['name'],
                                 'work_center_id' => $data['work_center_id'],
-                                'hourly_cost' => $data['hourly_cost'],
+                                // Short Full Review Point 2: real column, converted ONCE (sheet is in the active currency)
+                                'operating_cost_per_hour' => round(convert_to_base((float) $data['hourly_cost']), 4),
                                 'status' => $data['status']
                             ]);
                             $successCount++;
@@ -813,7 +814,7 @@ class ProductionMasterImportService
                             'code' => $data['code'],
                             'name' => $data['name'],
                             'work_center_id' => $data['work_center_id'],
-                            'hourly_cost' => $data['hourly_cost'],
+                            'operating_cost_per_hour' => round(convert_to_base((float) $data['hourly_cost']), 4),
                             'status' => $data['status']
                         ]);
                         $successCount++;
@@ -944,7 +945,8 @@ class ProductionMasterImportService
                 'expected_yield_percentage'    => (float) $op['expected_yield_percentage'],
                 'is_external'                  => (bool) $op['is_external'],
                 'vendor_id'                    => $op['vendor_id'] ?? null,
-                'subcontract_cost_per_unit'    => (float) ($op['subcontract_cost_per_unit'] ?? 0),
+                // Short Full Review Point 2: the sheet is in the active currency → DB base once, before the base calculator runs
+                'subcontract_cost_per_unit'    => round(convert_to_base((float) ($op['subcontract_cost_per_unit'] ?? 0)), 4),
             ];
 
             $resources = null;
@@ -972,7 +974,9 @@ class ProductionMasterImportService
             if ($resources) {
                 $row['section_calculation_id'] = $resources['section_calculation_id'] ?? null;
                 $row['section_snapshot_number'] = $resources['snapshot_number'] ?? null;
+                $row['work_center_calculation_id'] = $resources['work_center_calculation_id'] ?? null;
             }
+            $row['resource_snapshot'] = $calculator->buildResourceSnapshot($row, $calc['resource'], $resources); // DB base
             $payload[] = $row;
         }
 

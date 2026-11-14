@@ -75,7 +75,7 @@
                         </td>
                         <td class="fw-semibold text-dark">{{ $payGrade->name }}</td>
                         <td class="font-monospace text-dark fw-bold">
-                            {{ format_currency((float) $payGrade->hourly_rate) }} <span class="fs-10 text-muted fw-normal">/ hr</span>
+                            {{ format_currency((float) $payGrade->hourly_rate, 4) }} <span class="fs-10 text-muted fw-normal">/ hr</span>
                         </td>
                         <td class="text-muted fs-12">
                             {{ $payGrade->description ? \Illuminate\Support\Str::limit($payGrade->description, 50) : '—' }}

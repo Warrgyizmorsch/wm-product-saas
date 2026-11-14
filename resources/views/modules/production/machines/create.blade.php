@@ -42,7 +42,7 @@
                             <div class="fw-bold">Registering purchased asset {{ $linkedAsset->asset_code }}</div>
                             <div class="fs-12 text-muted">
                                 {{ $linkedAsset->name }} &middot; {{ $linkedAsset->category->name ?? '—' }} &middot;
-                                Cost: {{ number_format($linkedAsset->purchase_cost, 2) }}
+                                Cost: {{ format_currency($linkedAsset->purchase_cost) }}
                             </div>
                             <div class="fs-11 text-muted mt-1">Enter a name and code below to finish commissioning this machine.</div>
                         </div>

@@ -325,6 +325,68 @@ class RoutingService
      * (RT-IMPL-14). Problems (section not calculated, resource no longer in the snapshot) come back as warnings;
      * the save then refuses until they are fixed.
      */
+    /**
+     * Short Full Review Point 2 — DB write boundary for the web Routing form (convert ONCE).
+     * The form works in the active currency and its figures were already checked against the converted feed
+     * (ValidatesRoutingOperations, 'active' mode). Here the only user-entered money (subcontract cost) is converted
+     * with convert_to_base(), then every saved figure and the resource snapshot are rebuilt from the DB-base section
+     * snapshot with the same calculator — so the DB never holds active-currency numbers or round-trip drift.
+     */
+    public function operationsToBase(array $operations): array
+    {
+        $calculator = app(RoutingOperationCostCalculator::class);
+        $sectionService = app(\App\Domains\Production\Services\SectionCalculationService::class);
+        $snapshots = [];
+
+        foreach ($operations as $i => $op) {
+            if (!is_array($op)) {
+                continue;
+            }
+            if (isset($op['subcontract_cost_per_unit']) && $op['subcontract_cost_per_unit'] !== '') {
+                $op['subcontract_cost_per_unit'] = round(convert_to_base((float) $op['subcontract_cost_per_unit']), 4);
+            }
+
+            $isExternal = filter_var($op['is_external'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $resources = null;
+            if (!$isExternal && !empty($op['section_id'])) {
+                $sid = (int) $op['section_id'];
+                if (!array_key_exists($sid, $snapshots)) {
+                    $section = \App\Domains\Production\Models\WorkCenterSection::find($sid);
+                    $snapshots[$sid] = $section ? $sectionService->getSnapshotResourceCosts($section) : null;
+                }
+                $resources = $snapshots[$sid];
+            }
+
+            if ($isExternal || ($resources && empty($resources['not_calculated']))) {
+                $calc = $calculator->calculate($op, $isExternal ? null : $resources);
+                if ($calc['error'] === null) {
+                    foreach (RoutingOperationCostCalculator::FIELDS as $field) {
+                        $op[$field] = $calc['figures'][$field];
+                    }
+                    $op['resource_snapshot'] = $calculator->buildResourceSnapshot($op, $calc['resource'], $resources);
+                    if (!$isExternal) {
+                        $op['section_calculation_id'] = $resources['section_calculation_id'] ?? null;
+                        $op['section_snapshot_number'] = $resources['snapshot_number'] ?? null;
+                        $op['work_center_calculation_id'] = $resources['work_center_calculation_id'] ?? null;
+                    }
+                    $operations[$i] = $op;
+                    continue;
+                }
+            }
+
+            // No usable snapshot (validation normally blocks this): convert the figures as sent, never keep active currency
+            foreach (['labor_cost_rate', 'machine_cost_rate', 'labor_cost_per_unit', 'machine_cost_per_unit', 'cost_per_unit', 'setup_cost_per_run'] as $field) {
+                if (isset($op[$field]) && $op[$field] !== '') {
+                    $op[$field] = round(convert_to_base((float) $op[$field]), 4);
+                }
+            }
+            $op['resource_snapshot'] = null;
+            $operations[$i] = $op;
+        }
+
+        return $operations;
+    }
+
     public function buildCopyPayload(int $id, string $newVersion): array
     {
         $original = $this->routingRepository->getRoutingWithOperations($id);

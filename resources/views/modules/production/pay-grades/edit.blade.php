@@ -47,7 +47,8 @@
                     <div class="col-md-6">
                         <x-ui.odoo-form-ui type="input" label="Pay Grade Code" name="code" placeholder="e.g. EXT-W1" :value="old('code', $payGrade->code)" :required="true" :error-text="$errors->first('code')" />
                         <x-ui.odoo-form-ui type="input" label="Pay Grade Name" name="name" placeholder="e.g. General Assembly Laborer" :value="old('name', $payGrade->name)" :required="true" :error-text="$errors->first('name')" />
-                        <x-ui.odoo-form-ui type="input" label="Hourly Rate" name="hourly_rate" inputType="number" step="0.01" min="0" placeholder="e.g. 150.00" :value="old('hourly_rate', (float) $payGrade->hourly_rate)" :required="true" :error-text="$errors->first('hourly_rate')" />
+                        {{-- Short Full Review Point 2: DB holds base currency — pre-fill in the active currency (controller converts back once on save) --}}
+                        <x-ui.odoo-form-ui type="input" :label="'Hourly Rate (' . active_currency_symbol() . '/hr)'" name="hourly_rate" inputType="number" step="any" min="0" placeholder="e.g. 150" :value="old('hourly_rate', format_decimal(convert_from_base((float) $payGrade->hourly_rate), 4))" :required="true" :error-text="$errors->first('hourly_rate')" />
                     </div>
 
                     <div class="col-md-6">

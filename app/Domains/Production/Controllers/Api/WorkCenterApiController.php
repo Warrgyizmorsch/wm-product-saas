@@ -120,6 +120,11 @@ class WorkCenterApiController extends ApiBaseController
         try {
             $data = $request->validated();
             unset($data['capacity_per_hour'], $data['efficiency_percentage'], $data['cost_per_hour']);
+            // A partial PATCH must not reset fields it did not send (the DTO replaces every column).
+            if (!array_key_exists('overhead_cost', $data) && !array_key_exists('overhead_rate', $data)) {
+                $data['overhead_cost'] = (float) $workCenter->overhead_cost;
+            }
+            $data += $workCenter->only(['name', 'code', 'status', 'work_center_type', 'description', 'location', 'production_calendar_id', 'calculation_countdown_minutes']);
             $dto = WorkCenterDTO::fromArray($data);
             $this->service->update($id, $dto);
 

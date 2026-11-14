@@ -216,7 +216,7 @@ class MrpEngineService
             // Overhead costs
             $wc = $op->workCenter;
             if ($wc) {
-                $overheadCost = $op->total_time_minutes * ((float) $wc->overhead_rate / 60.0);
+                $overheadCost = $op->total_time_minutes * ($wc->calculatedOverheadCostPerHour() / 60.0);
                 $estimatedManufacturingCost += $overheadCost;
 
                 if ($wc->capacity_per_hour !== null && $wc->capacity_per_hour > 0) {

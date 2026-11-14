@@ -2810,7 +2810,7 @@
                                                                     <td class="fw-medium text-dark">{{ $alloc->payGrade?->name ?? 'Worker' }}</td>
                                                                     <td class="text-muted font-monospace fs-11">{{ $alloc->shift?->name ?? 'Shift' }}</td>
                                                                     <td class="text-center font-monospace fw-bold text-primary">{{ $alloc->number_of_external_workers }}</td>
-                                                                    <td class="text-end font-monospace">{{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0)) }}/hr</td>
+                                                                    <td class="text-end font-monospace">{{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0), 4) }}/hr</td>
                                                                 </tr>
                                                             @empty
                                                                 <tr>
@@ -3450,7 +3450,7 @@
                                                             <span class="font-monospace text-muted fs-11">[{{ $alloc->payGrade?->code ?? 'N/A' }}]</span>
                                                         </td>
                                                         <td class="font-monospace">
-                                                            {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0)) }} <span class="text-muted fs-10">/ hr</span>
+                                                            {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0), 4) }} <span class="text-muted fs-10">/ hr</span>
                                                         </td>
                                                         <td>
                                                             <form method="POST" action="{{ route('production.external-worker-allocations.quantity', $alloc->id) }}" class="d-flex align-items-center gap-1 ext-worker-qty-form">
@@ -3522,7 +3522,7 @@
                                                             <span class="font-monospace text-muted fs-11">[{{ $alloc->payGrade?->code ?? 'N/A' }}]</span>
                                                         </td>
                                                         <td class="font-monospace">
-                                                            {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0)) }} <span class="text-muted fs-10">/ hr</span>
+                                                            {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0), 4) }} <span class="text-muted fs-10">/ hr</span>
                                                         </td>
                                                         <td class="font-monospace fw-bold">{{ $alloc->number_of_external_workers }}</td>
                                                         <td>
@@ -3600,7 +3600,7 @@
                                                     <option value="">-- Select Active Pay Grade --</option>
                                                     @foreach($activePayGrades as $pg)
                                                         <option value="{{ $pg->id }}">
-                                                            {{ $pg->name }} [{{ $pg->code }}] &mdash; {{ format_currency((float) $pg->hourly_rate) }}/hr
+                                                            {{ $pg->name }} [{{ $pg->code }}] &mdash; {{ format_currency((float) $pg->hourly_rate, 4) }}/hr
                                                         </option>
                                                     @endforeach
                                                 </select>
@@ -4349,7 +4349,7 @@
                                                                 <span class="font-monospace text-muted fs-11">[{{ $alloc->payGrade?->code ?? 'N/A' }}]</span>
                                                             </td>
                                                             <td class="font-monospace">
-                                                                {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0)) }} <span class="text-muted fs-10">/ hr</span>
+                                                                {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0), 4) }} <span class="text-muted fs-10">/ hr</span>
                                                             </td>
                                                             <td>
                                                                 @if($alloc->active)
@@ -4465,7 +4465,7 @@
                                                         <option value="">-- Select Active Pay Grade --</option>
                                                         @foreach($activePayGrades as $pg)
                                                             <option value="{{ $pg->id }}">
-                                                                {{ $pg->name }} [{{ $pg->code }}] &mdash; {{ format_currency((float) $pg->hourly_rate) }}/hr
+                                                                {{ $pg->name }} [{{ $pg->code }}] &mdash; {{ format_currency((float) $pg->hourly_rate, 4) }}/hr
                                                             </option>
                                                         @endforeach
                                                     </select>

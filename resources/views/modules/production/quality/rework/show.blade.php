@@ -227,9 +227,9 @@
                                     @endif
                                     @if($op->workCenter)
                                         <div class="fs-10 text-muted mt-0.5">
-                                            Labor: {{ format_currency($op->workCenter->cost_per_hour) }}/hr
-                                            @if($op->workCenter->overhead_rate > 0)
-                                                | OH: {{ format_currency($op->workCenter->overhead_rate) }}/hr
+                                            Labor: {{ format_currency($op->workCenter->calculatedLaborCostPerHour(), 4) }}/hr
+                                            @if($op->workCenter->calculatedOverheadCostPerHour() > 0)
+                                                | OH: {{ format_currency($op->workCenter->calculatedOverheadCostPerHour(), 4) }}/hr
                                             @endif
                                         </div>
                                     @endif

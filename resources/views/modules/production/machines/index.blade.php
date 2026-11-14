@@ -59,7 +59,7 @@
                                         <td class="font-monospace fw-bold text-dark" style="width: 12%;">{{ $asset->asset_code }}</td>
                                         <td>{{ $asset->name }}</td>
                                         <td class="text-muted" style="width: 18%;">{{ $asset->category->name ?? '—' }}</td>
-                                        <td class="text-end text-muted" style="width: 14%;">{{ number_format($asset->purchase_cost, 2) }}</td>
+                                        <td class="text-end text-muted" style="width: 14%;">{{ format_currency($asset->purchase_cost) }}</td>
                                         <td class="text-end" style="width: 14%;">
                                             <a href="{{ route('production.machines.create', ['asset_id' => $asset->id]) }}" class="btn btn-xs btn-primary">
                                                 <i class="feather-tool me-1"></i>Register as Machine

@@ -62,7 +62,7 @@ class MachineController extends Controller
 
         try {
             $tenantId = require_tenant_id();
-            $dto      = MachineDTO::fromArray($request->validated());
+            $dto      = MachineDTO::fromArray($this->moneyToBase($request->validated()));
             $assetId  = $request->validated('asset_id') ? (int) $request->validated('asset_id') : null;
             $machine  = $this->service->create($dto, $tenantId, $assetId);
             $this->triggerCalculationCountdown($machine);
@@ -141,6 +141,18 @@ class MachineController extends Controller
         return view('modules.production.machines.edit', compact('machine', 'statuses', 'linkableAssets'));
     }
 
+    /** Short Full Review Point 2: DB write boundary — the form sends the active currency, the DB keeps base (convert once). */
+    private function moneyToBase(array $data): array
+    {
+        foreach (['energy_rate_per_unit', 'operating_cost_per_hour'] as $field) {
+            if (isset($data[$field]) && $data[$field] !== '') {
+                $data[$field] = round(convert_to_base((float) $data[$field]), 4);
+            }
+        }
+
+        return $data;
+    }
+
     public function update(UpdateMachineRequest $request, int $id): RedirectResponse
     {
         $machine = $this->repository->find($id);
@@ -150,7 +162,7 @@ class MachineController extends Controller
 
         try {
             $oldSectionId = $machine->section_id;
-            $dto     = MachineDTO::fromArray($request->validated());
+            $dto     = MachineDTO::fromArray($this->moneyToBase($request->validated()));
             $updatedMachine = $this->service->update($id, $dto);
             $this->triggerCalculationCountdown($updatedMachine, $oldSectionId ?: $updatedMachine->section_id);
 

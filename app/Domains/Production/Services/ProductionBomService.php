@@ -827,12 +827,7 @@ class ProductionBomService
             ->pluck('bom_id');
 
         $itemBomIds = ProductionBomItem::withoutGlobalScopes()
-            ->where(function ($q) use ($productId, $bomId) {
-                $q->where('material_id', $productId);
-                if ($bomId) {
-                    $q->orWhere('child_bom_id', $bomId);
-                }
-            })
+            ->where('material_id', $productId)
             ->pluck('bom_id');
 
         $parentBomIds = $opMatBomIds

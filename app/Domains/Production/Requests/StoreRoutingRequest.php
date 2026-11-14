@@ -10,6 +10,12 @@ class StoreRoutingRequest extends FormRequest
 {
     use ValidatesRoutingOperations; // RT-IMPL-07: operation rules + checks shared with the API
 
+    /** Short Full Review Point 2: the web form sends figures in the active currency (converted to base by the controller). */
+    protected function routingFiguresCurrency(): string
+    {
+        return 'active';
+    }
+
     public function authorize(): bool
     {
         return true;

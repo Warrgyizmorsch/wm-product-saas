@@ -277,6 +277,17 @@ trait ValidatesRoutingOperations
         }
     }
 
+    /**
+     * Short Full Review Point 2: currency of the money figures the caller sends.
+     * 'base'   — API / imports: DB base currency (default).
+     * 'active' — web Routing forms: the user's active currency (the form works on the converted resources feed).
+     * The check then runs on resources in the same currency, so it matches the form calculator exactly.
+     */
+    protected function routingFiguresCurrency(): string
+    {
+        return 'base';
+    }
+
     /** @var array<int, array> snapshot resource figures per section (one lookup per request) */
     private array $routingSnapshotResourceCache = [];
 
@@ -324,6 +335,10 @@ trait ValidatesRoutingOperations
                 $validator->errors()->add("operations.{$index}.section_calculation_id", "Operation {$label}: the section snapshot does not belong to the selected section.");
                 return;
             }
+        }
+
+        if ($this->routingFiguresCurrency() === 'active') {
+            $resources = \App\Domains\Production\Services\RoutingOperationCostCalculator::resourcesToActiveCurrency($resources);
         }
 
         $result = $calculator->calculate($op, $resources);

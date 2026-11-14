@@ -299,7 +299,7 @@
             {{-- RT-IMPL-10 (RT-12 / RT-17) --}}
             <div class="alert alert-soft-info border border-info-subtle py-1.5 px-3 fs-12 mb-2 d-flex align-items-center gap-2 routing-one-unit-notice"><i class="feather-info text-info fs-13"></i><span>{{ __('production.routing_one_unit_notice') }}</span></div>
             <div class="table-responsive">
-                <table class="erp-thin-table" style="min-width: 1300px;">
+                <table class="erp-thin-table" style="min-width: 1420px;">
                     <thead>
                         <tr>
                             <th style="width: 4%; min-width: 45px;" class="text-center">{{ __('production.seq') }}</th>
@@ -311,8 +311,12 @@
                             <th class="text-end" style="width: 5%; min-width: 60px;" title="Setup per piece — every unit">{{ __('production.setup') }} / piece</th>
                             <th class="text-end" style="width: 5%; min-width: 60px;">{{ __('production.run') }}</th>
                             <th class="text-end" style="width: 4%; min-width: 50px;">Wait</th>
-                            <th class="text-end" style="width: 8%; min-width: 90px;">
-                                Cost / Unit <i class="feather-info text-primary ms-0.5 fs-11" data-bs-toggle="tooltip" data-bs-placement="top" title="Cost / Unit = (setup per piece + run time) × (labor + machine rate) × (100 ÷ yield). Setup per run is shown separately as setup cost per run."></i>
+                            <th class="text-end text-nowrap" style="width: 8%; min-width: 110px;">
+                                Cost / Unit <i class="feather-info text-primary ms-0.5 fs-11" data-bs-toggle="tooltip" data-bs-placement="top" title="Cost / Unit (recurring, every piece) = (Setup / piece + Run time) × (Labor rate + Machine rate) × (100 ÷ Yield %). One-time setup per run is shown separately in Op Setup Cost."></i>
+                            </th>
+                            {{-- Short Full Review Point 1: one-time setup per run gets its own column --}}
+                            <th class="text-end text-nowrap routing-op-setup-cost-head" style="width: 8%; min-width: 120px;">
+                                Op Setup Cost <i class="feather-info text-primary ms-0.5 fs-11" data-bs-toggle="tooltip" data-bs-placement="top" title="Operation Setup Cost (per run): one-time setup cost incurred once per production run / batch for machine changeover or tool setting = Setup / run (m) × (Labor rate + Machine rate), yield excluded. Shown separately from Cost / Unit because batch size is decided at Production Order time."></i>
                             </th>
                             <th class="text-end" style="width: 4%; min-width: 50px;">{{ __('production.yield') }}</th>
                             <th class="text-center" style="width: 4%; min-width: 50px;">{{ __('production.qc_gate') }}</th>
@@ -519,9 +523,6 @@
                                     <span class="fw-bold text-primary fs-12" data-bs-toggle="tooltip" data-bs-placement="top" title="Setup / piece: {{ format_duration($setupMin) }} + Run: {{ format_duration($runMin) }} = {{ format_duration($activeMin) }} per piece">
                                         {{ format_currency($costVal, 4) }}
                                     </span>
-                                    @if ($setupRunCost > 0)
-                                        <small class="text-muted d-block fs-9" title="Setup per operation × (labor + machine rate) — once per run">+ {{ format_currency($setupRunCost, 4) }} / run</small>
-                                    @endif
                                     @if ($op->costsNotCalculated())
                                         <small class="text-warning d-block fs-9 routing-costs-not-calculated">Costs not calculated — open and save the routing</small>
                                     @elseif (!$op->is_external && $op->section_snapshot_number)
@@ -531,6 +532,13 @@
                                         <span class="badge bg-soft-warning text-warning fs-9 d-block mt-0.5" style="font-weight: 500;" title="Alternative operation — replaces a primary operation and is not added into the standard primary total.">
                                             <i class="feather-git-branch me-0.5"></i>Alt Branch
                                         </span>
+                                    @endif
+                                </td>
+                                <td class="text-end align-middle font-monospace text-nowrap routing-op-setup-cost" title="Setup per operation × (labor + machine rate) — once per production run, no yield">
+                                    @if ($op->setupCostPerRun() > 0)
+                                        <span class="fw-semibold text-dark fs-12">{{ format_currency($op->setupCostPerRun(), 4) }}</span>
+                                    @else
+                                        <span class="text-muted">—</span>
                                     @endif
                                 </td>
                                 <td class="text-end align-middle font-monospace">{{ number_format($op->expected_yield_percentage, 0) }}%</td>
@@ -574,7 +582,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="14" class="text-center py-4 text-muted">
+                                <td colspan="15" class="text-center py-4 text-muted">
                                     <i class="feather-info me-2"></i>{{ __('production.no_operations_defined') }}
                                 </td>
                             </tr>
@@ -588,6 +596,9 @@
                                 </td>
                                 <td class="text-end fw-bold text-primary py-2.5 fs-13 font-monospace">
                                     {{ format_currency($costSummary['total_cost'] ?? 0, 4) }}
+                                </td>
+                                <td class="text-end fw-bold text-dark py-2.5 fs-12 font-monospace text-nowrap routing-op-setup-cost-total" title="Σ setup cost per run of primary operations — paid once per production run">
+                                    {{ format_currency($costSummary['setup_cost_per_run'] ?? 0, 4) }}
                                 </td>
                                 <td colspan="4" class="py-2.5 fs-11 text-muted">
                                     @if ($routing->operations->where('is_alternative', true)->count() > 0)
@@ -841,10 +852,10 @@
                     'setup_per_run_minutes' => (float) $op->setup_time_minutes,
                     'processing_minutes' => (float) $op->processing_time_minutes,
                     'total_minutes' => $op->cycleTimePerPieceMinutes(),
-                    'cost_per_unit' => round((float) $cVal, 4),
-                    'labor_cost' => round((float) ($opCostDetails['labor_cost'] ?? 0), 4),
-                    'machine_cost' => round((float) ($opCostDetails['machine_cost'] ?? 0), 4),
-                    'subcontract_cost' => round((float) ($opCostDetails['subcontract_cost'] ?? 0), 4),
+                    'cost_per_unit' => round(convert_from_base((float) $cVal), 4), // Short Full Review Point 2: simulator works in the active currency
+                    'labor_cost' => round(convert_from_base((float) ($opCostDetails['labor_cost'] ?? 0)), 4),
+                    'machine_cost' => round(convert_from_base((float) ($opCostDetails['machine_cost'] ?? 0)), 4),
+                    'subcontract_cost' => round(convert_from_base((float) ($opCostDetails['subcontract_cost'] ?? 0)), 4),
                     'yield_percentage' => (float) ($op->expected_yield_percentage > 0 ? $op->expected_yield_percentage : 100),
                 ];
             }
@@ -880,7 +891,7 @@
                 }
             }
 
-            $primaryBaselineCost = (float) ($costSummary['total_cost'] ?? 0);
+            $primaryBaselineCost = round(convert_from_base((float) ($costSummary['total_cost'] ?? 0)), 4);
             // RT-IMPL-13: simulator compares cycle time per piece (setup per piece + run) — same basis as its own totals
             $primaryBaselineCycle = (float) $routing->operations->where('is_alternative', false)->sum(fn($o) => $o->cycleTimePerPieceMinutes());
             $currencySym = active_currency_symbol();

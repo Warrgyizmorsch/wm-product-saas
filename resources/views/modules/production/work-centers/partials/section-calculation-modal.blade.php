@@ -1116,7 +1116,7 @@
                                                         {{ $alloc['headcount'] ?? 0 }}
                                                     </td>
                                                     <td class="text-end font-monospace text-muted">
-                                                        {{ format_currency((float) ($alloc['pay_grade_rate'] ?? 0)) }}/hr
+                                                        {{ format_currency((float) ($alloc['pay_grade_rate'] ?? 0), 4) }}/hr
                                                     </td>
                                                     <td class="text-end font-monospace text-primary fw-semibold">
                                                         {{ format_currency((float) ($alloc['hourly_burn_rate'] ?? 0)) }}/hr

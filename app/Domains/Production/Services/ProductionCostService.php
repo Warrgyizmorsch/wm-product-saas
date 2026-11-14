@@ -70,7 +70,7 @@ class ProductionCostService
                     $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($operation->section);
                     $laborRate = ($sectionCosts['operator_labor_cost_per_machine_per_hour'] ?? 0.0) / 60.0;
                 } else {
-                    $laborRate = $operation->workCenter ? ((float) $operation->workCenter->cost_per_hour / 60.0) : 0.0;
+                    $laborRate = $operation->workCenter ? ($operation->workCenter->calculatedLaborCostPerHour() / 60.0) : 0.0;
                 }
             }
 

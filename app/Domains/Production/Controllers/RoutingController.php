@@ -81,18 +81,8 @@ class RoutingController extends Controller
             $tenantId = require_tenant_id();
             $data = $request->validated();
             if (!empty($data['operations']) && is_array($data['operations'])) {
-                foreach ($data['operations'] as &$op) {
-                    if (isset($op['labor_cost_rate'])) {
-                        $op['labor_cost_rate'] = convert_to_base((float) $op['labor_cost_rate']);
-                    }
-                    if (isset($op['machine_cost_rate'])) {
-                        $op['machine_cost_rate'] = convert_to_base((float) $op['machine_cost_rate']);
-                    }
-                    if (isset($op['subcontract_cost_per_unit'])) {
-                        $op['subcontract_cost_per_unit'] = convert_to_base((float) $op['subcontract_cost_per_unit']);
-                    }
-                }
-                unset($op);
+                // Short Full Review Point 2: convert ONCE at the DB write boundary — all 7 figures + snapshot rebuilt in DB base
+                $data['operations'] = $this->routingService->operationsToBase($data['operations']);
             }
             $dto      = RoutingDTO::fromArray($data);
             $routing  = $this->routingService->create($dto, $tenantId, auth()->id() ?: 1);
@@ -201,18 +191,8 @@ class RoutingController extends Controller
         try {
             $data = $request->validated();
             if (!empty($data['operations']) && is_array($data['operations'])) {
-                foreach ($data['operations'] as &$op) {
-                    if (isset($op['labor_cost_rate'])) {
-                        $op['labor_cost_rate'] = convert_to_base((float) $op['labor_cost_rate']);
-                    }
-                    if (isset($op['machine_cost_rate'])) {
-                        $op['machine_cost_rate'] = convert_to_base((float) $op['machine_cost_rate']);
-                    }
-                    if (isset($op['subcontract_cost_per_unit'])) {
-                        $op['subcontract_cost_per_unit'] = convert_to_base((float) $op['subcontract_cost_per_unit']);
-                    }
-                }
-                unset($op);
+                // Short Full Review Point 2: convert ONCE at the DB write boundary — all 7 figures + snapshot rebuilt in DB base
+                $data['operations'] = $this->routingService->operationsToBase($data['operations']);
             }
             $dto     = RoutingDTO::fromArray($data);
             $routing = $this->routingService->update($id, $dto);

@@ -309,10 +309,10 @@ class ProductionWipService
 
             // Resolve cost rates from routing snapshots (with Work Center fallback)
             $routingLaborRate = (float) ($orderOp->routingOperation?->labor_cost_rate ?? 0.0);
-            $wcLaborRate = $orderOp->workCenter ? ((float) $orderOp->workCenter->cost_per_hour / 60.0) : 0.0;
+            $wcLaborRate = $orderOp->workCenter ? ($orderOp->workCenter->calculatedLaborCostPerHour() / 60.0) : 0.0;
             $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
             $machineRate = $orderOp->routingOperation?->machine_cost_rate ?? 0.0;
-            $overheadRate = $orderOp->workCenter?->overhead_rate ?? 0.0;
+            $overheadRate = ($orderOp->workCenter?->calculatedOverheadCostPerHour() ?? 0.0);
 
             $activeMinutes = $setupMins + $runMins;
             $laborCost = $activeMinutes * $laborRate;

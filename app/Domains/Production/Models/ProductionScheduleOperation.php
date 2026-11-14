@@ -39,7 +39,9 @@ class ProductionScheduleOperation extends BaseModel
         'production_order_id',
         'production_order_operation_id',
         'work_center_id',
+        'section_id',
         'machine_id',
+        'section_manual_production_id',
         'sequence',
         'priority',
         'planned_start',
@@ -75,6 +77,8 @@ class ProductionScheduleOperation extends BaseModel
         'accumulated_paused_seconds' => 'integer',
         'planned_duration_minutes'   => 'float',
         'sequence'                   => 'integer',
+        'section_id'                 => 'integer',
+        'section_manual_production_id' => 'integer',
         'priority'                   => 'integer',
         'warnings'                   => 'array',
         'locked'                     => 'boolean',
@@ -110,6 +114,17 @@ class ProductionScheduleOperation extends BaseModel
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(WorkCenterSection::class, 'section_id');
+    }
+
+    /** Manual batch this operation is booked on (an operation has a machine OR a manual batch). */
+    public function manualProduction(): BelongsTo
+    {
+        return $this->belongsTo(SectionManualProduction::class, 'section_manual_production_id');
     }
 
     public function actualMachine(): BelongsTo

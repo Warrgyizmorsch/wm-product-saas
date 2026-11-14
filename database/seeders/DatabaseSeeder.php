@@ -59,12 +59,8 @@ class DatabaseSeeder extends Seeder
             InventoryMasterDemoSeeder::class,
             // // Kept for future Poona Radiators demo usage:
             // // PoonaRadiatorsProductSeeder::class,
-            // // PoonaRadiatorsProductionSeeder::class,
 
             TableManufacturingProductSeeder::class,
-            // Kept for future standard table manufacturing demo usage:
-            // TableManufacturingProductionSeeder::class,
-            ProductionVariationDemoSeeder::class,
             HrmsDemoSeeder::class,
         ]);
 

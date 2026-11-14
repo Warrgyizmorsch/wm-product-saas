@@ -34,11 +34,11 @@ class ProductionCostVarianceService
 
         foreach ($order->operations as $op) {
             $routingLaborRate = $op->routingOperation ? (float) $op->routingOperation->labor_cost_rate : 0.0;
-            $wcLaborRate = $op->workCenter ? ((float) $op->workCenter->cost_per_hour / 60.0) : 0.0;
+            $wcLaborRate = $op->workCenter ? ($op->workCenter->calculatedLaborCostPerHour() / 60.0) : 0.0;
             $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
 
             $machineRate = $op->routingOperation ? (float) $op->routingOperation->machine_cost_rate : 0.0;
-            $overheadRatePerMin = $op->workCenter ? ((float) $op->workCenter->overhead_rate / 60.0) : 0.0;
+            $overheadRatePerMin = $op->workCenter ? ($op->workCenter->calculatedOverheadCostPerHour() / 60.0) : 0.0;
 
             // Planned Calculations
             $plannedLaborCost += ($op->total_time_planned * $laborRate);
@@ -152,11 +152,11 @@ class ProductionCostVarianceService
                 if ($op) {
                     $operationsWorked[$op->operation_number] = $op->name;
                     $routingLaborRate = $op->routingOperation ? (float) $op->routingOperation->labor_cost_rate : 0.0;
-                    $wcLaborRate = $op->workCenter ? ((float) $op->workCenter->cost_per_hour / 60.0) : 0.0;
+                    $wcLaborRate = $op->workCenter ? ($op->workCenter->calculatedLaborCostPerHour() / 60.0) : 0.0;
                     $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
 
                     $machineRate = $op->routingOperation ? (float) $op->routingOperation->machine_cost_rate : 0.0;
-                    $overheadRatePerMin = $op->workCenter ? ((float) $op->workCenter->overhead_rate / 60.0) : 0.0;
+                    $overheadRatePerMin = $op->workCenter ? ($op->workCenter->calculatedOverheadCostPerHour() / 60.0) : 0.0;
 
                     $laborCost += ($actualTime * $laborRate);
                     $machineCost += ($actualTime * $machineRate);

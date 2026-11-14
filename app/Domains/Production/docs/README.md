@@ -157,7 +157,4 @@ This knowledge base is organized into 24 specialized developer guides:
 php vendor/phpunit/phpunit/phpunit tests/Feature/Production/AuditFixesTest.php --no-coverage
 php vendor/phpunit/phpunit/phpunit tests/Feature/Production/ShopfloorQcScrapReworkArchitectureTest.php --no-coverage
 php vendor/phpunit/phpunit/phpunit tests/Feature/Production/ScheduleDispatchAndPreReleaseTest.php --no-coverage
-
-# Re-seed Table Manufacturing Demo
-php artisan db:seed --class="Database\Seeders\TableManufacturingProductionSeeder"
 ```

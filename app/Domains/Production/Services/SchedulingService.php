@@ -11,9 +11,10 @@ use App\Domains\Production\Models\ProductionOrderOperation;
 use App\Domains\Production\Models\ProductionSchedule;
 use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Domains\Production\Models\RoutingOperation;
-use App\Domains\Production\Models\RoutingOperationAlternateMachine;
 use App\Domains\Production\Models\ProductionShift;
+use App\Domains\Production\Models\SectionManualProduction;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterSection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -60,6 +61,161 @@ class SchedulingService
             $this->shiftsCache[$wc->id] = $wc->getEffectiveShifts(true);
         }
         return $this->shiftsCache[$wc->id];
+    }
+
+    // ─── Section architecture: resource resolution ───────────────────────────
+
+    /**
+     * The resource an order operation runs on: a Machine OR a Manual Batch, inside a Section of its
+     * Work Center. Reads the order operation's own snapshot first and falls back to its routing
+     * operation (orders created before the snapshot columns existed).
+     *
+     * There is nothing to choose here: an alternative operation, when wanted, is picked at
+     * Production Order creation, so the order operation already points at the chosen one.
+     *
+     * @return array{section_id: int|null, machine: Machine|null, batch: SectionManualProduction|null}
+     */
+    public function resolveOperationResource(ProductionOrderOperation $op): array
+    {
+        $routingOp = $op->routingOperation;
+
+        $machineId = $op->machine_id;
+        $batchId = $op->section_manual_production_id;
+        if (!$machineId && !$batchId) {
+            $machineId = $routingOp?->machine_id;
+            $batchId = $machineId ? null : $routingOp?->section_manual_production_id;
+        }
+
+        $machine = $machineId ? Machine::withoutGlobalScopes()->find($machineId) : null;
+        $batch = (!$machine && $batchId) ? SectionManualProduction::withoutGlobalScopes()->find($batchId) : null;
+
+        $sectionId = $op->section_id ?: ($routingOp?->section_id ?: ($machine?->section_id ?: $batch?->section_id));
+
+        return [
+            'section_id' => $sectionId ? (int) $sectionId : null,
+            'machine' => $machine,
+            'batch' => $batch,
+        ];
+    }
+
+    /**
+     * Shifts a resource works in: a manual batch works its own shift, a machine works its section's
+     * shifts, and anything without a section falls back to every shift of the work center.
+     *
+     * @param array{section_id?: int|null, manual_production_id?: int|null} $resource
+     */
+    private function resolveResourceShifts(WorkCenter $wc, array $resource): \Illuminate\Support\Collection
+    {
+        $sectionId = $resource['section_id'] ?? null;
+        $batchId = $resource['manual_production_id'] ?? null;
+
+        if (!$sectionId && !$batchId) {
+            return $this->getCachedShifts($wc);
+        }
+
+        $key = $wc->id . ':' . ($sectionId ?: 0) . ':' . ($batchId ?: 0);
+        if (isset($this->shiftsCache[$key])) {
+            return $this->shiftsCache[$key];
+        }
+
+        $isActive = fn($shift) => (bool) ($shift->active ?? true);
+        $shifts = null;
+
+        if ($batchId) {
+            $batch = SectionManualProduction::withoutGlobalScopes()->find($batchId);
+            $sectionId = $sectionId ?: $batch?->section_id;
+            $batchShift = $batch?->shift_id ? ProductionShift::withoutGlobalScopes()->find($batch->shift_id) : null;
+            if ($batchShift && $isActive($batchShift)) {
+                $shifts = collect([$batchShift]);
+            }
+        }
+
+        if ($shifts === null && $sectionId) {
+            $section = WorkCenterSection::withoutGlobalScopes()->find($sectionId);
+            if ($section) {
+                $ids = $section->getAssignedShiftIds();
+                $shifts = empty($ids)
+                    ? collect()
+                    : ProductionShift::withoutGlobalScopes()->whereIn('id', $ids)->get()->filter($isActive)->values();
+            }
+        }
+
+        return $this->shiftsCache[$key] = $shifts ?? $this->getCachedShifts($wc);
+    }
+
+    /**
+     * Find the slot for an order operation on its own machine / manual batch.
+     *
+     * Problems with the resource (inactive machine, inactive batch, nothing assigned) are returned as
+     * warnings on the operation — the schedule is still generated; pre-release validation is the gate.
+     *
+     * @return array{machine_id: int|null, manual_production_id: int|null, section_id: int|null, start: Carbon|null, finish: Carbon|null, warnings: array, priority: int}
+     */
+    public function allocateOperationSlot(
+        ProductionOrderOperation $op,
+        Carbon $from,
+        float $durationMinutes,
+        int $tenantId,
+        bool $forward = true,
+        array $excludeScheduleOpIds = [],
+        array $inMemoryBookings = []
+    ): array {
+        $resource = $this->resolveOperationResource($op);
+        $machine = $resource['machine'];
+        $batch = $resource['batch'];
+        $warnings = [];
+
+        if ($machine) {
+            $check = $this->validateMachineForScheduling($machine, (int) $op->work_center_id, $tenantId);
+            if (!$check['valid'] && !empty($check['warning'])) {
+                $warnings[] = $check['warning'];
+            }
+        } elseif ($batch) {
+            if (!$batch->active || $batch->trashed()) {
+                $warnings[] = [
+                    'code' => 'MANUAL_BATCH_INACTIVE',
+                    'message' => "Manual batch [{$batch->batch_name}] is inactive.",
+                    'severity' => 'warning',
+                ];
+            }
+        } else {
+            $warnings[] = [
+                'code' => 'NO_RESOURCE_ASSIGNED',
+                'message' => "Operation [{$op->name}] has no machine or manual batch assigned.",
+                'severity' => 'warning',
+            ];
+        }
+
+        $slot = $this->calculateAvailableSlot(
+            $op->work_center_id,
+            $machine?->id,
+            $from,
+            $durationMinutes,
+            $forward,
+            $excludeScheduleOpIds,
+            $inMemoryBookings,
+            ['section_id' => $resource['section_id'], 'manual_production_id' => $batch?->id]
+        );
+
+        return [
+            'machine_id' => $machine?->id,
+            'manual_production_id' => $batch?->id,
+            'section_id' => $resource['section_id'],
+            'start' => $slot['start'],
+            'finish' => $slot['finish'],
+            'warnings' => ProductionScheduleOperation::aggregateWarnings(array_merge($warnings, $slot['warnings'] ?? [])),
+            'priority' => 1,
+        ];
+    }
+
+    /** Dispatch lane / resource key of a scheduled operation. */
+    private function resourceKey(?int $machineId, ?int $batchId, string $lane): string
+    {
+        if ($machineId) {
+            return 'Machine_' . $machineId;
+        }
+
+        return $batchId ? 'Batch_' . $batchId : $lane;
     }
 
     /**
@@ -233,6 +389,8 @@ class SchedulingService
                     $plannedFinish = $plannedStart->copy()->addMinutes((int) ceil($duration));
                     $warnings = [];
                     $machineId = null;
+                    $batchId = null;
+                    $sectionId = null;
                     $priority = 1;
                 } else {
                     $opQty = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1.0));
@@ -256,39 +414,20 @@ class SchedulingService
                         $excludeScheduleOpIds = $parallelGroupOpIds[$op->parallel_group] ?? [];
                     }
 
-                    // Find optimal machine & slot
-                    if ($op->routing_operation_id) {
-                        $alloc = $this->findNextAvailableMachine($op->routing_operation_id, $earliestStart, $duration, $tenantId, true, $excludeScheduleOpIds);
-                    } else {
-                        $slot = $this->calculateAvailableSlot($op->work_center_id, $op->machine_id, $earliestStart, $duration, true, $excludeScheduleOpIds);
-                        $warnings = $slot['warnings'];
-                        if ($op->machine_id) {
-                            $m = Machine::withoutGlobalScopes()->find($op->machine_id);
-                            if ($m) {
-                                $mCheck = $this->validateMachineForScheduling($m, $op->work_center_id, $tenantId);
-                                if (!$mCheck['valid'] && !empty($mCheck['warning'])) {
-                                    $warnings[] = $mCheck['warning'];
-                                }
-                            }
-                        }
-                        $alloc = [
-                            'machine_id' => $op->machine_id,
-                            'start' => $slot['start'],
-                            'finish' => $slot['finish'],
-                            'warnings' => $warnings,
-                            'priority' => 1,
-                        ];
-                    }
+                    // Slot on the operation's own machine / manual batch (section shifts)
+                    $alloc = $this->allocateOperationSlot($op, $earliestStart, $duration, $tenantId, true, $excludeScheduleOpIds);
 
                     $plannedStart = $alloc['start'] ?? $earliestStart->copy();
                     $plannedFinish = $alloc['finish'] ?? $earliestStart->copy()->addMinutes((int) ceil($duration));
                     $warnings = $alloc['warnings'] ?? [];
                     $machineId = $alloc['machine_id'] ?? null;
+                    $batchId = $alloc['manual_production_id'] ?? null;
+                    $sectionId = $alloc['section_id'] ?? null;
                     $priority = $alloc['priority'] ?? 1;
                 }
 
                 $lane = $op->work_center_id ? 'WorkCenter_' . $op->work_center_id : 'Vendor_' . ($op->vendor_id ?? 'External');
-                $resourceId = $machineId ? 'Machine_' . $machineId : $lane;
+                $resourceId = $this->resourceKey($machineId, $batchId, $lane);
 
                 $schedOp = ProductionScheduleOperation::create([
                     'tenant_id' => $tenantId,
@@ -296,7 +435,9 @@ class SchedulingService
                     'production_order_id' => $order->id,
                     'production_order_operation_id' => $op->id,
                     'work_center_id' => $op->work_center_id,
+                    'section_id' => $sectionId,
                     'machine_id' => $machineId,
+                    'section_manual_production_id' => $batchId,
                     'sequence' => $op->sequence,
                     'priority' => $priority,
                     'planned_start' => $plannedStart,
@@ -446,6 +587,8 @@ class SchedulingService
                     $plannedStart = $plannedFinish->copy()->subMinutes((int) ceil($duration));
                     $warnings = [];
                     $machineId = null;
+                    $batchId = null;
+                    $sectionId = null;
                     $priority = 1;
                 } else {
                     $opQty = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1.0));
@@ -470,33 +613,14 @@ class SchedulingService
                     }
 
                     // Find slot searching backwards respecting DB bookings and in-memory reservations
-                    if ($op->routing_operation_id) {
-                        $alloc = $this->findNextAvailableMachine($op->routing_operation_id, $latestFinish, $duration, $tenantId, false, $excludeScheduleOpIds, $inMemoryBookings);
-                    } else {
-                        $slot = $this->calculateAvailableSlot($op->work_center_id, $op->machine_id, $latestFinish, $duration, false, $excludeScheduleOpIds, $inMemoryBookings);
-                        $warnings = $slot['warnings'];
-                        if ($op->machine_id) {
-                            $m = Machine::withoutGlobalScopes()->find($op->machine_id);
-                            if ($m) {
-                                $mCheck = $this->validateMachineForScheduling($m, $op->work_center_id, $tenantId);
-                                if (!$mCheck['valid'] && !empty($mCheck['warning'])) {
-                                    $warnings[] = $mCheck['warning'];
-                                }
-                            }
-                        }
-                        $alloc = [
-                            'machine_id' => $op->machine_id,
-                            'start' => $slot['start'],
-                            'finish' => $slot['finish'],
-                            'warnings' => $warnings,
-                            'priority' => 1,
-                        ];
-                    }
+                    $alloc = $this->allocateOperationSlot($op, $latestFinish, $duration, $tenantId, false, $excludeScheduleOpIds, $inMemoryBookings);
 
                     $plannedStart = $alloc['start'] ?? $latestFinish->copy()->subMinutes((int) ceil($duration));
                     $plannedFinish = $alloc['finish'] ?? $latestFinish->copy();
                     $warnings = $alloc['warnings'] ?? [];
                     $machineId = $alloc['machine_id'] ?? null;
+                    $batchId = $alloc['manual_production_id'] ?? null;
+                    $sectionId = $alloc['section_id'] ?? null;
                     $priority = $alloc['priority'] ?? 1;
 
                     // Immediately register in-memory reservation for this operation so subsequent operations see it
@@ -504,6 +628,8 @@ class SchedulingService
                     $inMemoryBookings[] = [
                         'id' => $tempOpId,
                         'machine_id' => $machineId,
+                        'manual_production_id' => $batchId,
+                        'section_id' => $sectionId,
                         'work_center_id' => $op->work_center_id,
                         'planned_start' => $plannedStart->copy(),
                         'planned_finish' => $plannedFinish->copy(),
@@ -515,7 +641,7 @@ class SchedulingService
                 }
 
                 $lane = $op->work_center_id ? 'WorkCenter_' . $op->work_center_id : 'Vendor_' . ($op->vendor_id ?? 'External');
-                $resourceId = $machineId ? 'Machine_' . $machineId : $lane;
+                $resourceId = $this->resourceKey($machineId, $batchId, $lane);
 
                 $records[] = [
                     'tenant_id' => $tenantId,
@@ -523,7 +649,9 @@ class SchedulingService
                     'production_order_id' => $order->id,
                     'production_order_operation_id' => $op->id,
                     'work_center_id' => $op->work_center_id,
+                    'section_id' => $sectionId,
                     'machine_id' => $machineId,
+                    'section_manual_production_id' => $batchId,
                     'sequence' => $op->sequence,
                     'priority' => $priority,
                     'planned_start' => $plannedStart,
@@ -648,8 +776,20 @@ class SchedulingService
                     (float) ($schedule->order?->quantity_ordered ?? 1)
                 );
 
-                $routingOpId = $orderOp ? $orderOp->routing_operation_id : 0;
-                $alloc = $this->findNextAvailableMachine($routingOpId, $earliestStart, $op->planned_duration_minutes, $schedule->tenant_id, true);
+                if ($orderOp) {
+                    $alloc = $this->allocateOperationSlot($orderOp, $earliestStart, (float) $op->planned_duration_minutes, $schedule->tenant_id, true);
+                } else {
+                    $alloc = $this->calculateAvailableSlot(
+                        $op->work_center_id,
+                        $op->machine_id,
+                        $earliestStart,
+                        (float) $op->planned_duration_minutes,
+                        true,
+                        [],
+                        [],
+                        ['section_id' => $op->section_id, 'manual_production_id' => $op->section_manual_production_id]
+                    );
+                }
 
                 $plannedStart = $alloc['start'] ?? $earliestStart->copy();
                 $plannedFinish = $alloc['finish'] ?? $earliestStart->copy()->addMinutes((int) ceil($op->planned_duration_minutes));
@@ -726,8 +866,13 @@ class SchedulingService
         float $durationMinutes,
         bool $forward = true,
         array $excludeScheduleOpIds = [],
-        array $inMemoryBookings = []
+        array $inMemoryBookings = [],
+        array $resource = []
     ): array {
+        // Section architecture: the op runs on a machine OR a manual batch inside a section.
+        $sectionId = !empty($resource['section_id']) ? (int) $resource['section_id'] : null;
+        $batchId = (!$machineId && !empty($resource['manual_production_id'])) ? (int) $resource['manual_production_id'] : null;
+
         if (!$workCenterId) {
             return [
                 'start' => $forward ? $from->copy() : $from->copy()->subMinutes((int) $durationMinutes),
@@ -747,15 +892,18 @@ class SchedulingService
         // 1. Resolve Calendar Fallback Hierarchy
         $calendar = $this->getCachedCalendar($wc, $tenantId);
 
-        // Fetch effective shifts assigned to work center (derived from sections)
-        $shifts = $this->getCachedShifts($wc);
+        // Shifts of the resource: manual batch → its own shift; section → the section's shifts;
+        // no section → every shift of the work center.
+        $shifts = $this->resolveResourceShifts($wc, ['section_id' => $sectionId, 'manual_production_id' => $batchId]);
         if ($shifts->isEmpty()) {
             return [
                 'start' => null,
                 'finish' => null,
                 'warnings' => array_merge($warnings, [[
                     'code' => 'NO_SHIFTS_CONFIGURED',
-                    'message' => "Work Center '{$wc->name}' has no active shifts configured across its sections.",
+                    'message' => $sectionId
+                        ? "The section used at Work Center '{$wc->name}' has no active shifts assigned."
+                        : "Work Center '{$wc->name}' has no active shifts configured across its sections.",
                     'severity' => 'error',
                 ]]),
             ];
@@ -771,8 +919,12 @@ class SchedulingService
 
         if ($machineId) {
             $bookingsQuery->where('machine_id', $machineId);
+        } elseif ($batchId) {
+            $bookingsQuery->where('section_manual_production_id', $batchId);
+        } elseif ($sectionId) {
+            $bookingsQuery->where('section_id', $sectionId)->whereNull('machine_id')->whereNull('section_manual_production_id');
         } else {
-            $bookingsQuery->where('work_center_id', $workCenterId)->whereNull('machine_id');
+            $bookingsQuery->where('work_center_id', $workCenterId)->whereNull('machine_id')->whereNull('section_manual_production_id');
         }
 
         $bookings = $bookingsQuery->get();
@@ -797,10 +949,18 @@ class SchedulingService
             $matchesResource = false;
             if ($machineId) {
                 $matchesResource = isset($mem['machine_id']) && (int) $mem['machine_id'] === (int) $machineId;
+            } elseif ($batchId) {
+                $matchesResource = !empty($mem['manual_production_id']) && (int) $mem['manual_production_id'] === $batchId;
+            } elseif ($sectionId) {
+                $matchesResource = !empty($mem['section_id'])
+                    && (int) $mem['section_id'] === $sectionId
+                    && empty($mem['machine_id'])
+                    && empty($mem['manual_production_id']);
             } else {
                 $matchesResource = isset($mem['work_center_id'])
                     && (int) $mem['work_center_id'] === (int) $workCenterId
-                    && empty($mem['machine_id']);
+                    && empty($mem['machine_id'])
+                    && empty($mem['manual_production_id']);
             }
 
             if ($matchesResource && !empty($mem['planned_start']) && !empty($mem['planned_finish'])) {
@@ -1063,22 +1223,8 @@ class SchedulingService
             }
         }
 
-        // 2. Evaluate Alternates
-        $alternates = RoutingOperationAlternateMachine::where('routing_operation_id', $routingOp->id)->get();
-        foreach ($alternates as $alt) {
-            $altMachine = Machine::withoutGlobalScopes()->find($alt->machine_id);
-            if ($altMachine) {
-                $validation = $this->validateMachineForScheduling($altMachine, $routingOp->work_center_id, $tenantId);
-                if ($validation['valid']) {
-                    $candidates[] = [
-                        'machine' => $altMachine,
-                        'priority' => $alt->priority,
-                    ];
-                } else {
-                    $warnings[] = $validation['warning'];
-                }
-            }
-        }
+        // Alternate machines are not used for now: an alternative OPERATION is chosen at Production
+        // Order creation instead, so only the operation's own machine is a candidate.
 
         if (empty($candidates)) {
             $warnings[] = [
@@ -1199,7 +1345,13 @@ class SchedulingService
                 $totalMinutes += max(0.0, $diff);
             }
 
-        $machineCount = $wc->machines()->where('production_machines.status', Machine::STATUS_ACTIVE)->count();
+        // Resources of the work center = active machines + active manual batches of its sections
+        $machineCount = $wc->machines()->where('production_machines.status', Machine::STATUS_ACTIVE)->count()
+            + SectionManualProduction::withoutGlobalScopes()
+                ->where('active', true)
+                ->whereNull('deleted_at')
+                ->whereIn('section_id', WorkCenterSection::withoutGlobalScopes()->where('work_center_id', $wc->id)->whereNull('deleted_at')->select('id'))
+                ->count();
         if ($machineCount <= 0) {
             $machineCount = 1;
         }
@@ -1233,30 +1385,36 @@ class SchedulingService
         $ops = ProductionScheduleOperation::withoutGlobalScopes()
             ->whereHas('schedule', fn($q) => $q->where('tenant_id', $tenantId)->whereIn('status', ['scheduled', 'released', 'in_progress']))
             ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
-            ->whereNotNull('machine_id')
-            ->with(['machine', 'order', 'orderOperation'])
-            ->orderBy('machine_id')
+            ->where(fn($q) => $q->whereNotNull('machine_id')->orWhereNotNull('section_manual_production_id'))
+            ->with(['machine', 'manualProduction', 'order', 'orderOperation'])
             ->orderBy('planned_start')
             ->get();
 
-        $grouped = $ops->groupBy('machine_id');
-        foreach ($grouped as $machineId => $machineOps) {
+        // One resource = one machine or one manual batch
+        $grouped = $ops->groupBy(fn($op) => $op->machine_id ? 'm' . $op->machine_id : 'b' . $op->section_manual_production_id);
+        foreach ($grouped as $machineOps) {
             $machineOps = $machineOps->values();
+            $machineId = $machineOps[0]->machine_id;
             for ($i = 0; $i < $machineOps->count() - 1; $i++) {
                 $curr = $machineOps[$i];
                 $next = $machineOps[$i + 1];
 
                 if ($curr->planned_finish->gt($next->planned_start)) {
-                    $mName = $curr->machine ? "{$curr->machine->name} ({$curr->machine->code})" : "Machine #{$machineId}";
+                    if ($machineId) {
+                        $mName = 'machine ' . ($curr->machine ? "{$curr->machine->name} ({$curr->machine->code})" : "Machine #{$machineId}");
+                    } else {
+                        $mName = 'manual batch ' . ($curr->manualProduction?->batch_name ?? "#{$curr->section_manual_production_id}");
+                    }
                     $currOpName = $curr->orderOperation ? $curr->orderOperation->name : "Op #{$curr->sequence}";
                     $currOrder = $curr->order ? "Order #{$curr->order->order_number}" : "Schedule Op #{$curr->id}";
                     $nextOpName = $next->orderOperation ? $next->orderOperation->name : "Op #{$next->sequence}";
                     $nextOrder = $next->order ? "Order #{$next->order->order_number}" : "Schedule Op #{$next->id}";
 
-                    $msg = "Overlap on machine {$mName}: {$currOrder} (Op #{$curr->sequence} - {$currOpName}) overlaps with {$nextOrder} (Op #{$next->sequence} - {$nextOpName}).";
+                    $msg = "Overlap on {$mName}: {$currOrder} (Op #{$curr->sequence} - {$currOpName}) overlaps with {$nextOrder} (Op #{$next->sequence} - {$nextOpName}).";
 
                     $conflicts[] = [
-                        'machine_id' => (int) $machineId,
+                        'machine_id' => $machineId ? (int) $machineId : null,
+                        'manual_production_id' => $machineId ? null : (int) $curr->section_manual_production_id,
                         'curr_op_id' => (int) $curr->id,
                         'next_op_id' => (int) $next->id,
                         'curr_schedule_id' => (int) $curr->production_schedule_id,
@@ -2483,23 +2641,13 @@ class SchedulingService
                     $duration = $times['total_minutes'];
 
                     // Find slot
-                    if ($op->orderOperation?->routing_operation_id) {
-                        $alloc = $this->findNextAvailableMachine($op->orderOperation->routing_operation_id, $earliestStart, $duration, $tenantId, true);
-                    } else {
-                        $slot = $this->calculateAvailableSlot($op->work_center_id, null, $earliestStart, $duration, true);
-                        $alloc = [
-                            'machine_id' => null,
-                            'start' => $slot['start'],
-                            'finish' => $slot['finish'],
-                            'warnings' => $slot['warnings'],
-                            'priority' => 1,
-                        ];
-                    }
+                    $alloc = $this->allocateOperationSlot($op->orderOperation, $earliestStart, $duration, $tenantId, true, [$op->id]);
 
                     $plannedStart = $alloc['start'] ?? $earliestStart->copy();
                     $plannedFinish = $alloc['finish'] ?? $earliestStart->copy()->addMinutes((int) ceil($duration));
                     $warnings = $alloc['warnings'] ?? [];
                     $machineId = $alloc['machine_id'] ?? null;
+                    $batchId = $alloc['manual_production_id'] ?? null;
                     $priority = $alloc['priority'] ?? 1;
 
                     // Capture old values for audit logging
@@ -2510,10 +2658,12 @@ class SchedulingService
                     $op->update([
                         'planned_start' => $plannedStart,
                         'planned_finish' => $plannedFinish,
+                        'section_id' => $alloc['section_id'] ?? null,
                         'machine_id' => $machineId,
+                        'section_manual_production_id' => $batchId,
                         'priority' => $priority,
                         'warnings' => $warnings,
-                        'resource_id' => $machineId ? 'Machine_' . $machineId : 'WorkCenter_' . $op->work_center_id,
+                        'resource_id' => $this->resourceKey($machineId, $batchId, 'WorkCenter_' . $op->work_center_id),
                         'status' => $isFirstPending
                             ? ProductionScheduleOperation::STATUS_READY
                             : ProductionScheduleOperation::STATUS_WAITING,
@@ -2574,23 +2724,13 @@ class SchedulingService
                     $times = $this->calculateOperationTimes($op->orderOperation, $opTarget);
                     $duration = $times['total_minutes'];
 
-                    if ($op->orderOperation?->routing_operation_id) {
-                        $alloc = $this->findNextAvailableMachine($op->orderOperation->routing_operation_id, $latestFinish, $duration, $tenantId, false);
-                    } else {
-                        $slot = $this->calculateAvailableSlot($op->work_center_id, null, $latestFinish, $duration, false);
-                        $alloc = [
-                            'machine_id' => null,
-                            'start' => $slot['start'],
-                            'finish' => $slot['finish'],
-                            'warnings' => $slot['warnings'],
-                            'priority' => 1,
-                        ];
-                    }
+                    $alloc = $this->allocateOperationSlot($op->orderOperation, $latestFinish, $duration, $tenantId, false, [$op->id]);
 
                     $plannedStart = $alloc['start'] ?? $latestFinish->copy()->subMinutes((int) ceil($duration));
                     $plannedFinish = $alloc['finish'] ?? $latestFinish->copy();
                     $warnings = $alloc['warnings'] ?? [];
                     $machineId = $alloc['machine_id'] ?? null;
+                    $batchId = $alloc['manual_production_id'] ?? null;
                     $priority = $alloc['priority'] ?? 1;
 
                     $oldStart = $op->planned_start;
@@ -2600,10 +2740,12 @@ class SchedulingService
                     $op->update([
                         'planned_start' => $plannedStart,
                         'planned_finish' => $plannedFinish,
+                        'section_id' => $alloc['section_id'] ?? null,
                         'machine_id' => $machineId,
+                        'section_manual_production_id' => $batchId,
                         'priority' => $priority,
                         'warnings' => $warnings,
-                        'resource_id' => $machineId ? 'Machine_' . $machineId : 'WorkCenter_' . $op->work_center_id,
+                        'resource_id' => $this->resourceKey($machineId, $batchId, 'WorkCenter_' . $op->work_center_id),
                         'status' => ProductionScheduleOperation::STATUS_WAITING,
                     ]);
 

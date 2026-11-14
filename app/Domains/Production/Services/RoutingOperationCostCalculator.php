@@ -28,9 +28,105 @@ class RoutingOperationCostCalculator
         'labor_cost_per_unit', 'machine_cost_per_unit', 'cost_per_unit', 'setup_cost_per_run',
     ];
 
+    /** Money keys of the section resource payload (top level, machines[], manual_batches[]) — DB base in the snapshot. */
+    public const MONEY_RESOURCE_KEYS = [
+        'operating_cost_per_hour', 'operator_labor_cost_per_hour', 'operator_labor_cost_per_machine_per_hour',
+        'non_batch_daily_labor_cost', 'labor_cost_per_unit', 'machine_cost_per_unit', 'cost_per_unit',
+        'labor_cost_per_hour', 'total_unassigned_labor_cost_per_hour', 'unassigned_labor_hourly_total',
+    ];
+
     private static function r4($v): float
     {
         return round((float) $v, 4);
+    }
+
+    /**
+     * Short Full Review Point 2 — UI boundary: copy of the DB-base resource payload with every money key in the
+     * active currency (convert_from_base once). Used by the routing form feed and by the web check of what the form sent.
+     * Never persist the result — snapshots and saved figures stay DB base.
+     */
+    public static function resourcesToActiveCurrency(array $resources): array
+    {
+        $convert = function (array $row): array {
+            foreach (self::MONEY_RESOURCE_KEYS as $key) {
+                if (array_key_exists($key, $row) && is_numeric($row[$key])) {
+                    $row[$key] = convert_from_base((float) $row[$key]);
+                }
+            }
+            return $row;
+        };
+
+        $resources = $convert($resources);
+        foreach (['machines', 'manual_batches'] as $list) {
+            if (isset($resources[$list]) && is_array($resources[$list])) {
+                $resources[$list] = array_map(fn ($r) => is_array($r) ? $convert($r) : $r, $resources[$list]);
+            }
+        }
+
+        return $resources;
+    }
+
+    /**
+     * DB-base resource snapshot of an operation (same shape the routing form builds), built on the server from the
+     * section snapshot so `resource_snapshot` never holds active-currency numbers.
+     */
+    public function buildResourceSnapshot(array $op, ?array $resource, ?array $meta): ?array
+    {
+        if (filter_var($op['is_external'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return [
+                'type'          => 'outsourced',
+                'vendor_id'     => $op['vendor_id'] ?? null,
+                'cost_per_unit' => (float) ($op['subcontract_cost_per_unit'] ?? 0),
+            ];
+        }
+        if (!$resource) {
+            return null;
+        }
+
+        $source = [
+            'work_center_id'              => $meta['work_center_id'] ?? ($op['work_center_id'] ?? null),
+            'work_center_code'            => $meta['work_center_code'] ?? null,
+            'section_id'                  => $meta['section_id'] ?? ($op['section_id'] ?? null),
+            'section_code'                => $meta['section_code'] ?? null,
+            'section_calculation_id'      => $meta['section_calculation_id'] ?? null,
+            'section_snapshot_number'     => $meta['snapshot_number'] ?? null,
+            'work_center_calculation_id'  => $meta['work_center_calculation_id'] ?? null,
+            'work_center_snapshot_number' => $meta['work_center_snapshot_number'] ?? null,
+            'calculated_at'               => $meta['calculated_at'] ?? null,
+        ];
+
+        if (!empty($op['machine_id'])) {
+            return [
+                'type'                                     => 'machine',
+                'machine_id'                               => $resource['id'] ?? null,
+                'code'                                     => $resource['code'] ?? null,
+                'name'                                     => $resource['name'] ?? null,
+                'capacity'                                 => (float) ($resource['capacity'] ?? 0),
+                'speed_minutes_per_unit'                   => (float) ($resource['speed_minutes_per_unit'] ?? 0),
+                'operating_cost_per_hour'                  => (float) ($resource['operating_cost_per_hour'] ?? 0),
+                'operator_labor_cost_per_machine_per_hour' => (float) ($resource['operator_labor_cost_per_hour'] ?? $meta['operator_labor_cost_per_machine_per_hour'] ?? 0),
+                'non_batch_daily_labor_cost'               => (float) ($resource['non_batch_daily_labor_cost'] ?? 0),
+                'section_operating_hours'                  => (float) ($resource['section_operating_hours'] ?? 0),
+                'active_machines_count'                    => (int) ($resource['active_machines_count'] ?? 0),
+                'run_machine_cost_per_unit'                => (float) ($resource['machine_cost_per_unit'] ?? 0),
+                'run_labor_cost_per_unit'                  => (float) ($resource['labor_cost_per_unit'] ?? 0),
+                'run_cost_per_unit'                        => (float) ($resource['cost_per_unit'] ?? 0),
+                'rate_source'                              => 'operator labor = non-batch daily labor ÷ section operating hours ÷ active machines',
+            ] + $source;
+        }
+
+        return [
+            'type'                    => 'manual_batch',
+            'batch_id'                => $resource['id'] ?? null,
+            'batch_name'              => $resource['batch_name'] ?? null,
+            'shift_name'              => $resource['shift_name'] ?? null,
+            'capacity'                => (float) ($resource['capacity_per_hour'] ?? 0),
+            'speed_minutes_per_unit'  => (float) ($resource['speed_minutes_per_unit'] ?? 0),
+            'labor_cost_per_hour'     => (float) ($resource['labor_cost_per_hour'] ?? 0),
+            'run_labor_cost_per_unit' => (float) ($resource['labor_cost_per_unit'] ?? 0),
+            'run_cost_per_unit'       => (float) ($resource['cost_per_unit'] ?? 0),
+            'rate_source'             => 'batch labor per hour (batch workers)',
+        ] + $source;
     }
 
     /**

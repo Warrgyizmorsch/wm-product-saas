@@ -231,6 +231,26 @@ class WorkCenter extends BaseModel
         return 0.0;
     }
 
+    /**
+     * Short Full Review Point 2 — fallback rates for legacy cost readers.
+     * The old `cost_per_hour` / `overhead_rate` columns were dropped; the real figures live on the
+     * latest Work Center calculation snapshot and `overhead_cost` (flat amount per day). All values are DB base currency.
+     */
+    public function calculatedLaborCostPerHour(): float
+    {
+        return (float) ($this->latestCalculation?->labor_cost_per_hour ?? 0.0);
+    }
+
+    /** Overhead per operating hour = daily overhead ÷ unique operating hours of the latest calculation (0 when not calculated). */
+    public function calculatedOverheadCostPerHour(): float
+    {
+        $hours = (float) ($this->latestCalculation?->unique_operating_hours ?? 0.0);
+
+        $daily = (float) ($this->latestCalculation?->overhead_cost ?? $this->overhead_cost ?? 0.0);
+
+        return $hours > 0 ? $daily / $hours : 0.0;
+    }
+
     public function getCalculationDetails(): array
     {
         return [

@@ -34,7 +34,7 @@
                             <span class="text-dark ms-1">{{ $linkedAsset->name }}</span>
                             <div class="fs-12 text-muted mt-1">
                                 {{ $linkedAsset->category->name ?? '—' }} &middot;
-                                Cost {{ number_format($linkedAsset->purchase_cost, 2) }} &middot;
+                                Cost {{ format_currency($linkedAsset->purchase_cost) }} &middot;
                                 <x-ui.status-badge :status="$linkedAsset->status" size="sm" />
                             </div>
                         </div>
@@ -147,12 +147,12 @@
                         <!-- Right Column -->
                         <div class="col-md-6">
                             <div id="rate_wrapper">
-                                <x-ui.odoo-form-ui type="input" :label="__('production.energy_rate_per_unit') . ' (' . active_currency_symbol() . ')'" name="energy_rate_per_unit" id="energy_rate_per_unit_input" inputType="number" step="0.0001" min="0" placeholder="0.00" :value="old('energy_rate_per_unit', $machine->energy_rate_per_unit ?? '0')" />
+                                <x-ui.odoo-form-ui type="input" :label="__('production.energy_rate_per_unit') . ' (' . active_currency_symbol() . ')'" name="energy_rate_per_unit" id="energy_rate_per_unit_input" inputType="number" step="0.0001" min="0" placeholder="0.00" :value="old('energy_rate_per_unit', format_decimal(convert_from_base((float) ($machine->energy_rate_per_unit ?? 0)), 4))" />
                                 <small class="form-text text-muted fs-11 d-block mt-n2 mb-3" id="rate_unit_label">Energy cost per unit ({{ active_currency_symbol() }}/kWh)</small>
                             </div>
 
                             <div>
-                                <x-ui.odoo-form-ui type="input" :label="__('production.operating_cost_per_hour') . ' (' . active_currency_symbol() . '/hr)'" name="operating_cost_per_hour" id="operating_cost_per_hour_input" inputType="number" step="0.0001" min="0" placeholder="0.00" :value="old('operating_cost_per_hour', $machine->operating_cost_per_hour ?? '0')" :required="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('production.operating_cost_per_hour') . ' (' . active_currency_symbol() . '/hr)'" name="operating_cost_per_hour" id="operating_cost_per_hour_input" inputType="number" step="0.0001" min="0" placeholder="0.00" :value="old('operating_cost_per_hour', format_decimal(convert_from_base((float) ($machine->operating_cost_per_hour ?? 0)), 4))" :required="true" />
                                 <small class="form-text text-muted fs-11 d-flex align-items-center gap-1 mt-n2 mb-3" id="cost_help_label">
                                     <span>Automatically computed as Consumption × Rate ({{ active_currency_symbol() }}/hr).</span>
                                     <span class="text-primary cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" title="Defaults to baseline energy cost (Consumption × Energy Rate). If adjusted higher, the surplus is accounted as an additional operational expense (e.g., tooling wear, lubricants, routine servicing). If adjusted lower, the difference is accounted as an applied operating grant, energy subsidy, or tariff rebate.">

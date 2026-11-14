@@ -123,7 +123,14 @@ class ExternalWorkerPayGradeController extends Controller
             }
             $data['active'] = $request->boolean('active', true);
 
+            $oldRate = round((float) $payGrade->hourly_rate, 4);
             $updated = $this->service->update($id, $data, $tenantId);
+
+            // Short Full Review Point 2 (WC link): a new hourly rate changes the labor cost of every section using this
+            // pay grade — queue those sections in their Work Center countdown (same as a machine / allocation change).
+            if (round((float) $updated->hourly_rate, 4) !== $oldRate) {
+                $this->queueSectionsUsingPayGrade($updated->id, $tenantId);
+            }
 
             return redirect()
                 ->route('production.pay-grades.index')
@@ -132,6 +139,27 @@ class ExternalWorkerPayGradeController extends Controller
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', 'An error occurred while updating the pay grade: ' . $e->getMessage());
+        }
+    }
+
+    /** Queue every section with an active allocation of this pay grade for recalculation (WC countdown). */
+    private function queueSectionsUsingPayGrade(int $payGradeId, int $tenantId): void
+    {
+        $sections = \App\Domains\Production\Models\ExternalWorkerAllocation::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('pay_grade_id', $payGradeId)
+            ->where('active', true)
+            ->with('section.workCenter')
+            ->get()
+            ->pluck('section')
+            ->filter()
+            ->unique('id');
+
+        $engine = app(\App\Domains\Production\Services\CountdownCalculationEngine::class);
+        foreach ($sections as $section) {
+            if ($section->workCenter) {
+                $engine->triggerCountdown($section->workCenter->fresh(), (int) $section->id);
+            }
         }
     }
 

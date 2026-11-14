@@ -168,7 +168,7 @@ class ProductionOrderService
             $bom = $order->bom ?? ProductionBom::withoutGlobalScopes()->find($order->bom_id);
             $routing = $order->routing ?? ($order->routing_id ? Routing::withoutGlobalScopes()->find($order->routing_id) : null);
 
-            $hasChildBoms = $bom && ($bom->operationMaterials()->whereNotNull('child_bom_id')->exists() || $bom->items()->whereNotNull('child_bom_id')->exists());
+            $hasChildBoms = $bom && $bom->operationMaterials()->whereNotNull('child_bom_id')->exists();
 
             if ($hasChildBoms && $routing) {
                 $this->snapshotMultiLevelRoutings($order, $bom, $routing, (float) $order->quantity_ordered, $order->tenant_id, $userId);
@@ -232,7 +232,9 @@ class ProductionOrderService
                     'operation_number' => $planOp->operation_number,
                     'name' => $planOp->name,
                     'work_center_id' => $planOp->work_center_id,
+                    'section_id' => $routingOp?->section_id,
                     'machine_id' => $planOp->machine_id,
+                    'section_manual_production_id' => $planOp->machine_id ? null : $routingOp?->section_manual_production_id,
                     'status' => $status,
                     'setup_time_planned' => $planOp->setup_time_minutes,
                     'processing_time_planned' => $processingTime,
@@ -1366,7 +1368,9 @@ class ProductionOrderService
                 'operation_number' => $routingOp->operation_number,
                 'name' => $routingOp->name,
                 'work_center_id' => $routingOp->work_center_id,
+                'section_id' => $routingOp->section_id,
                 'machine_id' => $routingOp->machine_id,
+                'section_manual_production_id' => $routingOp->section_manual_production_id,
                 'status' => $status,
                 'setup_time_planned' => $routingOp->setup_time_minutes,
                 'processing_time_planned' => $processingTime,
@@ -1656,7 +1660,9 @@ class ProductionOrderService
                 'operation_number' => $routingOp->operation_number,
                 'name' => $routingOp->name,
                 'work_center_id' => $routingOp->work_center_id,
+                'section_id' => $routingOp->section_id,
                 'machine_id' => $routingOp->machine_id,
+                'section_manual_production_id' => $routingOp->section_manual_production_id,
                 'status' => ProductionOrderOperation::STATUS_WAITING,
                 'setup_time_planned' => $routingOp->setup_time_minutes,
                 'processing_time_planned' => $processingTime,
