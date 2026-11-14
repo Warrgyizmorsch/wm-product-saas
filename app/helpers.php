@@ -563,6 +563,9 @@ if (! function_exists('format_duration')) {
         }
 
         return sprintf('%ds', $secs);
+    }
+}
+
 if (! function_exists('billing_organization_details')) {
     /**
      * Resolves dynamic corporate billing/seller organization details

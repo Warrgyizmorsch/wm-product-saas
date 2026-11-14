@@ -230,6 +230,9 @@
             freshConfirmBtn.addEventListener('click', function() {
                 isConfirmed = true;
                 bsModal.hide();
+                if (cancelBtn) {
+                    cancelBtn.style.display = '';
+                }
                 if (typeof callback === 'function') {
                     callback();
                 }
@@ -238,6 +241,12 @@
 
             const onHidden = function () {
                 modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                if (cancelBtn) {
+                    cancelBtn.style.display = '';
+                }
+                if (document.querySelector('.modal.show')) {
+                    document.body.classList.add('modal-open');
+                }
                 if (!isConfirmed) {
                     if (typeof opts.onCancel === 'function') {
                         opts.onCancel();
@@ -247,41 +256,15 @@
             };
             modalEl.addEventListener('hidden.bs.modal', onHidden);
 
+            modalEl.style.zIndex = '1070';
             bsModal.show();
+            setTimeout(function() {
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                if (backdrops.length > 1) {
+                    backdrops[backdrops.length - 1].style.zIndex = '1065';
+                }
+            }, 50);
         });
-        // Bind callback on click
-        const freshConfirmBtn = confirmBtn.cloneNode(true);
-        confirmBtn.parentNode.replaceChild(freshConfirmBtn, confirmBtn);
-
-        const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
-
-        freshConfirmBtn.addEventListener('click', function() {
-            bsModal.hide();
-            if (cancelBtn) {
-                cancelBtn.style.display = '';
-            }
-            if (typeof callback === 'function') {
-                callback();
-            }
-        }, { once: true });
-
-        modalEl.addEventListener('hidden.bs.modal', function() {
-            if (cancelBtn) {
-                cancelBtn.style.display = '';
-            }
-            if (document.querySelector('.modal.show')) {
-                document.body.classList.add('modal-open');
-            }
-        }, { once: true });
-
-        modalEl.style.zIndex = '1070';
-        bsModal.show();
-        setTimeout(function() {
-            const backdrops = document.querySelectorAll('.modal-backdrop');
-            if (backdrops.length > 1) {
-                backdrops[backdrops.length - 1].style.zIndex = '1065';
-            }
-        }, 50);
     };
 </script>
 @endonce

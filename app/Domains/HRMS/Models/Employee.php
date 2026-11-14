@@ -396,6 +396,8 @@ class Employee extends BaseModel
     public function getEmployeeCodeAttribute(): ?string
     {
         return $this->employee_id;
+    }
+
     public function getJoiningDateAttribute(): mixed
     {
         return $this->date_of_joining;
