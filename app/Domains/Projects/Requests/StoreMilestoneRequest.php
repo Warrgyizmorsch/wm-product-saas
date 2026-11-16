@@ -30,6 +30,8 @@ class StoreMilestoneRequest extends FormRequest
             'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'status' => ['nullable', Rule::in(Milestone::STATUSES)],
             'completion_percentage' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'billing_amount' => ['nullable', 'numeric', 'min:0'],
+            'billing_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
     }
 }

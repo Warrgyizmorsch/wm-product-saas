@@ -498,8 +498,48 @@ class RbacSeeder extends Seeder
             ], RolePermission::SCOPE_TENANT);
         }
 
+        // Project Manager: Full operational management across the tenant
+        $projectPermissions = array_filter(
+            $permissions,
+            fn ($perm) => str_starts_with($perm->name, 'projects.')
+        );
+        $this->grant($roles['project_manager'], $projectPermissions, RolePermission::SCOPE_TENANT);
+
+        // Project Owner: Managerial control over projects they own, with tenant-level project creation
+        $projectOwnerTenantPermissions = [
+            'projects.projects.create' => $permissions['projects.projects.create'],
+            'projects.dashboard.view' => $permissions['projects.dashboard.view'],
+            'projects.reports.view' => $permissions['projects.reports.view'],
+        ];
+        $projectOwnerScopedPermissions = array_diff_key($projectPermissions, $projectOwnerTenantPermissions);
+
+        $this->grant($roles['project_owner'], $projectOwnerTenantPermissions, RolePermission::SCOPE_TENANT);
+        $this->grant($roles['project_owner'], $projectOwnerScopedPermissions, RolePermission::SCOPE_OWN);
+
+        // Project Member: Operational / Contributor access
+        $this->grant($roles['project_member'], [
+            'projects.projects.view' => $permissions['projects.projects.view'],
+            'projects.tasks.view' => $permissions['projects.tasks.view'],
+            'projects.tasks.update' => $permissions['projects.tasks.update'],
+            'projects.timetracking.view' => $permissions['projects.timetracking.view'],
+            'projects.issues.view' => $permissions['projects.issues.view'],
+            'projects.issues.update' => $permissions['projects.issues.update'],
+            'projects.documents.view' => $permissions['projects.documents.view'],
+            'projects.reviews.view' => $permissions['projects.reviews.view'],
+            'projects.changerequests.view' => $permissions['projects.changerequests.view'],
+        ], RolePermission::SCOPE_OWN);
+
+        $this->grant($roles['project_member'], [
+            'projects.tasks.create' => $permissions['projects.tasks.create'],
+            'projects.timetracking.log' => $permissions['projects.timetracking.log'],
+            'projects.issues.create' => $permissions['projects.issues.create'],
+            'projects.documents.upload' => $permissions['projects.documents.upload'],
+            'projects.changerequests.create' => $permissions['projects.changerequests.create'],
+            'projects.dashboard.view' => $permissions['projects.dashboard.view'],
+        ], RolePermission::SCOPE_TENANT);
+
         // All departmental managers can view and approve visitor requests
-        foreach (['hr_manager', 'sales_manager', 'production_manager', 'inventory_manager', 'purchase_manager', 'accountant'] as $mgrRole) {
+        foreach (['hr_manager', 'sales_manager', 'production_manager', 'inventory_manager', 'purchase_manager', 'accountant', 'project_manager'] as $mgrRole) {
             $this->grant($roles[$mgrRole], [
                 'visitor.passes.view' => $permissions['visitor.passes.view'],
                 'visitor.passes.approve' => $permissions['visitor.passes.approve'],
@@ -978,6 +1018,9 @@ class RbacSeeder extends Seeder
             ['slug' => 'production_engineer', 'name' => 'Production Engineer', 'tenant_id' => null, 'level' => 50],
             ['slug' => 'sales_manager', 'name' => 'Sales Manager', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'sales_executive', 'name' => 'Sales Executive', 'tenant_id' => null, 'level' => 50],
+            ['slug' => 'project_manager', 'name' => 'Project Manager', 'tenant_id' => null, 'level' => 40],
+            ['slug' => 'project_owner', 'name' => 'Project Owner', 'tenant_id' => null, 'level' => 45],
+            ['slug' => 'project_member', 'name' => 'Project Member', 'tenant_id' => null, 'level' => 50],
             ['slug' => 'inventory_manager', 'name' => 'Inventory Manager', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'purchase_manager', 'name' => 'Purchase Manager', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'hr_manager', 'name' => 'HR Manager', 'tenant_id' => null, 'level' => 40],

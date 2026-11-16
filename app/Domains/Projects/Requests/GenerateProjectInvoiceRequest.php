@@ -42,6 +42,13 @@ class GenerateProjectInvoiceRequest extends FormRequest
                     ->where('tenant_id', $tenantId)
                     ->where('project_id', $projectId),
             ],
+            'task_ids'           => ['nullable', 'array'],
+            'task_ids.*'         => [
+                'integer',
+                Rule::exists('project_tasks', 'id')
+                    ->where('tenant_id', $tenantId)
+                    ->where('project_id', $projectId),
+            ],
             'notes'              => ['nullable', 'string', 'max:1000'],
         ];
     }
@@ -51,9 +58,10 @@ class GenerateProjectInvoiceRequest extends FormRequest
         $validator->after(function ($validator) {
             $timeLogIds = $this->input('time_log_ids', []);
             $milestoneIds = $this->input('milestone_ids', []);
+            $taskIds = $this->input('task_ids', []);
 
-            if (empty($timeLogIds) && empty($milestoneIds)) {
-                $validator->errors()->add('selection', __('projects.select_at_least_one_deliverable') ?: 'Please select at least one time log or completed milestone to invoice.');
+            if (empty($timeLogIds) && empty($milestoneIds) && empty($taskIds)) {
+                $validator->errors()->add('selection', __('projects.select_at_least_one_deliverable') ?: 'Please select at least one time log, completed milestone, or completed task to invoice.');
             }
         });
     }

@@ -64,6 +64,7 @@ Route::prefix('projects')
         Route::get('{project}', [ProjectController::class, 'show'])->name('show');
         Route::put('{project}', [ProjectController::class, 'update'])->name('update');
         Route::patch('{project}/field', [ProjectController::class, 'updateField'])->name('field');
+        Route::post('{project}/amend-contract', [ProjectController::class, 'amendContract'])->name('amend-contract');
         Route::delete('{project}', [ProjectController::class, 'destroy'])->name('destroy');
 
         Route::get('{project}/closure-check', [ProjectClosureController::class, 'checkGates'])->name('closure.check');
@@ -85,6 +86,7 @@ Route::prefix('projects')
             ->group(function (): void {
                 Route::get('search', [ProjectMemberController::class, 'searchCollaborators'])->name('search');
                 Route::post('/', [ProjectMemberController::class, 'storeCollaborator'])->name('store');
+                Route::get('{member}/tasks', [ProjectMemberController::class, 'getCollaboratorActiveTasks'])->name('active-tasks');
                 Route::delete('{member}', [ProjectMemberController::class, 'destroyCollaborator'])->name('destroy');
             });
 

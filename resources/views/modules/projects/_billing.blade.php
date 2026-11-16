@@ -58,6 +58,59 @@
         </div>
     </div>
 
+    {{-- Project Billing & Budget Estimate Tracker Banner --}}
+    @if ((float)($project->budget_amount ?? 0) > 0 && ($project->billing_method !== 'Project Based' || $project->budget_type === \App\Domains\Projects\Models\Project::BUDGET_TYPE_TIME_AND_MATERIAL))
+        @php
+            $estimatedBudget = (float) $project->budget_amount;
+            $totalBillingValue = (float)($billingSummary['total_invoiced'] ?? 0) + (float)($billingSummary['unbilled_total'] ?? 0);
+            $isOverBudget = $totalBillingValue > $estimatedBudget;
+            $overBudgetAmount = $isOverBudget ? ($totalBillingValue - $estimatedBudget) : 0;
+            $budgetPercent = $estimatedBudget > 0 ? round(($totalBillingValue / $estimatedBudget) * 100, 1) : 0;
+        @endphp
+        <div class="p-3 mb-4 bg-light rounded-3 border">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="avatar-text avatar-sm {{ $isOverBudget ? 'bg-warning-subtle text-warning' : 'bg-info-subtle text-info' }} rounded-circle">
+                        <i class="{{ $isOverBudget ? 'feather-alert-triangle' : 'feather-check-square' }}"></i>
+                    </span>
+                    <div>
+                        <span class="fs-12 text-muted text-uppercase fw-semibold d-block">{{ __('projects.task_billing_estimate_tracker') }}</span>
+                        <span class="fs-14 fw-bold text-dark">
+                            {{ format_currency($totalBillingValue) }}
+                            <span class="text-muted fw-normal fs-12">/ {{ __('projects.estimated_budget') }}: {{ format_currency($estimatedBudget) }}</span>
+                            @if ($isOverBudget)
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1 fs-11">
+                                    <i class="feather-alert-circle me-1"></i>+{{ format_currency($overBudgetAmount) }} ({{ $budgetPercent }}%)
+                                </span>
+                            @else
+                                <span class="badge bg-success-subtle text-success border border-success-subtle ms-1 fs-11">
+                                    {{ $budgetPercent }}%
+                                </span>
+                            @endif
+                        </span>
+                    </div>
+                </div>
+
+                <div class="d-none d-lg-block" style="min-width: 160px; max-width: 200px;">
+                    <div class="d-flex justify-content-between fs-11 text-muted mb-1">
+                        <span>{{ __('projects.estimate_used') }}</span>
+                        <span class="fw-semibold {{ $isOverBudget ? 'text-warning-emphasis' : 'text-dark' }}">{{ $budgetPercent }}%</span>
+                    </div>
+                    <div class="progress ht-6">
+                        <div class="progress-bar {{ $isOverBudget ? 'bg-warning' : 'bg-info' }}" style="width: {{ min(100, $budgetPercent) }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            @if ($isOverBudget)
+                <div class="mt-2 pt-2 border-top fs-11 text-muted d-flex align-items-center gap-1">
+                    <i class="feather-info text-warning me-1"></i>
+                    <span>{{ __('projects.task_over_estimate_advisory', ['amount' => format_currency($overBudgetAmount)]) }}</span>
+                </div>
+            @endif
+        </div>
+    @endif
+
     {{-- Action Toolbar --}}
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">

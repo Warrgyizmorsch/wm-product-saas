@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Platform\Services\NotificationRuleService;
 use App\Domains\Projects\Events\ChangeRequestCreated;
 use App\Domains\Projects\Models\ChangeRequest;
 use App\Domains\Projects\Models\Project;
@@ -106,6 +107,19 @@ class ChangeRequestService
 
             event(new ChangeRequestCreated($cr, $requester));
 
+            try {
+                NotificationRuleService::trigger('projects.change_request.created', [
+                    'tenant_id'        => $project->tenant_id,
+                    'cr_number'        => $cr->cr_number,
+                    'title'            => $cr->title,
+                    'project'          => $project->name,
+                    'actor'            => $requester->name,
+                    'exclude_user_ids' => [$requester->id],
+                ], $project, $cr);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.change_request.created notification failed: ' . $e->getMessage());
+            }
+
             return $cr;
         });
     }
@@ -176,6 +190,20 @@ class ChangeRequestService
                 ]
             );
 
+            try {
+                NotificationRuleService::trigger('projects.change_request.approved', [
+                    'tenant_id'          => $freshProject->tenant_id,
+                    'cr_number'          => $lockedCr->cr_number,
+                    'title'              => $lockedCr->title,
+                    'project'            => $freshProject->name,
+                    'actor'              => $approver->name,
+                    'created_by_user_id' => $lockedCr->requested_by,
+                    'exclude_user_ids'   => [$approver->id],
+                ], $freshProject, $lockedCr);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.change_request.approved notification failed: ' . $e->getMessage());
+            }
+
             return $lockedCr->fresh(['requester', 'approver', 'review']);
         });
     }
@@ -214,6 +242,21 @@ class ChangeRequestService
                     'rejection_remarks' => $remarks,
                 ]
             );
+
+            try {
+                NotificationRuleService::trigger('projects.change_request.rejected', [
+                    'tenant_id'          => $cr->project?->tenant_id ?? $cr->tenant_id,
+                    'cr_number'          => $cr->cr_number,
+                    'title'              => $cr->title,
+                    'project'            => $cr->project?->name ?? 'Project',
+                    'actor'              => $rejecter->name,
+                    'reason'             => $remarks,
+                    'created_by_user_id' => $cr->requested_by,
+                    'exclude_user_ids'   => [$rejecter->id],
+                ], $cr->project, $cr);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.change_request.rejected notification failed: ' . $e->getMessage());
+            }
 
             return $cr->fresh(['requester', 'approver', 'review']);
         });

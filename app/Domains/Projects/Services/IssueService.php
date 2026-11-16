@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Platform\Services\NotificationRuleService;
 use App\Domains\Projects\Events\IssueAssigned;
 use App\Domains\Projects\Events\IssueLogged;
 use App\Domains\Projects\Events\IssueResolved;
@@ -69,6 +70,21 @@ class IssueService
 
             event(new IssueLogged($issue, $reporter));
 
+            try {
+                NotificationRuleService::trigger('projects.issue.logged', [
+                    'tenant_id'        => $project->tenant_id,
+                    'issue_number'     => $issue->issue_number,
+                    'title'            => $issue->title,
+                    'severity'         => $issue->severity,
+                    'project'          => $project->name,
+                    'actor'            => $reporter->name,
+                    'assigned_user_id' => $issue->assignee_id,
+                    'exclude_user_ids' => [$reporter->id],
+                ], $project, $issue);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.issue.logged notification failed: ' . $e->getMessage());
+            }
+
             if (!empty($issue->assignee_id)) {
                 event(new IssueAssigned($issue, $reporter));
             }
@@ -124,6 +140,7 @@ class IssueService
                     );
 
                     event(new IssueResolved($updated, $actor));
+                    $this->triggerIssueResolvedNotification($updated, $actor, $issue->project);
                 } else {
                     $this->activityLogs->record(
                         $project,
@@ -202,6 +219,7 @@ class IssueService
             );
 
             event(new IssueResolved($updated, $actor));
+            $this->triggerIssueResolvedNotification($updated, $actor, $issue->project);
 
             return $updated;
         });
@@ -274,6 +292,22 @@ class IssueService
 
             event(new IssueRetested($updated, $tester, $passed));
 
+            try {
+                NotificationRuleService::trigger('projects.issue.retested', [
+                    'tenant_id'          => $issue->project?->tenant_id ?? $issue->tenant_id,
+                    'issue_number'       => $updated->issue_number,
+                    'title'              => $updated->title,
+                    'result'             => $passed ? 'Passed (Closed)' : 'Failed (Reopened)',
+                    'project'            => $issue->project?->name ?? 'Project',
+                    'actor'              => $tester->name,
+                    'assigned_user_id'   => $updated->assignee_id,
+                    'created_by_user_id' => $updated->reporter_id,
+                    'exclude_user_ids'   => [$tester->id],
+                ], $issue->project, $updated);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.issue.retested notification failed: ' . $e->getMessage());
+            }
+
             return $updated;
         });
     }
@@ -323,6 +357,24 @@ class IssueService
                     'default' => 'Issue assignee must be an active collaborator on this project.',
                 ])],
             ]);
+        }
+    }
+
+    private function triggerIssueResolvedNotification(Issue $issue, User $actor, ?Project $project = null): void
+    {
+        try {
+            $proj = $project ?? $issue->project;
+            NotificationRuleService::trigger('projects.issue.resolved', [
+                'tenant_id'          => $proj?->tenant_id ?? $issue->tenant_id,
+                'issue_number'       => $issue->issue_number,
+                'title'              => $issue->title,
+                'project'            => $proj?->name ?? 'Project',
+                'actor'              => $actor->name,
+                'created_by_user_id' => $issue->reporter_id,
+                'exclude_user_ids'   => [$actor->id],
+            ], $proj, $issue);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('projects.issue.resolved notification failed: ' . $e->getMessage());
         }
     }
 }

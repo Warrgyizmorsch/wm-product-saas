@@ -301,11 +301,18 @@ class MilestoneController extends Controller
         $this->authorize('delete', $milestone);
 
         $taskAction = $request->input('task_action', 'unlink');
+        $milestoneShowUrl = route('projects.milestones.show', [$project, $milestone]);
+        $targetUrl = route('projects.show', [$project, 'tab' => 'milestones']);
 
         $this->milestones->delete($milestone, $taskAction);
 
+        $previous = url()->previous();
+        if ($previous && str_starts_with($previous, $milestoneShowUrl)) {
+            return redirect()->to($targetUrl)->with('success', __('projects.milestone_removed'));
+        }
+
         return redirect()
-            ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'milestones']))
+            ->to($this->backUrlWithQuery($targetUrl, ['tab' => 'milestones']))
             ->with('success', __('projects.milestone_removed'));
     }
 
@@ -357,6 +364,34 @@ class MilestoneController extends Controller
                     }
 
                     return $this->milestones->updateField($milestone, 'due_date', $value)?->format('Y-m-d');
+                },
+            ],
+            'billing_amount' => [
+                'rules'   => ['nullable', 'numeric', 'min:0'],
+                'handler' => function (Milestone $milestone, $value) {
+                    if ($milestone->is_invoiced) {
+                        throw ValidationException::withMessages([
+                            'value' => 'Cannot modify billing amount because this milestone has already been invoiced.',
+                        ]);
+                    }
+                    $amt = $value !== null && $value !== '' ? (float) $value : 0;
+                    $updated = $this->milestones->updateField($milestone, 'billing_amount', $amt);
+                    return $updated instanceof Milestone ? (float) $updated->billing_amount : $amt;
+                },
+            ],
+            'billing_percentage' => [
+                'rules'   => ['nullable', 'numeric', 'min:0', 'max:100'],
+                'handler' => function (Milestone $milestone, $value) {
+                    if ($milestone->is_invoiced) {
+                        throw ValidationException::withMessages([
+                            'value' => 'Cannot modify billing percentage because this milestone has already been invoiced.',
+                        ]);
+                    }
+                    $budget = (float) ($milestone->project?->budget_amount ?? 0);
+                    $pct = $value !== null && $value !== '' ? (float) $value : 0;
+                    $amt = $budget > 0 ? round(($pct / 100) * $budget, 2) : 0;
+                    $this->milestones->updateField($milestone, 'billing_amount', $amt);
+                    return $pct;
                 },
             ],
         ];

@@ -203,10 +203,12 @@ class NotificationRuleService
 
                     $q->orWhere('role', 'like', "%{$cleanRole}%")
                       ->orWhereHas('primaryRole', function ($rq) use ($cleanRole) {
-                          $rq->where('name', 'like', "%{$cleanRole}%");
+                          $rq->where('name', 'like', "%{$cleanRole}%")
+                             ->orWhere('slug', 'like', "%{$cleanRole}%");
                       })
                       ->orWhereHas('roles', function ($rq) use ($cleanRole) {
-                          $rq->where('name', 'like', "%{$cleanRole}%");
+                          $rq->where('name', 'like', "%{$cleanRole}%")
+                             ->orWhere('slug', 'like', "%{$cleanRole}%");
                       });
 
                     if (strcasecmp($cleanRole, 'Employee') === 0) {
@@ -220,7 +222,7 @@ class NotificationRuleService
 
         // 3. Dynamic Creator
         if ($notifyCreator) {
-            $creatorId = $data['created_by_user_id'] ?? $data['user_id'] ?? $subjectModel?->created_by ?? null;
+            $creatorId = $data['created_by_user_id'] ?? $data['user_id'] ?? $data['requested_by'] ?? $subjectModel?->created_by ?? $subjectModel?->requested_by ?? $subjectModel?->reporter_id ?? null;
             if (!$creatorId && $subjectModel && isset($subjectModel->employee_id)) {
                 $creatorId = $subjectModel->employee?->user_id;
             }
@@ -237,7 +239,7 @@ class NotificationRuleService
 
         // 4. Dynamic Assigned User
         if ($notifyAssignedUser) {
-            $assignedId = $data['assigned_user_id'] ?? $subjectModel?->assigned_to ?? $subjectModel?->user_id ?? null;
+            $assignedId = $data['assigned_user_id'] ?? $subjectModel?->assigned_to ?? $subjectModel?->assignee_id ?? $subjectModel?->user_id ?? null;
             if (!$assignedId && $subjectModel && method_exists($subjectModel, 'assignedAgent')) {
                 $assignedId = $subjectModel->assignedAgent?->user_id;
             }
@@ -267,6 +269,73 @@ class NotificationRuleService
             }
         }
 
+        // 4b. Dynamic Project Scoping (Project Manager & Owner resolution)
+        $projectModel = null;
+        if ($subjectModel instanceof \App\Domains\Projects\Models\Project) {
+            $projectModel = $subjectModel;
+        } elseif ($subjectModel && method_exists($subjectModel, 'project')) {
+            $projectModel = $subjectModel->project;
+        } elseif (!empty($data['project_id'])) {
+            $projectModel = \App\Domains\Projects\Models\Project::find($data['project_id']);
+        }
+
+        if ($projectModel) {
+            $rolesLower = array_map(fn($r) => strtolower(str_replace([' ', '_', '-'], '', (string) $r)), $roles);
+            $wantsProjectManager = in_array('projectmanager', $rolesLower, true);
+            $wantsProjectOwner = in_array('projectowner', $rolesLower, true);
+
+            if ($wantsProjectManager && !empty($projectModel->manager_id)) {
+                $finalIds[] = (int) $projectModel->manager_id;
+            }
+            if ($wantsProjectOwner && !empty($projectModel->owner_id)) {
+                $finalIds[] = (int) $projectModel->owner_id;
+            }
+
+            // Pre-load active project member IDs and pre-load users to avoid N+1 queries
+            $activeMemberIds = \App\Domains\Projects\Models\ProjectMember::where('project_id', $projectModel->id)
+                ->where('is_active', true)
+                ->pluck('user_id')
+                ->map(fn($id) => (int) $id)
+                ->all();
+
+            $explicitUserIds = array_map('intval', $userIds);
+            $directTargetIds = array_filter([
+                isset($data['assigned_user_id']) ? (int) $data['assigned_user_id'] : null,
+                isset($data['created_by_user_id']) ? (int) $data['created_by_user_id'] : null,
+                isset($data['user_id']) ? (int) $data['user_id'] : null,
+            ]);
+
+            $cachedUsers = !empty($finalIds) ? User::whereIn('id', $finalIds)->get()->keyBy('id') : collect();
+
+            // Filter out any role-matched users who do not have access to this project
+            $finalIds = array_filter($finalIds, function ($uid) use ($projectModel, $activeMemberIds, $explicitUserIds, $directTargetIds, $cachedUsers) {
+                $uid = (int) $uid;
+
+                if ($uid === (int) $projectModel->owner_id || $uid === (int) $projectModel->manager_id) {
+                    return true;
+                }
+
+                if (in_array($uid, $explicitUserIds, true)) {
+                    return true;
+                }
+
+                if (in_array($uid, $directTargetIds, true)) {
+                    return true;
+                }
+
+                if (in_array($uid, $activeMemberIds, true)) {
+                    return true;
+                }
+
+                $u = $cachedUsers->get($uid);
+                if ($u && ($u->hasAnyRole('tenant_owner', 'company_admin', 'super_admin', 'admin') || $u->hasAnyRole('project_manager'))) {
+                    return true;
+                }
+
+                return false;
+            });
+        }
+
         // 5. Exclude Users (prevent duplicate notification if already sent directly)
         if (!empty($data['exclude_user_ids'])) {
             $exclude = is_array($data['exclude_user_ids']) ? $data['exclude_user_ids'] : [$data['exclude_user_ids']];
@@ -291,6 +360,42 @@ class NotificationRuleService
 
             if (!empty($paramNames)) {
                 if ($subjectModel && $subjectModel->getKey()) {
+                    if (count($paramNames) === 1) {
+                        $param = $paramNames[0];
+                        if ($param === 'project' && !($subjectModel instanceof \App\Domains\Projects\Models\Project)) {
+                            $projectId = $subjectModel->project_id ?? ($subjectModel->relationLoaded('project') ? $subjectModel->project?->getKey() : null);
+                            if (!$projectId && method_exists($subjectModel, 'project')) {
+                                $projectId = $subjectModel->project?->getKey();
+                            }
+                            if ($projectId) {
+                                return route($routeName, $projectId);
+                            }
+                        }
+                        return route($routeName, $subjectModel->getKey());
+                    }
+
+                    if (count($paramNames) === 2 && in_array('project', $paramNames, true)) {
+                        $projectId = $subjectModel instanceof \App\Domains\Projects\Models\Project
+                            ? $subjectModel->getKey()
+                            : ($subjectModel->project_id ?? ($subjectModel->relationLoaded('project') ? $subjectModel->project?->getKey() : null));
+
+                        if (!$projectId && method_exists($subjectModel, 'project')) {
+                            $projectId = $subjectModel->project?->getKey();
+                        }
+
+                        if ($projectId) {
+                            $params = [];
+                            foreach ($paramNames as $param) {
+                                if ($param === 'project') {
+                                    $params['project'] = $projectId;
+                                } else {
+                                    $params[$param] = $subjectModel->getKey();
+                                }
+                            }
+                            return route($routeName, $params);
+                        }
+                    }
+
                     return route($routeName, $subjectModel->getKey());
                 }
                 // Parameter required but no subject model key available: fallback to index

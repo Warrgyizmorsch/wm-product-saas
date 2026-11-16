@@ -105,15 +105,34 @@ class ProjectClosureService
             ->where('approval_status', TimeLog::STATUS_PENDING)
             ->count();
 
-        $unbilledMilestonesCount = Milestone::query()
-            ->where('project_id', $project->id)
-            ->where('billing_amount', '>', 0)
-            ->where('status', Milestone::STATUS_COMPLETED)
-            ->where('is_invoiced', false)
-            ->count();
+        $isFixedDeliverable = ($project->budget_type === 'Fixed' || $project->budget_type === null)
+            && in_array($project->billing_method, ['Project Based', 'Milestone Based', 'Task Based'], true);
 
-        $gate4Passed = ($unbilledTimeLogsCount === 0) && ($pendingTimeLogsCount === 0) && ($unbilledMilestonesCount === 0);
-        if ($unbilledTimeLogsCount > 0) {
+        $unbilledMilestonesCount = ($isFixedDeliverable && in_array($project->billing_method, ['Project Based', 'Milestone Based'], true))
+            ? Milestone::query()
+                ->where('project_id', $project->id)
+                ->where('billing_amount', '>', 0)
+                ->where(function ($q) {
+                    $q->where('status', Milestone::STATUS_COMPLETED)
+                      ->orWhere('completion_percentage', 100);
+                })
+                ->where('is_invoiced', false)
+                ->count()
+            : 0;
+
+        $unbilledTasksCount = ($isFixedDeliverable && $project->billing_method === 'Task Based')
+            ? Task::query()
+                ->where('project_id', $project->id)
+                ->where('billing_amount', '>', 0)
+                ->where('status', Task::STATUS_COMPLETED)
+                ->where('is_invoiced', false)
+                ->count()
+            : 0;
+
+        $effectiveUnbilledLogsCount = $isFixedDeliverable ? 0 : $unbilledTimeLogsCount;
+
+        $gate4Passed = ($effectiveUnbilledLogsCount === 0) && ($pendingTimeLogsCount === 0) && ($unbilledMilestonesCount === 0) && ($unbilledTasksCount === 0);
+        if ($effectiveUnbilledLogsCount > 0) {
             $blockers[] = __('projects.closure_blocked_by_unbilled_timelogs', [
                 'count' => $unbilledTimeLogsCount,
                 'hours' => $unbilledHours,
@@ -124,6 +143,9 @@ class ProjectClosureService
         }
         if ($unbilledMilestonesCount > 0) {
             $blockers[] = __('projects.closure_blocked_by_unbilled_milestones', ['count' => $unbilledMilestonesCount]);
+        }
+        if ($unbilledTasksCount > 0) {
+            $blockers[] = __('projects.closure_blocked_by_unbilled_tasks', ['count' => $unbilledTasksCount]);
         }
 
         // Gate 5: Milestones Completion
@@ -163,6 +185,7 @@ class ProjectClosureService
                     'unbilled_time_logs_count'  => $unbilledTimeLogsCount,
                     'pending_time_logs_count'   => $pendingTimeLogsCount,
                     'unbilled_milestones_count' => $unbilledMilestonesCount,
+                    'unbilled_tasks_count'      => $unbilledTasksCount,
                 ],
                 'milestones' => [
                     'passed'           => $gate5Passed,

@@ -15,10 +15,6 @@ class StoreTimeLogRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if (!$this->has('is_billable')) {
-            $this->merge(['is_billable' => true]);
-        }
-
         if ($this->filled('start_time') && $this->filled('end_time')) {
             try {
                 $start = Carbon::createFromFormat('H:i', $this->input('start_time'));
