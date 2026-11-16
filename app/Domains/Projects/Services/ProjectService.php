@@ -17,15 +17,15 @@ class ProjectService
 {
     /**
      * Allowed forward status transitions — the single source of truth for the
-     * project lifecycle. Closed and Cancelled are terminal (no outgoing
-     * transitions); Closing a project is always a manual action taken from
-     * Completed, never automatic.
+     * operational project lifecycle. Closed and Cancelled are terminal (no outgoing
+     * transitions). Formal project closure is excluded from inline transitions and
+     * must occur exclusively through ProjectClosureController::close() via #modalCloseProject.
      */
     private const TRANSITIONS = [
         Project::STATUS_DRAFT     => [Project::STATUS_ACTIVE, Project::STATUS_CANCELLED],
         Project::STATUS_ACTIVE    => [Project::STATUS_ON_HOLD, Project::STATUS_COMPLETED, Project::STATUS_CANCELLED],
         Project::STATUS_ON_HOLD   => [Project::STATUS_ACTIVE, Project::STATUS_CANCELLED],
-        Project::STATUS_COMPLETED => [Project::STATUS_CLOSED],
+        Project::STATUS_COMPLETED => [],
         Project::STATUS_CLOSED    => [],
         Project::STATUS_CANCELLED => [],
     ];
@@ -94,10 +94,6 @@ class ProjectService
         $oldStatus = $project->status;
 
         $this->assertTransitionAllowed($oldStatus, $newStatus, $errorField);
-
-        if ($newStatus === Project::STATUS_CLOSED && $newStatus !== $oldStatus) {
-            app(ProjectClosureService::class)->assertClosable($project);
-        }
 
         if ($newStatus === $oldStatus) {
             return $project;
@@ -294,10 +290,6 @@ class ProjectService
         $newStatus = $data['status'] ?? $oldStatus;
 
         $this->assertTransitionAllowed($oldStatus, $newStatus);
-
-        if ($newStatus === Project::STATUS_CLOSED && $newStatus !== $oldStatus) {
-            app(ProjectClosureService::class)->assertClosable($project);
-        }
 
         return DB::transaction(function () use ($project, $data, $oldStatus, $newStatus) {
             if ($newStatus !== $oldStatus) {

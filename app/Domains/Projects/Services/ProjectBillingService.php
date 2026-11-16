@@ -5,11 +5,13 @@ namespace App\Domains\Projects\Services;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
+use App\Domains\Projects\Models\Task;
 use App\Domains\Projects\Models\TimeLog;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Services\SalesInvoiceCreationService;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class ProjectBillingService
@@ -24,6 +26,24 @@ class ProjectBillingService
      */
     public function getUnbilledTimeLogs(Project $project): Collection
     {
+        // When Fixed budget is set on deliverable-based methods, client pays deliverables, not timesheets
+        if ($project->budget_type === Project::BUDGET_TYPE_FIXED && in_array($project->billing_method, [
+            Project::BILLING_METHOD_PROJECT_BASED,
+            Project::BILLING_METHOD_MILESTONE_BASED,
+            Project::BILLING_METHOD_TASK_BASED,
+        ], true)) {
+            return collect();
+        }
+
+        // When budget_type is null and method is milestone or project based, default to deliverable
+        if ($project->budget_type === null && in_array($project->billing_method, [
+            Project::BILLING_METHOD_PROJECT_BASED,
+            Project::BILLING_METHOD_MILESTONE_BASED,
+            Project::BILLING_METHOD_TASK_BASED,
+        ], true)) {
+            return collect();
+        }
+
         return TimeLog::where('project_id', $project->id)
             ->where('is_billable', true)
             ->where('approval_status', TimeLog::STATUS_APPROVED)
@@ -38,11 +58,40 @@ class ProjectBillingService
      */
     public function getUnbilledMilestones(Project $project): Collection
     {
+        if (in_array($project->billing_method, [Project::BILLING_METHOD_USER_BASED, Project::BILLING_METHOD_TASK_BASED], true)) {
+            return collect();
+        }
+
+        // Under Time & Material, client is billed via timesheets rather than fixed milestone deliverables
+        if ($project->budget_type === Project::BUDGET_TYPE_TIME_AND_MATERIAL) {
+            return collect();
+        }
+
         return Milestone::where('project_id', $project->id)
-            ->where('status', Milestone::STATUS_COMPLETED)
-            ->where('completion_percentage', 100)
+            ->where(function ($q) {
+                $q->where('status', Milestone::STATUS_COMPLETED)
+                  ->orWhere('completion_percentage', 100);
+            })
             ->where('is_invoiced', false)
             ->where('billing_amount', '>', 0)
+            ->orderBy('due_date', 'asc')
+            ->get();
+    }
+
+    /**
+     * Get completed unbilled fixed-price tasks eligible for invoicing.
+     */
+    public function getUnbilledTasks(Project $project): Collection
+    {
+        if ($project->billing_method !== Project::BILLING_METHOD_TASK_BASED || $project->budget_type !== Project::BUDGET_TYPE_FIXED) {
+            return collect();
+        }
+
+        return Task::where('project_id', $project->id)
+            ->where('status', Task::STATUS_COMPLETED)
+            ->where('is_invoiced', false)
+            ->where('billing_amount', '>', 0)
+            ->with(['taskList'])
             ->orderBy('due_date', 'asc')
             ->get();
     }
@@ -67,7 +116,10 @@ class ProjectBillingService
         $unbilledMilestones = $this->getUnbilledMilestones($project);
         $unbilledMilestoneAmount = (float) $unbilledMilestones->sum('billing_amount');
 
-        $unbilledTotal = $unbilledTimeAmount + $unbilledMilestoneAmount;
+        $unbilledTasks = $this->getUnbilledTasks($project);
+        $unbilledTaskAmount = (float) $unbilledTasks->sum('billing_amount');
+
+        $unbilledTotal = $unbilledTimeAmount + $unbilledMilestoneAmount + $unbilledTaskAmount;
 
         return [
             'total_invoiced'             => $totalInvoiced,
@@ -75,10 +127,12 @@ class ProjectBillingService
             'balance_due'                => $balanceDue,
             'unbilled_time_amount'       => $unbilledTimeAmount,
             'unbilled_milestone_amount'  => $unbilledMilestoneAmount,
+            'unbilled_task_amount'       => $unbilledTaskAmount,
             'unbilled_total'             => $unbilledTotal,
             'invoices_count'             => $invoices->count(),
             'unbilled_logs_count'        => $unbilledLogs->count(),
             'unbilled_milestones_count'  => $unbilledMilestones->count(),
+            'unbilled_tasks_count'       => $unbilledTasks->count(),
             'invoices'                   => $invoices,
         ];
     }
@@ -94,7 +148,9 @@ class ProjectBillingService
                 ->find($serviceProductId);
 
             if (!$product) {
-                throw new InvalidArgumentException("The selected Service Product is invalid or does not exist in inventory.");
+                throw ValidationException::withMessages([
+                    'service_product_id' => 'The selected Service Product is invalid or does not exist in inventory.',
+                ]);
             }
 
             return $product;
@@ -102,7 +158,9 @@ class ProjectBillingService
 
         $activeService = Product::where('tenant_id', $project->tenant_id)
             ->where('item_type', 'Service')
-            ->where('status', 'active')
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhereIn('status', ['active', 'Active']);
+            })
             ->first();
 
         if ($activeService) {
@@ -118,7 +176,9 @@ class ProjectBillingService
             return $anyService;
         }
 
-        throw new InvalidArgumentException("No active Service Product found in the inventory catalog. Please configure a Service product before generating invoices.");
+        throw ValidationException::withMessages([
+            'service_product_id' => 'Please configure at least one active Service Product in your Inventory settings before generating project invoices.',
+        ]);
     }
 
     /**
@@ -128,6 +188,7 @@ class ProjectBillingService
     {
         $timeLogIds = $payload['time_log_ids'] ?? [];
         $milestoneIds = $payload['milestone_ids'] ?? [];
+        $taskIds = $payload['task_ids'] ?? [];
 
         $timeLogs = TimeLog::where('project_id', $project->id)
             ->whereIn('id', $timeLogIds)
@@ -137,13 +198,26 @@ class ProjectBillingService
             ->with(['task', 'user'])
             ->get();
 
-        $milestones = Milestone::where('project_id', $project->id)
-            ->whereIn('id', $milestoneIds)
-            ->where('status', Milestone::STATUS_COMPLETED)
-            ->where('completion_percentage', 100)
-            ->where('is_invoiced', false)
-            ->where('billing_amount', '>', 0)
-            ->get();
+        $milestones = !empty($milestoneIds) && $project->budget_type !== Project::BUDGET_TYPE_TIME_AND_MATERIAL
+            ? Milestone::where('project_id', $project->id)
+                ->whereIn('id', $milestoneIds)
+                ->where(function ($q) {
+                    $q->where('status', Milestone::STATUS_COMPLETED)
+                      ->orWhere('completion_percentage', 100);
+                })
+                ->where('is_invoiced', false)
+                ->where('billing_amount', '>', 0)
+                ->get()
+            : collect();
+
+        $tasks = !empty($taskIds) && $project->billing_method === Project::BILLING_METHOD_TASK_BASED && $project->budget_type === Project::BUDGET_TYPE_FIXED
+            ? Task::where('project_id', $project->id)
+                ->whereIn('id', $taskIds)
+                ->where('status', Task::STATUS_COMPLETED)
+                ->where('is_invoiced', false)
+                ->where('billing_amount', '>', 0)
+                ->get()
+            : collect();
 
         $serviceProduct = null;
         try {
@@ -187,6 +261,22 @@ class ProjectBillingService
             ];
         }
 
+        foreach ($tasks as $task) {
+            $amount = (float) $task->billing_amount;
+            $subtotal += $amount;
+
+            $taskTitle = $task->title ?? $task->name ?? 'Completed Task';
+            $items[] = [
+                'type'        => 'task',
+                'id'          => $task->id,
+                'name'        => "Task Deliverable: {$taskTitle}",
+                'description' => "Completed Task Deliverable: " . ($task->description ?? $taskTitle),
+                'quantity'    => 1,
+                'unit_price'  => $amount,
+                'subtotal'    => $amount,
+            ];
+        }
+
         $taxRate = (float) ($serviceProduct?->gst_rate ?? 0);
         $taxAmount = round($subtotal * ($taxRate / 100), 2);
         $totalAmount = $subtotal + $taxAmount;
@@ -212,6 +302,7 @@ class ProjectBillingService
      *     'payment_terms'      => string|null,
      *     'time_log_ids'       => array,
      *     'milestone_ids'      => array,
+     *     'task_ids'           => array,
      *     'service_product_id' => int|null,
      *     'notes'              => string|null,
      * ]
@@ -225,13 +316,24 @@ class ProjectBillingService
 
         $timeLogIds = $payload['time_log_ids'] ?? [];
         $milestoneIds = $payload['milestone_ids'] ?? [];
+        $taskIds = $payload['task_ids'] ?? [];
 
-        if (empty($timeLogIds) && empty($milestoneIds)) {
-            throw new InvalidArgumentException("Please select at least one approved time log or completed milestone to invoice.");
+        if (empty($timeLogIds) && empty($milestoneIds) && empty($taskIds)) {
+            throw new InvalidArgumentException("Please select at least one approved time log, completed milestone, or completed task to invoice.");
         }
 
-        return DB::transaction(function () use ($project, $payload, $timeLogIds, $milestoneIds) {
+        return DB::transaction(function () use ($project, $payload, $timeLogIds, $milestoneIds, $taskIds) {
             // 1. Identify and pessimistically lock eligible billable work
+            if (!empty($timeLogIds)) {
+                if ($project->budget_type === Project::BUDGET_TYPE_FIXED && in_array($project->billing_method, [
+                    Project::BILLING_METHOD_PROJECT_BASED,
+                    Project::BILLING_METHOD_MILESTONE_BASED,
+                    Project::BILLING_METHOD_TASK_BASED,
+                ], true)) {
+                    throw new InvalidArgumentException("Timesheet invoicing is not applicable for Fixed deliverable projects.");
+                }
+            }
+
             $timeLogs = !empty($timeLogIds)
                 ? TimeLog::where('project_id', $project->id)
                     ->whereIn('id', $timeLogIds)
@@ -251,6 +353,12 @@ class ProjectBillingService
                 }
             }
 
+            if (!empty($milestoneIds)) {
+                if ($project->budget_type === Project::BUDGET_TYPE_TIME_AND_MATERIAL) {
+                    throw new InvalidArgumentException("Milestone deliverable invoicing is not applicable for Time & Material projects.");
+                }
+            }
+
             $milestones = !empty($milestoneIds)
                 ? Milestone::where('project_id', $project->id)
                     ->whereIn('id', $milestoneIds)
@@ -259,7 +367,7 @@ class ProjectBillingService
                 : collect();
 
             foreach ($milestones as $milestone) {
-                if ($milestone->status !== Milestone::STATUS_COMPLETED || (int)$milestone->completion_percentage !== 100) {
+                if ($milestone->status !== Milestone::STATUS_COMPLETED && (int)$milestone->completion_percentage !== 100) {
                     throw new InvalidArgumentException("Milestone '{$milestone->name}' is not completed and cannot be invoiced.");
                 }
                 if ($milestone->is_invoiced) {
@@ -270,7 +378,32 @@ class ProjectBillingService
                 }
             }
 
-            if ($timeLogs->isEmpty() && $milestones->isEmpty()) {
+            if (!empty($taskIds)) {
+                if ($project->billing_method !== Project::BILLING_METHOD_TASK_BASED || $project->budget_type !== Project::BUDGET_TYPE_FIXED) {
+                    throw new InvalidArgumentException("Task deliverable invoicing is only applicable for Task Based projects with Fixed budget type.");
+                }
+            }
+
+            $tasks = !empty($taskIds)
+                ? Task::where('project_id', $project->id)
+                    ->whereIn('id', $taskIds)
+                    ->lockForUpdate()
+                    ->get()
+                : collect();
+
+            foreach ($tasks as $task) {
+                if ($task->status !== Task::STATUS_COMPLETED) {
+                    throw new InvalidArgumentException("Task '{$task->title}' is not completed and cannot be invoiced.");
+                }
+                if ($task->is_invoiced) {
+                    throw new InvalidArgumentException("Task '{$task->title}' has already been invoiced.");
+                }
+                if ((float)$task->billing_amount <= 0) {
+                    throw new InvalidArgumentException("Task '{$task->title}' has no positive billing amount configured.");
+                }
+            }
+
+            if ($timeLogs->isEmpty() && $milestones->isEmpty() && $tasks->isEmpty()) {
                 throw new InvalidArgumentException("No valid unbilled deliverables were found for the selected IDs.");
             }
 
@@ -318,6 +451,23 @@ class ProjectBillingService
                 ];
             }
 
+            foreach ($tasks as $task) {
+                $taskTitle = $task->title ?? $task->name ?? 'Completed Task';
+                $desc = "Completed Task: {$taskTitle}";
+                if (!empty($task->description)) {
+                    $desc .= " - {$task->description}";
+                }
+
+                $items[] = [
+                    'product_id'  => $serviceProduct->id,
+                    'item_name'   => "Task: {$taskTitle}",
+                    'description' => $desc,
+                    'quantity'    => 1,
+                    'unit_price'  => (float) $task->billing_amount,
+                    'discount'    => 0,
+                ];
+            }
+
             // 4. Delegate invoice creation to Sales domain
             $invoice = $this->salesInvoiceCreationService->createDraftInvoice([
                 'tenant_id'     => $project->tenant_id,
@@ -325,6 +475,7 @@ class ProjectBillingService
                 'branch_id'     => $project->branch_id,
                 'customer_id'   => $project->customer_id,
                 'project_id'    => $project->id,
+                'sales_order_id'=> $project->sales_order_id,
                 'invoice_date'  => $payload['invoice_date'] ?? now()->toDateString(),
                 'due_date'      => $payload['due_date'] ?? now()->addDays(30)->toDateString(),
                 'payment_terms' => $payload['payment_terms'] ?? null,
@@ -347,6 +498,13 @@ class ProjectBillingService
                 ]);
             }
 
+            foreach ($tasks as $task) {
+                $task->update([
+                    'is_invoiced' => true,
+                    'invoice_id'  => $invoice->id,
+                ]);
+            }
+
             // 6. Record activity log
             $this->activityLogService->record(
                 $project,
@@ -360,6 +518,7 @@ class ProjectBillingService
                     'total_amount'   => $invoice->total_amount,
                     'time_log_ids'   => $timeLogs->pluck('id')->all(),
                     'milestone_ids'  => $milestones->pluck('id')->all(),
+                    'task_ids'       => $tasks->pluck('id')->all(),
                 ]
             );
 

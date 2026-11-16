@@ -15,17 +15,24 @@ class ProjectMemberPolicy
 
     public function manage(User $user, Project $project): bool
     {
+        $isLead = (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id;
+
         return $this->access->allows($user, 'projects.members.manage', [
             'tenant_id' => $project->tenant_id,
-            'owner_id' => $project->owner_id,
+            'owner_id'  => $isLead ? $user->id : $project->owner_id,
         ]);
     }
 
     public function update(User $user, ProjectMember $member): bool
     {
+        $project = $member->project;
+        $isLead = (int) $user->id === (int) $project?->owner_id
+            || (int) $user->id === (int) $project?->manager_id;
+
         return $this->access->allows($user, 'projects.members.manage', [
             'tenant_id' => $member->tenant_id,
-            'owner_id' => $member->project?->owner_id,
+            'owner_id'  => $isLead ? $user->id : $project?->owner_id,
         ]);
     }
 

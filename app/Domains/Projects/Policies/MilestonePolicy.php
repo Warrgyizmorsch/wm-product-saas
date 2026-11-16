@@ -19,9 +19,12 @@ class MilestonePolicy
             return false;
         }
 
+        $isLead = (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id;
+
         return $this->access->allows($user, 'projects.milestones.manage', [
             'tenant_id' => $project->tenant_id,
-            'owner_id' => $project->owner_id,
+            'owner_id'  => $isLead ? $user->id : $project->owner_id,
         ]);
     }
 
@@ -31,9 +34,13 @@ class MilestonePolicy
             return false;
         }
 
+        $isLeadOrOwner = (int) $user->id === (int) $milestone->owner_id
+            || (int) $user->id === (int) $milestone->project?->owner_id
+            || (int) $user->id === (int) $milestone->project?->manager_id;
+
         return $this->access->allows($user, 'projects.milestones.manage', [
             'tenant_id' => $milestone->tenant_id,
-            'owner_id' => $milestone->project?->owner_id,
+            'owner_id'  => $isLeadOrOwner ? $user->id : $milestone->project?->owner_id,
         ]);
     }
 

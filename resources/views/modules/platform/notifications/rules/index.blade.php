@@ -95,6 +95,9 @@
                 <a href="{{ route('platform.notification-rules.index', ['module' => 'hrms']) }}" class="btn btn-sm {{ request('module') === 'hrms' ? 'btn-primary' : 'btn-light border' }}">
                     {{ __('ui.hrms') }}
                 </a>
+                <a href="{{ route('platform.notification-rules.index', ['module' => 'projects']) }}" class="btn btn-sm {{ request('module') === 'projects' ? 'btn-primary' : 'btn-light border' }}">
+                    {{ __('ui.projects', ['default' => 'Projects']) }}
+                </a>
             </div>
 
             <form method="GET" action="{{ route('platform.notification-rules.index') }}" class="d-flex align-items-center gap-2">
@@ -153,6 +156,7 @@
                                         'purchase' => 'warning',
                                         'production' => 'danger',
                                         'hrms' => 'primary',
+                                        'projects' => 'indigo',
                                         'document' => 'secondary',
                                         default => 'secondary'
                                     };

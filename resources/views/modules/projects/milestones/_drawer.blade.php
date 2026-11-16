@@ -42,18 +42,24 @@
     </form>
 
     <x-slot name="footer">
-        <a id="milestoneDetailWorkspaceBtn" href="#" class="btn btn-outline-primary d-none">
-            <i class="feather-maximize-2 me-1"></i>{{ __('projects.open_workspace') }}
-        </a>
-        <button type="button" class="btn btn-outline-danger" onclick="deleteCurrentMilestone()">
-            <i class="feather feather-trash-2 me-1"></i>{{ __('projects.remove') }}
-        </button>
-        <button type="button" class="btn btn-light-brand" onclick="cloneCurrentMilestone()">
-            <i class="feather feather-copy me-1"></i>{{ __('projects.clone') }}
-        </button>
-        <button type="button" class="btn btn-primary" onclick="editCurrentMilestone()">
-            {{ __('projects.edit_milestone') }}
-        </button>
+        <div class="d-flex align-items-center justify-content-between w-100 gap-2 flex-wrap">
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="milestoneDrawerDeleteBtn" onclick="deleteCurrentMilestone()">
+                    <i class="feather-trash-2 me-1"></i>{{ __('projects.remove') }}
+                </button>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a id="milestoneDetailWorkspaceBtn" href="#" class="btn btn-sm btn-outline-primary d-none">
+                    <i class="feather-maximize-2 me-1"></i>{{ __('projects.open_workspace') }}
+                </a>
+                <button type="button" class="btn btn-sm btn-light-brand" onclick="cloneCurrentMilestone()">
+                    <i class="feather-copy me-1"></i>{{ __('projects.clone') }}
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="editCurrentMilestone()">
+                    {{ __('projects.edit_milestone') }}
+                </button>
+            </div>
+        </div>
     </x-slot>
 </x-ui.drawer>
 
@@ -107,6 +113,15 @@
             }
         }
 
+        var deleteBtn = document.getElementById('milestoneDrawerDeleteBtn');
+        if (deleteBtn) {
+            if (data.isInvoiced) {
+                deleteBtn.classList.add('d-none');
+            } else {
+                deleteBtn.classList.remove('d-none');
+            }
+        }
+
         var drawerEl = document.getElementById('milestoneDrawer');
         if (drawerEl && window.bootstrap) {
             bootstrap.Offcanvas.getOrCreateInstance(drawerEl).show();
@@ -139,7 +154,7 @@
     }
 
     function deleteCurrentMilestone() {
-        if (!currentMilestoneData || !currentMilestoneData.deleteUrl) return;
+        if (!currentMilestoneData || !currentMilestoneData.deleteUrl || currentMilestoneData.isInvoiced) return;
 
         hideMilestoneDetailsDrawer();
         if (typeof openDeleteMilestoneModal === 'function') {

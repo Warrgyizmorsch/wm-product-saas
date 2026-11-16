@@ -1,4 +1,4 @@
-@props(['field', 'value', 'url', 'type' => 'text', 'options' => [], 'label' => null])
+@props(['field', 'value', 'url', 'type' => 'text', 'options' => [], 'label' => null, 'reload' => false])
 @php
     $dateValue = $type === 'date' && $value ? \Illuminate\Support\Carbon::parse($value) : null;
     $isEmpty = $type === 'date' ? $dateValue === null : ($value === null || $value === '');
@@ -14,7 +14,7 @@
     $cancelTooltip = __('ui.inline_edit_cancel_tooltip');
 @endphp
 
-<span class="inline-edit" data-field="{{ $field }}" data-url="{{ $url }}" data-type="{{ $type }}" data-empty-placeholder="{{ $placeholder }}">
+<span class="inline-edit" data-field="{{ $field }}" data-url="{{ $url }}" data-type="{{ $type }}" data-empty-placeholder="{{ $placeholder }}" @if($reload) data-reload="true" @endif>
     <span
         class="inline-edit__view @if ($isEmpty) inline-edit__view--empty @endif"
         tabindex="0"

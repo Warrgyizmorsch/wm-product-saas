@@ -238,18 +238,145 @@ class HrmsDemoSeeder extends Seeder
             'leave_plans',
         ];
 
+        // Safeguard: Protect customized user & employee accounts from being wiped or truncated.
+        $protectedEmails = [
+            'mohammadkaif.warrgyizmorsch@gmail.com',
+            'kaif@gmail.com',
+        ];
+
+        $protectedUserIds = [];
+        if (Schema::hasTable('users')) {
+            $protectedUserIds = User::withoutGlobalScopes()
+                ->where(function ($q) use ($protectedEmails) {
+                    $q->whereIn('email', $protectedEmails)
+                      ->orWhere('name', 'like', '%Mohammad Kaif%');
+                })
+                ->pluck('id')
+                ->toArray();
+        }
+
+        $protectedEmployeeIds = [];
+        if (Schema::hasTable('employees')) {
+            $protectedEmployeeIds = Employee::withoutGlobalScopes()
+                ->where(function ($q) use ($protectedUserIds, $protectedEmails) {
+                    if (! empty($protectedUserIds)) {
+                        $q->whereIn('user_id', $protectedUserIds);
+                    }
+                    $q->orWhereIn('office_email', $protectedEmails)
+                      ->orWhereIn('personal_email', $protectedEmails)
+                      ->orWhere('full_name', 'like', '%Mohammad Kaif%')
+                      ->orWhere('nick_name', 'like', '%Kaif%');
+                })
+                ->pluck('id')
+                ->toArray();
+        }
+
         foreach ($tablesToTruncate as $tbl) {
-            if (Schema::hasTable($tbl)) {
+            if (! Schema::hasTable($tbl)) {
+                continue;
+            }
+
+            try {
+                if (! empty($protectedEmployeeIds)) {
+                    if ($tbl === 'employees') {
+                        DB::table('employees')->whereNotIn('id', $protectedEmployeeIds)->delete();
+                        continue;
+                    }
+                    if ($tbl === 'documents') {
+                        DB::table('documents')
+                            ->where(function ($q) use ($protectedEmployeeIds) {
+                                $q->where('documentable_type', '!=', Employee::class)
+                                  ->orWhereNotIn('documentable_id', $protectedEmployeeIds);
+                            })
+                            ->delete();
+                        continue;
+                    }
+                    if ($tbl === 'feedback_360_participants') {
+                        DB::table('feedback_360_participants')
+                            ->whereNotIn('employee_id', $protectedEmployeeIds)
+                            ->whereNotIn('manager_id', $protectedEmployeeIds)
+                            ->delete();
+                        continue;
+                    }
+                    if ($tbl === 'feedback_360_nominations') {
+                        DB::table('feedback_360_nominations')
+                            ->whereNotIn('employee_id', $protectedEmployeeIds)
+                            ->whereNotIn('reviewer_id', $protectedEmployeeIds)
+                            ->delete();
+                        continue;
+                    }
+                    if ($tbl === 'feedback_360_responses') {
+                        $protectedNomIds = DB::table('feedback_360_nominations')
+                            ->whereIn('employee_id', $protectedEmployeeIds)
+                            ->orWhereIn('reviewer_id', $protectedEmployeeIds)
+                            ->pluck('id')
+                            ->toArray();
+                        DB::table('feedback_360_responses')->whereNotIn('nomination_id', $protectedNomIds)->delete();
+                        continue;
+                    }
+                    if ($tbl === 'employee_goal_items' || $tbl === 'goal_progress_logs') {
+                        $protectedPlanIds = DB::table('employee_goal_plans')->whereIn('employee_id', $protectedEmployeeIds)->pluck('id')->toArray();
+                        DB::table($tbl)->whereNotIn('employee_goal_plan_id', $protectedPlanIds)->delete();
+                        continue;
+                    }
+                    if ($tbl === 'attendance_breaks' || $tbl === 'attendance_location_logs') {
+                        $protectedAttIds = DB::table('attendances')->whereIn('employee_id', $protectedEmployeeIds)->pluck('id')->toArray();
+                        DB::table($tbl)->whereNotIn('attendance_id', $protectedAttIds)->delete();
+                        continue;
+                    }
+                    if ($tbl === 'expense_claims') {
+                        $protectedReportIds = DB::table('expense_reports')->whereIn('employee_id', $protectedEmployeeIds)->pluck('id')->toArray();
+                        DB::table('expense_claims')->whereNotIn('expense_report_id', $protectedReportIds)->delete();
+                        continue;
+                    }
+                    if ($tbl === 'helpdesk_ticket_replies' || $tbl === 'helpdesk_ticket_attachments' || $tbl === 'helpdesk_satisfaction_ratings') {
+                        $ticketCol = Schema::hasColumn($tbl, 'ticket_id') ? 'ticket_id' : 'helpdesk_ticket_id';
+                        $protectedTicketIds = DB::table('helpdesk_tickets')->whereIn('employee_id', $protectedEmployeeIds)->pluck('id')->toArray();
+                        DB::table($tbl)->whereNotIn($ticketCol, $protectedTicketIds)->delete();
+                        continue;
+                    }
+                    if ($tbl === 'employee_exit_clearances' || $tbl === 'employee_fnf_settlements' || $tbl === 'employee_exit_documents') {
+                        $protectedExitIds = DB::table('employee_exits')->whereIn('employee_id', $protectedEmployeeIds)->pluck('id')->toArray();
+                        DB::table($tbl)->whereNotIn('employee_exit_id', $protectedExitIds)->delete();
+                        continue;
+                    }
+                    if ($tbl === 'assets') {
+                        $protectedAssetIds = DB::table('asset_allocations')->whereIn('employee_id', $protectedEmployeeIds)->pluck('asset_id')->toArray();
+                        DB::table('assets')
+                            ->whereNotIn('id', $protectedAssetIds)
+                            ->where(function ($q) use ($protectedEmployeeIds) {
+                                $q->whereNull('assigned_employee_id')
+                                  ->orWhereNotIn('assigned_employee_id', $protectedEmployeeIds);
+                            })
+                            ->delete();
+                        continue;
+                    }
+                    if (Schema::hasColumn($tbl, 'employee_id')) {
+                        DB::table($tbl)->whereNotIn('employee_id', $protectedEmployeeIds)->delete();
+                        continue;
+                    }
+                }
+                DB::table($tbl)->truncate();
+            } catch (\Throwable) {
                 try {
-                    DB::table($tbl)->truncate();
-                } catch (\Throwable) {
+                    if (! empty($protectedEmployeeIds)) {
+                        if ($tbl === 'employees') {
+                            DB::table('employees')->whereNotIn('id', $protectedEmployeeIds)->delete();
+                            continue;
+                        }
+                        if (Schema::hasColumn($tbl, 'employee_id')) {
+                            DB::table($tbl)->whereNotIn('employee_id', $protectedEmployeeIds)->delete();
+                            continue;
+                        }
+                    }
                     DB::table($tbl)->delete();
+                } catch (\Throwable) {
+                    // Safe ignore
                 }
             }
         }
 
         try {
-            DB::transaction(function () {
             // 2. Fetch or Create Tenant & establish context
         $tenantSlug = config('tenancy.local_fallback_slug') ?: 'demo';
         $tenant = Tenant::where('slug', $tenantSlug)->first()
@@ -1252,16 +1379,18 @@ class HrmsDemoSeeder extends Seeder
                 'city' => 'Bangalore', 'pan' => 'AAACN7799N', 'aadhaar' => '2345 6789 0014', 'acc' => '5010041234014',
                 'work_mode' => 'wfh', 'wfh_lat' => 12.9352, 'wfh_lng' => 77.6245,
             ],
-            // 15. Senior Software Engineer (Bangalore Tech Center - Engineering)
+            // 15. Software Engineer (Bangalore Tech Center - Engineering)
             [
-                'first' => 'Rahul', 'last' => 'Sharma', 'email' => 'rahul@warrg.com',
-                'role_slug' => 'read_only', 'job_title' => 'Senior Software Engineer',
-                'dept' => $deptEng->id, 'desig' => $desigSrSwe->id, 'branch' => $branchBlr->id, 'bu' => $buTech->id,
-                'struct' => $structTech->id, 'pay_group' => $payGroupTech->id, 'leave_plan' => $leavePlanStandard->id,
-                'salary' => 1150000, 'gender' => 'Male', 'marital' => 'Single', 'blood' => 'A+', 'diet' => 'Veg',
-                'doj' => '2026-06-15', 'dob' => '1995-05-16', 'exp' => 4.5, 'mobile' => '+91 98111 00115',
-                'city' => 'Bangalore', 'pan' => 'AAACS9911P', 'aadhaar' => '2345 6789 0015', 'acc' => '5010041234015',
-                'work_mode' => 'wfh', 'wfh_lat' => 12.9121, 'wfh_lng' => 77.6446,
+                'first' => 'Mohammad', 'last' => 'Kaif', 'email' => 'mohammadkaif.warrgyizmorsch@gmail.com',
+                'personal_email' => 'kaif@gmail.com',
+                'role_slug' => 'hr_manager', 'job_title' => 'Software Engineer',
+                'dept' => $deptEng->id, 'desig' => $desigSwe->id, 'branch' => $branchBlr->id, 'bu' => $buTech->id,
+                'struct' => $structStaff->id, 'pay_group' => $payGroupStaff->id, 'leave_plan' => $leavePlanStandard->id,
+                'salary' => 480000, 'gender' => 'Male', 'marital' => 'Single', 'blood' => 'B+', 'diet' => 'Non Veg',
+                'doj' => '2026-06-15', 'dob' => '1995-02-15', 'exp' => 4.5, 'mobile' => '+91 98765 43321',
+                'city' => 'Noida', 'pan' => 'AAACS9911P', 'aadhaar' => '2345 6789 0015', 'acc' => '5010041234015',
+                'work_mode' => 'office', 'wfh_lat' => 28.6280, 'wfh_lng' => 77.3730,
+                'password' => '12345678', 'nick_name' => 'Kaif',
             ],
             // 16. HR Operations Specialist (Corporate HQ - Human Resources)
             [
@@ -1290,10 +1419,12 @@ class HrmsDemoSeeder extends Seeder
                     ['name' => ucfirst(str_replace('_', ' ', $def['role_slug'])), 'level' => 50, 'is_system' => true]
                 );
 
+            $userPassword = ! empty($def['password']) ? Hash::make($def['password']) : $defaultPassword;
+
             // Create or update User safely without global scope or cross-tenant unique index collision
             $user = User::withoutGlobalScopes()->where('email', $def['email'])->first();
             if ($user) {
-                $user->update([
+                $userUpdates = [
                     'tenant_id' => $tenant->id,
                     'company_id' => $company->id,
                     'branch_id' => $def['branch'],
@@ -1301,9 +1432,14 @@ class HrmsDemoSeeder extends Seeder
                     'role_id' => $roleModel?->id,
                     'name' => $def['first'] . ' ' . $def['last'],
                     'phone' => $def['mobile'],
-                    'password' => $defaultPassword,
                     'role' => $def['role_slug'],
-                ]);
+                ];
+                if (! empty($def['password'])) {
+                    $userUpdates['password'] = Hash::make($def['password']);
+                } elseif (empty($user->password)) {
+                    $userUpdates['password'] = $userPassword;
+                }
+                $user->update($userUpdates);
             } else {
                 $user = User::create([
                     'tenant_id' => $tenant->id,
@@ -1314,7 +1450,7 @@ class HrmsDemoSeeder extends Seeder
                     'name' => $def['first'] . ' ' . $def['last'],
                     'email' => $def['email'],
                     'phone' => $def['mobile'],
-                    'password' => $defaultPassword,
+                    'password' => $userPassword,
                     'role' => $def['role_slug'],
                 ]);
             }
@@ -1352,7 +1488,7 @@ class HrmsDemoSeeder extends Seeder
                 // HR Manager reports to VP HR & Admin
                 $managerId = $employees[2]->id ?? null;
             } elseif ($index === 14) {
-                // Senior Software Engineer reports to Tech Lead & Architect
+                // Software Engineer reports to Tech Lead & Architect
                 $managerId = $employees[13]->id ?? null;
             } elseif ($index === 15) {
                 // HR Operations Specialist reports to HR Manager
@@ -1367,72 +1503,131 @@ class HrmsDemoSeeder extends Seeder
                 $stage = 'Notice Period';
             }
 
-            $emp = Employee::create([
-                'tenant_id' => $tenant->id,
-                'user_id' => $user->id,
-                'company_id' => $company->id,
-                'business_unit_id' => $def['bu'],
-                'branch_id' => $def['branch'],
-                'department_id' => $def['dept'],
-                'designation_id' => $def['desig'],
-                'pay_group_id' => $def['pay_group'],
-                'salary_structure_id' => $def['struct'],
-                'leave_plan_id' => $def['leave_plan'],
-                'attendance_penalty_id' => $penaltyLate->id,
-                'reporting_manager_id' => $managerId,
-                'shift_id' => $def['branch'] === $branchPune->id ? $shiftMorning->id : $shiftDay->id,
-                'weekly_pattern' => [
-                    0 => 'off',
-                ],
+            // Adapt code if WRG-001 is already held by protected employee (Mohammad Kaif on live)
+            if ($def['email'] !== 'mohammadkaif.warrgyizmorsch@gmail.com' && $empCode === 'WRG-001') {
+                $is001TakenByProtected = Employee::withoutGlobalScopes()
+                    ->where('tenant_id', $tenant->id)
+                    ->where('employee_id', 'WRG-001')
+                    ->where(function ($q) {
+                        $q->where('office_email', 'mohammadkaif.warrgyizmorsch@gmail.com')
+                          ->orWhere('personal_email', 'kaif@gmail.com')
+                          ->orWhere('full_name', 'like', '%Mohammad Kaif%');
+                    })
+                    ->exists();
+                if ($is001TakenByProtected) {
+                    $empCode = 'WRG-015';
+                }
+            }
 
-                'employee_id' => $empCode,
-                'full_name' => $def['first'] . ' ' . $def['last'],
-                'nick_name' => $def['first'],
-                'blood_group' => $def['blood'],
-                'employee_stage' => $stage,
-                'job_title' => $def['job_title'],
-                'role' => $def['role_slug'],
-                'employment_type' => 'Full-time',
-                'date_of_joining' => $def['doj'],
-                'date_of_birth' => $def['dob'],
-                'probation_end_date' => Carbon::parse($def['doj'])->addMonths(3)->format('Y-m-d'),
-                'confirmation_date' => $stage === 'Confirmed' ? Carbon::parse($def['doj'])->addMonths(3)->format('Y-m-d') : null,
-                'office' => $def['work_mode'] ?? 'office',
-                'wfh_latitude' => $def['wfh_lat'] ?? 28.6280,
-                'wfh_longitude' => $def['wfh_lng'] ?? 77.3730,
-                'gender' => $def['gender'],
-                'marital_status' => $def['marital'],
-                'diet_preference' => $def['diet'],
-                'aadhaar_card_number' => $def['aadhaar'],
-                'pan_card_number' => $def['pan'],
-                'photo' => null,
+            // Check if employee already exists to preserve existing custom code or manual edits
+            $emp = Employee::withoutGlobalScopes()
+                ->where('tenant_id', $tenant->id)
+                ->where(function ($q) use ($user, $def) {
+                    $q->where('user_id', $user->id)
+                      ->orWhere('office_email', $def['email'])
+                      ->orWhere('personal_email', $def['personal_email'] ?? $def['email']);
+                    if ($def['email'] === 'mohammadkaif.warrgyizmorsch@gmail.com') {
+                        $q->orWhere('full_name', 'like', '%Mohammad Kaif%');
+                    }
+                })
+                ->first();
 
-                'present_address' => 'Plot #' . (20 + $index) . ', Tech Park Avenue, Sector 62',
-                'permanent_address' => 'House #' . (101 + $index) . ', Green Valley Residency',
-                'city' => $def['city'],
-                'postal_code' => $def['city'] === 'Pune' ? '411057' : ($def['city'] === 'Bangalore' ? '560100' : '201301'),
-                'personal_mobile_number' => $def['mobile'],
-                'home_phone' => '011-456789' . str_pad((string)$index, 2, '0', STR_PAD_LEFT),
-                'personal_email' => strtolower($def['first']) . '.' . strtolower($def['last']) . '@gmail.com',
-                'office_email' => $def['email'],
+            // Ensure unique employee code if the code is already taken in the database
+            if (! $emp) {
+                $existingWithCode = Employee::withoutGlobalScopes()
+                    ->where('tenant_id', $tenant->id)
+                    ->where('employee_id', $empCode)
+                    ->exists();
 
-                'experience' => $def['exp'],
-                'source_of_hire' => 'Direct Referral / Leadership Search',
-                'skill_set' => 'Leadership, System Architecture, Fullstack Development, Operations, Strategic Planning',
-                'current_salary' => $def['salary'],
-                'qualification' => 'B.Tech / MCA / MBA Graduate',
-                'bank_name' => 'HDFC Bank',
-                'account_number' => $def['acc'],
-                'ifsc_code' => 'HDFC0001234',
-                'emergency_contact_name' => 'Spouse / Family Contact of ' . $def['first'],
-                'emergency_contact_number' => '+91 99887 766' . str_pad((string)$index, 2, '0', STR_PAD_LEFT),
-                'emergency_contact_relation' => $def['marital'] === 'Married' ? 'Spouse' : 'Parent',
+                if ($existingWithCode) {
+                    $usedCodes = Employee::withoutGlobalScopes()
+                        ->where('tenant_id', $tenant->id)
+                        ->where('employee_id', 'like', 'WRG-%')
+                        ->pluck('employee_id')
+                        ->toArray();
+                    $cNum = 1;
+                    while (in_array('WRG-' . str_pad((string)$cNum, 3, '0', STR_PAD_LEFT), $usedCodes)) {
+                        $cNum++;
+                    }
+                    $empCode = 'WRG-' . str_pad((string)$cNum, 3, '0', STR_PAD_LEFT);
+                }
+            }
 
-                'status' => true,
-                'resume_path' => 'resumes/' . $empCode . '.pdf',
-            ]);
+            if ($emp) {
+                if (empty($emp->user_id)) {
+                    $emp->update(['user_id' => $user->id]);
+                }
+            } else {
+                $emp = Employee::create([
+                    'tenant_id' => $tenant->id,
+                    'user_id' => $user->id,
+                    'company_id' => $company->id,
+                    'business_unit_id' => $def['bu'],
+                    'branch_id' => $def['branch'],
+                    'department_id' => $def['dept'],
+                    'designation_id' => $def['desig'],
+                    'pay_group_id' => $def['pay_group'],
+                    'salary_structure_id' => $def['struct'],
+                    'leave_plan_id' => $def['leave_plan'],
+                    'attendance_penalty_id' => $penaltyLate->id,
+                    'reporting_manager_id' => $managerId,
+                    'shift_id' => $def['branch'] === $branchPune->id ? $shiftMorning->id : $shiftDay->id,
+                    'weekly_pattern' => [
+                        0 => 'off',
+                    ],
+
+                    'employee_id' => $empCode,
+                    'full_name' => $def['first'] . ' ' . $def['last'],
+                    'nick_name' => $def['nick_name'] ?? $def['first'],
+                    'blood_group' => $def['blood'],
+                    'employee_stage' => $stage,
+                    'job_title' => $def['job_title'],
+                    'role' => $def['role_slug'],
+                    'employment_type' => 'Full-time',
+                    'date_of_joining' => $def['doj'],
+                    'date_of_birth' => $def['dob'],
+                    'probation_end_date' => Carbon::parse($def['doj'])->addMonths(3)->format('Y-m-d'),
+                    'confirmation_date' => $stage === 'Confirmed' ? Carbon::parse($def['doj'])->addMonths(3)->format('Y-m-d') : null,
+                    'office' => $def['work_mode'] ?? 'office',
+                    'wfh_latitude' => $def['wfh_lat'] ?? 28.6280,
+                    'wfh_longitude' => $def['wfh_lng'] ?? 77.3730,
+                    'gender' => $def['gender'],
+                    'marital_status' => $def['marital'],
+                    'diet_preference' => $def['diet'],
+                    'aadhaar_card_number' => $def['aadhaar'],
+                    'pan_card_number' => $def['pan'],
+                    'photo' => null,
+
+                    'present_address' => 'Plot #' . (20 + $index) . ', Tech Park Avenue, Sector 62',
+                    'permanent_address' => 'House #' . (101 + $index) . ', Green Valley Residency',
+                    'city' => $def['city'],
+                    'postal_code' => $def['city'] === 'Pune' ? '411057' : ($def['city'] === 'Bangalore' ? '560100' : '201301'),
+                    'personal_mobile_number' => $def['mobile'],
+                    'home_phone' => '011-456789' . str_pad((string)$index, 2, '0', STR_PAD_LEFT),
+                    'personal_email' => $def['personal_email'] ?? (strtolower($def['first']) . '.' . strtolower($def['last']) . '@gmail.com'),
+                    'office_email' => $def['email'],
+
+                    'experience' => $def['exp'],
+                    'source_of_hire' => 'Direct Referral / Leadership Search',
+                    'skill_set' => 'Leadership, System Architecture, Fullstack Development, Operations, Strategic Planning',
+                    'current_salary' => $def['salary'],
+                    'qualification' => 'B.Tech / MCA / MBA Graduate',
+                    'bank_name' => 'HDFC Bank',
+                    'account_number' => $def['acc'],
+                    'ifsc_code' => 'HDFC0001234',
+                    'emergency_contact_name' => 'Emergency Contact of ' . $def['first'],
+                    'emergency_contact_number' => '+91 99887 766' . str_pad((string)$index, 2, '0', STR_PAD_LEFT),
+                    'emergency_contact_relation' => $def['marital'] === 'Married' ? 'Spouse' : 'Parent',
+
+                    'status' => true,
+                    'resume_path' => 'resumes/' . $empCode . '.pdf',
+                ]);
+            }
 
             $employees[] = $emp;
+            if ($def['email'] === 'mohammadkaif.warrgyizmorsch@gmail.com' && ! in_array($emp->id, $protectedEmployeeIds)) {
+                $protectedEmployeeIds[] = $emp->id;
+            }
 
             // Setup Leave Balances
             $isExecPlan = ($def['leave_plan'] === $leavePlanExec->id);
@@ -1440,20 +1635,21 @@ class HrmsDemoSeeder extends Seeder
             $sl = $isExecPlan ? $ltSlExec : $ltSlStd;
             $el = $isExecPlan ? $ltElExec : $ltElStd;
 
-            LeaveBalance::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'employee_id' => $emp->id, 'leave_type_id' => $cl->id, 'allocated' => $cl->quota, 'used' => 0, 'encashed' => 0]);
-            LeaveBalance::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'employee_id' => $emp->id, 'leave_type_id' => $sl->id, 'allocated' => $sl->quota, 'used' => 0, 'encashed' => 0]);
-            LeaveBalance::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'employee_id' => $emp->id, 'leave_type_id' => $el->id, 'allocated' => $el->quota, 'used' => 0, 'encashed' => 0]);
+            LeaveBalance::firstOrCreate(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'employee_id' => $emp->id, 'leave_type_id' => $cl->id], ['allocated' => $cl->quota, 'used' => 0, 'encashed' => 0]);
+            LeaveBalance::firstOrCreate(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'employee_id' => $emp->id, 'leave_type_id' => $sl->id], ['allocated' => $sl->quota, 'used' => 0, 'encashed' => 0]);
+            LeaveBalance::firstOrCreate(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'employee_id' => $emp->id, 'leave_type_id' => $el->id], ['allocated' => $el->quota, 'used' => 0, 'encashed' => 0]);
 
             // Setup Employment History
-            EmployeeEmploymentHistory::create([
-                'tenant_id' => $tenant->id,
-                'employee_id' => $emp->id,
-                'company_name' => 'Previous Global Enterprise Solutions Ltd',
-                'designation' => 'Senior Specialist',
-                'start_date' => Carbon::parse($def['doj'])->subYears(3)->format('Y-m-d'),
-                'end_date' => Carbon::parse($def['doj'])->subDays(15)->format('Y-m-d'),
-                'job_description' => 'Managed end-to-end deliverables, system scaling, and cross-functional enterprise workflows.',
-            ]);
+            EmployeeEmploymentHistory::firstOrCreate(
+                ['tenant_id' => $tenant->id, 'employee_id' => $emp->id],
+                [
+                    'company_name' => 'Previous Global Enterprise Solutions Ltd',
+                    'designation' => 'Senior Specialist',
+                    'start_date' => Carbon::parse($def['doj'])->subYears(3)->format('Y-m-d'),
+                    'end_date' => Carbon::parse($def['doj'])->subDays(15)->format('Y-m-d'),
+                    'job_description' => 'Managed end-to-end deliverables, system scaling, and cross-functional enterprise workflows.',
+                ]
+            );
 
             // Seed Employee Self-Service Uploaded Documents (Requested/Uploaded by employee from their profile)
             // Aadhaar Card
@@ -1463,96 +1659,116 @@ class HrmsDemoSeeder extends Seeder
             } elseif ($index === 6) {
                 $aadhaarStatus = 'rejected'; // Devendra Verma - Admin rejected due to blurry photocopy
             }
-            Document::create([
-                'tenant_id'          => $tenant->id,
-                'documentable_id'    => $emp->id,
-                'documentable_type'  => Employee::class,
-                'document_master_id' => $masterAadhaar->id,
-                'name'               => 'Aadhaar Card - ' . $emp->full_name,
-                'description'        => 'Self-uploaded government identity proof',
-                'file_name'          => 'aadhaar_' . strtolower($def['first']) . '.pdf',
-                'file_path'          => 'documents/aadhaar_' . $empCode . '.pdf',
-                'file_type'          => 'application/pdf',
-                'file_size'          => 245760,
-                'has_expiry'         => false,
-                'status'             => $aadhaarStatus,
-                'requested_by_id'    => $user->id, // Uploaded by employee
-            ]);
-
-            // PAN Card
-            $panStatus = ($index === 12) ? 'uploaded' : 'approved'; // Kavita Reddy (Probation) - Pending Verification
-            Document::create([
-                'tenant_id'          => $tenant->id,
-                'documentable_id'    => $emp->id,
-                'documentable_type'  => Employee::class,
-                'document_master_id' => $masterPan->id,
-                'name'               => 'PAN Card - ' . $emp->full_name,
-                'description'        => 'Self-uploaded income tax permanent account card',
-                'file_name'          => 'pan_' . strtolower($def['first']) . '.pdf',
-                'file_path'          => 'documents/pan_' . $empCode . '.pdf',
-                'file_type'          => 'application/pdf',
-                'file_size'          => 189440,
-                'has_expiry'         => false,
-                'status'             => $panStatus,
-                'requested_by_id'    => $user->id, // Uploaded by employee
-            ]);
-
-            // Degree Certificate
-            $degreeStatus = in_array($index, [4, 15]) ? 'uploaded' : 'approved'; // Rohan Gupta, Pooja Bhatt - Pending Verification
-            Document::create([
-                'tenant_id'          => $tenant->id,
-                'documentable_id'    => $emp->id,
-                'documentable_type'  => Employee::class,
-                'document_master_id' => $masterDegree->id,
-                'name'               => 'Degree Certificate - ' . $emp->full_name,
-                'description'        => 'Self-uploaded educational degree and transcript',
-                'file_name'          => 'degree_' . strtolower($def['first']) . '.pdf',
-                'file_path'          => 'documents/degree_' . $empCode . '.pdf',
-                'file_type'          => 'application/pdf',
-                'file_size'          => 412000,
-                'has_expiry'         => false,
-                'status'             => $degreeStatus,
-                'requested_by_id'    => $user->id, // Uploaded by employee
-            ]);
-
-            // Passport (Uploaded by senior/travel employees)
-            if (in_array($index, [0, 1, 2, 5, 13, 14])) {
-                Document::create([
+            Document::firstOrCreate(
+                [
                     'tenant_id'          => $tenant->id,
                     'documentable_id'    => $emp->id,
                     'documentable_type'  => Employee::class,
-                    'document_master_id' => $masterPassport->id,
-                    'name'               => 'Passport - ' . $emp->full_name,
-                    'description'        => 'Self-uploaded international travel passport copy',
-                    'file_name'          => 'passport_' . strtolower($def['first']) . '.pdf',
-                    'file_path'          => 'documents/passport_' . $empCode . '.pdf',
+                    'document_master_id' => $masterAadhaar->id,
+                ],
+                [
+                    'name'               => 'Aadhaar Card - ' . $emp->full_name,
+                    'description'        => 'Self-uploaded government identity proof',
+                    'file_name'          => 'aadhaar_' . strtolower($def['first']) . '.pdf',
+                    'file_path'          => 'documents/aadhaar_' . $empCode . '.pdf',
                     'file_type'          => 'application/pdf',
-                    'file_size'          => 320000,
-                    'has_expiry'         => true,
-                    'expiry_date'        => '2032-10-15',
-                    'status'             => 'approved',
+                    'file_size'          => 245760,
+                    'has_expiry'         => false,
+                    'status'             => $aadhaarStatus,
                     'requested_by_id'    => $user->id, // Uploaded by employee
-                ]);
+                ]
+            );
+
+            // PAN Card
+            $panStatus = ($index === 12) ? 'uploaded' : 'approved'; // Kavita Reddy (Probation) - Pending Verification
+            Document::firstOrCreate(
+                [
+                    'tenant_id'          => $tenant->id,
+                    'documentable_id'    => $emp->id,
+                    'documentable_type'  => Employee::class,
+                    'document_master_id' => $masterPan->id,
+                ],
+                [
+                    'name'               => 'PAN Card - ' . $emp->full_name,
+                    'description'        => 'Self-uploaded income tax permanent account card',
+                    'file_name'          => 'pan_' . strtolower($def['first']) . '.pdf',
+                    'file_path'          => 'documents/pan_' . $empCode . '.pdf',
+                    'file_type'          => 'application/pdf',
+                    'file_size'          => 189440,
+                    'has_expiry'         => false,
+                    'status'             => $panStatus,
+                    'requested_by_id'    => $user->id, // Uploaded by employee
+                ]
+            );
+
+            // Degree Certificate
+            $degreeStatus = in_array($index, [4, 15]) ? 'uploaded' : 'approved'; // Rohan Gupta, Pooja Bhatt - Pending Verification
+            Document::firstOrCreate(
+                [
+                    'tenant_id'          => $tenant->id,
+                    'documentable_id'    => $emp->id,
+                    'documentable_type'  => Employee::class,
+                    'document_master_id' => $masterDegree->id,
+                ],
+                [
+                    'name'               => 'Degree Certificate - ' . $emp->full_name,
+                    'description'        => 'Self-uploaded educational degree and transcript',
+                    'file_name'          => 'degree_' . strtolower($def['first']) . '.pdf',
+                    'file_path'          => 'documents/degree_' . $empCode . '.pdf',
+                    'file_type'          => 'application/pdf',
+                    'file_size'          => 412000,
+                    'has_expiry'         => false,
+                    'status'             => $degreeStatus,
+                    'requested_by_id'    => $user->id, // Uploaded by employee
+                ]
+            );
+
+            // Passport (Uploaded by senior/travel employees)
+            if (in_array($index, [0, 1, 2, 5, 13, 14])) {
+                Document::firstOrCreate(
+                    [
+                        'tenant_id'          => $tenant->id,
+                        'documentable_id'    => $emp->id,
+                        'documentable_type'  => Employee::class,
+                        'document_master_id' => $masterPassport->id,
+                    ],
+                    [
+                        'name'               => 'Passport - ' . $emp->full_name,
+                        'description'        => 'Self-uploaded international travel passport copy',
+                        'file_name'          => 'passport_' . strtolower($def['first']) . '.pdf',
+                        'file_path'          => 'documents/passport_' . $empCode . '.pdf',
+                        'file_type'          => 'application/pdf',
+                        'file_size'          => 320000,
+                        'has_expiry'         => true,
+                        'expiry_date'        => '2032-10-15',
+                        'status'             => 'approved',
+                        'requested_by_id'    => $user->id, // Uploaded by employee
+                    ]
+                );
             }
 
             // Previous Employer Relieving Letter (Uploaded by lateral hires)
             if (in_array($index, [1, 3, 5, 8, 10, 13, 14])) {
                 $relievingStatus = ($index === 10) ? 'uploaded' : 'approved'; // Amit Patel - Pending Verification
-                Document::create([
-                    'tenant_id'          => $tenant->id,
-                    'documentable_id'    => $emp->id,
-                    'documentable_type'  => Employee::class,
-                    'document_master_id' => $masterRelieving->id,
-                    'name'               => 'Previous Employer Relieving Letter - ' . $emp->full_name,
-                    'description'        => 'Self-uploaded relieving and work experience certificate',
-                    'file_name'          => 'relieving_' . strtolower($def['first']) . '.pdf',
-                    'file_path'          => 'documents/relieving_' . $empCode . '.pdf',
-                    'file_type'          => 'application/pdf',
-                    'file_size'          => 280000,
-                    'has_expiry'         => false,
-                    'status'             => $relievingStatus,
-                    'requested_by_id'    => $user->id, // Uploaded by employee
-                ]);
+                Document::firstOrCreate(
+                    [
+                        'tenant_id'          => $tenant->id,
+                        'documentable_id'    => $emp->id,
+                        'documentable_type'  => Employee::class,
+                        'document_master_id' => $masterRelieving->id,
+                    ],
+                    [
+                        'name'               => 'Previous Employer Relieving Letter - ' . $emp->full_name,
+                        'description'        => 'Self-uploaded relieving and work experience certificate',
+                        'file_name'          => 'relieving_' . strtolower($def['first']) . '.pdf',
+                        'file_path'          => 'documents/relieving_' . $empCode . '.pdf',
+                        'file_type'          => 'application/pdf',
+                        'file_size'          => 280000,
+                        'has_expiry'         => false,
+                        'status'             => $relievingStatus,
+                        'requested_by_id'    => $user->id, // Uploaded by employee
+                    ]
+                );
             }
         }
 
@@ -1579,270 +1795,302 @@ class HrmsDemoSeeder extends Seeder
             $empCode = $emp->employee_id;
 
             // 1. Official Employment Offer & Appointment Letter (HR Issued & digitally signed)
-            Document::create([
-                'tenant_id'          => $tenant->id,
-                'documentable_id'    => $emp->id,
-                'documentable_type'  => Employee::class,
-                'document_master_id' => $masterOffer->id,
-                'name'               => 'Official Employment Offer & Appointment Letter - ' . $emp->full_name,
-                'description'        => 'Official corporate employment offer letter issued by HR Department',
-                'file_name'          => 'offer_letter_' . strtolower($def['first']) . '.pdf',
-                'file_path'          => 'documents/offer_' . $empCode . '.pdf',
-                'file_type'          => 'application/pdf',
-                'file_size'          => 285400,
-                'has_expiry'         => false,
-                'status'             => 'approved',
-                'requested_by_id'    => $hrManagerUserId,
-                'requires_signature' => true,
-                'is_signed'          => true,
-                'signed_at'          => Carbon::parse($def['doj'])->subDays(5),
-                'signed_by_id'       => $emp->user_id,
-            ]);
-
-            // 2. Signed Non-Disclosure Agreement (NDA)
-            Document::create([
-                'tenant_id'          => $tenant->id,
-                'documentable_id'    => $emp->id,
-                'documentable_type'  => Employee::class,
-                'document_master_id' => $masterNda->id,
-                'name'               => 'Corporate Non-Disclosure Agreement (NDA) - ' . $emp->full_name,
-                'description'        => 'Proprietary IP and confidentiality agreement signed upon onboarding',
-                'file_name'          => 'nda_' . strtolower($def['first']) . '.pdf',
-                'file_path'          => 'documents/nda_' . $empCode . '.pdf',
-                'file_type'          => 'application/pdf',
-                'file_size'          => 194200,
-                'has_expiry'         => false,
-                'status'             => 'approved',
-                'requested_by_id'    => $hrManagerUserId,
-                'requires_signature' => true,
-                'is_signed'          => true,
-                'signed_at'          => Carbon::parse($def['doj'])->addDay(),
-                'signed_by_id'       => $emp->user_id,
-            ]);
-
-            // 3. Employee Code of Conduct & Workplace Ethics Policy
-            $isProbation = in_array($index, [12, 15]); // Kavita, Pooja
-            Document::create([
-                'tenant_id'          => $tenant->id,
-                'documentable_id'    => $emp->id,
-                'documentable_type'  => Employee::class,
-                'document_master_id' => $masterConduct->id,
-                'name'               => 'Code of Conduct & Workplace Ethics Acknowledgment - ' . $emp->full_name,
-                'description'        => 'Enterprise compliance, safety, and workplace ethics agreement',
-                'file_name'          => 'code_of_conduct_' . strtolower($def['first']) . '.pdf',
-                'file_path'          => 'documents/conduct_' . $empCode . '.pdf',
-                'file_type'          => 'application/pdf',
-                'file_size'          => 152000,
-                'has_expiry'         => false,
-                'status'             => $isProbation ? 'pending_signature' : 'approved',
-                'requested_by_id'    => $hrManagerUserId,
-                'requires_signature' => true,
-                'is_signed'          => ! $isProbation,
-                'signed_at'          => $isProbation ? null : Carbon::parse($def['doj'])->addDays(2),
-                'signed_by_id'       => $isProbation ? null : $emp->user_id,
-            ]);
-
-            // 4. Annual Performance Appraisal & Salary Revision (for Senior / Tenured Staff)
-            if (in_array($index, [0, 1, 2, 3, 5, 13])) {
-                Document::create([
+            Document::firstOrCreate(
+                [
                     'tenant_id'          => $tenant->id,
                     'documentable_id'    => $emp->id,
                     'documentable_type'  => Employee::class,
-                    'document_master_id' => $masterAppraisal->id,
-                    'name'               => 'FY26 Annual Appraisal & Compensation Revision - ' . $emp->full_name,
-                    'description'        => 'Annual performance appraisal and revised salary structure band',
-                    'file_name'          => 'appraisal_fy26_' . strtolower($def['first']) . '.pdf',
-                    'file_path'          => 'documents/appraisal_' . $empCode . '.pdf',
+                    'document_master_id' => $masterOffer->id,
+                ],
+                [
+                    'name'               => 'Official Employment Offer & Appointment Letter - ' . $emp->full_name,
+                    'description'        => 'Official corporate employment offer letter issued by HR Department',
+                    'file_name'          => 'offer_letter_' . strtolower($def['first']) . '.pdf',
+                    'file_path'          => 'documents/offer_' . $empCode . '.pdf',
                     'file_type'          => 'application/pdf',
-                    'file_size'          => 164000,
+                    'file_size'          => 285400,
                     'has_expiry'         => false,
                     'status'             => 'approved',
                     'requested_by_id'    => $hrManagerUserId,
-                    'requires_signature' => false,
-                    'is_signed'          => false,
-                ]);
+                    'requires_signature' => true,
+                    'is_signed'          => true,
+                    'signed_at'          => Carbon::parse($def['doj'])->subDays(5),
+                    'signed_by_id'       => $emp->user_id,
+                ]
+            );
+
+            // 2. Signed Non-Disclosure Agreement (NDA)
+            Document::firstOrCreate(
+                [
+                    'tenant_id'          => $tenant->id,
+                    'documentable_id'    => $emp->id,
+                    'documentable_type'  => Employee::class,
+                    'document_master_id' => $masterNda->id,
+                ],
+                [
+                    'name'               => 'Corporate Non-Disclosure Agreement (NDA) - ' . $emp->full_name,
+                    'description'        => 'Proprietary IP and confidentiality agreement signed upon onboarding',
+                    'file_name'          => 'nda_' . strtolower($def['first']) . '.pdf',
+                    'file_path'          => 'documents/nda_' . $empCode . '.pdf',
+                    'file_type'          => 'application/pdf',
+                    'file_size'          => 194200,
+                    'has_expiry'         => false,
+                    'status'             => 'approved',
+                    'requested_by_id'    => $hrManagerUserId,
+                    'requires_signature' => true,
+                    'is_signed'          => true,
+                    'signed_at'          => Carbon::parse($def['doj'])->addDay(),
+                    'signed_by_id'       => $emp->user_id,
+                ]
+            );
+
+            // 3. Employee Code of Conduct & Workplace Ethics Policy
+            $isProbation = in_array($index, [12, 15]); // Kavita, Pooja
+            Document::firstOrCreate(
+                [
+                    'tenant_id'          => $tenant->id,
+                    'documentable_id'    => $emp->id,
+                    'documentable_type'  => Employee::class,
+                    'document_master_id' => $masterConduct->id,
+                ],
+                [
+                    'name'               => 'Code of Conduct & Workplace Ethics Acknowledgment - ' . $emp->full_name,
+                    'description'        => 'Enterprise compliance, safety, and workplace ethics agreement',
+                    'file_name'          => 'code_of_conduct_' . strtolower($def['first']) . '.pdf',
+                    'file_path'          => 'documents/conduct_' . $empCode . '.pdf',
+                    'file_type'          => 'application/pdf',
+                    'file_size'          => 152000,
+                    'has_expiry'         => false,
+                    'status'             => $isProbation ? 'pending_signature' : 'approved',
+                    'requested_by_id'    => $hrManagerUserId,
+                    'requires_signature' => true,
+                    'is_signed'          => ! $isProbation,
+                    'signed_at'          => $isProbation ? null : Carbon::parse($def['doj'])->addDays(2),
+                    'signed_by_id'       => $isProbation ? null : $emp->user_id,
+                ]
+            );
+
+            // 4. Annual Performance Appraisal & Salary Revision (for Senior / Tenured Staff)
+            if (in_array($index, [0, 1, 2, 3, 5, 13])) {
+                Document::firstOrCreate(
+                    [
+                        'tenant_id'          => $tenant->id,
+                        'documentable_id'    => $emp->id,
+                        'documentable_type'  => Employee::class,
+                        'document_master_id' => $masterAppraisal->id,
+                    ],
+                    [
+                        'name'               => 'FY26 Annual Appraisal & Compensation Revision - ' . $emp->full_name,
+                        'description'        => 'Annual performance appraisal and revised salary structure band',
+                        'file_name'          => 'appraisal_fy26_' . strtolower($def['first']) . '.pdf',
+                        'file_path'          => 'documents/appraisal_' . $empCode . '.pdf',
+                        'file_type'          => 'application/pdf',
+                        'file_size'          => 164000,
+                        'has_expiry'         => false,
+                        'status'             => 'approved',
+                        'requested_by_id'    => $hrManagerUserId,
+                        'requires_signature' => false,
+                        'is_signed'          => false,
+                    ]
+                );
             }
         }
 
         // 13. Asset Allocations & Requests
-        // Physical Allocation 1: Rahul Sharma (Senior SWE) - Active
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetMac1->id,
-            'employee_id' => $employees[14]->id,
-            'allocated_at' => '2026-06-16',
-            'allocation_condition' => 'excellent',
-        ]);
-        $assetMac1->update(['status' => 'allocated', 'assigned_employee_id' => $employees[14]->id]);
+        // Physical Allocation 1: Mohammad Kaif (Software Engineer) - Active
+        if (! AssetAllocation::where('tenant_id', $tenant->id)->where('asset_id', $assetMac1->id)->where('employee_id', $employees[14]->id)->exists()) {
+            AssetAllocation::create([
+                'tenant_id' => $tenant->id,
+                'asset_id' => $assetMac1->id,
+                'employee_id' => $employees[14]->id,
+                'allocated_at' => '2026-06-16',
+                'allocation_condition' => 'excellent',
+            ]);
+            $assetMac1->update(['status' => 'allocated', 'assigned_employee_id' => $employees[14]->id]);
+        }
 
         // Physical Allocation 2: Priya (Tech Lead) - Active
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetMac2->id,
-            'employee_id' => $employees[13]->id,
-            'allocated_at' => '2026-06-02',
-            'allocation_condition' => 'excellent',
-        ]);
+        AssetAllocation::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'asset_id' => $assetMac2->id, 'employee_id' => $employees[13]->id],
+            ['allocated_at' => '2026-06-02', 'allocation_condition' => 'excellent']
+        );
         $assetMac2->update(['status' => 'allocated', 'assigned_employee_id' => $employees[13]->id]);
 
         // Physical Allocation 3: Vikram Malhotra (VP HR) - Active
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetThinkPad1->id,
-            'employee_id' => $employees[2]->id,
-            'allocated_at' => '2026-06-02',
-            'allocation_condition' => 'excellent',
-        ]);
+        AssetAllocation::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'asset_id' => $assetThinkPad1->id, 'employee_id' => $employees[2]->id],
+            ['allocated_at' => '2026-06-02', 'allocation_condition' => 'excellent']
+        );
         $assetThinkPad1->update(['status' => 'allocated', 'assigned_employee_id' => $employees[2]->id]);
 
         // Physical Allocation 4: Priya (Dell Monitor) - Active
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetDell1->id,
-            'employee_id' => $employees[13]->id,
-            'allocated_at' => '2026-06-05',
-            'allocation_condition' => 'excellent',
-        ]);
+        AssetAllocation::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'asset_id' => $assetDell1->id, 'employee_id' => $employees[13]->id],
+            ['allocated_at' => '2026-06-05', 'allocation_condition' => 'excellent']
+        );
         $assetDell1->update(['status' => 'allocated', 'assigned_employee_id' => $employees[13]->id]);
 
         // Physical Allocation 5: Priya (Ergonomic Chair) - Active
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetChair1->id,
-            'employee_id' => $employees[13]->id,
-            'allocated_at' => '2026-06-05',
-            'allocation_condition' => 'excellent',
-        ]);
+        AssetAllocation::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'asset_id' => $assetChair1->id, 'employee_id' => $employees[13]->id],
+            ['allocated_at' => '2026-06-05', 'allocation_condition' => 'excellent']
+        );
         $assetChair1->update(['status' => 'allocated', 'assigned_employee_id' => $employees[13]->id]);
 
         // Physical Allocation 6: Returned Asset Example (Rohan returned temporary test laptop upon project completion)
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetMac1->id,
-            'employee_id' => $employees[4]->id, // Rohan Kulkarni
-            'allocated_at' => '2026-06-01',
-            'returned_at' => '2026-06-15',
-            'allocation_condition' => 'good',
-            'return_condition' => 'good',
-            'notes' => 'Temporary test device returned in pristine condition after initial staging setup.',
-        ]);
+        AssetAllocation::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'asset_id' => $assetMac1->id, 'employee_id' => $employees[4]->id, 'allocated_at' => '2026-06-01'],
+            [
+                'returned_at' => '2026-06-15',
+                'allocation_condition' => 'good',
+                'return_condition' => 'good',
+                'notes' => 'Temporary test device returned in pristine condition after initial staging setup.',
+            ]
+        );
 
-        // Asset Request 1: Rahul Sharma - ALLOCATED / FULFILLED (Req: 1, Allocated: 1, Remaining: 0)
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employees[14]->id, // Rahul
-            'asset_category_id' => $catLaptops->id,
-            'asset_item_id' => $itemMacBook->id,
-            'quantity' => 1,
-            'reason' => 'Development workstation for fullstack SaaS platform engineering.',
-            'status' => 'allocated',
-            'request_date' => '2026-06-15',
-            'allocated_asset_id' => $assetMac1->id,
-            'admin_notes' => 'Allocated: AST-MBP-001 on 16 Jun, 2026',
-        ]);
+        // Asset Request 1: Mohammad Kaif - ALLOCATED / FULFILLED (Req: 1, Allocated: 1, Remaining: 0)
+        AssetRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[14]->id,
+                'asset_item_id' => $itemMacBook->id,
+            ],
+            [
+                'company_id' => $company->id,
+                'asset_category_id' => $catLaptops->id,
+                'quantity' => 1,
+                'reason' => 'Development workstation for fullstack SaaS platform engineering.',
+                'status' => 'allocated',
+                'request_date' => '2026-06-15',
+                'allocated_asset_id' => $assetMac1->id,
+                'admin_notes' => 'Allocated: AST-MBP-001 on 16 Jun, 2026',
+            ]
+        );
 
         // Asset Request 2: Devendra Verma - APPROVED (Awaiting physical serial allocation: Req: 1, Allocated: 0, Remaining: 1)
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employees[6]->id, // Devendra
-            'asset_category_id' => $catLaptops->id,
-            'asset_item_id' => $itemThinkPad->id,
-            'quantity' => 1,
-            'reason' => 'Need ultraportable laptop for continuous client site visits and customer demos.',
-            'status' => 'approved',
-            'request_date' => '2026-08-01',
-        ]);
+        AssetRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[6]->id,
+                'asset_item_id' => $itemThinkPad->id,
+            ],
+            [
+                'company_id' => $company->id,
+                'asset_category_id' => $catLaptops->id,
+                'quantity' => 1,
+                'reason' => 'Need ultraportable laptop for continuous client site visits and customer demos.',
+                'status' => 'approved',
+                'request_date' => '2026-08-01',
+            ]
+        );
 
         // Asset Request 3: Sneha Patel - PENDING REVIEW (Req: 1, Allocated: 0, Remaining: 1)
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employees[9]->id, // Sneha (HR Exec)
-            'asset_category_id' => $catDisplays->id,
-            'asset_item_id' => $itemDell4k->id,
-            'quantity' => 1,
-            'reason' => 'Secondary display screen for ATS candidate pipeline reviews and document processing.',
-            'status' => 'pending',
-            'request_date' => '2026-08-20',
-        ]);
+        AssetRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[9]->id,
+                'asset_item_id' => $itemDell4k->id,
+            ],
+            [
+                'company_id' => $company->id,
+                'asset_category_id' => $catDisplays->id,
+                'quantity' => 1,
+                'reason' => 'Secondary display screen for ATS candidate pipeline reviews and document processing.',
+                'status' => 'pending',
+                'request_date' => '2026-08-20',
+            ]
+        );
 
         // Asset Request 4: Manish Gupta - REJECTED (Declined with reason notes)
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employees[7]->id, // Manish Gupta
-            'asset_category_id' => $catFurniture->id,
-            'asset_item_id' => $itemChair->id,
-            'quantity' => 1,
-            'reason' => 'Requesting additional ergonomic executive chair for plant office.',
-            'status' => 'rejected',
-            'request_date' => '2026-08-10',
-            'admin_notes' => 'Declined: Executive chair policy is limited to designated workstation desks; existing seating is compliant.',
-        ]);
+        AssetRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[7]->id,
+                'asset_item_id' => $itemChair->id,
+            ],
+            [
+                'company_id' => $company->id,
+                'asset_category_id' => $catFurniture->id,
+                'quantity' => 1,
+                'reason' => 'Requesting additional ergonomic executive chair for plant office.',
+                'status' => 'rejected',
+                'request_date' => '2026-08-10',
+                'admin_notes' => 'Declined: Executive chair policy is limited to designated workstation desks; existing seating is compliant.',
+            ]
+        );
 
         // 14. Biometric Device Master & Hardware Registry
-        $bioDeviceHq = BiometricDevice::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'business_unit_id' => $buCorporate->id,
-            'branch_id' => $branchHq->id,
-            'name' => 'HQ Noida Main Lobby Turnstile Scanner',
-            'device_serial' => 'ZKT-ECO-994820',
-            'ip_address' => '192.168.10.50',
-            'port' => 4370,
-            'status' => true,
-            'last_ping_at' => now(),
-        ]);
+        $bioDeviceHq = BiometricDevice::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'device_serial' => 'ZKT-ECO-994820'],
+            [
+                'company_id' => $company->id,
+                'business_unit_id' => $buCorporate->id,
+                'branch_id' => $branchHq->id,
+                'name' => 'HQ Noida Main Lobby Turnstile Scanner',
+                'ip_address' => '192.168.10.50',
+                'port' => 4370,
+                'status' => true,
+                'last_ping_at' => now(),
+            ]
+        );
 
-        $bioDevicePune = BiometricDevice::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'business_unit_id' => $buMfg->id,
-            'branch_id' => $branchPune->id,
-            'name' => 'Pune Plant Production Bay Biometric Terminal',
-            'device_serial' => 'ESL-BIO-882190',
-            'ip_address' => '192.168.20.75',
-            'port' => 4370,
-            'status' => true,
-            'last_ping_at' => now(),
-        ]);
+        $bioDevicePune = BiometricDevice::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'device_serial' => 'ESL-BIO-882190'],
+            [
+                'company_id' => $company->id,
+                'business_unit_id' => $buMfg->id,
+                'branch_id' => $branchPune->id,
+                'name' => 'Pune Plant Production Bay Biometric Terminal',
+                'ip_address' => '192.168.20.75',
+                'port' => 4370,
+                'status' => true,
+                'last_ping_at' => now(),
+            ]
+        );
 
-        $bioDeviceBlr = BiometricDevice::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'business_unit_id' => $buTech->id,
-            'branch_id' => $branchBlr->id,
-            'name' => 'Bangalore Tech Center 4th Floor Face Scanner',
-            'device_serial' => 'HIK-VIS-771142',
-            'ip_address' => '192.168.30.90',
-            'port' => 4370,
-            'status' => true,
-            'last_ping_at' => now(),
-        ]);
+        $bioDeviceBlr = BiometricDevice::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'device_serial' => 'HIK-VIS-771142'],
+            [
+                'company_id' => $company->id,
+                'business_unit_id' => $buTech->id,
+                'branch_id' => $branchBlr->id,
+                'name' => 'Bangalore Tech Center 4th Floor Face Scanner',
+                'ip_address' => '192.168.30.90',
+                'port' => 4370,
+                'status' => true,
+                'last_ping_at' => now(),
+            ]
+        );
 
         // Sample Biometric Punch Logs
         BiometricPunchLog::withoutEvents(function () use ($tenant, $bioDeviceHq, $bioDevicePune, $employees) {
-            BiometricPunchLog::create([
-                'tenant_id' => $tenant->id,
-                'biometric_device_id' => $bioDeviceHq->id,
-                'employee_id' => $employees[0]->id, // Rajesh Singhania
-                'punch_time' => Carbon::parse('2026-09-24 08:55:00'),
-                'punch_type' => 'check_in',
-                'processed' => true,
-                'raw_data' => ['card_no' => 'WRG-001', 'verify_mode' => 'fingerprint', 'device_ip' => '192.168.10.50'],
-            ]);
+            BiometricPunchLog::firstOrCreate(
+                [
+                    'tenant_id' => $tenant->id,
+                    'biometric_device_id' => $bioDeviceHq->id,
+                    'employee_id' => $employees[0]->id,
+                    'punch_time' => Carbon::parse('2026-09-24 08:55:00'),
+                ],
+                [
+                    'punch_type' => 'check_in',
+                    'processed' => true,
+                    'raw_data' => ['card_no' => 'WRG-001', 'verify_mode' => 'fingerprint', 'device_ip' => '192.168.10.50'],
+                ]
+            );
 
-            BiometricPunchLog::create([
-                'tenant_id' => $tenant->id,
-                'biometric_device_id' => $bioDevicePune->id,
-                'employee_id' => $employees[3]->id, // Vikramaditya (Plant Mgr)
-                'punch_time' => Carbon::parse('2026-09-24 05:50:00'),
-                'punch_type' => 'check_in',
-                'processed' => true,
-                'raw_data' => ['card_no' => 'WRG-004', 'verify_mode' => 'facial_recognition', 'device_ip' => '192.168.20.75'],
-            ]);
+            BiometricPunchLog::firstOrCreate(
+                [
+                    'tenant_id' => $tenant->id,
+                    'biometric_device_id' => $bioDevicePune->id,
+                    'employee_id' => $employees[3]->id,
+                    'punch_time' => Carbon::parse('2026-09-24 05:50:00'),
+                ],
+                [
+                    'punch_type' => 'check_in',
+                    'processed' => true,
+                    'raw_data' => ['card_no' => 'WRG-004', 'verify_mode' => 'facial_recognition', 'device_ip' => '192.168.20.75'],
+                ]
+            );
         });
 
         // 15. Shift Rosters Generation from Joining Date to 2026-10-31
@@ -1852,6 +2100,11 @@ class HrmsDemoSeeder extends Seeder
         $rosterRecords = [];
 
         foreach ($employees as $emp) {
+            // Safeguard: Preserve existing live shift rosters for protected employee
+            if (in_array($emp->id, $protectedEmployeeIds) && DB::table('shift_rosters')->where('tenant_id', $tenant->id)->where('employee_id', $emp->id)->exists()) {
+                continue;
+            }
+
             $curr = Carbon::parse($emp->date_of_joining);
             while ($curr->lte($rosterEnd)) {
                 $isPlant = ($emp->branch_id === $branchPune->id);
@@ -1880,22 +2133,26 @@ class HrmsDemoSeeder extends Seeder
         }
 
         foreach (array_chunk($rosterRecords, 100) as $chunk) {
-            DB::table('shift_rosters')->insert($chunk);
+            DB::table('shift_rosters')->insertOrIgnore($chunk);
         }
 
         // Shift Change Request Sample
-        ShiftChangeRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employees[4]->id, // Rohan (Production Engineer)
-            'type' => 'temporary',
-            'start_date' => '2026-08-20',
-            'end_date' => '2026-08-20',
-            'current_shift_id' => $shiftMorning->id,
-            'requested_shift_id' => $shiftEvening->id,
-            'reason' => 'Swapping shift for machinery maintenance overhaul support',
-            'status' => 'approved',
-        ]);
+        ShiftChangeRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[4]->id, // Rohan (Production Engineer)
+                'start_date' => '2026-08-20',
+            ],
+            [
+                'company_id' => $company->id,
+                'type' => 'temporary',
+                'end_date' => '2026-08-20',
+                'current_shift_id' => $shiftMorning->id,
+                'requested_shift_id' => $shiftEvening->id,
+                'reason' => 'Swapping shift for machinery maintenance overhaul support',
+                'status' => 'approved',
+            ]
+        );
 
         // 16. Attendance & Map Geolocation Generation (from Joining Date to 2026-09-24)
         // Realistic distribution of Office, WFH, and On-Site coordinates with polyline tracking breadcrumbs
@@ -1911,7 +2168,7 @@ class HrmsDemoSeeder extends Seeder
 
         // Specific Approved WFH Days for specific employees
         $wfhApprovedDays = [
-            $employees[14]->id => ['2026-08-10', '2026-08-11', '2026-09-07', '2026-09-08', '2026-09-24'], // Rahul (Senior Dev - WFH today!)
+            $employees[14]->id => ['2026-08-10', '2026-08-11', '2026-09-07', '2026-09-08', '2026-09-24'], // Mohammad Kaif (Software Engineer - WFH today!)
             $employees[9]->id  => ['2026-08-14', '2026-09-18'],                                           // Sneha (HR Manager)
             $employees[2]->id  => ['2026-09-04'],                                                         // Vikram (VP HR)
             $employees[13]->id => ['2026-08-21', '2026-09-18'],                                           // Priya (Tech Lead)
@@ -1938,7 +2195,7 @@ class HrmsDemoSeeder extends Seeder
             $employees[8]->id  => ['2026-09-01'],                             // Deepak Joshi
             $employees[11]->id => ['2026-08-21', '2026-09-10'],               // Suresh Iyer
             $employees[12]->id => ['2026-09-07'],                             // Kavita Reddy
-            $employees[14]->id => ['2026-08-28'],                             // Rahul Sharma
+            $employees[14]->id => ['2026-08-28'],                             // Mohammad Kaif
         ];
 
         // Specific Late Arrival Days
@@ -1960,13 +2217,13 @@ class HrmsDemoSeeder extends Seeder
             $employees[15]->id => ['2026-09-11'],               // Pooja Bhatt
             $employees[9]->id  => ['2026-08-29'],               // Sneha Roy
             $employees[12]->id => ['2026-08-08'],               // Kavita Reddy
-            $employees[14]->id => ['2026-09-05'],               // Rahul Sharma
+            $employees[14]->id => ['2026-09-05'],               // Mohammad Kaif
             $employees[8]->id  => ['2026-08-27'],               // Deepak Joshi
         ];
 
         // Specific Overtime Dates
         $overtimeDates = [
-            $employees[14]->id => ['2026-08-15', '2026-09-12'], // Rahul Sharma
+            $employees[14]->id => ['2026-08-15', '2026-09-12'], // Mohammad Kaif
             $employees[3]->id  => ['2026-08-29', '2026-09-19'], // Vikramaditya Rao
             $employees[13]->id => ['2026-08-20'],               // Priya Nair
             $employees[11]->id => ['2026-09-05'],               // Suresh Iyer
@@ -1976,6 +2233,11 @@ class HrmsDemoSeeder extends Seeder
         $locationLogsBatch = [];
 
         foreach ($employees as $empIndex => $emp) {
+            // Safeguard: If protected employee already has live attendance records, keep them intact
+            if (in_array($emp->id, $protectedEmployeeIds) && Attendance::where('tenant_id', $tenant->id)->where('employee_id', $emp->id)->exists()) {
+                continue;
+            }
+
             $joiningDate = Carbon::parse($emp->date_of_joining);
             $curr = $joiningDate->copy();
 
@@ -2002,17 +2264,21 @@ class HrmsDemoSeeder extends Seeder
                 // 1. Check Approved Leave
                 $empLeaveDays = $approvedLeaves[$emp->id] ?? [];
                 if (in_array($dateStr, $empLeaveDays)) {
-                    Attendance::create([
-                        'tenant_id'        => $tenant->id,
-                        'employee_id'      => $emp->id,
-                        'date'             => $dateStr,
-                        'check_in'         => Carbon::parse($dateStr . ' 00:00:00'),
-                        'check_out'        => null,
-                        'location_type'    => null,
-                        'status'           => 'on_leave',
-                        'total_work_hours' => 0.00,
-                        'total_break_hours'=> 0.00,
-                    ]);
+                    Attendance::firstOrCreate(
+                        [
+                            'tenant_id'   => $tenant->id,
+                            'employee_id' => $emp->id,
+                            'date'        => $dateStr,
+                        ],
+                        [
+                            'check_in'         => Carbon::parse($dateStr . ' 00:00:00'),
+                            'check_out'        => null,
+                            'location_type'    => null,
+                            'status'           => 'on_leave',
+                            'total_work_hours' => 0.00,
+                            'total_break_hours'=> 0.00,
+                        ]
+                    );
                     $curr->addDay();
                     continue;
                 }
@@ -2020,17 +2286,21 @@ class HrmsDemoSeeder extends Seeder
                 // 2. Check Absent (unplanned absence)
                 $empAbsentDays = $absentDates[$emp->id] ?? [];
                 if (in_array($dateStr, $empAbsentDays)) {
-                    Attendance::create([
-                        'tenant_id'        => $tenant->id,
-                        'employee_id'      => $emp->id,
-                        'date'             => $dateStr,
-                        'check_in'         => Carbon::parse($dateStr . ' 00:00:00'),
-                        'check_out'        => null,
-                        'location_type'    => null,
-                        'status'           => 'absent',
-                        'total_work_hours' => 0.00,
-                        'total_break_hours'=> 0.00,
-                    ]);
+                    Attendance::firstOrCreate(
+                        [
+                            'tenant_id'   => $tenant->id,
+                            'employee_id' => $emp->id,
+                            'date'        => $dateStr,
+                        ],
+                        [
+                            'check_in'         => Carbon::parse($dateStr . ' 00:00:00'),
+                            'check_out'        => null,
+                            'location_type'    => null,
+                            'status'           => 'absent',
+                            'total_work_hours' => 0.00,
+                            'total_break_hours'=> 0.00,
+                        ]
+                    );
                     $curr->addDay();
                     continue;
                 }
@@ -2194,21 +2464,25 @@ class HrmsDemoSeeder extends Seeder
                     }
                 }
 
-                $att = Attendance::create([
-                    'tenant_id'            => $tenant->id,
-                    'employee_id'          => $emp->id,
-                    'date'                 => $dateStr,
-                    'check_in'             => $checkInDt,
-                    'check_out'            => $checkOutDt,
-                    'location_type'        => $locType,
-                    'status'               => $status,
-                    'total_work_hours'     => $totalWorkHours,
-                    'total_break_hours'    => $hasActiveBreakToday ? 0.00 : ($breakDuration > 0 ? round($breakDuration / 60, 2) : 0.00),
-                    'check_in_latitude'    => $checkInLat,
-                    'check_in_longitude'   => $checkInLng,
-                    'check_out_latitude'   => $checkOutLat,
-                    'check_out_longitude'  => $checkOutLng,
-                ]);
+                $att = Attendance::firstOrCreate(
+                    [
+                        'tenant_id'   => $tenant->id,
+                        'employee_id' => $emp->id,
+                        'date'        => $dateStr,
+                    ],
+                    [
+                        'check_in'             => $checkInDt,
+                        'check_out'            => $checkOutDt,
+                        'location_type'        => $locType,
+                        'status'               => $status,
+                        'total_work_hours'     => $totalWorkHours,
+                        'total_break_hours'    => $hasActiveBreakToday ? 0.00 : ($breakDuration > 0 ? round($breakDuration / 60, 2) : 0.00),
+                        'check_in_latitude'    => $checkInLat,
+                        'check_in_longitude'   => $checkInLng,
+                        'check_out_latitude'   => $checkOutLat,
+                        'check_out_longitude'  => $checkOutLng,
+                    ]
+                );
 
                 // Attendance Break
                 if ($hasActiveBreakToday) {
@@ -2247,628 +2521,821 @@ class HrmsDemoSeeder extends Seeder
         }
 
         foreach (array_chunk($breaksBatch, 100) as $chunk) {
-            DB::table('attendance_breaks')->insert($chunk);
+            DB::table('attendance_breaks')->insertOrIgnore($chunk);
         }
         foreach (array_chunk($locationLogsBatch, 100) as $chunk) {
-            DB::table('attendance_location_logs')->insert($chunk);
+            DB::table('attendance_location_logs')->insertOrIgnore($chunk);
         }
 
         // Attendance Correction Samples (Approved & Pending)
         $sampleAtt1 = Attendance::where('employee_id', $employees[10]->id)->where('status', 'late')->first();
         if ($sampleAtt1) {
-            AttendanceCorrection::create([
-                'tenant_id'           => $tenant->id,
-                'employee_id'         => $employees[10]->id,
-                'attendance_id'       => $sampleAtt1->id,
-                'date'                => $sampleAtt1->date,
-                'requested_check_in'  => Carbon::parse($sampleAtt1->date)->setTime(8, 55, 0),
-                'requested_check_out' => Carbon::parse($sampleAtt1->date)->setTime(18, 5, 0),
-                'reason'              => 'Heavy traffic congestion due to expressway waterlogging.',
-                'status'              => 'approved',
-                'approved_by'         => $hrManagerUser->id,
-            ]);
+            AttendanceCorrection::firstOrCreate(
+                [
+                    'tenant_id'     => $tenant->id,
+                    'employee_id'   => $employees[10]->id,
+                    'attendance_id' => $sampleAtt1->id,
+                ],
+                [
+                    'date'                => $sampleAtt1->date,
+                    'requested_check_in'  => Carbon::parse($sampleAtt1->date)->setTime(8, 55, 0),
+                    'requested_check_out' => Carbon::parse($sampleAtt1->date)->setTime(18, 5, 0),
+                    'reason'              => 'Heavy traffic congestion due to expressway waterlogging.',
+                    'status'              => 'approved',
+                    'approved_by'         => $hrManagerUser->id,
+                ]
+            );
         }
 
         $sampleAtt2 = Attendance::where('employee_id', $employees[6]->id)->where('status', 'late')->where('date', '2026-09-08')->first();
         if ($sampleAtt2) {
-            AttendanceCorrection::create([
-                'tenant_id'           => $tenant->id,
-                'employee_id'         => $employees[6]->id,
-                'attendance_id'       => $sampleAtt2->id,
-                'date'                => $sampleAtt2->date,
-                'requested_check_in'  => Carbon::parse($sampleAtt2->date)->setTime(9, 0, 0),
-                'requested_check_out' => Carbon::parse($sampleAtt2->date)->setTime(18, 15, 0),
-                'reason'              => 'Metro blue line technical delay between Sector 52 and Noida Electronic City.',
-                'status'              => 'pending',
-            ]);
+            AttendanceCorrection::firstOrCreate(
+                [
+                    'tenant_id'     => $tenant->id,
+                    'employee_id'   => $employees[6]->id,
+                    'attendance_id' => $sampleAtt2->id,
+                ],
+                [
+                    'date'                => $sampleAtt2->date,
+                    'requested_check_in'  => Carbon::parse($sampleAtt2->date)->setTime(9, 0, 0),
+                    'requested_check_out' => Carbon::parse($sampleAtt2->date)->setTime(18, 15, 0),
+                    'reason'              => 'Metro blue line technical delay between Sector 52 and Noida Electronic City.',
+                    'status'              => 'pending',
+                ]
+            );
         }
 
         // 17. Leaves, Encashments, WFH & Overtime Requests
         // WFH Requests
-        WfhRequest::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'employee_id' => $employees[14]->id, // Rahul
-            'start_date'  => '2026-08-10',
-            'end_date'    => '2026-08-11',
-            'duration'    => 2,
-            'reason'      => 'High-speed fiber installation and system maintenance at residence.',
-            'status'      => 'approved',
-        ]);
+        WfhRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[14]->id,
+                'start_date'  => '2026-08-10',
+            ],
+            [
+                'company_id'  => $company->id,
+                'end_date'    => '2026-08-11',
+                'duration'    => 2,
+                'reason'      => 'High-speed fiber installation and system maintenance at residence.',
+                'status'      => 'approved',
+            ]
+        );
 
-        WfhRequest::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'employee_id' => $employees[14]->id, // Rahul
-            'start_date'  => '2026-09-07',
-            'end_date'    => '2026-09-08',
-            'duration'    => 2,
-            'reason'      => 'Core architecture sprint delivery and remote pair programming.',
-            'status'      => 'approved',
-        ]);
+        WfhRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[14]->id,
+                'start_date'  => '2026-09-07',
+            ],
+            [
+                'company_id'  => $company->id,
+                'end_date'    => '2026-09-08',
+                'duration'    => 2,
+                'reason'      => 'Core architecture sprint delivery and remote pair programming.',
+                'status'      => 'approved',
+            ]
+        );
 
-        WfhRequest::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'employee_id' => $employees[9]->id, // Sneha HR
-            'start_date'  => '2026-08-14',
-            'end_date'    => '2026-08-14',
-            'duration'    => 1,
-            'reason'      => 'Home maintenance and delivery coordination.',
-            'status'      => 'approved',
-        ]);
+        WfhRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[9]->id, // Sneha HR
+                'start_date'  => '2026-08-14',
+            ],
+            [
+                'company_id'  => $company->id,
+                'end_date'    => '2026-08-14',
+                'duration'    => 1,
+                'reason'      => 'Home maintenance and delivery coordination.',
+                'status'      => 'approved',
+            ]
+        );
 
-        WfhRequest::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'employee_id' => $employees[9]->id, // Sneha HR
-            'start_date'  => '2026-09-18',
-            'end_date'    => '2026-09-18',
-            'duration'    => 1,
-            'reason'      => 'Conducting remote candidate final interviews from home studio.',
-            'status'      => 'approved',
-        ]);
+        WfhRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[9]->id, // Sneha HR
+                'start_date'  => '2026-09-18',
+            ],
+            [
+                'company_id'  => $company->id,
+                'end_date'    => '2026-09-18',
+                'duration'    => 1,
+                'reason'      => 'Conducting remote candidate final interviews from home studio.',
+                'status'      => 'approved',
+            ]
+        );
 
-        WfhRequest::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'employee_id' => $employees[2]->id, // Vikram VP HR
-            'start_date'  => '2026-09-04',
-            'end_date'    => '2026-09-04',
-            'duration'    => 1,
-            'reason'      => 'Executive board deck preparation and remote strategy review.',
-            'status'      => 'approved',
-        ]);
+        WfhRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[2]->id, // Vikram VP HR
+                'start_date'  => '2026-09-04',
+            ],
+            [
+                'company_id'  => $company->id,
+                'end_date'    => '2026-09-04',
+                'duration'    => 1,
+                'reason'      => 'Executive board deck preparation and remote strategy review.',
+                'status'      => 'approved',
+            ]
+        );
 
-        WfhRequest::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'employee_id' => $employees[13]->id, // Priya Nair
-            'start_date'  => '2026-08-21',
-            'end_date'    => '2026-08-21',
-            'duration'    => 1,
-            'reason'      => 'Deep work on microservices refactoring and benchmark profiling.',
-            'status'      => 'approved',
-        ]);
+        WfhRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[13]->id, // Priya Nair
+                'start_date'  => '2026-08-21',
+            ],
+            [
+                'company_id'  => $company->id,
+                'end_date'    => '2026-08-21',
+                'duration'    => 1,
+                'reason'      => 'Deep work on microservices refactoring and benchmark profiling.',
+                'status'      => 'approved',
+            ]
+        );
 
         // Approved Leaves
-        LeaveRequest::create([
-            'tenant_id'     => $tenant->id,
-            'company_id'    => $company->id,
-            'employee_id'   => $employees[10]->id, // Amit
-            'leave_type_id' => $ltClStd->id,
-            'start_date'    => '2026-08-25',
-            'end_date'      => '2026-08-26',
-            'duration'      => 2,
-            'reason'        => 'Family annual function and religious ceremony.',
-            'status'        => 'approved',
-        ]);
-        LeaveBalance::where('employee_id', $employees[10]->id)->where('leave_type_id', $ltClStd->id)->increment('used', 2);
+        $lrAmit = LeaveRequest::firstOrCreate(
+            [
+                'tenant_id'     => $tenant->id,
+                'employee_id'   => $employees[10]->id, // Amit
+                'start_date'    => '2026-08-25',
+            ],
+            [
+                'company_id'    => $company->id,
+                'leave_type_id' => $ltClStd->id,
+                'end_date'      => '2026-08-26',
+                'duration'      => 2,
+                'reason'        => 'Family annual function and religious ceremony.',
+                'status'        => 'approved',
+            ]
+        );
+        if ($lrAmit->wasRecentlyCreated) {
+            LeaveBalance::where('employee_id', $employees[10]->id)->where('leave_type_id', $ltClStd->id)->increment('used', 2);
+        }
 
-        LeaveRequest::create([
-            'tenant_id'     => $tenant->id,
-            'company_id'    => $company->id,
-            'employee_id'   => $employees[15]->id, // Pooja
-            'leave_type_id' => $ltSlStd->id,
-            'start_date'    => '2026-08-05',
-            'end_date'      => '2026-08-05',
-            'duration'      => 1,
-            'reason'        => 'Medical checkup and viral fever recovery.',
-            'status'        => 'approved',
-        ]);
-        LeaveBalance::where('employee_id', $employees[15]->id)->where('leave_type_id', $ltSlStd->id)->increment('used', 1);
+        $lrPooja = LeaveRequest::firstOrCreate(
+            [
+                'tenant_id'     => $tenant->id,
+                'employee_id'   => $employees[15]->id, // Pooja
+                'start_date'    => '2026-08-05',
+            ],
+            [
+                'company_id'    => $company->id,
+                'leave_type_id' => $ltSlStd->id,
+                'end_date'      => '2026-08-05',
+                'duration'      => 1,
+                'reason'        => 'Medical checkup and viral fever recovery.',
+                'status'        => 'approved',
+            ]
+        );
+        if ($lrPooja->wasRecentlyCreated) {
+            LeaveBalance::where('employee_id', $employees[15]->id)->where('leave_type_id', $ltSlStd->id)->increment('used', 1);
+        }
 
-        LeaveRequest::create([
-            'tenant_id'     => $tenant->id,
-            'company_id'    => $company->id,
-            'employee_id'   => $employees[6]->id, // Devendra
-            'leave_type_id' => $ltClStd->id,
-            'start_date'    => '2026-08-14',
-            'end_date'      => '2026-08-14',
-            'duration'      => 1,
-            'reason'        => 'Long weekend family visit.',
-            'status'        => 'approved',
-        ]);
-        LeaveBalance::where('employee_id', $employees[6]->id)->where('leave_type_id', $ltClStd->id)->increment('used', 1);
+        $lrDevendra = LeaveRequest::firstOrCreate(
+            [
+                'tenant_id'     => $tenant->id,
+                'employee_id'   => $employees[6]->id, // Devendra
+                'start_date'    => '2026-08-14',
+            ],
+            [
+                'company_id'    => $company->id,
+                'leave_type_id' => $ltClStd->id,
+                'end_date'      => '2026-08-14',
+                'duration'      => 1,
+                'reason'        => 'Long weekend family visit.',
+                'status'        => 'approved',
+            ]
+        );
+        if ($lrDevendra->wasRecentlyCreated) {
+            LeaveBalance::where('employee_id', $employees[6]->id)->where('leave_type_id', $ltClStd->id)->increment('used', 1);
+        }
 
-        LeaveRequest::create([
-            'tenant_id'     => $tenant->id,
-            'company_id'    => $company->id,
-            'employee_id'   => $employees[9]->id, // Sneha
-            'leave_type_id' => $ltElStd->id,
-            'start_date'    => '2026-09-15',
-            'end_date'      => '2026-09-15',
-            'duration'      => 1,
-            'reason'        => 'Personal legal and property registry documentation.',
-            'status'        => 'approved',
-        ]);
-        LeaveBalance::where('employee_id', $employees[9]->id)->where('leave_type_id', $ltElStd->id)->increment('used', 1);
+        $lrSneha = LeaveRequest::firstOrCreate(
+            [
+                'tenant_id'     => $tenant->id,
+                'employee_id'   => $employees[9]->id, // Sneha
+                'start_date'    => '2026-09-15',
+            ],
+            [
+                'company_id'    => $company->id,
+                'leave_type_id' => $ltElStd->id,
+                'end_date'      => '2026-09-15',
+                'duration'      => 1,
+                'reason'        => 'Personal legal and property registry documentation.',
+                'status'        => 'approved',
+            ]
+        );
+        if ($lrSneha->wasRecentlyCreated) {
+            LeaveBalance::where('employee_id', $employees[9]->id)->where('leave_type_id', $ltElStd->id)->increment('used', 1);
+        }
 
-        LeaveRequest::create([
-            'tenant_id'     => $tenant->id,
-            'company_id'    => $company->id,
-            'employee_id'   => $employees[1]->id, // Rajesh
-            'leave_type_id' => $ltClStd->id,
-            'start_date'    => '2026-09-21',
-            'end_date'      => '2026-09-21',
-            'duration'      => 1,
-            'reason'        => 'Attending family wedding reception.',
-            'status'        => 'approved',
-        ]);
-        LeaveBalance::where('employee_id', $employees[1]->id)->where('leave_type_id', $ltClStd->id)->increment('used', 1);
+        $lrRajesh = LeaveRequest::firstOrCreate(
+            [
+                'tenant_id'     => $tenant->id,
+                'employee_id'   => $employees[1]->id, // Rajesh
+                'start_date'    => '2026-09-21',
+            ],
+            [
+                'company_id'    => $company->id,
+                'leave_type_id' => $ltClStd->id,
+                'end_date'      => '2026-09-21',
+                'duration'      => 1,
+                'reason'        => 'Attending family wedding reception.',
+                'status'        => 'approved',
+            ]
+        );
+        if ($lrRajesh->wasRecentlyCreated) {
+            LeaveBalance::where('employee_id', $employees[1]->id)->where('leave_type_id', $ltClStd->id)->increment('used', 1);
+        }
 
-        LeaveRequest::create([
-            'tenant_id'     => $tenant->id,
-            'company_id'    => $company->id,
-            'employee_id'   => $employees[12]->id, // Kavita
-            'leave_type_id' => $ltSlStd->id,
-            'start_date'    => '2026-08-11',
-            'end_date'      => '2026-08-11',
-            'duration'      => 1,
-            'reason'        => 'Dental surgery and post-operative care.',
-            'status'        => 'approved',
-        ]);
-        LeaveBalance::where('employee_id', $employees[12]->id)->where('leave_type_id', $ltSlStd->id)->increment('used', 1);
+        $lrKavita = LeaveRequest::firstOrCreate(
+            [
+                'tenant_id'     => $tenant->id,
+                'employee_id'   => $employees[12]->id, // Kavita
+                'start_date'    => '2026-08-11',
+            ],
+            [
+                'company_id'    => $company->id,
+                'leave_type_id' => $ltSlStd->id,
+                'end_date'      => '2026-08-11',
+                'duration'      => 1,
+                'reason'        => 'Dental surgery and post-operative care.',
+                'status'        => 'approved',
+            ]
+        );
+        if ($lrKavita->wasRecentlyCreated) {
+            LeaveBalance::where('employee_id', $employees[12]->id)->where('leave_type_id', $ltSlStd->id)->increment('used', 1);
+        }
 
-        LeaveRequest::create([
-            'tenant_id'     => $tenant->id,
-            'company_id'    => $company->id,
-            'employee_id'   => $employees[4]->id, // Rohan (Today On Leave)
-            'leave_type_id' => $ltSlStd->id,
-            'start_date'    => '2026-09-24',
-            'end_date'      => '2026-09-24',
-            'duration'      => 1,
-            'reason'        => 'Acute migraine and medical rest.',
-            'status'        => 'approved',
-        ]);
-        LeaveBalance::where('employee_id', $employees[4]->id)->where('leave_type_id', $ltSlStd->id)->increment('used', 1);
+        $lrRohan = LeaveRequest::firstOrCreate(
+            [
+                'tenant_id'     => $tenant->id,
+                'employee_id'   => $employees[4]->id, // Rohan (Today On Leave)
+                'start_date'    => '2026-09-24',
+            ],
+            [
+                'company_id'    => $company->id,
+                'leave_type_id' => $ltSlStd->id,
+                'end_date'      => '2026-09-24',
+                'duration'      => 1,
+                'reason'        => 'Acute migraine and medical rest.',
+                'status'        => 'approved',
+            ]
+        );
+        if ($lrRohan->wasRecentlyCreated) {
+            LeaveBalance::where('employee_id', $employees[4]->id)->where('leave_type_id', $ltSlStd->id)->increment('used', 1);
+        }
 
         // Pending Leave Request for October
-        LeaveRequest::create([
-            'tenant_id'     => $tenant->id,
-            'company_id'    => $company->id,
-            'employee_id'   => $employees[9]->id, // Sneha
-            'leave_type_id' => $ltElStd->id,
-            'start_date'    => '2026-10-05',
-            'end_date'      => '2026-10-09',
-            'duration'      => 5,
-            'reason'        => 'Annual vacation travel with family.',
-            'status'        => 'pending',
-        ]);
+        LeaveRequest::firstOrCreate(
+            [
+                'tenant_id'     => $tenant->id,
+                'employee_id'   => $employees[9]->id, // Sneha
+                'start_date'    => '2026-10-05',
+            ],
+            [
+                'company_id'    => $company->id,
+                'leave_type_id' => $ltElStd->id,
+                'end_date'      => '2026-10-09',
+                'duration'      => 5,
+                'reason'        => 'Annual vacation travel with family.',
+                'status'        => 'pending',
+            ]
+        );
 
-        LeaveEncashment::create([
-            'tenant_id'      => $tenant->id,
-            'company_id'     => $company->id,
-            'employee_id'    => $employees[13]->id, // Priya
-            'leave_type_id'  => $ltElStd->id,
-            'requested_days' => 5.0,
-            'reason'         => 'Annual leave encashment policy benefit.',
-            'status'         => 'approved',
-            'approved_by'    => $hrManagerUser->id,
-            'approved_at'    => '2026-08-30 14:00:00',
-        ]);
-        LeaveBalance::where('employee_id', $employees[13]->id)->where('leave_type_id', $ltElStd->id)->increment('encashed', 5);
+        $encashPriya = LeaveEncashment::firstOrCreate(
+            [
+                'tenant_id'      => $tenant->id,
+                'employee_id'    => $employees[13]->id, // Priya
+                'leave_type_id'  => $ltElStd->id,
+            ],
+            [
+                'company_id'     => $company->id,
+                'requested_days' => 5.0,
+                'reason'         => 'Annual leave encashment policy benefit.',
+                'status'         => 'approved',
+                'approved_by'    => $hrManagerUser->id,
+                'approved_at'    => '2026-08-30 14:00:00',
+            ]
+        );
+        if ($encashPriya->wasRecentlyCreated) {
+            LeaveBalance::where('employee_id', $employees[13]->id)->where('leave_type_id', $ltElStd->id)->increment('encashed', 5);
+        }
 
         // Overtime Requests
-        OvertimeRequest::create([
-            'tenant_id'         => $tenant->id,
-            'company_id'        => $company->id,
-            'employee_id'       => $employees[14]->id,
-            'date'              => '2026-08-15',
-            'start_time'        => '09:00:00',
-            'end_time'          => '15:00:00',
-            'duration_hours'    => 6,
-            'compensation_type' => 'payout',
-            'reason'            => 'Critical cloud infrastructure database migration and zero-downtime cutover.',
-            'status'            => 'approved',
-        ]);
+        OvertimeRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[14]->id,
+                'date'        => '2026-08-15',
+            ],
+            [
+                'company_id'        => $company->id,
+                'start_time'        => '09:00:00',
+                'end_time'          => '15:00:00',
+                'duration_hours'    => 6,
+                'compensation_type' => 'payout',
+                'reason'            => 'Critical cloud infrastructure database migration and zero-downtime cutover.',
+                'status'            => 'approved',
+            ]
+        );
 
-        OvertimeRequest::create([
-            'tenant_id'         => $tenant->id,
-            'company_id'        => $company->id,
-            'employee_id'       => $employees[14]->id,
-            'date'              => '2026-09-12',
-            'start_time'        => '18:00:00',
-            'end_time'          => '21:00:00',
-            'duration_hours'    => 3,
-            'compensation_type' => 'payout',
-            'reason'            => 'Release sprint v2.4 deployment and load testing.',
-            'status'            => 'approved',
-        ]);
+        OvertimeRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[14]->id,
+                'date'        => '2026-09-12',
+            ],
+            [
+                'company_id'        => $company->id,
+                'start_time'        => '18:00:00',
+                'end_time'          => '21:00:00',
+                'duration_hours'    => 3,
+                'compensation_type' => 'payout',
+                'reason'            => 'Release sprint v2.4 deployment and load testing.',
+                'status'            => 'approved',
+            ]
+        );
 
-        OvertimeRequest::create([
-            'tenant_id'         => $tenant->id,
-            'company_id'        => $company->id,
-            'employee_id'       => $employees[3]->id, // Vikramaditya
-            'date'              => '2026-08-29',
-            'start_time'        => '18:00:00',
-            'end_time'          => '21:00:00',
-            'duration_hours'    => 3,
-            'compensation_type' => 'payout',
-            'reason'            => 'Overtime supervision for emergency CNC spindle maintenance.',
-            'status'            => 'approved',
-        ]);
+        OvertimeRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[3]->id, // Vikramaditya
+                'date'        => '2026-08-29',
+            ],
+            [
+                'company_id'        => $company->id,
+                'start_time'        => '18:00:00',
+                'end_time'          => '21:00:00',
+                'duration_hours'    => 3,
+                'compensation_type' => 'payout',
+                'reason'            => 'Overtime supervision for emergency CNC spindle maintenance.',
+                'status'            => 'approved',
+            ]
+        );
 
-        OvertimeRequest::create([
-            'tenant_id'         => $tenant->id,
-            'company_id'        => $company->id,
-            'employee_id'       => $employees[3]->id, // Vikramaditya
-            'date'              => '2026-09-19',
-            'start_time'        => '18:00:00',
-            'end_time'          => '21:00:00',
-            'duration_hours'    => 3,
-            'compensation_type' => 'payout',
-            'reason'            => 'Weekend plant assembly line throughput calibration.',
-            'status'            => 'approved',
-        ]);
+        OvertimeRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[3]->id, // Vikramaditya
+                'date'        => '2026-09-19',
+            ],
+            [
+                'company_id'        => $company->id,
+                'start_time'        => '18:00:00',
+                'end_time'          => '21:00:00',
+                'duration_hours'    => 3,
+                'compensation_type' => 'payout',
+                'reason'            => 'Weekend plant assembly line throughput calibration.',
+                'status'            => 'approved',
+            ]
+        );
 
-        OvertimeRequest::create([
-            'tenant_id'         => $tenant->id,
-            'company_id'        => $company->id,
-            'employee_id'       => $employees[13]->id, // Priya
-            'date'              => '2026-08-20',
-            'start_time'        => '18:30:00',
-            'end_time'          => '21:30:00',
-            'duration_hours'    => 3,
-            'compensation_type' => 'payout',
-            'reason'            => 'Enterprise security patch rollout and staging cluster validation.',
-            'status'            => 'approved',
-        ]);
+        OvertimeRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[13]->id, // Priya
+                'date'        => '2026-08-20',
+            ],
+            [
+                'company_id'        => $company->id,
+                'start_time'        => '18:30:00',
+                'end_time'          => '21:30:00',
+                'duration_hours'    => 3,
+                'compensation_type' => 'payout',
+                'reason'            => 'Enterprise security patch rollout and staging cluster validation.',
+                'status'            => 'approved',
+            ]
+        );
 
-        OvertimeRequest::create([
-            'tenant_id'         => $tenant->id,
-            'company_id'        => $company->id,
-            'employee_id'       => $employees[11]->id, // Suresh
-            'date'              => '2026-09-05',
-            'start_time'        => '18:00:00',
-            'end_time'          => '21:00:00',
-            'duration_hours'    => 3,
-            'compensation_type' => 'payout',
-            'reason'            => 'Quarterly internal financial reconciliation and tax audit prep.',
-            'status'            => 'approved',
-        ]);
+        OvertimeRequest::firstOrCreate(
+            [
+                'tenant_id'   => $tenant->id,
+                'employee_id' => $employees[11]->id, // Suresh
+                'date'        => '2026-09-05',
+            ],
+            [
+                'company_id'        => $company->id,
+                'start_time'        => '18:00:00',
+                'end_time'          => '21:00:00',
+                'duration_hours'    => 3,
+                'compensation_type' => 'payout',
+                'reason'            => 'Quarterly internal financial reconciliation and tax audit prep.',
+                'status'            => 'approved',
+            ]
+        );
 
         // Attendance Corrections
-        AttendanceCorrection::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[6]->id, // Devendra
-            'date' => '2026-09-10',
-            'requested_check_in' => '2026-09-10 09:15:00',
-            'requested_check_out' => '2026-09-10 18:30:00',
-            'reason' => 'Morning offsite client pitch meeting; forgot mobile clock-in during presentation.',
-            'status' => 'approved',
-            'approved_by' => $hrManagerUser->id,
-        ]);
+        AttendanceCorrection::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[6]->id, // Devendra
+                'date' => '2026-09-10',
+            ],
+            [
+                'requested_check_in' => '2026-09-10 09:15:00',
+                'requested_check_out' => '2026-09-10 18:30:00',
+                'reason' => 'Morning offsite client pitch meeting; forgot mobile clock-in during presentation.',
+                'status' => 'approved',
+                'approved_by' => $hrManagerUser->id,
+            ]
+        );
 
-        AttendanceCorrection::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[15]->id, // Pooja
-            'date' => '2026-09-22',
-            'requested_check_in' => '2026-09-22 09:30:00',
-            'requested_check_out' => '2026-09-22 18:30:00',
-            'reason' => 'Lobby turnstile network sync latency on Tuesday morning.',
-            'status' => 'pending',
-        ]);
+        AttendanceCorrection::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[15]->id, // Pooja
+                'date' => '2026-09-22',
+            ],
+            [
+                'requested_check_in' => '2026-09-22 09:30:00',
+                'requested_check_out' => '2026-09-22 18:30:00',
+                'reason' => 'Lobby turnstile network sync latency on Tuesday morning.',
+                'status' => 'pending',
+            ]
+        );
 
         // WFH Requests
-        WfhRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employees[14]->id, // Rahul
-            'start_date' => '2026-08-10',
-            'end_date' => '2026-08-14',
-            'duration' => 5.0,
-            'start_date_type' => 'full_day',
-            'end_date_type' => 'full_day',
-            'reason' => 'Focus sprint delivery for core database migration.',
-            'status' => 'approved',
-            'approved_by' => $employees[13]->id,
-        ]);
+        WfhRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[14]->id,
+                'start_date' => '2026-08-10',
+                'end_date' => '2026-08-14',
+            ],
+            [
+                'company_id' => $company->id,
+                'duration' => 5.0,
+                'start_date_type' => 'full_day',
+                'end_date_type' => 'full_day',
+                'reason' => 'Focus sprint delivery for core database migration.',
+                'status' => 'approved',
+                'approved_by' => $employees[13]->id,
+            ]
+        );
 
-        WfhRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employees[9]->id, // Sneha (HR Mgr)
-            'start_date' => '2026-10-01',
-            'end_date' => '2026-10-02',
-            'duration' => 2.0,
-            'start_date_type' => 'full_day',
-            'end_date_type' => 'full_day',
-            'reason' => 'Remote hiring interviews for Q4 technical pipeline.',
-            'status' => 'pending',
-        ]);
+        WfhRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[9]->id, // Sneha (HR Mgr)
+                'start_date' => '2026-10-01',
+            ],
+            [
+                'company_id' => $company->id,
+                'end_date' => '2026-10-02',
+                'duration' => 2.0,
+                'start_date_type' => 'full_day',
+                'end_date_type' => 'full_day',
+                'reason' => 'Remote hiring interviews for Q4 technical pipeline.',
+                'status' => 'pending',
+            ]
+        );
 
         // Employee Self-Service Profile Update Requests
-        EmployeeProfileUpdateRequest::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[13]->id, // Priya (Tech Lead)
-            'user_id' => $employees[13]->user_id,
-            'changes' => [
-                'present_address' => [
-                    'old' => $employees[13]->present_address,
-                    'new' => 'Flat 402, Prestige Lakeside Habitat, Varthur, Bangalore - 560087',
-                    'label' => 'Present Address',
-                ],
-                'personal_mobile_number' => [
-                    'old' => $employees[13]->personal_mobile_number,
-                    'new' => '+91 98450 99881',
-                    'label' => 'Personal Mobile Number',
-                ],
+        EmployeeProfileUpdateRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[13]->id, // Priya (Tech Lead)
+                'status' => 'pending',
             ],
-            'status' => 'pending',
-        ]);
+            [
+                'user_id' => $employees[13]->user_id,
+                'changes' => [
+                    'present_address' => [
+                        'old' => $employees[13]->present_address,
+                        'new' => 'Flat 402, Prestige Lakeside Habitat, Varthur, Bangalore - 560087',
+                        'label' => 'Present Address',
+                    ],
+                    'personal_mobile_number' => [
+                        'old' => $employees[13]->personal_mobile_number,
+                        'new' => '+91 98450 99881',
+                        'label' => 'Personal Mobile Number',
+                    ],
+                ],
+            ]
+        );
 
-        EmployeeProfileUpdateRequest::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[6]->id, // Devendra
-            'user_id' => $employees[6]->user_id,
-            'changes' => [
-                'emergency_contact_name' => [
-                    'old' => $employees[6]->emergency_contact_name,
-                    'new' => 'Kavita Verma',
-                    'label' => 'Emergency Contact Name',
-                ],
-                'emergency_contact_number' => [
-                    'old' => $employees[6]->emergency_contact_number,
-                    'new' => '+91 99887 76655',
-                    'label' => 'Emergency Contact Number',
-                ],
-                'emergency_contact_relation' => [
-                    'old' => $employees[6]->emergency_contact_relation,
-                    'new' => 'Spouse',
-                    'label' => 'Emergency Contact Relation',
-                ],
-                'marital_status' => [
-                    'old' => $employees[6]->marital_status,
-                    'new' => 'Married',
-                    'label' => 'Marital Status',
-                ],
+        EmployeeProfileUpdateRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[6]->id, // Devendra
+                'status' => 'approved',
             ],
-            'status' => 'approved',
-            'reviewed_by' => $hrManagerUser->id,
-            'reviewed_at' => Carbon::parse('2026-08-15 14:30:00'),
-        ]);
+            [
+                'user_id' => $employees[6]->user_id,
+                'changes' => [
+                    'emergency_contact_name' => [
+                        'old' => $employees[6]->emergency_contact_name,
+                        'new' => 'Kavita Verma',
+                        'label' => 'Emergency Contact Name',
+                    ],
+                    'emergency_contact_number' => [
+                        'old' => $employees[6]->emergency_contact_number,
+                        'new' => '+91 99887 76655',
+                        'label' => 'Emergency Contact Number',
+                    ],
+                    'emergency_contact_relation' => [
+                        'old' => $employees[6]->emergency_contact_relation,
+                        'new' => 'Spouse',
+                        'label' => 'Emergency Contact Relation',
+                    ],
+                    'marital_status' => [
+                        'old' => $employees[6]->marital_status,
+                        'new' => 'Married',
+                        'label' => 'Marital Status',
+                    ],
+                ],
+                'reviewed_by' => $hrManagerUser->id,
+                'reviewed_at' => Carbon::parse('2026-08-15 14:30:00'),
+            ]
+        );
 
-        EmployeeProfileUpdateRequest::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[15]->id, // Pooja
-            'user_id' => $employees[15]->user_id,
-            'changes' => [
-                'bank_name' => [
-                    'old' => $employees[15]->bank_name,
-                    'new' => 'State Bank of India',
-                    'label' => 'Bank Name',
-                ],
-                'account_number' => [
-                    'old' => $employees[15]->account_number,
-                    'new' => '30998877665',
-                    'label' => 'Bank Account Number',
-                ],
-                'ifsc_code' => [
-                    'old' => $employees[15]->ifsc_code,
-                    'new' => 'SBIN0001234',
-                    'label' => 'IFSC Code',
-                ],
+        EmployeeProfileUpdateRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[15]->id, // Pooja
+                'status' => 'rejected',
             ],
-            'status' => 'rejected',
-            'rejection_reason' => 'Passbook scan was illegible. Please upload clear scan showing account number and IFSC code.',
-            'reviewed_by' => $hrManagerUser->id,
-            'reviewed_at' => Carbon::parse('2026-08-18 11:00:00'),
-        ]);
+            [
+                'user_id' => $employees[15]->user_id,
+                'changes' => [
+                    'bank_name' => [
+                        'old' => $employees[15]->bank_name,
+                        'new' => 'State Bank of India',
+                        'label' => 'Bank Name',
+                    ],
+                    'account_number' => [
+                        'old' => $employees[15]->account_number,
+                        'new' => '30998877665',
+                        'label' => 'Bank Account Number',
+                    ],
+                    'ifsc_code' => [
+                        'old' => $employees[15]->ifsc_code,
+                        'new' => 'SBIN0001234',
+                        'label' => 'IFSC Code',
+                    ],
+                ],
+                'rejection_reason' => 'Passbook scan was illegible. Please upload clear scan showing account number and IFSC code.',
+                'reviewed_by' => $hrManagerUser->id,
+                'reviewed_at' => Carbon::parse('2026-08-18 11:00:00'),
+            ]
+        );
 
         // 18. Travel & Expense Management
-        $travelReq = TravelRequest::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[5]->id, // Ananya Sen (Sales Manager)
-            'purpose' => 'Q3 Enterprise Client Demonstrations & Contract Negotiations',
-            'destination' => 'Mumbai & Pune Regional Offices',
-            'start_date' => '2026-08-18',
-            'end_date' => '2026-08-21',
-            'estimated_budget' => 35000.00,
-            'approved_budget' => 35000.00,
-            'status' => 'approved',
-        ]);
+        $travelReq = TravelRequest::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[5]->id, // Ananya Sen (Sales Manager)
+                'start_date' => '2026-08-18',
+            ],
+            [
+                'purpose' => 'Q3 Enterprise Client Demonstrations & Contract Negotiations',
+                'destination' => 'Mumbai & Pune Regional Offices',
+                'end_date' => '2026-08-21',
+                'estimated_budget' => 35000.00,
+                'approved_budget' => 35000.00,
+                'status' => 'approved',
+            ]
+        );
 
-        CashAdvance::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[5]->id,
-            'travel_request_id' => $travelReq->id,
-            'amount' => 15000.00,
-            'approved_amount' => 15000.00,
-            'purpose' => 'Advance for local conveyance and customer meetings',
-            'status' => 'approved',
-            'approval_levels' => 1,
-            'current_approval_level' => 1,
-            'l1_approved_by' => $companyAdminUser->id,
-            'l1_approved_at' => '2026-08-16 11:00:00',
-        ]);
+        CashAdvance::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[5]->id,
+                'travel_request_id' => $travelReq->id,
+            ],
+            [
+                'amount' => 15000.00,
+                'approved_amount' => 15000.00,
+                'purpose' => 'Advance for local conveyance and customer meetings',
+                'status' => 'approved',
+                'approval_levels' => 1,
+                'current_approval_level' => 1,
+                'l1_approved_by' => $companyAdminUser->id,
+                'l1_approved_at' => '2026-08-16 11:00:00',
+            ]
+        );
 
-        $expReport = ExpenseReport::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[5]->id,
-            'title' => 'Mumbai-Pune Client Visit Travel Reimbursement',
-            'status' => 'approved',
-            'total_amount' => 28400.00,
-            'advance_adjusted' => 15000.00,
-            'net_reimbursement' => 13400.00,
-            'approved_amount' => 28400.00,
-            'approved_net_reimbursement' => 13400.00,
-            'payout_channel' => 'monthly_payroll',
-        ]);
+        $expReport = ExpenseReport::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[5]->id,
+                'title' => 'Mumbai-Pune Client Visit Travel Reimbursement',
+            ],
+            [
+                'status' => 'approved',
+                'total_amount' => 28400.00,
+                'advance_adjusted' => 15000.00,
+                'net_reimbursement' => 13400.00,
+                'approved_amount' => 28400.00,
+                'approved_net_reimbursement' => 13400.00,
+                'payout_channel' => 'monthly_payroll',
+            ]
+        );
 
-        ExpenseClaim::create([
-            'expense_report_id' => $expReport->id,
-            'expense_category_id' => $expCatTravel->id,
-            'expense_date' => '2026-08-18',
-            'amount' => 14200.00,
-            'receipt_path' => 'expenses/flight_tickets_bom.pdf',
-            'description' => 'Round trip air tickets DEL-BOM-DEL (Air India)',
-            'status' => 'approved',
-            'approved_amount' => 14200.00,
-        ]);
+        ExpenseClaim::firstOrCreate(
+            [
+                'expense_report_id' => $expReport->id,
+                'expense_category_id' => $expCatTravel->id,
+                'expense_date' => '2026-08-18',
+            ],
+            [
+                'amount' => 14200.00,
+                'receipt_path' => 'expenses/flight_tickets_bom.pdf',
+                'description' => 'Round trip air tickets DEL-BOM-DEL (Air India)',
+                'status' => 'approved',
+                'approved_amount' => 14200.00,
+            ]
+        );
 
-        ExpenseClaim::create([
-            'expense_report_id' => $expReport->id,
-            'expense_category_id' => $expCatHotel->id,
-            'expense_date' => '2026-08-20',
-            'amount' => 10500.00,
-            'receipt_path' => 'expenses/hotel_radisson.pdf',
-            'description' => 'Hotel stay 2 nights at Radisson Blu Mumbai',
-            'status' => 'approved',
-            'approved_amount' => 10500.00,
-        ]);
+        ExpenseClaim::firstOrCreate(
+            [
+                'expense_report_id' => $expReport->id,
+                'expense_category_id' => $expCatHotel->id,
+                'expense_date' => '2026-08-20',
+            ],
+            [
+                'amount' => 10500.00,
+                'receipt_path' => 'expenses/hotel_radisson.pdf',
+                'description' => 'Hotel stay 2 nights at Radisson Blu Mumbai',
+                'status' => 'approved',
+                'approved_amount' => 10500.00,
+            ]
+        );
 
-        ExpenseClaim::create([
-            'expense_report_id' => $expReport->id,
-            'expense_category_id' => $expCatMeals->id,
-            'expense_date' => '2026-08-20',
-            'amount' => 3700.00,
-            'receipt_path' => 'expenses/client_dinner.pdf',
-            'description' => 'Business working dinner with enterprise procurement committee',
-            'status' => 'approved',
-            'approved_amount' => 3700.00,
-        ]);
+        ExpenseClaim::firstOrCreate(
+            [
+                'expense_report_id' => $expReport->id,
+                'expense_category_id' => $expCatMeals->id,
+                'expense_date' => '2026-08-20',
+            ],
+            [
+                'amount' => 3700.00,
+                'receipt_path' => 'expenses/client_dinner.pdf',
+                'description' => 'Business working dinner with enterprise procurement committee',
+                'status' => 'approved',
+                'approved_amount' => 3700.00,
+            ]
+        );
 
         // 19. Performance Improvement Plan (PIP)
-        $pipCatDelivery = PipCategory::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Project Delivery & Velocity', 'code' => 'DELIVERY', 'description' => 'Timely milestone execution and sprint throughput', 'status' => 'active']);
-        $pipCatQuality = PipCategory::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Code Quality & System Architecture', 'code' => 'QUALITY', 'description' => 'Code hygiene, test coverage, and documentation', 'status' => 'active']);
+        $pipCatDelivery = PipCategory::firstOrCreate(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'DELIVERY'], ['name' => 'Project Delivery & Velocity', 'description' => 'Timely milestone execution and sprint throughput', 'status' => 'active']);
+        $pipCatQuality = PipCategory::firstOrCreate(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'QUALITY'], ['name' => 'Code Quality & System Architecture', 'description' => 'Code hygiene, test coverage, and documentation', 'status' => 'active']);
 
-        PipPolicyTemplate::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'Standard 30-Day Engineering Improvement Plan',
-            'duration_days' => 30,
-            'checkin_frequency' => 'weekly',
-            'description' => 'Structured milestone reviews for engineering output acceleration',
-            'status' => 'active',
-        ]);
+        PipPolicyTemplate::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Standard 30-Day Engineering Improvement Plan'],
+            [
+                'duration_days' => 30,
+                'checkin_frequency' => 'weekly',
+                'description' => 'Structured milestone reviews for engineering output acceleration',
+                'status' => 'active',
+            ]
+        );
 
-        $pipDev = PerformanceImprovementPlan::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'pip_number' => 'PIP-2026-001',
-            'employee_id' => $employees[6]->id, // Devendra
-            'manager_id' => $employees[5]->id,  // Ananya Sen (Sales Mgr)
-            'hr_representative_id' => $hrManagerUser->id,
-            'pip_category_id' => $pipCatDelivery->id,
-            'reason_category' => 'Lead Conversion & Sales Pipeline Shortfall',
-            'reason_details' => 'Target conversion rate fell below 15% in Q2. Structured intervention to improve qualified opportunity closures.',
-            'start_date' => '2026-08-01',
-            'end_date' => '2026-08-31',
-            'duration_days' => 30,
-            'checkin_frequency' => 'weekly',
-            'status' => 'completed_success',
-            'final_outcome' => 'successful_completion',
-            'final_comments' => 'Devendra demonstrated remarkable dedication, closed 4 new enterprise accounts, and exceeded pipeline recovery benchmarks.',
-            'completed_at' => '2026-08-31 17:00:00',
-            'employee_signed_at' => '2026-08-01 10:00:00',
-            'manager_signed_at' => '2026-08-01 10:30:00',
-            'hr_signed_at' => '2026-08-01 11:00:00',
-        ]);
+        $pipDev = PerformanceImprovementPlan::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'pip_number' => 'PIP-2026-001',
+            ],
+            [
+                'employee_id' => $employees[6]->id, // Devendra
+                'manager_id' => $employees[5]->id,  // Ananya Sen (Sales Mgr)
+                'hr_representative_id' => $hrManagerUser->id,
+                'pip_category_id' => $pipCatDelivery->id,
+                'reason_category' => 'Lead Conversion & Sales Pipeline Shortfall',
+                'reason_details' => 'Target conversion rate fell below 15% in Q2. Structured intervention to improve qualified opportunity closures.',
+                'start_date' => '2026-08-01',
+                'end_date' => '2026-08-31',
+                'duration_days' => 30,
+                'checkin_frequency' => 'weekly',
+                'status' => 'completed_success',
+                'final_outcome' => 'successful_completion',
+                'final_comments' => 'Devendra demonstrated remarkable dedication, closed 4 new enterprise accounts, and exceeded pipeline recovery benchmarks.',
+                'completed_at' => '2026-08-31 17:00:00',
+                'employee_signed_at' => '2026-08-01 10:00:00',
+                'manager_signed_at' => '2026-08-01 10:30:00',
+                'hr_signed_at' => '2026-08-01 11:00:00',
+            ]
+        );
 
-        PipObjective::create([
-            'tenant_id' => $tenant->id,
-            'pip_id' => $pipDev->id,
-            'title' => 'Achieve 20 Validated Enterprise Client Demos',
-            'description' => 'Schedule and deliver comprehensive ERP module demonstrations to prospective clients.',
-            'target_criteria' => 'Minimum 20 completed demo sessions recorded in CRM.',
-            'weightage' => 50.00,
-            'status' => 'achieved',
-            'manager_remarks' => 'Completed 22 demos with high client engagement.',
-        ]);
+        PipObjective::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'pip_id' => $pipDev->id,
+                'title' => 'Achieve 20 Validated Enterprise Client Demos',
+            ],
+            [
+                'description' => 'Schedule and deliver comprehensive ERP module demonstrations to prospective clients.',
+                'target_criteria' => 'Minimum 20 completed demo sessions recorded in CRM.',
+                'weightage' => 50.00,
+                'status' => 'achieved',
+                'manager_remarks' => 'Completed 22 demos with high client engagement.',
+            ]
+        );
 
-        PipObjective::create([
-            'tenant_id' => $tenant->id,
-            'pip_id' => $pipDev->id,
-            'title' => 'Convert at least 3 Pipeline Accounts to Paid Quotations',
-            'description' => 'Execute high-touch negotiations and secure approved purchase orders.',
-            'target_criteria' => 'INR 15 Lakhs in converted sales contracts.',
-            'weightage' => 50.00,
-            'status' => 'achieved',
-            'manager_remarks' => 'Converted 3 major contracts totaling INR 18.5 Lakhs.',
-        ]);
+        PipObjective::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'pip_id' => $pipDev->id,
+                'title' => 'Convert at least 3 Pipeline Accounts to Paid Quotations',
+            ],
+            [
+                'description' => 'Execute high-touch negotiations and secure approved purchase orders.',
+                'target_criteria' => 'INR 15 Lakhs in converted sales contracts.',
+                'weightage' => 50.00,
+                'status' => 'achieved',
+                'manager_remarks' => 'Converted 3 major contracts totaling INR 18.5 Lakhs.',
+            ]
+        );
 
-        PipCheckin::create([
-            'tenant_id' => $tenant->id,
-            'pip_id' => $pipDev->id,
-            'review_date' => '2026-08-08',
-            'reviewer_id' => $salesManagerUser->id,
-            'rating_status' => 'on_track',
-            'manager_comments' => 'Good initial traction. Continue focusing on follow-up velocity.',
-            'employee_comments' => 'Completed 6 product demonstrations; 2 quotations submitted.',
-            'action_items' => 'Schedule follow-up calls with top 5 enterprise prospects.',
-        ]);
+        PipCheckin::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'pip_id' => $pipDev->id,
+                'review_date' => '2026-08-08',
+            ],
+            [
+                'reviewer_id' => $salesManagerUser->id,
+                'rating_status' => 'on_track',
+                'manager_comments' => 'Good initial traction. Continue focusing on follow-up velocity.',
+                'employee_comments' => 'Completed 6 product demonstrations; 2 quotations submitted.',
+                'action_items' => 'Schedule follow-up calls with top 5 enterprise prospects.',
+            ]
+        );
 
-        PipCheckin::create([
-            'tenant_id' => $tenant->id,
-            'pip_id' => $pipDev->id,
-            'review_date' => '2026-08-22',
-            'reviewer_id' => $salesManagerUser->id,
-            'rating_status' => 'exceeding',
-            'manager_comments' => 'Outstanding execution and customer engagement. Exceeded revenue targets.',
-            'employee_comments' => 'Closed 3 enterprise accounts with total revenue of INR 18.5 Lakhs.',
-            'action_items' => 'Prepare onboarding handoff documents for new accounts.',
-        ]);
+        PipCheckin::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'pip_id' => $pipDev->id,
+                'review_date' => '2026-08-22',
+            ],
+            [
+                'reviewer_id' => $salesManagerUser->id,
+                'rating_status' => 'exceeding',
+                'manager_comments' => 'Outstanding execution and customer engagement. Exceeded revenue targets.',
+                'employee_comments' => 'Closed 3 enterprise accounts with total revenue of INR 18.5 Lakhs.',
+                'action_items' => 'Prepare onboarding handoff documents for new accounts.',
+            ]
+        );
 
         // 20. Broadcasts & Announcements
-        $b1 = Broadcast::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'broadcast_number' => 'BC-2026-001',
-            'title' => 'Q3 2026 Company Town Hall & Strategy Update',
-            'category' => 'announcement',
-            'priority' => 'important',
-            'content' => '<p>Team Warrgyizmorsch,</p><p>We are delighted to invite everyone to our <strong>Q3 2026 Virtual Town Hall</strong> this Friday at 4:00 PM IST. We will share key business milestones, product releases, and recognize top contributors.</p>',
-            'target_type' => 'all',
-            'is_acknowledgement_required' => true,
-            'allow_comments' => true,
-            'send_email' => true,
-            'show_banner' => true,
-            'published_at' => '2026-08-10 09:00:00',
-            'status' => 'published',
-            'created_by_user_id' => $companyAdminUser->id,
-        ]);
+        $b1 = Broadcast::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'broadcast_number' => 'BC-2026-001',
+            ],
+            [
+                'company_id' => $company->id,
+                'title' => 'Q3 2026 Company Town Hall & Strategy Update',
+                'category' => 'announcement',
+                'priority' => 'important',
+                'content' => '<p>Team Warrgyizmorsch,</p><p>We are delighted to invite everyone to our <strong>Q3 2026 Virtual Town Hall</strong> this Friday at 4:00 PM IST. We will share key business milestones, product releases, and recognize top contributors.</p>',
+                'target_type' => 'all',
+                'is_acknowledgement_required' => true,
+                'allow_comments' => true,
+                'send_email' => true,
+                'show_banner' => true,
+                'published_at' => '2026-08-10 09:00:00',
+                'status' => 'published',
+                'created_by_user_id' => $companyAdminUser->id,
+            ]
+        );
 
-        $b2 = Broadcast::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'broadcast_number' => 'BC-2026-002',
-            'title' => 'Enhanced Health Insurance & Wellness Benefits 2026-27',
-            'category' => 'policy_update',
-            'priority' => 'normal',
-            'content' => '<p>Dear Colleagues,</p><p>We have upgraded our group medical coverage to include comprehensive OPD coverage, parent health benefits, and mental health wellness counseling sessions.</p>',
-            'target_type' => 'all',
-            'is_acknowledgement_required' => true,
-            'allow_comments' => true,
-            'send_email' => true,
-            'show_banner' => false,
-            'published_at' => '2026-08-20 10:00:00',
-            'status' => 'published',
-            'created_by_user_id' => $hrHeadUser->id,
-        ]);
+        $b2 = Broadcast::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'broadcast_number' => 'BC-2026-002',
+            ],
+            [
+                'company_id' => $company->id,
+                'title' => 'Enhanced Health Insurance & Wellness Benefits 2026-27',
+                'category' => 'policy_update',
+                'priority' => 'normal',
+                'content' => '<p>Dear Colleagues,</p><p>We have upgraded our group medical coverage to include comprehensive OPD coverage, parent health benefits, and mental health wellness counseling sessions.</p>',
+                'target_type' => 'all',
+                'is_acknowledgement_required' => true,
+                'allow_comments' => true,
+                'send_email' => true,
+                'show_banner' => false,
+                'published_at' => '2026-08-20 10:00:00',
+                'status' => 'published',
+                'created_by_user_id' => $hrHeadUser->id,
+            ]
+        );
 
         $broadcastReceipts = [];
         foreach ($employees as $emp) {
+            // Safeguard: Preserve existing broadcast receipts for protected employee
+            if (in_array($emp->id, $protectedEmployeeIds) && DB::table('broadcast_receipts')->where('tenant_id', $tenant->id)->where('employee_id', $emp->id)->exists()) {
+                continue;
+            }
+
             $broadcastReceipts[] = [
                 'tenant_id' => $tenant->id,
                 'broadcast_id' => $b1->id,
@@ -2889,165 +3356,217 @@ class HrmsDemoSeeder extends Seeder
                 'updated_at' => $now,
             ];
         }
-        DB::table('broadcast_receipts')->insert($broadcastReceipts);
+        DB::table('broadcast_receipts')->insertOrIgnore($broadcastReceipts);
 
-        BroadcastComment::create([
-            'tenant_id' => $tenant->id,
-            'broadcast_id' => $b1->id,
-            'employee_id' => $employees[13]->id, // Priya
-            'comment_text' => 'Looking forward to the architecture updates and demoing our new multi-tenant SaaS features!',
-            'status' => 'published',
-        ]);
+        BroadcastComment::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'broadcast_id' => $b1->id,
+                'employee_id' => $employees[13]->id, // Priya
+            ],
+            [
+                'comment_text' => 'Looking forward to the architecture updates and demoing our new multi-tenant SaaS features!',
+                'status' => 'published',
+            ]
+        );
 
-        BroadcastComment::create([
-            'tenant_id' => $tenant->id,
-            'broadcast_id' => $b2->id,
-            'employee_id' => $employees[5]->id, // Ananya
-            'comment_text' => 'Fantastic initiative by HR leadership. The OPD benefit is a huge plus for families!',
-            'status' => 'published',
-        ]);
+        BroadcastComment::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'broadcast_id' => $b2->id,
+                'employee_id' => $employees[5]->id, // Ananya
+            ],
+            [
+                'comment_text' => 'Fantastic initiative by HR leadership. The OPD benefit is a huge plus for families!',
+                'status' => 'published',
+            ]
+        );
 
         // 21. Recruitment & ATS Master Data
-        $reqDev = JobRequisition::create([
-            'tenant_id' => $tenant->id,
-            'requisition_code' => 'REQ-2026-001',
-            'job_title' => 'Senior Full Stack Software Engineer (Laravel / Vue)',
-            'department_id' => $deptEng->id,
-            'designation_id' => $desigSrSwe->id,
-            'vacancies' => 2,
-            'min_experience_years' => 4,
-            'max_experience_years' => 7,
-            'work_mode' => 'hybrid',
-            'job_location' => 'Bangalore',
-            'employment_type' => 'full_time',
-            'priority' => 'high',
-            'status' => 'approved',
-            'requested_by_employee_id' => $employees[13]->id,
-            'approved_by_user_id' => $hrHeadUser->id,
-            'approved_at' => '2026-07-10 10:00:00',
-            'skills_required' => 'PHP 8.3, Laravel 11, PostgreSQL / MySQL, Vue.js 3, REST APIs, Redis, Docker',
-            'job_description' => 'Architect and build robust enterprise modules for our scalable multi-tenant SaaS ERP.',
-            'target_joining_date' => '2026-10-01',
-        ]);
+        $reqDev = JobRequisition::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'requisition_code' => 'REQ-2026-001',
+            ],
+            [
+                'job_title' => 'Senior Full Stack Software Engineer (Laravel / Vue)',
+                'department_id' => $deptEng->id,
+                'designation_id' => $desigSrSwe->id,
+                'vacancies' => 2,
+                'min_experience_years' => 4,
+                'max_experience_years' => 7,
+                'work_mode' => 'hybrid',
+                'job_location' => 'Bangalore',
+                'employment_type' => 'full_time',
+                'priority' => 'high',
+                'status' => 'approved',
+                'requested_by_employee_id' => $employees[13]->id,
+                'approved_by_user_id' => $hrHeadUser->id,
+                'approved_at' => '2026-07-10 10:00:00',
+                'skills_required' => 'PHP 8.3, Laravel 11, PostgreSQL / MySQL, Vue.js 3, REST APIs, Redis, Docker',
+                'job_description' => 'Architect and build robust enterprise modules for our scalable multi-tenant SaaS ERP.',
+                'target_joining_date' => '2026-10-01',
+            ]
+        );
 
-        $cand1 = Candidate::create([
-            'tenant_id' => $tenant->id,
-            'candidate_code' => 'CAN-2026-001',
-            'first_name' => 'Siddharth',
-            'last_name' => 'Menon',
-            'email' => 'siddharth.menon@techmail.com',
-            'phone' => '+91 98450 12345',
-            'current_location' => 'Bangalore',
-            'current_company' => 'Infosys Technologies',
-            'current_designation' => 'Technology Analyst',
-            'total_experience_years' => 5,
-            'notice_period_days' => 30,
-            'resume_path' => 'resumes/siddharth_menon.pdf',
-            'source' => 'linkedin',
-            'status' => 'active',
-        ]);
+        $cand1 = Candidate::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'candidate_code' => 'CAN-2026-001',
+            ],
+            [
+                'first_name' => 'Siddharth',
+                'last_name' => 'Menon',
+                'email' => 'siddharth.menon@techmail.com',
+                'phone' => '+91 98450 12345',
+                'current_location' => 'Bangalore',
+                'current_company' => 'Infosys Technologies',
+                'current_designation' => 'Technology Analyst',
+                'total_experience_years' => 5,
+                'notice_period_days' => 30,
+                'resume_path' => 'resumes/siddharth_menon.pdf',
+                'source' => 'linkedin',
+                'status' => 'active',
+            ]
+        );
 
-        $candApp1 = CandidateApplication::create([
-            'tenant_id' => $tenant->id,
-            'candidate_id' => $cand1->id,
-            'job_requisition_id' => $reqDev->id,
-            'current_stage' => 'offer_sent',
-            'stage_updated_at' => '2026-08-25 15:00:00',
-            'notes' => 'Exceptional system design and hands-on coding interview scores. Recommended for offer.',
-        ]);
+        $candApp1 = CandidateApplication::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'candidate_id' => $cand1->id,
+                'job_requisition_id' => $reqDev->id,
+            ],
+            [
+                'current_stage' => 'offer_sent',
+                'stage_updated_at' => '2026-08-25 15:00:00',
+                'notes' => 'Exceptional system design and hands-on coding interview scores. Recommended for offer.',
+            ]
+        );
 
-        $candInterview = CandidateInterview::create([
-            'tenant_id' => $tenant->id,
-            'application_id' => $candApp1->id,
-            'round_number' => 1,
-            'round_name' => 'Technical Architecture & Live Coding',
-            'scheduled_at' => '2026-08-20 14:00:00',
-            'interviewer_employee_id' => $employees[13]->id, // Priya (Tech Lead)
-            'meeting_link' => 'https://meet.google.com/xyz-tech-round',
-            'venue_location' => 'Bangalore Office / Google Meet',
-            'status' => 'completed',
-            'round_notes' => 'Strong grasp of database indexing, Eloquent ORM performance, and clean hexagonal architecture.',
-        ]);
+        $candInterview = CandidateInterview::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'application_id' => $candApp1->id,
+                'round_number' => 1,
+            ],
+            [
+                'round_name' => 'Technical Architecture & Live Coding',
+                'scheduled_at' => '2026-08-20 14:00:00',
+                'interviewer_employee_id' => $employees[13]->id, // Priya (Tech Lead)
+                'meeting_link' => 'https://meet.google.com/xyz-tech-round',
+                'venue_location' => 'Bangalore Office / Google Meet',
+                'status' => 'completed',
+                'round_notes' => 'Strong grasp of database indexing, Eloquent ORM performance, and clean hexagonal architecture.',
+            ]
+        );
 
-        InterviewScorecard::create([
-            'tenant_id' => $tenant->id,
-            'interview_id' => $candInterview->id,
-            'interviewer_user_id' => $employees[13]->user_id,
-            'technical_rating' => 5,
-            'communication_rating' => 5,
-            'culture_fit_rating' => 5,
-            'overall_rating' => 5,
-            'recommendation' => 'pass',
-            'feedback_notes' => 'Excellent understanding of SaaS tenant boundaries, distributed locking, and event dispatching.',
-        ]);
+        InterviewScorecard::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'interview_id' => $candInterview->id,
+            ],
+            [
+                'interviewer_user_id' => $employees[13]->user_id,
+                'technical_rating' => 5,
+                'communication_rating' => 5,
+                'culture_fit_rating' => 5,
+                'overall_rating' => 5,
+                'recommendation' => 'pass',
+                'feedback_notes' => 'Excellent understanding of SaaS tenant boundaries, distributed locking, and event dispatching.',
+            ]
+        );
 
-        JobOffer::create([
-            'tenant_id' => $tenant->id,
-            'application_id' => $candApp1->id,
-            'offer_code' => 'OFR-2026-001',
-            'offered_designation_id' => $desigSrSwe->id,
-            'offered_department_id' => $deptEng->id,
-            'offered_annual_ctc' => 1200000.00,
-            'joining_date' => '2026-10-01',
-            'status' => 'accepted',
-            'accepted_at' => '2026-08-28 12:00:00',
-        ]);
+        JobOffer::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'application_id' => $candApp1->id,
+            ],
+            [
+                'offer_code' => 'OFR-2026-001',
+                'offered_designation_id' => $desigSrSwe->id,
+                'offered_department_id' => $deptEng->id,
+                'offered_annual_ctc' => 1200000.00,
+                'joining_date' => '2026-10-01',
+                'status' => 'accepted',
+                'accepted_at' => '2026-08-28 12:00:00',
+            ]
+        );
 
         // 22. Helpdesk & IT Service Desk Master Data
-        $helpCatIt = HelpdeskCategory::create(['tenant_id' => $tenant->id, 'name' => 'IT Hardware & Workstation Support', 'code' => 'IT_HW', 'description' => 'Laptops, displays, monitors, dock issues, chargers', 'is_active' => true]);
-        $helpCatSoftware = HelpdeskCategory::create(['tenant_id' => $tenant->id, 'name' => 'Software Access & Cloud Permissions', 'code' => 'SW_ACCESS', 'description' => 'Git repository access, VPN, cloud server permissions', 'is_active' => true]);
-        $helpCatPayroll = HelpdeskCategory::create(['tenant_id' => $tenant->id, 'name' => 'Payroll & Tax Deductions Queries', 'code' => 'PAYROLL_TAX', 'description' => 'Form 16, payslip clarification, tax declaration submission', 'is_active' => true]);
-        $helpCatFacilities = HelpdeskCategory::create(['tenant_id' => $tenant->id, 'name' => 'Workplace & Facilities Management', 'code' => 'FACILITIES', 'description' => 'ID access card, parking pass, desk setup, cafeteria', 'is_active' => true]);
+        $helpCatIt = HelpdeskCategory::firstOrCreate(['tenant_id' => $tenant->id, 'code' => 'IT_HW'], ['name' => 'IT Hardware & Workstation Support', 'description' => 'Laptops, displays, monitors, dock issues, chargers', 'is_active' => true]);
+        $helpCatSoftware = HelpdeskCategory::firstOrCreate(['tenant_id' => $tenant->id, 'code' => 'SW_ACCESS'], ['name' => 'Software Access & Cloud Permissions', 'description' => 'Git repository access, VPN, cloud server permissions', 'is_active' => true]);
+        $helpCatPayroll = HelpdeskCategory::firstOrCreate(['tenant_id' => $tenant->id, 'code' => 'PAYROLL_TAX'], ['name' => 'Payroll & Tax Deductions Queries', 'description' => 'Form 16, payslip clarification, tax declaration submission', 'is_active' => true]);
+        $helpCatFacilities = HelpdeskCategory::firstOrCreate(['tenant_id' => $tenant->id, 'code' => 'FACILITIES'], ['name' => 'Workplace & Facilities Management', 'description' => 'ID access card, parking pass, desk setup, cafeteria', 'is_active' => true]);
 
-        HelpdeskKbArticle::create([
-            'tenant_id' => $tenant->id,
-            'category_id' => $helpCatIt->id,
-            'title' => 'Connecting to Warrgyizmorsch Secure Office Wi-Fi & VPN',
-            'slug' => 'connecting-to-office-wifi-and-vpn',
-            'content' => '<p class="lead fw-semibold text-primary mb-3">Warrgyizmorsch Global Office Network & Remote Gateway Access Guide</p><p>Follow these steps to configure the WPA3-Enterprise Wi-Fi profile on your company MacBook or Windows laptop:</p><ol class="ps-3 mb-3"><li>Select <strong>WRG-Corp-Secure</strong> from your network list.</li><li>Enter your official office email address and SSO password.</li><li>Accept and trust the root security certificate when prompted.</li></ol><p>For remote work, launch the WireGuard / OpenVPN client with your assigned configuration profile.</p>',
-            'view_count' => 142,
-            'is_published' => true,
-        ]);
+        HelpdeskKbArticle::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'slug' => 'connecting-to-office-wifi-and-vpn',
+            ],
+            [
+                'category_id' => $helpCatIt->id,
+                'title' => 'Connecting to Warrgyizmorsch Secure Office Wi-Fi & VPN',
+                'content' => '<p class="lead fw-semibold text-primary mb-3">Warrgyizmorsch Global Office Network & Remote Gateway Access Guide</p><p>Follow these steps to configure the WPA3-Enterprise Wi-Fi profile on your company MacBook or Windows laptop:</p><ol class="ps-3 mb-3"><li>Select <strong>WRG-Corp-Secure</strong> from your network list.</li><li>Enter your official office email address and SSO password.</li><li>Accept and trust the root security certificate when prompted.</li></ol><p>For remote work, launch the WireGuard / OpenVPN client with your assigned configuration profile.</p>',
+                'view_count' => 142,
+                'is_published' => true,
+            ]
+        );
 
-        HelpdeskKbArticle::create([
-            'tenant_id' => $tenant->id,
-            'category_id' => $helpCatPayroll->id,
-            'title' => 'How to Submit Income Tax Declarations & Rent Receipts',
-            'slug' => 'submitting-income-tax-declarations-and-rent-receipts',
-            'content' => '<p class="lead fw-semibold text-primary mb-3">Annual Income Tax Investment & Exemption Guidelines</p><p>All employees under the Old Tax Regime must submit their statutory investment proofs through the ESS portal before the monthly cutoff date.</p><p><strong>Step-by-Step Submission:</strong></p><ol class="ps-3 mb-3"><li>Navigate to <strong>HRMS &gt; Payroll &gt; Tax Declarations</strong>.</li><li>Upload valid receipts for Section 80C (PPF, ELSS, Life Insurance), Section 80D (Health Insurance), and monthly HRA rent receipts with landlord PAN.</li><li>Verify the computed exemption summary and click <strong>Submit Declaration</strong>.</li></ol><p class="text-muted small"><em>Note: Deductions will be adjusted in the upcoming payroll cycle once HR approves the uploaded proofs.</em></p>',
-            'view_count' => 289,
-            'is_published' => true,
-        ]);
+        HelpdeskKbArticle::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'slug' => 'submitting-income-tax-declarations-and-rent-receipts',
+            ],
+            [
+                'category_id' => $helpCatPayroll->id,
+                'title' => 'How to Submit Income Tax Declarations & Rent Receipts',
+                'content' => '<p class="lead fw-semibold text-primary mb-3">Annual Income Tax Investment & Exemption Guidelines</p><p>All employees under the Old Tax Regime must submit their statutory investment proofs through the ESS portal before the monthly cutoff date.</p><p><strong>Step-by-Step Submission:</strong></p><ol class="ps-3 mb-3"><li>Navigate to <strong>HRMS &gt; Payroll &gt; Tax Declarations</strong>.</li><li>Upload valid receipts for Section 80C (PPF, ELSS, Life Insurance), Section 80D (Health Insurance), and monthly HRA rent receipts with landlord PAN.</li><li>Verify the computed exemption summary and click <strong>Submit Declaration</strong>.</li></ol><p class="text-muted small"><em>Note: Deductions will be adjusted in the upcoming payroll cycle once HR approves the uploaded proofs.</em></p>',
+                'view_count' => 289,
+                'is_published' => true,
+            ]
+        );
 
-        $ticket1 = HelpdeskTicket::create([
-            'tenant_id' => $tenant->id,
-            'ticket_number' => 'TICK-2026-00001',
-            'employee_id' => $employees[14]->id, // Rahul Sharma
-            'category_id' => $helpCatSoftware->id,
-            'priority' => 'medium',
-            'status' => 'resolved',
-            'subject' => 'Request for AWS Staging Environment S3 Bucket Read/Write Access',
-            'description' => 'Need IAM policy attachment to test multi-tenant document generation and storage uploads on staging cluster.',
-            'assigned_to' => $employees[13]->id, // Priya (Tech Lead)
-            'due_at' => Carbon::parse('2026-08-12 18:00:00'),
-            'resolved_at' => Carbon::parse('2026-08-11 16:30:00'),
-            'closed_at' => Carbon::parse('2026-08-12 09:00:00'),
-            'is_confidential' => false,
-        ]);
+        $ticket1 = HelpdeskTicket::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'ticket_number' => 'TICK-2026-00001',
+            ],
+            [
+                'employee_id' => $employees[14]->id, // Mohammad Kaif
+                'category_id' => $helpCatSoftware->id,
+                'priority' => 'medium',
+                'status' => 'resolved',
+                'subject' => 'Request for AWS Staging Environment S3 Bucket Read/Write Access',
+                'description' => 'Need IAM policy attachment to test multi-tenant document generation and storage uploads on staging cluster.',
+                'assigned_to' => $employees[13]->id, // Priya (Tech Lead)
+                'due_at' => Carbon::parse('2026-08-12 18:00:00'),
+                'resolved_at' => Carbon::parse('2026-08-11 16:30:00'),
+                'closed_at' => Carbon::parse('2026-08-12 09:00:00'),
+                'is_confidential' => false,
+            ]
+        );
 
-        HelpdeskTicketReply::create([
-            'tenant_id' => $tenant->id,
-            'ticket_id' => $ticket1->id,
-            'sender_id' => $employees[13]->id, // Priya
-            'message' => 'IAM policy `wrg-s3-staging-documents-rw` has been attached to your developer role. Please verify access via AWS CLI.',
-            'is_internal_note' => false,
-        ]);
+        HelpdeskTicketReply::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'ticket_id' => $ticket1->id,
+            ],
+            [
+                'sender_id' => $employees[13]->id, // Priya
+                'message' => 'IAM policy `wrg-s3-staging-documents-rw` has been attached to your developer role. Please verify access via AWS CLI.',
+                'is_internal_note' => false,
+            ]
+        );
 
-        HelpdeskSatisfactionRating::create([
-            'ticket_id' => $ticket1->id,
-            'rating' => 5,
-            'feedback' => 'Instant resolution within 2 hours. Excellent support!',
-        ]);
+        HelpdeskSatisfactionRating::firstOrCreate(
+            [
+                'ticket_id' => $ticket1->id,
+            ],
+            [
+                'rating' => 5,
+                'feedback' => 'Instant resolution within 2 hours. Excellent support!',
+            ]
+        );
 
         // 23. Payroll Processing Data
         $monthsToSeed = ['2026-06', '2026-07', '2026-08'];
@@ -3056,87 +3575,111 @@ class HrmsDemoSeeder extends Seeder
             $start = $carbonMonth->copy()->startOfMonth()->format('Y-m-d');
             $end = $carbonMonth->copy()->endOfMonth()->format('Y-m-d');
 
-            PayrollRun::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'payroll_month' => $pm,
-                'start_date' => $start,
-                'end_date' => $end,
-                'status' => 'paid',
-                'processed_by' => $hrManagerUser->id,
-            ]);
+            PayrollRun::firstOrCreate(
+                [
+                    'tenant_id' => $tenant->id,
+                    'company_id' => $company->id,
+                    'payroll_month' => $pm,
+                ],
+                [
+                    'start_date' => $start,
+                    'end_date' => $end,
+                    'status' => 'paid',
+                    'processed_by' => $hrManagerUser->id,
+                ]
+            );
         }
 
         // Active draft run for current month (2026-09)
-        PayrollRun::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'payroll_month' => '2026-09',
-            'start_date' => '2026-09-01',
-            'end_date' => '2026-09-30',
-            'status' => 'draft',
-            'processed_by' => $hrManagerUser->id,
-        ]);
+        PayrollRun::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'payroll_month' => '2026-09',
+            ],
+            [
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+                'status' => 'draft',
+                'processed_by' => $hrManagerUser->id,
+            ]
+        );
 
-        // Salary Revision for Rahul Sharma (Promoted from Software Engineer to Senior SWE)
-        SalaryRevision::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[14]->id,
-            'old_salary_structure_id' => $structStaff->id,
-            'new_salary_structure_id' => $structTech->id,
-            'effective_date' => '2026-08-01',
-            'old_ctc' => 950000.00,
-            'new_ctc' => 1150000.00,
-            'arrears_paid' => true,
-        ]);
+        // Salary Revision for Mohammad Kaif (Software Engineer)
+        SalaryRevision::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[14]->id,
+                'effective_date' => '2026-08-01',
+            ],
+            [
+                'old_salary_structure_id' => $structStaff->id,
+                'new_salary_structure_id' => $structTech->id,
+                'old_ctc' => 420000.00,
+                'new_ctc' => 480000.00,
+                'arrears_paid' => true,
+            ]
+        );
 
         // Employee Adhoc Component (Bonus for Q2 sprint delivery)
         $compBonus = $seededComponents[$payGroupTech->id]['PERF_BONUS']
             ?? SalaryComponent::where('company_id', $company->id)->where('code', 'PERF_BONUS')->first();
 
         if ($compBonus) {
-            EmployeeAdhocComponent::create([
-                'employee_id' => $employees[14]->id,
-                'salary_component_id' => $compBonus->id,
-                'amount' => 25000.00,
-                'payroll_month' => '2026-08',
-                'status' => 'processed',
-                'remarks' => 'Q2 Outstanding Sprint Delivery & Zero-Defect Release Award',
-            ]);
+            EmployeeAdhocComponent::firstOrCreate(
+                [
+                    'employee_id' => $employees[14]->id,
+                    'salary_component_id' => $compBonus->id,
+                    'payroll_month' => '2026-08',
+                ],
+                [
+                    'amount' => 25000.00,
+                    'status' => 'processed',
+                    'remarks' => 'Q2 Outstanding Sprint Delivery & Zero-Defect Release Award',
+                ]
+            );
         }
 
         // 24. Employee Lifecycle: Probation Evaluations & Exit / FnF
-        EmployeeProbationEvaluation::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[14]->id, // Rahul
-            'reviewer_id' => $techLeadUser->id,
-            'evaluation_date' => '2026-08-15',
-            'performance_rating' => 5,
-            'attendance_rating' => 5,
-            'culture_rating' => 5,
-            'recommendation' => 'confirm',
-            'remarks' => 'Outstanding software development velocity and exceptional code quality.',
-            'status' => 'completed',
-        ]);
+        EmployeeProbationEvaluation::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[14]->id,
+            ],
+            [
+                'reviewer_id' => $techLeadUser->id,
+                'evaluation_date' => '2026-08-15',
+                'performance_rating' => 5,
+                'attendance_rating' => 5,
+                'culture_rating' => 5,
+                'recommendation' => 'confirm',
+                'remarks' => 'Outstanding software development velocity and exceptional code quality.',
+                'status' => 'completed',
+            ]
+        );
 
         // Employee Exit & Clearance for Rohan Kulkarni (Production Engineer - Notice Period)
-        $sampleExit = EmployeeExit::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employees[4]->id, // Rohan
-            'separation_type' => 'resignation',
-            'resignation_date' => '2026-08-20',
-            'preferred_lwd' => '2026-09-30',
-            'approved_lwd' => '2026-09-30',
-            'notice_period_days' => 40,
-            'notice_shortfall_days' => 0,
-            'notice_action' => 'serve',
-            'reason_category' => 'Higher Education / Relocation',
-            'reason_details' => 'Pursuing Advanced Master of Engineering at University of Stuttgart.',
-            'status' => 'in_clearance',
-            'initiated_by' => 'employee',
-            'approved_by' => $hrHeadUser->id,
-            'approved_at' => '2026-08-21 10:00:00',
-        ]);
+        $sampleExit = EmployeeExit::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[4]->id, // Rohan
+            ],
+            [
+                'separation_type' => 'resignation',
+                'resignation_date' => '2026-08-20',
+                'preferred_lwd' => '2026-09-30',
+                'approved_lwd' => '2026-09-30',
+                'notice_period_days' => 40,
+                'notice_shortfall_days' => 0,
+                'notice_action' => 'serve',
+                'reason_category' => 'Higher Education / Relocation',
+                'reason_details' => 'Pursuing Advanced Master of Engineering at University of Stuttgart.',
+                'status' => 'in_clearance',
+                'initiated_by' => 'employee',
+                'approved_by' => $hrHeadUser->id,
+                'approved_at' => '2026-08-21 10:00:00',
+            ]
+        );
 
         $clearanceChecklist = [
             ['department' => 'it_assets', 'item_name' => 'System & Email Access Deactivation', 'status' => 'pending'],
@@ -3147,541 +3690,600 @@ class HrmsDemoSeeder extends Seeder
         ];
 
         foreach ($clearanceChecklist as $item) {
-            EmployeeExitClearance::create([
-                'tenant_id' => $tenant->id,
-                'employee_exit_id' => $sampleExit->id,
-                'department' => $item['department'],
-                'item_name' => $item['item_name'],
-                'status' => $item['status'],
-                'cleared_by' => $item['cleared_by'] ?? null,
-                'cleared_at' => $item['cleared_at'] ?? null,
-            ]);
+            EmployeeExitClearance::firstOrCreate(
+                [
+                    'tenant_id' => $tenant->id,
+                    'employee_exit_id' => $sampleExit->id,
+                    'department' => $item['department'],
+                    'item_name' => $item['item_name'],
+                ],
+                [
+                    'status' => $item['status'],
+                    'cleared_by' => $item['cleared_by'] ?? null,
+                    'cleared_at' => $item['cleared_at'] ?? null,
+                ]
+            );
         }
 
         // Seed Exit Clearance Templates Master
         foreach (ExitClearanceTemplate::DEFAULT_TEMPLATES as $tpl) {
-            ExitClearanceTemplate::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'clearance_category' => $tpl['clearance_category'],
-                'category_name' => $tpl['category_name'],
-                'item_name' => $tpl['item_name'],
-                'description' => $tpl['description'],
-                'is_mandatory' => $tpl['is_mandatory'],
-                'sort_order' => $tpl['sort_order'],
-                'status' => true,
-            ]);
+            ExitClearanceTemplate::firstOrCreate(
+                [
+                    'tenant_id' => $tenant->id,
+                    'company_id' => $company->id,
+                    'item_name' => $tpl['item_name'],
+                ],
+                [
+                    'clearance_category' => $tpl['clearance_category'],
+                    'category_name' => $tpl['category_name'],
+                    'description' => $tpl['description'],
+                    'is_mandatory' => $tpl['is_mandatory'],
+                    'sort_order' => $tpl['sort_order'],
+                    'status' => true,
+                ]
+            );
         }
 
         // Issue Official Exit Documents (Relieving Letter & Experience Certificate)
-        EmployeeExitDocument::create([
-            'tenant_id' => $tenant->id,
-            'employee_exit_id' => $sampleExit->id,
-            'employee_id' => $employees[4]->id,
-            'document_type' => 'relieving_letter',
-            'reference_number' => 'WRG/REL/2026/001',
-            'issue_date' => '2026-09-30',
-            'file_path' => 'documents/relieving_rohan_kulkarni.pdf',
-            'content_data' => [
-                'employee_name' => 'Rohan Kulkarni',
-                'designation' => 'Senior Production Engineer',
-                'department' => 'Plant Operations & Manufacturing',
-                'relieving_date' => '2026-09-30',
-                'signatory' => 'Vikram Malhotra (VP HR)',
+        EmployeeExitDocument::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_exit_id' => $sampleExit->id,
+                'document_type' => 'relieving_letter',
             ],
-        ]);
+            [
+                'employee_id' => $employees[4]->id,
+                'reference_number' => 'WRG/REL/2026/001',
+                'issue_date' => '2026-09-30',
+                'file_path' => 'documents/relieving_rohan_kulkarni.pdf',
+                'content_data' => [
+                    'employee_name' => 'Rohan Kulkarni',
+                    'designation' => 'Senior Production Engineer',
+                    'department' => 'Plant Operations & Manufacturing',
+                    'relieving_date' => '2026-09-30',
+                    'signatory' => 'Vikram Malhotra (VP HR)',
+                ],
+            ]
+        );
 
-        EmployeeExitDocument::create([
-            'tenant_id' => $tenant->id,
-            'employee_exit_id' => $sampleExit->id,
-            'employee_id' => $employees[4]->id,
-            'document_type' => 'experience_letter',
-            'reference_number' => 'WRG/EXP/2026/001',
-            'issue_date' => '2026-09-30',
-            'file_path' => 'documents/experience_rohan_kulkarni.pdf',
-            'content_data' => [
-                'employee_name' => 'Rohan Kulkarni',
-                'joining_date' => '2026-07-01',
-                'relieving_date' => '2026-09-30',
-                'conduct' => 'Exemplary',
+        EmployeeExitDocument::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_exit_id' => $sampleExit->id,
+                'document_type' => 'experience_letter',
             ],
-        ]);
+            [
+                'employee_id' => $employees[4]->id,
+                'reference_number' => 'WRG/EXP/2026/001',
+                'issue_date' => '2026-09-30',
+                'file_path' => 'documents/experience_rohan_kulkarni.pdf',
+                'content_data' => [
+                    'employee_name' => 'Rohan Kulkarni',
+                    'joining_date' => '2026-07-01',
+                    'relieving_date' => '2026-09-30',
+                    'conduct' => 'Exemplary',
+                ],
+            ]
+        );
 
         // 25. KRA & KPI Performance Management Master & Cycles
-        $kraEng = KraCategory::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'Core Engineering Velocity & Architecture',
-            'code' => 'KRA-ENG',
-            'color' => '#3B82F6',
-            'description' => 'Software engineering deliverables, test automation, system architecture, and uptime.',
-            'status' => 'active',
-        ]);
+        $kraEng = KraCategory::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'KRA-ENG'],
+            [
+                'company_id' => $company->id,
+                'name' => 'Core Engineering Velocity & Architecture',
+                'color' => '#3B82F6',
+                'description' => 'Software engineering deliverables, test automation, system architecture, and uptime.',
+                'status' => 'active',
+            ]
+        );
 
-        $kraSales = KraCategory::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'Sales Pipeline & Revenue Generation',
-            'code' => 'KRA-SALES',
-            'color' => '#10B981',
-            'description' => 'Target quota achievement, qualified opportunity pipeline, and client conversion.',
-            'status' => 'active',
-        ]);
+        $kraSales = KraCategory::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'KRA-SALES'],
+            [
+                'company_id' => $company->id,
+                'name' => 'Sales Pipeline & Revenue Generation',
+                'color' => '#10B981',
+                'description' => 'Target quota achievement, qualified opportunity pipeline, and client conversion.',
+                'status' => 'active',
+            ]
+        );
 
-        $kraOps = KraCategory::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'Operational Quality & Plant Safety',
-            'code' => 'KRA-OPS',
-            'color' => '#F59E0B',
-            'description' => 'Zero-defect manufacturing, machine OEE, inventory turn rate, and compliance.',
-            'status' => 'active',
-        ]);
+        $kraOps = KraCategory::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'KRA-OPS'],
+            [
+                'company_id' => $company->id,
+                'name' => 'Operational Quality & Plant Safety',
+                'color' => '#F59E0B',
+                'description' => 'Zero-defect manufacturing, machine OEE, inventory turn rate, and compliance.',
+                'status' => 'active',
+            ]
+        );
 
-        $kraLead = KraCategory::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'Leadership, Mentorship & Culture',
-            'code' => 'KRA-LEAD',
-            'color' => '#8B5CF6',
-            'description' => 'Team development, knowledge sharing, onboarding mentorship, and innovation.',
-            'status' => 'active',
-        ]);
+        $kraLead = KraCategory::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'KRA-LEAD'],
+            [
+                'company_id' => $company->id,
+                'name' => 'Leadership, Mentorship & Culture',
+                'color' => '#8B5CF6',
+                'description' => 'Team development, knowledge sharing, onboarding mentorship, and innovation.',
+                'status' => 'active',
+            ]
+        );
 
         // KPI Masters
-        $kpiStoryPoints = KpiMaster::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'kra_category_id' => $kraEng->id,
-            'name' => 'Sprint Velocity (Story Points Completed)',
-            'code' => 'KPI-ENG-SP',
-            'description' => 'Total story points committed vs delivered in two-week agile sprints.',
-            'unit' => 'number',
-            'calculation_type' => 'higher_is_better',
-            'default_target' => 45.0,
-            'default_weightage' => 40.0,
-            'status' => 'active',
-        ]);
+        $kpiStoryPoints = KpiMaster::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'KPI-ENG-SP'],
+            [
+                'company_id' => $company->id,
+                'kra_category_id' => $kraEng->id,
+                'name' => 'Sprint Velocity (Story Points Completed)',
+                'description' => 'Total story points committed vs delivered in two-week agile sprints.',
+                'unit' => 'number',
+                'calculation_type' => 'higher_is_better',
+                'default_target' => 45.0,
+                'default_weightage' => 40.0,
+                'status' => 'active',
+            ]
+        );
 
-        $kpiCodeReview = KpiMaster::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'kra_category_id' => $kraEng->id,
-            'name' => 'PR Review SLA (< 24 Hours)',
-            'code' => 'KPI-ENG-CR',
-            'description' => 'Peer code reviews performed within 24 hours of submission with constructive feedback.',
-            'unit' => 'percentage',
-            'calculation_type' => 'higher_is_better',
-            'default_target' => 95.0,
-            'default_weightage' => 30.0,
-            'status' => 'active',
-        ]);
+        $kpiCodeReview = KpiMaster::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'KPI-ENG-CR'],
+            [
+                'company_id' => $company->id,
+                'kra_category_id' => $kraEng->id,
+                'name' => 'PR Review SLA (< 24 Hours)',
+                'description' => 'Peer code reviews performed within 24 hours of submission with constructive feedback.',
+                'unit' => 'percentage',
+                'calculation_type' => 'higher_is_better',
+                'default_target' => 95.0,
+                'default_weightage' => 30.0,
+                'status' => 'active',
+            ]
+        );
 
-        $kpiTestCoverage = KpiMaster::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'kra_category_id' => $kraEng->id,
-            'name' => 'Automated Test Coverage',
-            'code' => 'KPI-ENG-TEST',
-            'description' => 'Unit and integration test code coverage on new pull requests.',
-            'unit' => 'percentage',
-            'calculation_type' => 'higher_is_better',
-            'default_target' => 85.0,
-            'default_weightage' => 30.0,
-            'status' => 'active',
-        ]);
+        $kpiTestCoverage = KpiMaster::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'KPI-ENG-TEST'],
+            [
+                'company_id' => $company->id,
+                'kra_category_id' => $kraEng->id,
+                'name' => 'Automated Test Coverage',
+                'description' => 'Unit and integration test code coverage on new pull requests.',
+                'unit' => 'percentage',
+                'calculation_type' => 'higher_is_better',
+                'default_target' => 85.0,
+                'default_weightage' => 30.0,
+                'status' => 'active',
+            ]
+        );
 
-        $kpiRevenue = KpiMaster::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'kra_category_id' => $kraSales->id,
-            'name' => 'Quarterly Booked Revenue (INR)',
-            'code' => 'KPI-SALES-REV',
-            'description' => 'Gross closed-won deal value recorded in CRM.',
-            'unit' => 'currency',
-            'calculation_type' => 'higher_is_better',
-            'default_target' => 2500000.0,
-            'default_weightage' => 50.0,
-            'status' => 'active',
-        ]);
+        $kpiRevenue = KpiMaster::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'KPI-SALES-REV'],
+            [
+                'company_id' => $company->id,
+                'kra_category_id' => $kraSales->id,
+                'name' => 'Quarterly Booked Revenue (INR)',
+                'description' => 'Gross closed-won deal value recorded in CRM.',
+                'unit' => 'currency',
+                'calculation_type' => 'higher_is_better',
+                'default_target' => 2500000.0,
+                'default_weightage' => 50.0,
+                'status' => 'active',
+            ]
+        );
 
-        $kpiOee = KpiMaster::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'kra_category_id' => $kraOps->id,
-            'name' => 'Overall Equipment Effectiveness (OEE)',
-            'code' => 'KPI-OPS-OEE',
-            'description' => 'Machine availability, performance rate, and quality output in plant machining.',
-            'unit' => 'percentage',
-            'calculation_type' => 'higher_is_better',
-            'default_target' => 92.0,
-            'default_weightage' => 50.0,
-            'status' => 'active',
-        ]);
+        $kpiOee = KpiMaster::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'KPI-OPS-OEE'],
+            [
+                'company_id' => $company->id,
+                'kra_category_id' => $kraOps->id,
+                'name' => 'Overall Equipment Effectiveness (OEE)',
+                'description' => 'Machine availability, performance rate, and quality output in plant machining.',
+                'unit' => 'percentage',
+                'calculation_type' => 'higher_is_better',
+                'default_target' => 92.0,
+                'default_weightage' => 50.0,
+                'status' => 'active',
+            ]
+        );
 
         // KPI Scorecard Templates
-        $tplSwe = KpiTemplate::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'department_id' => $deptEng->id,
-            'designation_id' => $desigSrSwe->id,
-            'name' => 'Senior Software Engineer Performance Template',
-            'code' => 'TPL-SR-SWE',
-            'description' => 'Standard technical deliverables scorecard for senior engineering talent.',
-            'status' => 'active',
-        ]);
+        $tplSwe = KpiTemplate::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'TPL-SR-SWE'],
+            [
+                'company_id' => $company->id,
+                'department_id' => $deptEng->id,
+                'designation_id' => $desigSrSwe->id,
+                'name' => 'Senior Software Engineer Performance Template',
+                'description' => 'Standard technical deliverables scorecard for senior engineering talent.',
+                'status' => 'active',
+            ]
+        );
 
-        KpiTemplateItem::create([
-            'tenant_id' => $tenant->id,
-            'kpi_template_id' => $tplSwe->id,
-            'kra_category_id' => $kraEng->id,
-            'kpi_master_id' => $kpiStoryPoints->id,
-            'title' => $kpiStoryPoints->name,
-            'description' => $kpiStoryPoints->description,
-            'unit' => $kpiStoryPoints->unit,
-            'calculation_type' => $kpiStoryPoints->calculation_type,
-            'target' => 45.0,
-            'weightage' => 40.0,
-        ]);
-        KpiTemplateItem::create([
-            'tenant_id' => $tenant->id,
-            'kpi_template_id' => $tplSwe->id,
-            'kra_category_id' => $kraEng->id,
-            'kpi_master_id' => $kpiCodeReview->id,
-            'title' => $kpiCodeReview->name,
-            'description' => $kpiCodeReview->description,
-            'unit' => $kpiCodeReview->unit,
-            'calculation_type' => $kpiCodeReview->calculation_type,
-            'target' => 95.0,
-            'weightage' => 30.0,
-        ]);
-        KpiTemplateItem::create([
-            'tenant_id' => $tenant->id,
-            'kpi_template_id' => $tplSwe->id,
-            'kra_category_id' => $kraEng->id,
-            'kpi_master_id' => $kpiTestCoverage->id,
-            'title' => $kpiTestCoverage->name,
-            'description' => $kpiTestCoverage->description,
-            'unit' => $kpiTestCoverage->unit,
-            'calculation_type' => $kpiTestCoverage->calculation_type,
-            'target' => 85.0,
-            'weightage' => 30.0,
-        ]);
+        KpiTemplateItem::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'kpi_template_id' => $tplSwe->id, 'kpi_master_id' => $kpiStoryPoints->id],
+            [
+                'kra_category_id' => $kraEng->id,
+                'title' => $kpiStoryPoints->name,
+                'description' => $kpiStoryPoints->description,
+                'unit' => $kpiStoryPoints->unit,
+                'calculation_type' => $kpiStoryPoints->calculation_type,
+                'target' => 45.0,
+                'weightage' => 40.0,
+            ]
+        );
+        KpiTemplateItem::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'kpi_template_id' => $tplSwe->id, 'kpi_master_id' => $kpiCodeReview->id],
+            [
+                'kra_category_id' => $kraEng->id,
+                'title' => $kpiCodeReview->name,
+                'description' => $kpiCodeReview->description,
+                'unit' => $kpiCodeReview->unit,
+                'calculation_type' => $kpiCodeReview->calculation_type,
+                'target' => 95.0,
+                'weightage' => 30.0,
+            ]
+        );
+        KpiTemplateItem::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'kpi_template_id' => $tplSwe->id, 'kpi_master_id' => $kpiTestCoverage->id],
+            [
+                'kra_category_id' => $kraEng->id,
+                'title' => $kpiTestCoverage->name,
+                'description' => $kpiTestCoverage->description,
+                'unit' => $kpiTestCoverage->unit,
+                'calculation_type' => $kpiTestCoverage->calculation_type,
+                'target' => 85.0,
+                'weightage' => 30.0,
+            ]
+        );
 
         // Appraisal Review Cycles
-        $cycleAnnual = AppraisalCycle::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'FY 2026-27 Annual Performance Appraisal Cycle',
-            'code' => 'CYC-FY26-ANNUAL',
-            'period_type' => 'annual',
-            'start_date' => '2026-04-01',
-            'end_date' => '2027-03-31',
-            'goal_setting_deadline' => '2026-05-15',
-            'self_review_deadline' => '2027-03-15',
-            'manager_review_deadline' => '2027-03-25',
-            'status' => 'in_progress',
-            'goal_weightage_percent' => 70.0,
-            'competency_weightage_percent' => 30.0,
-            'description' => 'Company-wide annual compensation appraisal and leadership review.',
-        ]);
+        $cycleAnnual = AppraisalCycle::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'CYC-FY26-ANNUAL'],
+            [
+                'company_id' => $company->id,
+                'name' => 'FY 2026-27 Annual Performance Appraisal Cycle',
+                'period_type' => 'annual',
+                'start_date' => '2026-04-01',
+                'end_date' => '2027-03-31',
+                'goal_setting_deadline' => '2026-05-15',
+                'self_review_deadline' => '2027-03-15',
+                'manager_review_deadline' => '2027-03-25',
+                'status' => 'in_progress',
+                'goal_weightage_percent' => 70.0,
+                'competency_weightage_percent' => 30.0,
+                'description' => 'Company-wide annual compensation appraisal and leadership review.',
+            ]
+        );
 
-        $cycleH1 = AppraisalCycle::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'H1 FY 2026-27 Mid-Year Performance Review',
-            'code' => 'CYC-FY26-H1',
-            'period_type' => 'semi_annual',
-            'start_date' => '2026-04-01',
-            'end_date' => '2026-09-30',
-            'goal_setting_deadline' => '2026-05-01',
-            'self_review_deadline' => '2026-09-15',
-            'manager_review_deadline' => '2026-09-25',
-            'status' => 'in_review',
-            'goal_weightage_percent' => 80.0,
-            'competency_weightage_percent' => 20.0,
-            'description' => 'Mid-year progress calibration and milestone scoring.',
-        ]);
+        $cycleH1 = AppraisalCycle::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'CYC-FY26-H1'],
+            [
+                'company_id' => $company->id,
+                'name' => 'H1 FY 2026-27 Mid-Year Performance Review',
+                'period_type' => 'semi_annual',
+                'start_date' => '2026-04-01',
+                'end_date' => '2026-09-30',
+                'goal_setting_deadline' => '2026-05-01',
+                'self_review_deadline' => '2026-09-15',
+                'manager_review_deadline' => '2026-09-25',
+                'status' => 'in_review',
+                'goal_weightage_percent' => 80.0,
+                'competency_weightage_percent' => 20.0,
+                'description' => 'Mid-year progress calibration and milestone scoring.',
+            ]
+        );
 
-        // Employee Goal Plan for Rahul Sharma (Senior SWE)
-        $goalPlanRahul = EmployeeGoalPlan::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'plan_number' => 'GP-2026-001',
-            'employee_id' => $employees[14]->id, // Rahul Sharma
-            'appraisal_cycle_id' => $cycleH1->id,
-            'manager_id' => $employees[13]->id,  // Priya Nair (Tech Lead)
-            'kpi_template_id' => $tplSwe->id,
-            'status' => 'manager_reviewed',
-            'total_weightage' => 100.0,
-            'goal_score' => 93.5,
-            'competency_score' => 90.0,
-            'final_score' => 92.8,
-            'final_grade' => 'A',
-            'normalized_score' => 92.8,
-            'employee_comments' => 'Completed core multi-tenant authentication refactor and maintained zero sprint carryover.',
-            'manager_comments' => 'Exceptional technical depth and sprint velocity. Consistently leads architecture reviews.',
-            'hr_comments' => 'Eligible for annual leadership merit bonus.',
-            'promotion_recommended' => true,
-            'pip_triggered' => false,
-            'submitted_at' => '2026-09-10 14:00:00',
-            'approved_at' => '2026-09-12 10:00:00',
-            'self_reviewed_at' => '2026-09-16 11:00:00',
-            'manager_reviewed_at' => '2026-09-20 16:30:00',
-        ]);
+        // Employee Goal Plan for Mohammad Kaif (Software Engineer)
+        $goalPlanKaif = EmployeeGoalPlan::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employees[14]->id,
+                'plan_number' => 'GP-2026-001',
+            ],
+            [
+                'company_id' => $company->id,
+                'appraisal_cycle_id' => $cycleH1->id,
+                'manager_id' => $employees[13]->id,  // Priya Nair (Tech Lead)
+                'kpi_template_id' => $tplSwe->id,
+                'status' => 'manager_reviewed',
+                'total_weightage' => 100.0,
+                'goal_score' => 93.5,
+                'competency_score' => 90.0,
+                'final_score' => 92.8,
+                'final_grade' => 'A',
+                'normalized_score' => 92.8,
+                'employee_comments' => 'Completed core multi-tenant authentication refactor and maintained zero sprint carryover.',
+                'manager_comments' => 'Exceptional technical depth and sprint velocity. Consistently leads architecture reviews.',
+                'hr_comments' => 'Eligible for annual leadership merit bonus.',
+                'promotion_recommended' => true,
+                'pip_triggered' => false,
+                'submitted_at' => '2026-09-10 14:00:00',
+                'approved_at' => '2026-09-12 10:00:00',
+                'self_reviewed_at' => '2026-09-16 11:00:00',
+                'manager_reviewed_at' => '2026-09-20 16:30:00',
+            ]
+        );
 
-        $itemStoryPoints = EmployeeGoalItem::create([
-            'tenant_id' => $tenant->id,
-            'employee_goal_plan_id' => $goalPlanRahul->id,
-            'kra_category_id' => $kraEng->id,
-            'kpi_master_id' => $kpiStoryPoints->id,
-            'title' => 'Deliver 45+ Story Points per Sprint',
-            'description' => 'Execute high-complexity backend PRs for tenant isolation and billing engine.',
-            'unit' => 'number',
-            'calculation_type' => 'higher_is_better',
-            'target' => 45.0,
-            'actual' => 48.0,
-            'weightage' => 40.0,
-            'self_rating' => 4.8,
-            'self_score' => 96.0,
-            'self_comment' => 'Delivered 48 points on average across 6 sprints.',
-            'manager_rating' => 5.0,
-            'manager_score' => 96.0,
-            'manager_comment' => 'Exceeded targets consistently with high test quality.',
-            'final_score' => 96.0,
-            'status' => 'achieved',
-        ]);
+        $itemStoryPoints = EmployeeGoalItem::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_goal_plan_id' => $goalPlanKaif->id,
+                'title' => 'Deliver 45+ Story Points per Sprint',
+            ],
+            [
+                'kra_category_id' => $kraEng->id,
+                'kpi_master_id' => $kpiStoryPoints->id,
+                'description' => 'Execute high-complexity backend PRs for tenant isolation and billing engine.',
+                'unit' => 'number',
+                'calculation_type' => 'higher_is_better',
+                'target' => 45.0,
+                'actual' => 48.0,
+                'weightage' => 40.0,
+                'self_rating' => 4.8,
+                'self_score' => 96.0,
+                'self_comment' => 'Delivered 48 points on average across 6 sprints.',
+                'manager_rating' => 5.0,
+                'manager_score' => 96.0,
+                'manager_comment' => 'Exceeded targets consistently with high test quality.',
+                'final_score' => 96.0,
+                'status' => 'achieved',
+            ]
+        );
 
-        $itemReview = EmployeeGoalItem::create([
-            'tenant_id' => $tenant->id,
-            'employee_goal_plan_id' => $goalPlanRahul->id,
-            'kra_category_id' => $kraEng->id,
-            'kpi_master_id' => $kpiCodeReview->id,
-            'title' => 'Maintain 95%+ PR Turnaround SLA',
-            'description' => 'Review all assigned team PRs within 24 hours.',
-            'unit' => 'percentage',
-            'calculation_type' => 'higher_is_better',
-            'target' => 95.0,
-            'actual' => 96.5,
-            'weightage' => 30.0,
-            'self_rating' => 4.5,
-            'self_score' => 95.0,
-            'self_comment' => 'Average review time was 18 hours.',
-            'manager_rating' => 4.8,
-            'manager_score' => 95.0,
-            'manager_comment' => 'Very prompt and thorough reviews.',
-            'final_score' => 95.0,
-            'status' => 'achieved',
-        ]);
+        $itemReview = EmployeeGoalItem::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_goal_plan_id' => $goalPlanKaif->id,
+                'title' => 'Maintain 95%+ PR Turnaround SLA',
+            ],
+            [
+                'kra_category_id' => $kraEng->id,
+                'kpi_master_id' => $kpiCodeReview->id,
+                'description' => 'Review all assigned team PRs within 24 hours.',
+                'unit' => 'percentage',
+                'calculation_type' => 'higher_is_better',
+                'target' => 95.0,
+                'actual' => 96.5,
+                'weightage' => 30.0,
+                'self_rating' => 4.5,
+                'self_score' => 95.0,
+                'self_comment' => 'Average review time was 18 hours.',
+                'manager_rating' => 4.8,
+                'manager_score' => 95.0,
+                'manager_comment' => 'Very prompt and thorough reviews.',
+                'final_score' => 95.0,
+                'status' => 'achieved',
+            ]
+        );
 
-        $itemCoverage = EmployeeGoalItem::create([
-            'tenant_id' => $tenant->id,
-            'employee_goal_plan_id' => $goalPlanRahul->id,
-            'kra_category_id' => $kraEng->id,
-            'kpi_master_id' => $kpiTestCoverage->id,
-            'title' => 'Maintain 85%+ Automated Test Coverage',
-            'description' => 'Ensure all new APIs have comprehensive Pest / PHPUnit tests.',
-            'unit' => 'percentage',
-            'calculation_type' => 'higher_is_better',
-            'target' => 85.0,
-            'actual' => 88.0,
-            'weightage' => 30.0,
-            'self_rating' => 4.5,
-            'self_score' => 90.0,
-            'self_comment' => 'Coverage maintained at 88% on new endpoints.',
-            'manager_rating' => 4.5,
-            'manager_score' => 90.0,
-            'manager_comment' => 'Great test hygiene.',
-            'final_score' => 90.0,
-            'status' => 'achieved',
-        ]);
+        $itemCoverage = EmployeeGoalItem::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_goal_plan_id' => $goalPlanKaif->id,
+                'title' => 'Maintain 85%+ Automated Test Coverage',
+            ],
+            [
+                'kra_category_id' => $kraEng->id,
+                'kpi_master_id' => $kpiTestCoverage->id,
+                'description' => 'Ensure all new APIs have comprehensive Pest / PHPUnit tests.',
+                'unit' => 'percentage',
+                'calculation_type' => 'higher_is_better',
+                'target' => 85.0,
+                'actual' => 88.0,
+                'weightage' => 30.0,
+                'self_rating' => 4.5,
+                'self_score' => 90.0,
+                'self_comment' => 'Coverage maintained at 88% on new endpoints.',
+                'manager_rating' => 4.5,
+                'manager_score' => 90.0,
+                'manager_comment' => 'Great test hygiene.',
+                'final_score' => 90.0,
+                'status' => 'achieved',
+            ]
+        );
 
         // Goal Progress Logs
-        GoalProgressLog::create([
-            'tenant_id' => $tenant->id,
-            'employee_goal_item_id' => $itemStoryPoints->id,
-            'employee_id' => $employees[14]->id,
-            'logged_by_id' => $employees[14]->user_id,
-            'previous_value' => 40.0,
-            'current_value' => 48.0,
-            'notes' => 'Sprint 14 closed with 52 points, lifting the cumulative average to 48.',
-        ]);
+        GoalProgressLog::firstOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'employee_goal_item_id' => $itemStoryPoints->id,
+                'employee_id' => $employees[14]->id,
+            ],
+            [
+                'logged_by_id' => $employees[14]->user_id,
+                'previous_value' => 40.0,
+                'current_value' => 48.0,
+                'notes' => 'Sprint 14 closed with 52 points, lifting the cumulative average to 48.',
+            ]
+        );
 
         // ==========================================
         // 22. SOP (Standard Operating Procedure) Management Seeding
         // ==========================================
-        $catIT = SopCategory::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'IT & Information Security',
-            'code' => 'IT',
-            'color' => '#3b82f6',
-            'icon' => 'feather-shield',
-            'description' => 'Standard operating procedures for access security, server deployments, and data protection.',
-            'status' => 'active',
-        ]);
+        $catIT = SopCategory::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'IT'],
+            [
+                'company_id' => $company->id,
+                'name' => 'IT & Information Security',
+                'color' => '#3b82f6',
+                'icon' => 'feather-shield',
+                'description' => 'Standard operating procedures for access security, server deployments, and data protection.',
+                'status' => 'active',
+            ]
+        );
 
-        $catSafety = SopCategory::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'Workplace Safety & OSHA',
-            'code' => 'SAFE',
-            'color' => '#ef4444',
-            'icon' => 'feather-alert-triangle',
-            'description' => 'Mandatory safety protocols, emergency responses, and hazard prevention.',
-            'status' => 'active',
-        ]);
+        $catSafety = SopCategory::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'SAFE'],
+            [
+                'company_id' => $company->id,
+                'name' => 'Workplace Safety & OSHA',
+                'color' => '#ef4444',
+                'icon' => 'feather-alert-triangle',
+                'description' => 'Mandatory safety protocols, emergency responses, and hazard prevention.',
+                'status' => 'active',
+            ]
+        );
 
-        $catQA = SopCategory::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'Quality Assurance & Operations',
-            'code' => 'QA',
-            'color' => '#10b981',
-            'icon' => 'feather-check-circle',
-            'description' => 'Quality control guidelines, production inspection checklists, and release protocols.',
-            'status' => 'active',
-        ]);
+        $catQA = SopCategory::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'QA'],
+            [
+                'company_id' => $company->id,
+                'name' => 'Quality Assurance & Operations',
+                'color' => '#10b981',
+                'icon' => 'feather-check-circle',
+                'description' => 'Quality control guidelines, production inspection checklists, and release protocols.',
+                'status' => 'active',
+            ]
+        );
 
-        $catHR = SopCategory::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'name' => 'HR Policies & Ethics',
-            'code' => 'HR',
-            'color' => '#8b5cf6',
-            'icon' => 'feather-users',
-            'description' => 'Code of conduct, POSH compliance, grievance resolution, and remote working guidelines.',
-            'status' => 'active',
-        ]);
+        $catHR = SopCategory::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'HR'],
+            [
+                'company_id' => $company->id,
+                'name' => 'HR Policies & Ethics',
+                'color' => '#8b5cf6',
+                'icon' => 'feather-users',
+                'description' => 'Code of conduct, POSH compliance, grievance resolution, and remote working guidelines.',
+                'status' => 'active',
+            ]
+        );
 
         // SOP 1: Production Server Deployment (IT)
-        $sopDeploy = SopDocument::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'sop_category_id' => $catIT->id,
-            'department_id' => $deptEng->id, // Engineering/IT
-            'code' => 'SOP-IT-001',
-            'title' => 'Production Server Deployment & Release Rollback Protocol',
-            'summary' => 'Comprehensive step-by-step guideline for deploying releases into production with zero-downtime and automated rollback checks.',
-            'objective' => 'Ensure all production deployments adhere to security scanning, database backup snapshots, and smoke tests to minimize downtime.',
-            'scope' => 'Applicable to all DevOps engineers, Tech Leads, and Backend Developers with production deploy permissions.',
-            'prerequisites' => 'Production SSH keys, AWS/Cloud console access, Jenkins pipeline approval, and signed-off Jira release ticket.',
-            'version' => '1.0',
-            'status' => 'published',
-            'criticality' => 'critical',
-            'target_audience_type' => 'all',
-            'is_mandatory' => true,
-            'auto_assign_new_hires' => true,
-            'acknowledgment_days_limit' => 7,
-            'effective_date' => Carbon::now()->subMonths(2),
-            'review_interval_months' => 12,
-            'next_review_date' => Carbon::now()->addMonths(10),
-            'created_by' => $users['super_admin']->id,
-            'approved_by' => $users['hr_head']->id,
-            'approved_at' => Carbon::now()->subMonths(2),
-        ]);
+        $sopDeploy = SopDocument::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'SOP-IT-001'],
+            [
+                'company_id' => $company->id,
+                'sop_category_id' => $catIT->id,
+                'department_id' => $deptEng->id, // Engineering/IT
+                'title' => 'Production Server Deployment & Release Rollback Protocol',
+                'summary' => 'Comprehensive step-by-step guideline for deploying releases into production with zero-downtime and automated rollback checks.',
+                'objective' => 'Ensure all production deployments adhere to security scanning, database backup snapshots, and smoke tests to minimize downtime.',
+                'scope' => 'Applicable to all DevOps engineers, Tech Leads, and Backend Developers with production deploy permissions.',
+                'prerequisites' => 'Production SSH keys, AWS/Cloud console access, Jenkins pipeline approval, and signed-off Jira release ticket.',
+                'version' => '1.0',
+                'status' => 'published',
+                'criticality' => 'critical',
+                'target_audience_type' => 'all',
+                'is_mandatory' => true,
+                'auto_assign_new_hires' => true,
+                'acknowledgment_days_limit' => 7,
+                'effective_date' => Carbon::now()->subMonths(2),
+                'review_interval_months' => 12,
+                'next_review_date' => Carbon::now()->addMonths(10),
+                'created_by' => $users['super_admin']->id,
+                'approved_by' => $users['hr_head']->id,
+                'approved_at' => Carbon::now()->subMonths(2),
+            ]
+        );
 
-        SopSection::create([
-            'tenant_id' => $tenant->id,
-            'sop_document_id' => $sopDeploy->id,
-            'step_number' => 1,
-            'title' => 'Pre-Deployment Snapshot & Verification',
-            'content' => "1. Check server health metrics (CPU < 60%, RAM available > 4GB).\n2. Trigger automated DB snapshot in RDS.\n3. Verify latest staging build passed all unit & integration tests.",
-            'has_checklist' => true,
-            'checklist_items' => [
-                ['id' => 1, 'text' => 'Take automated database backup snapshot'],
-                ['id' => 2, 'text' => 'Verify staging integration tests pass 100%'],
-                ['id' => 3, 'text' => 'Notify #engineering channel 15 mins in advance'],
-            ],
-        ]);
+        SopSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'sop_document_id' => $sopDeploy->id, 'step_number' => 1],
+            [
+                'title' => 'Pre-Deployment Snapshot & Verification',
+                'content' => "1. Check server health metrics (CPU < 60%, RAM available > 4GB).\n2. Trigger automated DB snapshot in RDS.\n3. Verify latest staging build passed all unit & integration tests.",
+                'has_checklist' => true,
+                'checklist_items' => [
+                    ['id' => 1, 'text' => 'Take automated database backup snapshot'],
+                    ['id' => 2, 'text' => 'Verify staging integration tests pass 100%'],
+                    ['id' => 3, 'text' => 'Notify #engineering channel 15 mins in advance'],
+                ],
+            ]
+        );
 
-        SopSection::create([
-            'tenant_id' => $tenant->id,
-            'sop_document_id' => $sopDeploy->id,
-            'step_number' => 2,
-            'title' => 'Release Execution & Migration',
-            'content' => "1. Put application in maintenance mode if running non-concurrent DB migrations.\n2. Pull release tag: git checkout tags/vX.X.X.\n3. Run: composer install --no-dev --optimize-autoloader.\n4. Run: php artisan migrate --force.\n5. Warm up cache: php artisan config:cache && php artisan route:cache.",
-            'has_checklist' => true,
-            'checklist_items' => [
-                ['id' => 1, 'text' => 'Execute DB migrations with --force flag'],
-                ['id' => 2, 'text' => 'Clear and re-cache config/routes'],
-            ],
-        ]);
+        SopSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'sop_document_id' => $sopDeploy->id, 'step_number' => 2],
+            [
+                'title' => 'Release Execution & Migration',
+                'content' => "1. Put application in maintenance mode if running non-concurrent DB migrations.\n2. Pull release tag: git checkout tags/vX.X.X.\n3. Run: composer install --no-dev --optimize-autoloader.\n4. Run: php artisan migrate --force.\n5. Warm up cache: php artisan config:cache && php artisan route:cache.",
+                'has_checklist' => true,
+                'checklist_items' => [
+                    ['id' => 1, 'text' => 'Execute DB migrations with --force flag'],
+                    ['id' => 2, 'text' => 'Clear and re-cache config/routes'],
+                ],
+            ]
+        );
 
-        SopSection::create([
-            'tenant_id' => $tenant->id,
-            'sop_document_id' => $sopDeploy->id,
-            'step_number' => 3,
-            'title' => 'Post-Deployment Smoke Testing & Rollback Trigger',
-            'content' => "1. Run automated health check curl https://app.domain.com/health.\n2. Monitor Sentry / CloudWatch error rates for 15 minutes.\n3. If 5xx error rate exceeds 0.5%, immediately trigger rollback to previous release tag.",
-            'has_checklist' => true,
-            'checklist_items' => [
-                ['id' => 1, 'text' => 'Execute health check endpoint'],
-                ['id' => 2, 'text' => 'Monitor 5xx error logs for 15 minutes'],
-            ],
-        ]);
+        SopSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'sop_document_id' => $sopDeploy->id, 'step_number' => 3],
+            [
+                'title' => 'Post-Deployment Smoke Testing & Rollback Trigger',
+                'content' => "1. Run automated health check curl https://app.domain.com/health.\n2. Monitor Sentry / CloudWatch error rates for 15 minutes.\n3. If 5xx error rate exceeds 0.5%, immediately trigger rollback to previous release tag.",
+                'has_checklist' => true,
+                'checklist_items' => [
+                    ['id' => 1, 'text' => 'Execute health check endpoint'],
+                    ['id' => 2, 'text' => 'Monitor 5xx error logs for 15 minutes'],
+                ],
+            ]
+        );
 
-        SopVersionHistory::create([
-            'tenant_id' => $tenant->id,
-            'sop_document_id' => $sopDeploy->id,
-            'version' => '1.0',
-            'change_type' => 'minor',
-            'changes_summary' => 'Initial publication of production release guidelines.',
-            'created_by' => $users['super_admin']->id,
-        ]);
+        SopVersionHistory::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'sop_document_id' => $sopDeploy->id, 'version' => '1.0'],
+            [
+                'change_type' => 'minor',
+                'changes_summary' => 'Initial publication of production release guidelines.',
+                'created_by' => $users['super_admin']->id,
+            ]
+        );
 
         // SOP 2: Workplace Safety & Fire Drill Protocol
-        $sopSafety = SopDocument::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'sop_category_id' => $catSafety->id,
-            'department_id' => null,
-            'code' => 'SOP-SAFE-001',
-            'title' => 'Workplace Safety, Hazard Reporting & Emergency Evacuation Protocol',
-            'summary' => 'Organization-wide safety guidelines covering fire alarms, first aid responses, emergency assembly areas, and hazard escalation.',
-            'objective' => 'Maintain zero workplace accidents and establish rapid response during fire or health emergencies.',
-            'scope' => 'Mandatory for all full-time employees, contractors, and visitors across all branches.',
-            'prerequisites' => 'Familiarity with office floor plan and nearest fire exits.',
-            'version' => '1.0',
-            'status' => 'published',
-            'criticality' => 'high',
-            'target_audience_type' => 'all',
-            'is_mandatory' => true,
-            'auto_assign_new_hires' => true,
-            'acknowledgment_days_limit' => 5,
-            'effective_date' => Carbon::now()->subMonths(3),
-            'review_interval_months' => 6,
-            'next_review_date' => Carbon::now()->addMonths(3),
-            'created_by' => $users['hr_head']->id,
-            'approved_by' => $users['hr_head']->id,
-            'approved_at' => Carbon::now()->subMonths(3),
-        ]);
+        $sopSafety = SopDocument::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'SOP-SAFE-001'],
+            [
+                'company_id' => $company->id,
+                'sop_category_id' => $catSafety->id,
+                'department_id' => null,
+                'title' => 'Workplace Safety, Hazard Reporting & Emergency Evacuation Protocol',
+                'summary' => 'Organization-wide safety guidelines covering fire alarms, first aid responses, emergency assembly areas, and hazard escalation.',
+                'objective' => 'Maintain zero workplace accidents and establish rapid response during fire or health emergencies.',
+                'scope' => 'Mandatory for all full-time employees, contractors, and visitors across all branches.',
+                'prerequisites' => 'Familiarity with office floor plan and nearest fire exits.',
+                'version' => '1.0',
+                'status' => 'published',
+                'criticality' => 'high',
+                'target_audience_type' => 'all',
+                'is_mandatory' => true,
+                'auto_assign_new_hires' => true,
+                'acknowledgment_days_limit' => 5,
+                'effective_date' => Carbon::now()->subMonths(3),
+                'review_interval_months' => 6,
+                'next_review_date' => Carbon::now()->addMonths(3),
+                'created_by' => $users['hr_head']->id,
+                'approved_by' => $users['hr_head']->id,
+                'approved_at' => Carbon::now()->subMonths(3),
+            ]
+        );
 
-        SopSection::create([
-            'tenant_id' => $tenant->id,
-            'sop_document_id' => $sopSafety->id,
-            'step_number' => 1,
-            'title' => 'Emergency Alarm & Evacuation Protocol',
-            'content' => "1. Do NOT use elevators during a fire or earthquake alarm.\n2. Proceed calmly to the nearest illuminated Emergency Exit.\n3. Assemble at the designated Assembly Point (East Parking Lot).\n4. Report to your Department Fire Warden for head count.",
-            'has_checklist' => true,
-            'checklist_items' => [
-                ['id' => 1, 'text' => 'I have identified my nearest emergency exit'],
-                ['id' => 2, 'text' => 'I know my designated assembly point'],
-            ],
-        ]);
+        SopSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'sop_document_id' => $sopSafety->id, 'step_number' => 1],
+            [
+                'title' => 'Emergency Alarm & Evacuation Protocol',
+                'content' => "1. Do NOT use elevators during a fire or earthquake alarm.\n2. Proceed calmly to the nearest illuminated Emergency Exit.\n3. Assemble at the designated Assembly Point (East Parking Lot).\n4. Report to your Department Fire Warden for head count.",
+                'has_checklist' => true,
+                'checklist_items' => [
+                    ['id' => 1, 'text' => 'I have identified my nearest emergency exit'],
+                    ['id' => 2, 'text' => 'I know my designated assembly point'],
+                ],
+            ]
+        );
 
-        SopVersionHistory::create([
-            'tenant_id' => $tenant->id,
-            'sop_document_id' => $sopSafety->id,
-            'version' => '1.0',
-            'change_type' => 'minor',
-            'changes_summary' => 'Annual workplace safety compliance standard.',
-            'created_by' => $users['hr_head']->id,
-        ]);
+        SopVersionHistory::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'sop_document_id' => $sopSafety->id, 'version' => '1.0'],
+            [
+                'change_type' => 'minor',
+                'changes_summary' => 'Annual workplace safety compliance standard.',
+                'created_by' => $users['hr_head']->id,
+            ]
+        );
 
         // Seed Sample Assignments & Sign-offs
         $sopAssignments = [];
         foreach ($employees as $idx => $emp) {
+            // Safeguard: Preserve existing SOP assignments for protected employee
+            if (in_array($emp->id, $protectedEmployeeIds) && DB::table('sop_assignments')->where('tenant_id', $tenant->id)->where('employee_id', $emp->id)->exists()) {
+                continue;
+            }
+
             // Assign SOP-IT-001
             $isAck = ($idx % 3 !== 0); // 66% acknowledged, others pending/overdue
             $sopAssignments[] = [
@@ -3723,362 +4325,367 @@ class HrmsDemoSeeder extends Seeder
             ];
         }
         foreach (array_chunk($sopAssignments, 100) as $chunk) {
-            DB::table('sop_assignments')->insert($chunk);
+            DB::table('sop_assignments')->insertOrIgnore($chunk);
         }
 
         // ==========================================
         // 24. GOALS & OKRS MANAGEMENT MODULE SEEDING
         // ==========================================
-        $cycleQ1 = GoalCycle::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'name'        => '2026-Q1 OKR Cycle',
-            'code'        => 'OKR-2026-Q1',
-            'start_date'  => Carbon::now()->startOfQuarter(),
-            'end_date'    => Carbon::now()->endOfQuarter(),
-            'status'      => 'active',
-            'description' => 'Q1 strategic execution sprint focusing on revenue growth and cloud scaling.',
-        ]);
+        $cycleQ1 = GoalCycle::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'OKR-2026-Q1'],
+            [
+                'company_id'  => $company->id,
+                'name'        => '2026-Q1 OKR Cycle',
+                'start_date'  => Carbon::now()->startOfQuarter(),
+                'end_date'    => Carbon::now()->endOfQuarter(),
+                'status'      => 'active',
+                'description' => 'Q1 strategic execution sprint focusing on revenue growth and cloud scaling.',
+            ]
+        );
 
-        $cycleAnnual = GoalCycle::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'name'        => '2026 Annual Strategic Horizon',
-            'code'        => 'STRAT-2026',
-            'start_date'  => Carbon::now()->startOfYear(),
-            'end_date'    => Carbon::now()->endOfYear(),
-            'status'      => 'active',
-            'description' => 'Organization-wide annual strategic goals and transformation initiatives.',
-        ]);
+        $cycleAnnual = GoalCycle::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'STRAT-2026'],
+            [
+                'company_id'  => $company->id,
+                'name'        => '2026 Annual Strategic Horizon',
+                'start_date'  => Carbon::now()->startOfYear(),
+                'end_date'    => Carbon::now()->endOfYear(),
+                'status'      => 'active',
+                'description' => 'Organization-wide annual strategic goals and transformation initiatives.',
+            ]
+        );
 
-        $catRevenue = GoalCategory::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Revenue & Global Expansion', 'code' => 'REV', 'color' => '#10b981', 'icon' => 'feather-trending-up', 'status' => 'active']);
-        $catTech = GoalCategory::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Product & Cloud Innovation', 'code' => 'TECH', 'color' => '#3b82f6', 'icon' => 'feather-cpu', 'status' => 'active']);
-        $catCust = GoalCategory::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Customer Success & Retention', 'code' => 'CUST', 'color' => '#06b6d4', 'icon' => 'feather-smile', 'status' => 'active']);
-        $catOps = GoalCategory::create(['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Operational Excellence', 'code' => 'OPS', 'color' => '#8b5cf6', 'icon' => 'feather-shield', 'status' => 'active']);
+        $catRevenue = GoalCategory::firstOrCreate(['tenant_id' => $tenant->id, 'code' => 'REV'], ['company_id' => $company->id, 'name' => 'Revenue & Global Expansion', 'color' => '#10b981', 'icon' => 'feather-trending-up', 'status' => 'active']);
+        $catTech = GoalCategory::firstOrCreate(['tenant_id' => $tenant->id, 'code' => 'TECH'], ['company_id' => $company->id, 'name' => 'Product & Cloud Innovation', 'color' => '#3b82f6', 'icon' => 'feather-cpu', 'status' => 'active']);
+        $catCust = GoalCategory::firstOrCreate(['tenant_id' => $tenant->id, 'code' => 'CUST'], ['company_id' => $company->id, 'name' => 'Customer Success & Retention', 'color' => '#06b6d4', 'icon' => 'feather-smile', 'status' => 'active']);
+        $catOps = GoalCategory::firstOrCreate(['tenant_id' => $tenant->id, 'code' => 'OPS'], ['company_id' => $company->id, 'name' => 'Operational Excellence', 'color' => '#8b5cf6', 'icon' => 'feather-shield', 'status' => 'active']);
 
         // 1. Top-Level Company Strategic Goal
-        $goalCompany1 = Goal::create([
-            'tenant_id'           => $tenant->id,
-            'company_id'          => $company->id,
-            'code'                => 'G-2026-001',
-            'title'               => 'Accelerate Enterprise SaaS Market Penetration & ARR Growth',
-            'description'         => 'Expand global enterprise presence and acquire key anchor clients across North America and EMEA.',
-            'goal_cycle_id'       => $cycleQ1->id,
-            'goal_category_id'    => $catRevenue->id,
-            'owner_type'          => 'company',
-            'visibility'          => 'public',
-            'priority'            => 'critical',
-            'start_date'          => Carbon::now()->startOfQuarter(),
-            'due_date'            => Carbon::now()->endOfQuarter(),
-            'weightage'           => 100.00,
-            'progress_percentage' => 72.50,
-            'health_status'       => 'on_track',
-            'status'              => 'active',
-            'created_by'          => $users['company_admin']->id,
-            'approved_by'         => $users['company_admin']->id,
-            'approved_at'         => Carbon::now()->startOfQuarter(),
-        ]);
+        $goalCompany1 = Goal::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'G-2026-001'],
+            [
+                'company_id'          => $company->id,
+                'title'               => 'Accelerate Enterprise SaaS Market Penetration & ARR Growth',
+                'description'         => 'Expand global enterprise presence and acquire key anchor clients across North America and EMEA.',
+                'goal_cycle_id'       => $cycleQ1->id,
+                'goal_category_id'    => $catRevenue->id,
+                'owner_type'          => 'company',
+                'visibility'          => 'public',
+                'priority'            => 'critical',
+                'start_date'          => Carbon::now()->startOfQuarter(),
+                'due_date'            => Carbon::now()->endOfQuarter(),
+                'weightage'           => 100.00,
+                'progress_percentage' => 72.50,
+                'health_status'       => 'on_track',
+                'status'              => 'active',
+                'created_by'          => $users['company_admin']->id,
+                'approved_by'         => $users['company_admin']->id,
+                'approved_at'         => Carbon::now()->startOfQuarter(),
+            ]
+        );
 
-        $kr1 = GoalKeyResult::create([
-            'tenant_id'           => $tenant->id,
-            'goal_id'             => $goalCompany1->id,
-            'title'               => 'Close $1,200,000 in Net New Annual Recurring Revenue',
-            'metric_type'         => 'currency',
-            'unit'                => 'USD',
-            'start_value'         => 0.00,
-            'target_value'        => 1200000.00,
-            'current_value'       => 900000.00,
-            'weightage'           => 50.00,
-            'progress_percentage' => 75.00,
-            'health_status'       => 'on_track',
-            'due_date'            => Carbon::now()->endOfQuarter(),
-        ]);
+        $kr1 = GoalKeyResult::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'goal_id' => $goalCompany1->id, 'title' => 'Close $1,200,000 in Net New Annual Recurring Revenue'],
+            [
+                'metric_type'         => 'currency',
+                'unit'                => 'USD',
+                'start_value'         => 0.00,
+                'target_value'        => 1200000.00,
+                'current_value'       => 900000.00,
+                'weightage'           => 50.00,
+                'progress_percentage' => 75.00,
+                'health_status'       => 'on_track',
+                'due_date'            => Carbon::now()->endOfQuarter(),
+            ]
+        );
 
-        $kr2 = GoalKeyResult::create([
-            'tenant_id'           => $tenant->id,
-            'goal_id'             => $goalCompany1->id,
-            'title'               => 'Acquire 15 New Fortune 500 Enterprise Logo Accounts',
-            'metric_type'         => 'numeric',
-            'unit'                => 'Accounts',
-            'start_value'         => 0.00,
-            'target_value'        => 15.00,
-            'current_value'       => 10.00,
-            'weightage'           => 50.00,
-            'progress_percentage' => 66.67,
-            'health_status'       => 'on_track',
-            'due_date'            => Carbon::now()->endOfQuarter(),
-        ]);
+        $kr2 = GoalKeyResult::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'goal_id' => $goalCompany1->id, 'title' => 'Acquire 15 New Fortune 500 Enterprise Logo Accounts'],
+            [
+                'metric_type'         => 'numeric',
+                'unit'                => 'Accounts',
+                'start_value'         => 0.00,
+                'target_value'        => 15.00,
+                'current_value'       => 10.00,
+                'weightage'           => 50.00,
+                'progress_percentage' => 66.67,
+                'health_status'       => 'on_track',
+                'due_date'            => Carbon::now()->endOfQuarter(),
+            ]
+        );
 
         // 2. Cascaded Department Goal (Sales)
-        $goalDeptSales = Goal::create([
-            'tenant_id'           => $tenant->id,
-            'company_id'          => $company->id,
-            'code'                => 'G-2026-002',
-            'title'               => 'Build $4.5M Qualified Enterprise Pipeline & Reduce Sales Cycle',
-            'description'         => 'Sales department objective directly aligned to Company ARR expansion.',
-            'goal_cycle_id'       => $cycleQ1->id,
-            'goal_category_id'    => $catRevenue->id,
-            'owner_type'          => 'department',
-            'department_id'       => $deptSales->id,
-            'parent_goal_id'      => $goalCompany1->id,
-            'visibility'          => 'department',
-            'priority'            => 'high',
-            'start_date'          => Carbon::now()->startOfQuarter(),
-            'due_date'            => Carbon::now()->endOfQuarter(),
-            'weightage'           => 100.00,
-            'progress_percentage' => 65.00,
-            'health_status'       => 'on_track',
-            'status'              => 'active',
-            'created_by'          => $users['sales_manager']->id ?? $users['company_admin']->id,
-        ]);
+        $goalDeptSales = Goal::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'G-2026-002'],
+            [
+                'company_id'          => $company->id,
+                'title'               => 'Build $4.5M Qualified Enterprise Pipeline & Reduce Sales Cycle',
+                'description'         => 'Sales department objective directly aligned to Company ARR expansion.',
+                'goal_cycle_id'       => $cycleQ1->id,
+                'goal_category_id'    => $catRevenue->id,
+                'owner_type'          => 'department',
+                'department_id'       => $deptSales->id,
+                'parent_goal_id'      => $goalCompany1->id,
+                'visibility'          => 'department',
+                'priority'            => 'high',
+                'start_date'          => Carbon::now()->startOfQuarter(),
+                'due_date'            => Carbon::now()->endOfQuarter(),
+                'weightage'           => 100.00,
+                'progress_percentage' => 65.00,
+                'health_status'       => 'on_track',
+                'status'              => 'active',
+                'created_by'          => $users['sales_manager']->id ?? $users['company_admin']->id,
+            ]
+        );
 
         // 3. Cascaded Individual Goal (Account Executive)
-        $goalIndivSales = Goal::create([
-            'tenant_id'           => $tenant->id,
-            'company_id'          => $company->id,
-            'code'                => 'G-2026-003',
-            'title'               => 'Deliver 35 Technical Demonstrations and Close 4 Deals in EMEA',
-            'description'         => 'Individual contributor execution goal linked to department sales targets.',
-            'goal_cycle_id'       => $cycleQ1->id,
-            'goal_category_id'    => $catRevenue->id,
-            'owner_type'          => 'employee',
-            'employee_id'         => $employees[6]->id ?? $employees[0]->id,
-            'parent_goal_id'      => $goalDeptSales->id,
-            'visibility'          => 'public',
-            'priority'            => 'high',
-            'start_date'          => Carbon::now()->startOfQuarter(),
-            'due_date'            => Carbon::now()->endOfQuarter(),
-            'weightage'           => 100.00,
-            'progress_percentage' => 80.00,
-            'health_status'       => 'on_track',
-            'status'              => 'active',
-            'created_by'          => $users['company_admin']->id,
-        ]);
+        $goalIndivSales = Goal::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'G-2026-003'],
+            [
+                'company_id'          => $company->id,
+                'title'               => 'Deliver 35 Technical Demonstrations and Close 4 Deals in EMEA',
+                'description'         => 'Individual contributor execution goal linked to department sales targets.',
+                'goal_cycle_id'       => $cycleQ1->id,
+                'goal_category_id'    => $catRevenue->id,
+                'owner_type'          => 'employee',
+                'employee_id'         => $employees[6]->id ?? $employees[0]->id,
+                'parent_goal_id'      => $goalDeptSales->id,
+                'visibility'          => 'public',
+                'priority'            => 'high',
+                'start_date'          => Carbon::now()->startOfQuarter(),
+                'due_date'            => Carbon::now()->endOfQuarter(),
+                'weightage'           => 100.00,
+                'progress_percentage' => 80.00,
+                'health_status'       => 'on_track',
+                'status'              => 'active',
+                'created_by'          => $users['company_admin']->id,
+            ]
+        );
         if ($goalIndivSales->employee_id) {
-            $goalIndivSales->employees()->sync([$goalIndivSales->employee_id => ['tenant_id' => $tenant->id]]);
+            $goalIndivSales->employees()->syncWithoutDetaching([$goalIndivSales->employee_id => ['tenant_id' => $tenant->id]]);
         }
 
         // 4. Technology High Availability Objective
-        $goalTech = Goal::create([
-            'tenant_id'           => $tenant->id,
-            'company_id'          => $company->id,
-            'code'                => 'G-2026-004',
-            'title'               => 'Maintain 99.99% Cloud Infrastructure High Availability & ISO 27001 Readiness',
-            'description'         => 'Core engineering initiative ensuring resilient cloud systems and zero unplanned downtime.',
-            'goal_cycle_id'       => $cycleQ1->id,
-            'goal_category_id'    => $catTech->id,
-            'owner_type'          => 'department',
-            'department_id'       => $deptEng->id,
-            'visibility'          => 'public',
-            'priority'            => 'critical',
-            'start_date'          => Carbon::now()->startOfQuarter(),
-            'due_date'            => Carbon::now()->endOfQuarter(),
-            'weightage'           => 100.00,
-            'progress_percentage' => 50.00,
-            'health_status'       => 'at_risk',
-            'status'              => 'active',
-            'created_by'          => $users['company_admin']->id,
-        ]);
+        $goalTech = Goal::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => 'G-2026-004'],
+            [
+                'company_id'          => $company->id,
+                'title'               => 'Maintain 99.99% Cloud Infrastructure High Availability & ISO 27001 Readiness',
+                'description'         => 'Core engineering initiative ensuring resilient cloud systems and zero unplanned downtime.',
+                'goal_cycle_id'       => $cycleQ1->id,
+                'goal_category_id'    => $catTech->id,
+                'owner_type'          => 'department',
+                'department_id'       => $deptEng->id,
+                'visibility'          => 'public',
+                'priority'            => 'critical',
+                'start_date'          => Carbon::now()->startOfQuarter(),
+                'due_date'            => Carbon::now()->endOfQuarter(),
+                'weightage'           => 100.00,
+                'progress_percentage' => 50.00,
+                'health_status'       => 'at_risk',
+                'status'              => 'active',
+                'created_by'          => $users['company_admin']->id,
+            ]
+        );
 
         // Key Result for Tech
-        $krTech1 = GoalKeyResult::create([
-            'tenant_id'           => $tenant->id,
-            'goal_id'             => $goalTech->id,
-            'title'               => 'Deploy Multi-Region Database Replica Failover System',
-            'metric_type'         => 'boolean_milestone',
-            'unit'                => 'Milestone',
-            'start_value'         => 0.00,
-            'target_value'        => 1.00,
-            'current_value'       => 0.00,
-            'weightage'           => 50.00,
-            'progress_percentage' => 0.00,
-            'health_status'       => 'at_risk',
-            'due_date'            => Carbon::now()->endOfQuarter(),
-        ]);
+        $krTech1 = GoalKeyResult::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'goal_id' => $goalTech->id, 'title' => 'Deploy Multi-Region Database Replica Failover System'],
+            [
+                'metric_type'         => 'boolean_milestone',
+                'unit'                => 'Milestone',
+                'start_value'         => 0.00,
+                'target_value'        => 1.00,
+                'current_value'       => 0.00,
+                'weightage'           => 50.00,
+                'progress_percentage' => 0.00,
+                'health_status'       => 'at_risk',
+                'due_date'            => Carbon::now()->endOfQuarter(),
+            ]
+        );
 
-        $krTech2 = GoalKeyResult::create([
-            'tenant_id'           => $tenant->id,
-            'goal_id'             => $goalTech->id,
-            'title'               => 'Achieve < 120ms P99 API Response Latency Globally',
-            'metric_type'         => 'numeric',
-            'unit'                => 'ms',
-            'start_value'         => 250.00,
-            'target_value'        => 120.00,
-            'current_value'       => 150.00,
-            'weightage'           => 50.00,
-            'progress_percentage' => 76.92,
-            'health_status'       => 'on_track',
-            'due_date'            => Carbon::now()->endOfQuarter(),
-        ]);
+        $krTech2 = GoalKeyResult::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'goal_id' => $goalTech->id, 'title' => 'Achieve < 120ms P99 API Response Latency Globally'],
+            [
+                'metric_type'         => 'numeric',
+                'unit'                => 'ms',
+                'start_value'         => 250.00,
+                'target_value'        => 120.00,
+                'current_value'       => 150.00,
+                'weightage'           => 50.00,
+                'progress_percentage' => 76.92,
+                'health_status'       => 'on_track',
+                'due_date'            => Carbon::now()->endOfQuarter(),
+            ]
+        );
 
         // Seed Sample Check-ins
-        GoalCheckIn::create([
-            'tenant_id'          => $tenant->id,
-            'goal_id'            => $goalCompany1->id,
-            'goal_key_result_id' => $kr1->id,
-            'user_id'            => $users['company_admin']->id,
-            'employee_id'        => $employees[0]->id,
-            'previous_value'     => 600000.00,
-            'new_value'          => 900000.00,
-            'previous_progress'  => 50.00,
-            'new_progress'       => 75.00,
-            'health_status'      => 'on_track',
-            'comment'            => 'Closed major $300K annual deal with global logistics partner in EMEA.',
-            'check_in_date'      => Carbon::now()->subDays(3),
-        ]);
+        GoalCheckIn::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'goal_id' => $goalCompany1->id, 'goal_key_result_id' => $kr1->id, 'check_in_date' => Carbon::now()->subDays(3)->toDateString()],
+            [
+                'user_id'            => $users['company_admin']->id,
+                'employee_id'        => $employees[0]->id,
+                'previous_value'     => 600000.00,
+                'new_value'          => 900000.00,
+                'previous_progress'  => 50.00,
+                'new_progress'       => 75.00,
+                'health_status'      => 'on_track',
+                'comment'            => 'Closed major $300K annual deal with global logistics partner in EMEA.',
+            ]
+        );
 
-        GoalCheckIn::create([
-            'tenant_id'          => $tenant->id,
-            'goal_id'            => $goalTech->id,
-            'goal_key_result_id' => $krTech1->id,
-            'user_id'            => $users['company_admin']->id,
-            'employee_id'        => $employees[1]->id ?? $employees[0]->id,
-            'previous_value'     => 0.00,
-            'new_value'          => 0.00,
-            'previous_progress'  => 0.00,
-            'new_progress'       => 50.00,
-            'health_status'      => 'at_risk',
-            'comment'            => 'Completed architecture diagram. Awaiting AWS cross-region peering quota increase approval.',
-            'blockers'           => 'AWS Support ticket pending for Frankfurt VPC peering bandwidth increase.',
-            'check_in_date'      => Carbon::now()->subDays(1),
-        ]);
+        GoalCheckIn::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'goal_id' => $goalTech->id, 'goal_key_result_id' => $krTech1->id, 'check_in_date' => Carbon::now()->subDays(1)->toDateString()],
+            [
+                'user_id'            => $users['company_admin']->id,
+                'employee_id'        => $employees[1]->id ?? $employees[0]->id,
+                'previous_value'     => 0.00,
+                'new_value'          => 0.00,
+                'previous_progress'  => 0.00,
+                'new_progress'       => 50.00,
+                'health_status'      => 'at_risk',
+                'comment'            => 'Completed architecture diagram. Awaiting AWS cross-region peering quota increase approval.',
+                'blockers'           => 'AWS Support ticket pending for Frankfurt VPC peering bandwidth increase.',
+            ]
+        );
 
         // 30. 360° Multi-Rater Feedback Reviews & Real Scores
         // Seed Competencies without obsolete columns (cycle_id, code, category, weightage)
-        $compTech = Feedback360Competency::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'name'        => 'Technical Architecture & Code Quality',
-            'description' => 'Clean code standards, multi-tenant safety, performance optimization, and architectural reliability.',
-            'is_active'   => true,
-        ]);
+        $compTech = Feedback360Competency::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Technical Architecture & Code Quality'],
+            [
+                'description' => 'Clean code standards, multi-tenant safety, performance optimization, and architectural reliability.',
+                'is_active'   => true,
+            ]
+        );
 
-        $compTeam = Feedback360Competency::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'name'        => 'Team Collaboration & Mentorship',
-            'description' => 'Active knowledge sharing, constructive PR code reviews, empathy, and supporting junior teammates.',
-            'is_active'   => true,
-        ]);
+        $compTeam = Feedback360Competency::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Team Collaboration & Mentorship'],
+            [
+                'description' => 'Active knowledge sharing, constructive PR code reviews, empathy, and supporting junior teammates.',
+                'is_active'   => true,
+            ]
+        );
 
-        $compOwner = Feedback360Competency::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'name'        => 'Ownership & Delivery Discipline',
-            'description' => 'Proactive problem resolution, taking accountability for releases, and adhering to sprint commitments.',
-            'is_active'   => true,
-        ]);
+        $compOwner = Feedback360Competency::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Ownership & Delivery Discipline'],
+            [
+                'description' => 'Proactive problem resolution, taking accountability for releases, and adhering to sprint commitments.',
+                'is_active'   => true,
+            ]
+        );
 
-        $compComm = Feedback360Competency::create([
-            'tenant_id'   => $tenant->id,
-            'company_id'  => $company->id,
-            'name'        => 'Strategic Communication & Alignment',
-            'description' => 'Clear cross-functional stakeholder communication, transparency on blockers, and aligning with business goals.',
-            'is_active'   => true,
-        ]);
+        $compComm = Feedback360Competency::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'name' => 'Strategic Communication & Alignment'],
+            [
+                'description' => 'Clear cross-functional stakeholder communication, transparency on blockers, and aligning with business goals.',
+                'is_active'   => true,
+            ]
+        );
 
         $competencyIds = [$compTech->id, $compTeam->id, $compOwner->id, $compComm->id];
 
         // Seed Questions linked to competencies (without obsolete cycle_id column)
-        $qTech1 = Feedback360Question::create([
-            'tenant_id'            => $tenant->id,
-            'competency_id'        => $compTech->id,
-            'question_text'        => 'How effectively does this employee write scalable, clean, and well-tested backend code?',
-            'question_type'        => 'rating_scale',
-            'target_reviewer_type' => 'all',
-            'is_required'          => true,
-            'sort_order'           => 1,
-        ]);
+        $qTech1 = Feedback360Question::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'competency_id' => $compTech->id, 'question_text' => 'How effectively does this employee write scalable, clean, and well-tested backend code?'],
+            [
+                'question_type'        => 'rating_scale',
+                'target_reviewer_type' => 'all',
+                'is_required'          => true,
+                'sort_order'           => 1,
+            ]
+        );
 
-        $qTech2 = Feedback360Question::create([
-            'tenant_id'            => $tenant->id,
-            'competency_id'        => $compTech->id,
-            'question_text'        => 'Does the employee follow multi-tenant data isolation and security best practices?',
-            'question_type'        => 'rating_scale',
-            'target_reviewer_type' => 'all',
-            'is_required'          => true,
-            'sort_order'           => 2,
-        ]);
+        $qTech2 = Feedback360Question::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'competency_id' => $compTech->id, 'question_text' => 'Does the employee follow multi-tenant data isolation and security best practices?'],
+            [
+                'question_type'        => 'rating_scale',
+                'target_reviewer_type' => 'all',
+                'is_required'          => true,
+                'sort_order'           => 2,
+            ]
+        );
 
-        $qTeam1 = Feedback360Question::create([
-            'tenant_id'            => $tenant->id,
-            'competency_id'        => $compTeam->id,
-            'question_text'        => 'How constructively does this person conduct peer code reviews and offer helpful guidance?',
-            'question_type'        => 'rating_scale',
-            'target_reviewer_type' => 'all',
-            'is_required'          => true,
-            'sort_order'           => 3,
-        ]);
+        $qTeam1 = Feedback360Question::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'competency_id' => $compTeam->id, 'question_text' => 'How constructively does this person conduct peer code reviews and offer helpful guidance?'],
+            [
+                'question_type'        => 'rating_scale',
+                'target_reviewer_type' => 'all',
+                'is_required'          => true,
+                'sort_order'           => 3,
+            ]
+        );
 
-        $qOwner1 = Feedback360Question::create([
-            'tenant_id'            => $tenant->id,
-            'competency_id'        => $compOwner->id,
-            'question_text'        => 'Takes complete ownership of assigned sub-modules and proactively communicates blockers.',
-            'question_type'        => 'rating_scale',
-            'target_reviewer_type' => 'all',
-            'is_required'          => true,
-            'sort_order'           => 4,
-        ]);
+        $qOwner1 = Feedback360Question::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'competency_id' => $compOwner->id, 'question_text' => 'Takes complete ownership of assigned sub-modules and proactively communicates blockers.'],
+            [
+                'question_type'        => 'rating_scale',
+                'target_reviewer_type' => 'all',
+                'is_required'          => true,
+                'sort_order'           => 4,
+            ]
+        );
 
-        $qComm1 = Feedback360Question::create([
-            'tenant_id'            => $tenant->id,
-            'competency_id'        => $compComm->id,
-            'question_text'        => 'Communicates complex technical concepts with clarity across cross-functional teams.',
-            'question_type'        => 'rating_scale',
-            'target_reviewer_type' => 'all',
-            'is_required'          => true,
-            'sort_order'           => 5,
-        ]);
+        $qComm1 = Feedback360Question::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'competency_id' => $compComm->id, 'question_text' => 'Communicates complex technical concepts with clarity across cross-functional teams.'],
+            [
+                'question_type'        => 'rating_scale',
+                'target_reviewer_type' => 'all',
+                'is_required'          => true,
+                'sort_order'           => 5,
+            ]
+        );
 
-        $qOpen1 = Feedback360Question::create([
-            'tenant_id'            => $tenant->id,
-            'competency_id'        => $compTeam->id,
-            'question_text'        => 'What is this individual\'s greatest strength and standout contribution to the team?',
-            'description'          => 'Highlight key achievements, qualities, and positive behaviors.',
-            'question_type'        => 'text',
-            'target_reviewer_type' => 'all',
-            'is_required'          => false,
-            'sort_order'           => 6,
-        ]);
+        $qOpen1 = Feedback360Question::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'competency_id' => $compTeam->id, 'question_text' => 'What is this individual\'s greatest strength and standout contribution to the team?'],
+            [
+                'description'          => 'Highlight key achievements, qualities, and positive behaviors.',
+                'question_type'        => 'text',
+                'target_reviewer_type' => 'all',
+                'is_required'          => false,
+                'sort_order'           => 6,
+            ]
+        );
 
-        $qOpen2 = Feedback360Question::create([
-            'tenant_id'            => $tenant->id,
-            'competency_id'        => $compComm->id,
-            'question_text'        => 'What are 1-2 actionable growth areas where this person can level up?',
-            'description'          => 'Provide constructive, forward-looking advice for technical or leadership growth.',
-            'question_type'        => 'text',
-            'target_reviewer_type' => 'all',
-            'is_required'          => false,
-            'sort_order'           => 7,
-        ]);
+        $qOpen2 = Feedback360Question::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'competency_id' => $compComm->id, 'question_text' => 'What are 1-2 actionable growth areas where this person can level up?'],
+            [
+                'description'          => 'Provide constructive, forward-looking advice for technical or leadership growth.',
+                'question_type'        => 'text',
+                'target_reviewer_type' => 'all',
+                'is_required'          => false,
+                'sort_order'           => 7,
+            ]
+        );
 
         // Feedback Cycle 1: Active In Progress 360 Review
-        $feedbackCycle = Feedback360Cycle::create([
-            'tenant_id'                   => $tenant->id,
-            'company_id'                  => $company->id,
-            'name'                        => 'Q3-Q4 360° Leadership & Peer Performance Review 2026',
-            'code'                        => '360-REV-2026-H2',
-            'description'                 => 'Comprehensive multi-rater appraisal evaluating core technical excellence, cross-functional collaboration, ownership, and client empathy.',
-            'start_date'                  => Carbon::now()->subDays(20),
-            'end_date'                    => Carbon::now()->addDays(40),
-            'nomination_deadline'         => Carbon::now()->subDays(5),
-            'submission_deadline'         => Carbon::now()->addDays(25),
-            'status'                      => 'in_progress',
-            'is_peer_anonymous'           => true,
-            'is_direct_report_anonymous'  => true,
-            'min_peer_nominations'        => 2,
-            'max_peer_nominations'        => 5,
-            'allow_self_nomination'       => true,
-            'require_manager_approval'    => true,
-            'competency_ids'              => $competencyIds,
-            'created_by'                  => $users['company_admin']->id ?? null,
-        ]);
+        $feedbackCycle = Feedback360Cycle::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'code' => '360-REV-2026-H2'],
+            [
+                'company_id'                  => $company->id,
+                'name'                        => 'Q3-Q4 360° Leadership & Peer Performance Review 2026',
+                'description'                 => 'Comprehensive multi-rater appraisal evaluating core technical excellence, cross-functional collaboration, ownership, and client empathy.',
+                'start_date'                  => Carbon::now()->subDays(20),
+                'end_date'                    => Carbon::now()->addDays(40),
+                'nomination_deadline'         => Carbon::now()->subDays(5),
+                'submission_deadline'         => Carbon::now()->addDays(25),
+                'status'                      => 'in_progress',
+                'is_peer_anonymous'           => true,
+                'is_direct_report_anonymous'  => true,
+                'min_peer_nominations'        => 2,
+                'max_peer_nominations'        => 5,
+                'allow_self_nomination'       => true,
+                'require_manager_approval'    => true,
+                'competency_ids'              => $competencyIds,
+                'created_by'                  => $users['company_admin']->id ?? null,
+            ]
+        );
 
         // Safely resolve participants with zero hardcoded dependency
         $allTenantEmployees = Employee::where('tenant_id', $tenant->id)->orderBy('id')->get();
 
         $targetEmployee = Employee::where('tenant_id', $tenant->id)
-            ->where(fn($q) => $q->where('office_email', 'rahul@warrg.com')->orWhere('personal_email', 'rahul@warrg.com'))
+            ->where(fn($q) => $q->where('office_email', 'mohammadkaif.warrgyizmorsch@gmail.com')->orWhere('personal_email', 'kaif@gmail.com'))
             ->first() ?? $allTenantEmployees->get(14) ?? $allTenantEmployees->first();
 
         $managerEmployee = Employee::where('tenant_id', $tenant->id)
@@ -4103,150 +4710,187 @@ class HrmsDemoSeeder extends Seeder
             $targetEmployee->update(['user_id' => $adminUser->id]);
         }
 
-        // Establish manager-subordinate relationships if needed
+        // Establish manager-subordinate relationships if needed (Safeguard: never overwrite protected employee's reporting manager)
         if ($targetEmployee && $managerEmployee && $targetEmployee->id !== $managerEmployee->id) {
-            $targetEmployee->update(['reporting_manager_id' => $managerEmployee->id]);
+            if (! in_array($targetEmployee->id, $protectedEmployeeIds) || empty($targetEmployee->reporting_manager_id)) {
+                $targetEmployee->update(['reporting_manager_id' => $managerEmployee->id]);
+            }
         }
         if ($directReportEmployee && $targetEmployee && $directReportEmployee->id !== $targetEmployee->id) {
             $directReportEmployee->update(['reporting_manager_id' => $targetEmployee->id]);
         }
 
         if ($targetEmployee && $managerEmployee) {
-            $participant = Feedback360Participant::create([
-                'tenant_id'            => $tenant->id,
-                'cycle_id'             => $feedbackCycle->id,
-                'employee_id'          => $targetEmployee->id,
-                'manager_id'           => $managerEmployee->id,
-                'status'               => 'in_progress',
-                'manager_summary'      => 'Rahul has shown stellar progress in backend API architecture, clean system abstractions, and high sprint velocity.',
-                'development_plan'     => 'Focus on distributed cache invalidation strategies, cross-team architecture alignment, and end-to-end integration test coverage.',
-            ]);
+            $participant = Feedback360Participant::firstOrCreate(
+                [
+                    'tenant_id'   => $tenant->id,
+                    'cycle_id'    => $feedbackCycle->id,
+                    'employee_id' => $targetEmployee->id,
+                ],
+                [
+                    'manager_id'       => $managerEmployee->id,
+                    'status'           => 'in_progress',
+                    'manager_summary'  => 'Mohammad Kaif has shown stellar progress in backend API architecture, clean system abstractions, and high sprint velocity.',
+                    'development_plan' => 'Focus on distributed cache invalidation strategies, cross-team architecture alignment, and end-to-end integration test coverage.',
+                ]
+            );
 
             // 1. Self Review (Completed)
-            $nomSelf = Feedback360Nomination::create([
-                'tenant_id'      => $tenant->id,
-                'cycle_id'       => $feedbackCycle->id,
-                'participant_id' => $participant->id,
-                'employee_id'    => $targetEmployee->id,
-                'reviewer_id'    => $targetEmployee->id,
-                'reviewer_type'  => 'self',
-                'status'         => 'completed',
-                'submitted_at'   => Carbon::now()->subDays(5),
-            ]);
-
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech1->id, 'competency_id' => $compTech->id, 'rating_value' => 4.5]);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech2->id, 'competency_id' => $compTech->id, 'rating_value' => 5.0]);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTeam1->id, 'competency_id' => $compTeam->id, 'rating_value' => 4.0]);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOwner1->id, 'competency_id' => $compOwner->id, 'rating_value' => 4.5]);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qComm1->id, 'competency_id' => $compComm->id, 'rating_value' => 4.0]);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOpen1->id, 'competency_id' => $compTeam->id, 'text_response' => 'Successfully refactored HRMS repository layer and improved database query execution times by 40%.']);
-
-            // 2. Manager Review (Completed)
-            $nomManager = Feedback360Nomination::create([
-                'tenant_id'      => $tenant->id,
-                'cycle_id'       => $feedbackCycle->id,
-                'participant_id' => $participant->id,
-                'employee_id'    => $targetEmployee->id,
-                'reviewer_id'    => $managerEmployee->id,
-                'reviewer_type'  => 'manager',
-                'status'         => 'completed',
-                'submitted_at'   => Carbon::now()->subDays(2),
-            ]);
-
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech1->id, 'competency_id' => $compTech->id, 'rating_value' => 5.0]);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech2->id, 'competency_id' => $compTech->id, 'rating_value' => 4.5]);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTeam1->id, 'competency_id' => $compTeam->id, 'rating_value' => 4.5]);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOwner1->id, 'competency_id' => $compOwner->id, 'rating_value' => 4.5]);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qComm1->id, 'competency_id' => $compComm->id, 'rating_value' => 4.5]);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen1->id, 'competency_id' => $compTeam->id, 'text_response' => 'Rahul exhibits exceptional technical grit, consistently delivering zero-defect pull requests.']);
-            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen2->id, 'competency_id' => $compComm->id, 'text_response' => 'Encouraged to take on lead architecture roles in upcoming cross-module services.']);
-
-            // 3. Peer Review 1 (Completed)
-            if ($peerEmployee1 && $peerEmployee1->id !== $targetEmployee->id) {
-                $nomPeer1 = Feedback360Nomination::create([
+            $nomSelf = Feedback360Nomination::firstOrCreate(
+                [
                     'tenant_id'      => $tenant->id,
                     'cycle_id'       => $feedbackCycle->id,
                     'participant_id' => $participant->id,
+                    'reviewer_type'  => 'self',
+                ],
+                [
                     'employee_id'    => $targetEmployee->id,
-                    'reviewer_id'    => $peerEmployee1->id,
-                    'reviewer_type'  => 'peer',
+                    'reviewer_id'    => $targetEmployee->id,
                     'status'         => 'completed',
-                    'is_anonymous'   => true,
-                    'submitted_at'   => Carbon::now()->subDay(),
-                ]);
+                    'submitted_at'   => Carbon::now()->subDays(5),
+                ]
+            );
 
-                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech1->id, 'competency_id' => $compTech->id, 'rating_value' => 4.5]);
-                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech2->id, 'competency_id' => $compTech->id, 'rating_value' => 4.0]);
-                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTeam1->id, 'competency_id' => $compTeam->id, 'rating_value' => 5.0]);
-                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOwner1->id, 'competency_id' => $compOwner->id, 'rating_value' => 4.0]);
-                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qComm1->id, 'competency_id' => $compComm->id, 'rating_value' => 4.5]);
-                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOpen1->id, 'competency_id' => $compTeam->id, 'text_response' => 'Always approachable, provides thorough and respectful code review feedback.']);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech1->id], ['competency_id' => $compTech->id, 'rating_value' => 4.5]);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech2->id], ['competency_id' => $compTech->id, 'rating_value' => 5.0]);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTeam1->id], ['competency_id' => $compTeam->id, 'rating_value' => 4.0]);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOwner1->id], ['competency_id' => $compOwner->id, 'rating_value' => 4.5]);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qComm1->id], ['competency_id' => $compComm->id, 'rating_value' => 4.0]);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOpen1->id], ['competency_id' => $compTeam->id, 'text_response' => 'Successfully refactored HRMS repository layer and improved database query execution times by 40%.']);
+
+            // 2. Manager Review (Completed)
+            $nomManager = Feedback360Nomination::firstOrCreate(
+                [
+                    'tenant_id'      => $tenant->id,
+                    'cycle_id'       => $feedbackCycle->id,
+                    'participant_id' => $participant->id,
+                    'reviewer_type'  => 'manager',
+                ],
+                [
+                    'employee_id'    => $targetEmployee->id,
+                    'reviewer_id'    => $managerEmployee->id,
+                    'status'         => 'completed',
+                    'submitted_at'   => Carbon::now()->subDays(2),
+                ]
+            );
+
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech1->id], ['competency_id' => $compTech->id, 'rating_value' => 5.0]);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech2->id], ['competency_id' => $compTech->id, 'rating_value' => 4.5]);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTeam1->id], ['competency_id' => $compTeam->id, 'rating_value' => 4.5]);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOwner1->id], ['competency_id' => $compOwner->id, 'rating_value' => 4.5]);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qComm1->id], ['competency_id' => $compComm->id, 'rating_value' => 4.5]);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen1->id], ['competency_id' => $compTeam->id, 'text_response' => 'Kaif exhibits exceptional technical grit, consistently delivering zero-defect pull requests.']);
+            Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen2->id], ['competency_id' => $compComm->id, 'text_response' => 'Encouraged to take on lead architecture roles in upcoming cross-module services.']);
+
+            // 3. Peer Review 1 (Completed)
+            if ($peerEmployee1 && $peerEmployee1->id !== $targetEmployee->id) {
+                $nomPeer1 = Feedback360Nomination::firstOrCreate(
+                    [
+                        'tenant_id'      => $tenant->id,
+                        'cycle_id'       => $feedbackCycle->id,
+                        'participant_id' => $participant->id,
+                        'reviewer_id'    => $peerEmployee1->id,
+                        'reviewer_type'  => 'peer',
+                    ],
+                    [
+                        'employee_id'    => $targetEmployee->id,
+                        'status'         => 'completed',
+                        'is_anonymous'   => true,
+                        'submitted_at'   => Carbon::now()->subDay(),
+                    ]
+                );
+
+                Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech1->id], ['competency_id' => $compTech->id, 'rating_value' => 4.5]);
+                Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech2->id], ['competency_id' => $compTech->id, 'rating_value' => 4.0]);
+                Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTeam1->id], ['competency_id' => $compTeam->id, 'rating_value' => 5.0]);
+                Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOwner1->id], ['competency_id' => $compOwner->id, 'rating_value' => 4.0]);
+                Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qComm1->id], ['competency_id' => $compComm->id, 'rating_value' => 4.5]);
+                Feedback360Response::firstOrCreate(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOpen1->id], ['competency_id' => $compTeam->id, 'text_response' => 'Always approachable, provides thorough and respectful code review feedback.']);
             }
 
             // 4. Peer Review 2 (Pending - shows actionable item under "My Reviews to Complete")
             if ($peerEmployee2 && $peerEmployee2->id !== $targetEmployee->id) {
-                Feedback360Nomination::create([
-                    'tenant_id'      => $tenant->id,
-                    'cycle_id'       => $feedbackCycle->id,
-                    'participant_id' => $participant->id,
-                    'employee_id'    => $targetEmployee->id,
-                    'reviewer_id'    => $peerEmployee2->id,
-                    'reviewer_type'  => 'peer',
-                    'status'         => 'approved',
-                    'is_anonymous'   => true,
-                ]);
+                Feedback360Nomination::firstOrCreate(
+                    [
+                        'tenant_id'      => $tenant->id,
+                        'cycle_id'       => $feedbackCycle->id,
+                        'participant_id' => $participant->id,
+                        'reviewer_id'    => $peerEmployee2->id,
+                    ],
+                    [
+                        'employee_id'    => $targetEmployee->id,
+                        'reviewer_type'  => 'peer',
+                        'status'         => 'approved',
+                        'is_anonymous'   => true,
+                    ]
+                );
             }
 
             // 5. Direct Report Upward Review (Pending)
             if ($directReportEmployee && $directReportEmployee->id !== $targetEmployee->id) {
-                Feedback360Nomination::create([
-                    'tenant_id'      => $tenant->id,
-                    'cycle_id'       => $feedbackCycle->id,
-                    'participant_id' => $participant->id,
-                    'employee_id'    => $targetEmployee->id,
-                    'reviewer_id'    => $directReportEmployee->id,
-                    'reviewer_type'  => 'direct_report',
-                    'status'         => 'approved',
-                    'is_anonymous'   => true,
-                ]);
+                Feedback360Nomination::firstOrCreate(
+                    [
+                        'tenant_id'      => $tenant->id,
+                        'cycle_id'       => $feedbackCycle->id,
+                        'participant_id' => $participant->id,
+                        'reviewer_id'    => $directReportEmployee->id,
+                    ],
+                    [
+                        'employee_id'    => $targetEmployee->id,
+                        'reviewer_type'  => 'direct_report',
+                        'status'         => 'approved',
+                        'is_anonymous'   => true,
+                    ]
+                );
             }
 
             // 6. Actionable Review assigned to Target Employee (evaluating Manager Priya)
-            $participantManager = Feedback360Participant::create([
-                'tenant_id'   => $tenant->id,
-                'cycle_id'    => $feedbackCycle->id,
-                'employee_id' => $managerEmployee->id,
-                'manager_id'  => null,
-                'status'      => 'in_progress',
-            ]);
+            $participantManager = Feedback360Participant::firstOrCreate(
+                [
+                    'tenant_id'   => $tenant->id,
+                    'cycle_id'    => $feedbackCycle->id,
+                    'employee_id' => $managerEmployee->id,
+                ],
+                [
+                    'manager_id'  => null,
+                    'status'      => 'in_progress',
+                ]
+            );
 
-            Feedback360Nomination::create([
-                'tenant_id'      => $tenant->id,
-                'cycle_id'       => $feedbackCycle->id,
-                'participant_id' => $participantManager->id,
-                'employee_id'    => $managerEmployee->id,
-                'reviewer_id'    => $targetEmployee->id,
-                'reviewer_type'  => 'direct_report',
-                'status'         => 'approved',
-                'is_anonymous'   => true,
-            ]);
+            Feedback360Nomination::firstOrCreate(
+                [
+                    'tenant_id'      => $tenant->id,
+                    'cycle_id'       => $feedbackCycle->id,
+                    'participant_id' => $participantManager->id,
+                    'employee_id'    => $managerEmployee->id,
+                    'reviewer_id'    => $targetEmployee->id,
+                ],
+                [
+                    'reviewer_type'  => 'direct_report',
+                    'status'         => 'approved',
+                    'is_anonymous'   => true,
+                ]
+            );
 
             // 7. Pending Peer Nomination (shows under "Nomination Approvals" tab)
-            Feedback360Nomination::create([
-                'tenant_id'         => $tenant->id,
-                'cycle_id'          => $feedbackCycle->id,
-                'participant_id'    => $participant->id,
-                'employee_id'       => $targetEmployee->id,
-                'reviewer_id'       => $directReportEmployee->id,
-                'reviewer_type'     => 'peer',
-                'status'            => 'pending_approval',
-                'nominated_by'      => $targetEmployee->id,
-                'nomination_reason' => 'Collaborated closely on frontend integration.',
-            ]);
+            Feedback360Nomination::firstOrCreate(
+                [
+                    'tenant_id'         => $tenant->id,
+                    'cycle_id'          => $feedbackCycle->id,
+                    'participant_id'    => $participant->id,
+                    'employee_id'       => $targetEmployee->id,
+                    'reviewer_id'       => $directReportEmployee->id,
+                ],
+                [
+                    'reviewer_type'     => 'peer',
+                    'status'            => 'pending_approval',
+                    'nominated_by'      => $targetEmployee->id,
+                    'nomination_reason' => 'Collaborated closely on frontend integration.',
+                ]
+            );
 
             $participant->recalculateScores();
         }
-            });
         } finally {
             Schema::enableForeignKeyConstraints();
         }

@@ -17,8 +17,8 @@ class StoreProjectMemberRequest extends FormRequest
     {
         $tenantId = require_tenant_id();
         $project = $this->route('project');
-        $isUserBased = $project instanceof Project
-            ? $project->billing_method === 'User Based'
+        $isStrictlyRequired = $project instanceof Project
+            ? ($project->billing_method === 'User Based' || $project->budget_type === 'Time & Material')
             : false;
 
         return [
@@ -28,7 +28,7 @@ class StoreProjectMemberRequest extends FormRequest
                 Rule::exists('users', 'id')->where('tenant_id', $tenantId),
             ],
             'project_role' => ['nullable', 'string', 'max:255'],
-            'rate_per_hour' => [$isUserBased ? 'required' : 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+            'rate_per_hour' => [$isStrictlyRequired ? 'required' : 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'cost_per_hour' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'budget_hours' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'is_active' => ['nullable', 'boolean'],
@@ -40,5 +40,16 @@ class StoreProjectMemberRequest extends FormRequest
         return [
             'rate_per_hour.required' => __('projects.rate_required_for_user_billing'),
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $project = $this->route('project');
+            if ($project instanceof Project && !$project->isSetupComplete()) {
+                $missing = implode(', ', $project->missingSetupFields());
+                $validator->errors()->add('user_id', __('projects.setup_required_before_collaborators_error', ['fields' => $missing]));
+            }
+        });
     }
 }

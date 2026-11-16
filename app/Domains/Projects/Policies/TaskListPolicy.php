@@ -15,17 +15,24 @@ class TaskListPolicy
 
     public function manage(User $user, Project $project): bool
     {
+        $isLead = (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id;
+
         return $this->access->allows($user, 'projects.tasklists.manage', [
             'tenant_id' => $project->tenant_id,
-            'owner_id' => $project->owner_id,
+            'owner_id'  => $isLead ? $user->id : $project->owner_id,
         ]);
     }
 
     public function update(User $user, TaskList $taskList): bool
     {
+        $project = $taskList->project;
+        $isLead = (int) $user->id === (int) $project?->owner_id
+            || (int) $user->id === (int) $project?->manager_id;
+
         return $this->access->allows($user, 'projects.tasklists.manage', [
             'tenant_id' => $taskList->tenant_id,
-            'owner_id' => $taskList->project?->owner_id,
+            'owner_id'  => $isLead ? $user->id : $project?->owner_id,
         ]);
     }
 

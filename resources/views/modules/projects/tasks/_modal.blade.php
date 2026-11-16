@@ -47,6 +47,7 @@
         setTaskSelect('task_task_list_id', data.taskListId, data.taskListName);
         setTaskSelect('task_assignee_id', data.assigneeId);
         setTaskSelect('task_reviewer_id', data.reviewerId);
+        setTaskFieldValue('task_billing_amount', data.billingAmount !== undefined ? data.billingAmount : '');
 
         var modalEl = document.getElementById('taskModal');
         if (modalEl && window.bootstrap) {

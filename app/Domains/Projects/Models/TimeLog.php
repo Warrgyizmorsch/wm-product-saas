@@ -16,6 +16,19 @@ class TimeLog extends BaseModel
 {
     use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
+    protected ?string $rbacPermission = 'projects.timetracking.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $table = $this->getTable();
+        $builder->where(function (Builder $sub) use ($user, $table) {
+            $sub->where($table . '.user_id', $user->id)
+                ->orWhereHas('project', fn (Builder $pq) => 
+                    $pq->where('owner_id', $user->id)->orWhere('manager_id', $user->id)
+                );
+        });
+    }
+
     protected $table = 'project_time_logs';
 
     public const STATUS_PENDING = 'Pending';

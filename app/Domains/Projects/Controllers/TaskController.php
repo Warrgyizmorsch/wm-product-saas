@@ -267,6 +267,18 @@ class TaskController extends Controller
                     return $this->tasks->updateField($task, 'due_date', $value)?->format('Y-m-d');
                 },
             ],
+            'billing_amount' => [
+                'rules' => ['nullable', 'numeric', 'min:0'],
+                'handler' => function (Task $task, $value) {
+                    if ($task->is_invoiced) {
+                        throw ValidationException::withMessages([
+                            'value' => 'Cannot modify billing settings on an invoiced task.',
+                        ]);
+                    }
+
+                    return $this->tasks->updateField($task, 'billing_amount', $value ? (float) $value : 0.0);
+                },
+            ],
         ];
     }
 

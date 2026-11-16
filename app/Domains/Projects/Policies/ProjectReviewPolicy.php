@@ -15,19 +15,31 @@ class ProjectReviewPolicy
 
     public function viewAny(User $user, Project $project): bool
     {
+        $isMemberOrLead = (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id
+            || ($project->relationLoaded('members')
+                ? $project->members->where('user_id', $user->id)->where('is_active', true)->isNotEmpty()
+                : $project->members()->where('user_id', $user->id)->where('is_active', true)->exists());
+
         return $this->access->allows($user, 'projects.reviews.view', [
             'tenant_id' => $project->tenant_id,
-            'owner_id'  => $project->owner_id,
+            'owner_id'  => $isMemberOrLead ? $user->id : $project->owner_id,
         ]);
     }
 
     public function view(User $user, ProjectReview $review): bool
     {
         $project = $review->project;
+        $isParty = (int) $user->id === (int) $review->reviewer_id
+            || (int) $user->id === (int) $project?->owner_id
+            || (int) $user->id === (int) $project?->manager_id
+            || ($project && ($project->relationLoaded('members')
+                ? $project->members->where('user_id', $user->id)->where('is_active', true)->isNotEmpty()
+                : $project->members()->where('user_id', $user->id)->where('is_active', true)->exists()));
 
         return $this->access->allows($user, 'projects.reviews.view', [
-            'tenant_id' => $project->tenant_id,
-            'owner_id'  => $project->owner_id,
+            'tenant_id' => $project?->tenant_id ?? $review->tenant_id,
+            'owner_id'  => $isParty ? $user->id : $project?->owner_id,
         ]);
     }
 
@@ -37,9 +49,12 @@ class ProjectReviewPolicy
             return false;
         }
 
+        $isLead = (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id;
+
         return $this->access->allows($user, 'projects.reviews.create', [
             'tenant_id' => $project->tenant_id,
-            'owner_id'  => $project->owner_id,
+            'owner_id'  => $isLead ? $user->id : $project->owner_id,
         ]);
     }
 
@@ -51,9 +66,13 @@ class ProjectReviewPolicy
             return false;
         }
 
+        $isParty = (int) $user->id === (int) $review->reviewer_id
+            || (int) $user->id === (int) $project?->owner_id
+            || (int) $user->id === (int) $project?->manager_id;
+
         return $this->access->allows($user, 'projects.reviews.signoff', [
-            'tenant_id' => $project->tenant_id,
-            'owner_id'  => $project->owner_id,
+            'tenant_id' => $project?->tenant_id ?? $review->tenant_id,
+            'owner_id'  => $isParty ? $user->id : $project?->owner_id,
         ]);
     }
 
@@ -65,9 +84,12 @@ class ProjectReviewPolicy
             return false;
         }
 
+        $isLead = (int) $user->id === (int) $project?->owner_id
+            || (int) $user->id === (int) $project?->manager_id;
+
         return $this->access->allows($user, 'projects.reviews.signoff', [
-            'tenant_id' => $project->tenant_id,
-            'owner_id'  => $project->owner_id,
+            'tenant_id' => $project?->tenant_id ?? $review->tenant_id,
+            'owner_id'  => $isLead ? $user->id : $project?->owner_id,
         ]);
     }
 }

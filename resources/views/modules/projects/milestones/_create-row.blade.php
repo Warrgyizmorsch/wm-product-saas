@@ -51,6 +51,26 @@
                         <div class="invalid-feedback d-block fs-11 milestone-create-error" data-field="due_date"></div>
                     </div>
 
+                    @if (isset($project) && $project->budget_type !== 'Time & Material' && $project->billing_method === 'Project Based' && (float)$project->budget_amount > 0)
+                        <div style="min-width: 110px; width: 120px;">
+                            <input type="number" step="0.1" min="0" max="100" class="form-control form-control-sm odoo-table-input milestone-create-billing-percentage"
+                                   placeholder="Installment %" title="{{ __('projects.installment_percentage') }}">
+                            <div class="invalid-feedback d-block fs-11 milestone-create-error" data-field="billing_percentage"></div>
+                        </div>
+                    @elseif (isset($project) && $project->budget_type !== 'Time & Material' && $project->billing_method === 'Milestone Based')
+                        <div style="min-width: 130px; width: 140px;">
+                            <input type="number" step="0.01" min="0" class="form-control form-control-sm odoo-table-input milestone-create-billing-amount"
+                                   placeholder="{{ __('projects.deliverable_price') }}" title="{{ __('projects.deliverable_price') }}">
+                            <div class="invalid-feedback d-block fs-11 milestone-create-error" data-field="billing_amount"></div>
+                        </div>
+                    @elseif (isset($project) && $project->budget_type !== 'Time & Material' && $project->billing_method === 'Project Based')
+                        <div style="min-width: 130px; width: 140px;">
+                            <input type="number" step="0.01" min="0" class="form-control form-control-sm odoo-table-input milestone-create-billing-amount"
+                                   placeholder="{{ __('projects.installment_amount') }}">
+                            <div class="invalid-feedback d-block fs-11 milestone-create-error" data-field="billing_amount"></div>
+                        </div>
+                    @endif
+
                     <div class="d-flex align-items-center gap-1 flex-shrink-0 pt-1">
                         <button type="button" class="btn btn-sm btn-primary milestone-create-submit" title="{{ __('projects.create') }}">
                             <i class="feather-check"></i>
