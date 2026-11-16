@@ -252,20 +252,35 @@ class ProjectScheduleTest extends TestCase
         $this->assertEquals('2026-10-12', $taskC->due_date->format('Y-m-d'));
     }
 
-    public function test_ripple_rescheduling_safeguards_completed_tasks(): void
+    public function test_ripple_rescheduling_skips_completed_tasks_while_updating_open_tasks(): void
     {
         $taskA = $this->createTask('Task A', '2026-10-01', '2026-10-03');
         $taskB = $this->createTask('Task B', '2026-10-04', '2026-10-06', null, 'Completed');
+        $taskC = $this->createTask('Task C', '2026-10-04', '2026-10-06', null, 'Open');
 
         $this->createDependency($taskB, $taskA, TaskDependency::TYPE_FINISH_TO_START);
+        $this->createDependency($taskC, $taskA, TaskDependency::TYPE_FINISH_TO_START);
 
-        // Delay Task A: Task B is completed so ripple cannot automatically reschedule it and must throw ValidationException
-        $this->expectException(ValidationException::class);
-        $this->scheduleService->rescheduleTask($taskA, '2026-10-05', '2026-10-07', 'ripple');
+        // Delay Task A: Task B is completed so it is skipped (dates kept unchanged), while Task C is open and gets shifted
+        $result = $this->scheduleService->rescheduleTask($taskA, '2026-10-05', '2026-10-07', 'ripple');
 
+        $this->assertTrue($result['success']);
+        $this->assertContains($taskB->task_code, $result['skipped_completed_tasks']);
+        $this->assertContains($taskC->task_code, $result['shifted_tasks']);
+
+        $taskA->refresh();
+        $this->assertEquals('2026-10-05', $taskA->start_date->format('Y-m-d'));
+        $this->assertEquals('2026-10-07', $taskA->due_date->format('Y-m-d'));
+
+        // Task B remains locked at original dates
         $taskB->refresh();
         $this->assertEquals('2026-10-04', $taskB->start_date->format('Y-m-d'));
         $this->assertEquals('2026-10-06', $taskB->due_date->format('Y-m-d'));
+
+        // Task C shifted to start on or after Task A finish (2026-10-08)
+        $taskC->refresh();
+        $this->assertEquals('2026-10-08', $taskC->start_date->format('Y-m-d'));
+        $this->assertEquals('2026-10-10', $taskC->due_date->format('Y-m-d'));
     }
 
     public function test_milestone_scoping_schedule(): void

@@ -39,6 +39,9 @@
         'dueDateDisplay' => $milestone->due_date?->format('d/m/Y'),
         'status' => $milestone->status,
         'completionPercentage' => $milestone->completion_percentage,
+        'billingAmount' => (float) ($milestone->billing_amount ?? 0),
+        'billingPercentage' => $milestone->billing_percentage,
+        'isInvoiced' => (bool) $milestone->is_invoiced,
     ];
 
     $rowCloneJsData = array_merge($rowJsData, [
@@ -98,6 +101,38 @@
             @endif
         </div>
 
+        @if ($project->budget_type !== 'Time & Material' && !in_array($project->billing_method, ['Task Based', 'User Based'], true) && ($project->billing_method === 'Project Based' || $project->billing_method === 'Milestone Based' || (float)$milestone->billing_amount > 0))
+            <div class="flex-shrink-0 text-end" style="min-width: 120px;">
+                @if ($project->billing_method === 'Project Based' && $milestone->billing_percentage !== null)
+                    <div class="fw-bold fs-13 text-dark">{{ $milestone->billing_percentage }}%</div>
+                    <div class="fs-11 text-muted">{{ format_currency($milestone->billing_amount ?? 0) }}</div>
+                @else
+                    <div class="fw-bold fs-12 text-dark">{{ format_currency($milestone->billing_amount ?? 0) }}</div>
+                @endif
+                @if ($milestone->is_invoiced)
+                    @if ($milestone->invoice_id)
+                        <a href="{{ route('sales.invoices.show', $milestone->invoice_id) }}" class="badge bg-success-subtle text-success fs-10 text-uppercase text-decoration-none" title="{{ __('projects.view_invoice') }}">
+                            <i class="feather-check-circle me-1"></i>{{ __('projects.invoiced') }}
+                        </a>
+                    @else
+                        <span class="badge bg-success-subtle text-success fs-10 text-uppercase">{{ __('projects.invoiced') }}</span>
+                    @endif
+                @elseif ($milestone->status === 'Completed' && (float)$milestone->billing_amount > 0)
+                    <a href="{{ route('projects.show', [$project, 'tab' => 'billing']) }}" class="badge bg-info-subtle text-info fs-10 text-uppercase text-decoration-none" title="{{ __('projects.generate_invoice') }}">
+                        <i class="feather-file-text me-1"></i>{{ __('projects.ready_to_invoice') }}
+                    </a>
+                @elseif ((float)$milestone->billing_amount > 0)
+                    <span class="badge bg-light text-muted fs-10 text-uppercase">{{ __('projects.unbilled') }}</span>
+                @endif
+            </div>
+        @elseif ($project->budget_type === 'Time & Material')
+            <div class="flex-shrink-0 text-end" style="min-width: 120px;">
+                <span class="badge bg-light text-muted border fs-10 text-uppercase">
+                    <i class="feather-clock me-1"></i>{{ __('projects.billed_via_timesheets') }}
+                </span>
+            </div>
+        @endif
+
         @if ($canManageMilestones)
             <div class="flex-shrink-0 ms-auto">
                 <x-ui.action-dropdown id="milestoneActions{{ $milestone->id }}">
@@ -116,12 +151,14 @@
                             <i class="feather-copy me-2"></i>{{ __('projects.clone') }}
                         </a>
                     </li>
-                    <li>
-                        <a class="dropdown-item text-danger" href="javascript:void(0);"
-                           onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone->id]) }}', @js($milestone->name), {{ $rowTasksTotal }})">
-                            <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
-                        </a>
-                    </li>
+                    @if (!$milestone->is_invoiced)
+                        <li>
+                            <a class="dropdown-item text-danger" href="javascript:void(0);"
+                               onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone->id]) }}', @js($milestone->name), {{ $rowTasksTotal }})">
+                                <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
+                            </a>
+                        </li>
+                    @endif
                 </x-ui.action-dropdown>
                 <form id="milestoneRowDeleteForm{{ $milestone->id }}" method="POST" action="{{ route('projects.milestones.destroy', [$project, $milestone->id]) }}" class="d-none">
                     @csrf
@@ -164,12 +201,14 @@
                             <i class="feather-copy me-2"></i>{{ __('projects.clone') }}
                         </a>
                     </li>
-                    <li>
-                        <a class="dropdown-item text-danger" href="javascript:void(0);"
-                           onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone->id]) }}', @js($milestone->name), {{ $rowTasksTotal }})">
-                            <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
-                        </a>
-                    </li>
+                    @if (!$milestone->is_invoiced)
+                        <li>
+                            <a class="dropdown-item text-danger" href="javascript:void(0);"
+                               onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone->id]) }}', @js($milestone->name), {{ $rowTasksTotal }})">
+                                <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
+                            </a>
+                        </li>
+                    @endif
                 </x-ui.action-dropdown>
                 <form id="milestoneRowDeleteFormMobile{{ $milestone->id }}" method="POST" action="{{ route('projects.milestones.destroy', [$project, $milestone->id]) }}" class="d-none">
                     @csrf
@@ -201,6 +240,20 @@
                 <x-ui.badge variant="{{ $rowStatusVariant }}" soft>
                     {{ __('projects.statuses.' . $milestone->status) }}
                 </x-ui.badge>
+            @endif
+            @if (!in_array($project->billing_method, ['Task Based', 'User Based'], true) && ((float)$milestone->billing_amount > 0 || $project->billing_method === 'Project Based' || $project->billing_method === 'Milestone Based'))
+                <span class="badge bg-light text-dark border fs-11">
+                    @if ($project->billing_method === 'Project Based' && $milestone->billing_percentage !== null)
+                        <strong>{{ $milestone->billing_percentage }}%</strong> ({{ format_currency($milestone->billing_amount ?? 0) }})
+                    @else
+                        {{ format_currency($milestone->billing_amount ?? 0) }}
+                    @endif
+                    @if ($milestone->is_invoiced)
+                        · <span class="text-success">{{ __('projects.invoiced') }}</span>
+                    @elseif ($milestone->status === 'Completed' && (float)$milestone->billing_amount > 0)
+                        · <span class="text-info">{{ __('projects.ready_to_invoice') }}</span>
+                    @endif
+                </span>
             @endif
             <span class="fs-11 text-muted">{{ $milestone->start_date?->format('d/m/Y') ?: '—' }} &rarr; {{ $milestone->due_date?->format('d/m/Y') ?: '—' }}</span>
         </div>

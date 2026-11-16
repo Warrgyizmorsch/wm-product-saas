@@ -402,4 +402,26 @@ class ProjectBillingTest extends TestCase
 
         $this->assertTrue(in_array($response->status(), [403, 404], true));
     }
+
+    public function test_amend_contract_rejects_inactive_customer(): void
+    {
+        $inactiveCustomer = Customer::create([
+            'tenant_id' => $this->tenant->id,
+            'name'      => 'Inactive Client Corp',
+            'status'    => 'inactive',
+        ]);
+
+        $response = $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->postJson(route('projects.amend-contract', $this->project), [
+                'field'  => 'customer_id',
+                'value'  => $inactiveCustomer->id,
+                'reason' => 'Reassigning to archived customer',
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJson([
+            'message' => 'Invalid customer selected.',
+        ]);
+    }
 }

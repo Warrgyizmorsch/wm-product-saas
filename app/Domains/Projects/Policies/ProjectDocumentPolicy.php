@@ -57,9 +57,15 @@ class ProjectDocumentPolicy
 
     private function authorizeOnProject(User $user, Project $project, string $permission): bool
     {
+        $isMemberOrLead = (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id
+            || ($project->relationLoaded('members')
+                ? $project->members->where('user_id', $user->id)->where('is_active', true)->isNotEmpty()
+                : $project->members()->where('user_id', $user->id)->where('is_active', true)->exists());
+
         return $this->access->allows($user, $permission, [
             'tenant_id' => $project->tenant_id,
-            'owner_id' => $project->owner_id,
+            'owner_id'  => $isMemberOrLead ? $user->id : $project->owner_id,
         ]);
     }
 }

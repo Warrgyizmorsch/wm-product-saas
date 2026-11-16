@@ -30,6 +30,20 @@ class UpdateMilestoneRequest extends FormRequest
             'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'status' => ['nullable', Rule::in(Milestone::STATUSES)],
             'completion_percentage' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'billing_amount' => ['nullable', 'numeric', 'min:0'],
+            'billing_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $milestone = $this->route('milestone');
+            if ($milestone && $milestone->is_invoiced) {
+                if ($this->has('billing_amount') && (float)$this->input('billing_amount') !== (float)$milestone->billing_amount) {
+                    $validator->errors()->add('billing_amount', 'Cannot modify billing amount because this milestone has already been invoiced.');
+                }
+            }
+        });
     }
 }

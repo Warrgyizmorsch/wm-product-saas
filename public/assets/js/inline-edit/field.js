@@ -95,6 +95,16 @@ export class InlineEditField {
             this.viewEl.classList.toggle('inline-edit__view--empty', isEmpty);
             this.cancelEdit();
             window.showAppToast?.('success', 'Saved');
+
+            this.el.dispatchEvent(new CustomEvent('inline-edit:success', {
+                bubbles: true,
+                detail: { field: this.field, value: this.originalValue, data },
+            }));
+
+            if (this.el.dataset.reload === 'true' || this.field === 'billing_method') {
+                setTimeout(() => window.location.reload(), 300);
+                return;
+            }
         } catch (error) {
             if (error.status === 422) {
                 const errors = error.data?.errors ?? {};

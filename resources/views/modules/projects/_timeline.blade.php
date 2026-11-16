@@ -761,27 +761,8 @@ document.addEventListener('alpine:init', () => {
                 }
             }
 
-            // 3. In Ripple mode, safeguard against downstream completed tasks
-            if (mode === 'ripple') {
-                for (let link of this.schedule.links) {
-                    let pId = link.predecessor_id ?? link.depends_on_task_id;
-                    let sId = link.successor_id ?? link.task_id;
-                    if (pId === task.id) {
-                        let succ = taskMap[sId];
-                        if (succ && (succ.is_completed || succ.status === 'Completed')) {
-                            let type = link.type ?? link.dependency_type ?? 'Finish-to-Start';
-                            let lag = parseInt(link.lag_days ?? 0, 10) || 0;
-                            if (type === 'Finish-to-Start') {
-                                let pDue = this.parseLocalDate(proposedDue);
-                                pDue.setDate(pDue.getDate() + 1 + lag);
-                                if (succ.start_date < this.formatLocalDate(pDue)) {
-                                    return `Cannot ripple reschedule: Downstream task '${succ.task_code}' is already Completed and cannot be automatically rescheduled.`;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            // 3. In Ripple mode, downstream completed tasks are automatically skipped while open tasks are shifted
+            // (No blocking constraint violation needed for ripple mode completed tasks)
 
             return null; // Valid
         },

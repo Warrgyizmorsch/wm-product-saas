@@ -52,30 +52,55 @@ class TaskPolicy
 
     private function authorizeOnProject(User $user, Project $project, string $permission): bool
     {
+        $isMemberOrLead = (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id
+            || ($project->relationLoaded('members')
+                ? $project->members->where('user_id', $user->id)->where('is_active', true)->isNotEmpty()
+                : $project->members()->where('user_id', $user->id)->where('is_active', true)->exists());
+
         return $this->access->allows($user, $permission, [
             'tenant_id' => $project->tenant_id,
-            'owner_id' => $project->owner_id,
+            'owner_id'  => $isMemberOrLead ? $user->id : $project->owner_id,
         ]);
     }
 
     /**
      * Tries the "own" grant first (assignee acting on their own task), then
-     * falls back to the "team" grant (project owner/manager) — AccessService's
-     * scope matcher only compares a single owner_id per call, so a task's two
-     * distinct owners have to be tried as two separate context checks.
+     * falls back to project scope (active member for view, lead for mutate).
      */
     private function authorizeOnTask(User $user, Task $task, string $permission): bool
     {
-        if ($this->access->allows($user, $permission, [
-            'tenant_id' => $task->tenant_id,
-            'owner_id' => $task->assignee_id,
-        ])) {
-            return true;
+        $assigneeId = $task->assignee_id ?? $task->assigned_to;
+        if ($assigneeId && (int) $user->id === (int) $assigneeId) {
+            if ($this->access->allows($user, $permission, [
+                'tenant_id' => $task->tenant_id,
+                'owner_id'  => $user->id,
+            ])) {
+                return true;
+            }
         }
+
+        $project = $task->project;
+        $isMemberOrLead = $project && (
+            (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id
+            || ($project->relationLoaded('members')
+                ? $project->members->where('user_id', $user->id)->where('is_active', true)->isNotEmpty()
+                : $project->members()->where('user_id', $user->id)->where('is_active', true)->exists())
+        );
+
+        $isLead = $project && (
+            (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id
+        );
+
+        $effectiveOwnerId = ($permission === 'projects.tasks.view' ? $isMemberOrLead : $isLead)
+            ? $user->id
+            : $project?->owner_id;
 
         return $this->access->allows($user, $permission, [
             'tenant_id' => $task->tenant_id,
-            'owner_id' => $task->project?->owner_id,
+            'owner_id'  => $effectiveOwnerId,
         ]);
     }
 }

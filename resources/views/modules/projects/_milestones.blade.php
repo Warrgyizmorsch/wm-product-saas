@@ -73,6 +73,138 @@
     @endpush
 @endonce
 
+@if ($project->billing_method === 'Project Based' && $project->budget_type !== 'Time & Material' && (float)$project->budget_amount > 0)
+    @php
+        $totalAllocated = (float) $milestones->sum('billing_amount');
+        $budget = (float) $project->budget_amount;
+        $allocatedPercent = min(100, round(($totalAllocated / $budget) * 100, 1));
+        $isOverAllocated = $totalAllocated > $budget;
+    @endphp
+    <div class="p-3 mb-3 bg-light rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <span class="avatar-text avatar-sm bg-primary-subtle text-primary rounded-circle">
+                <i class="feather-pie-chart"></i>
+            </span>
+            <div>
+                <span class="fs-12 text-muted text-uppercase fw-semibold d-block">{{ __('projects.contract_payment_schedule') }}</span>
+                <span class="fs-13 fw-bold text-dark">
+                    {{ format_currency($totalAllocated) }} <span class="text-muted fw-normal">/ {{ format_currency($budget) }}</span>
+                    <span class="badge {{ $isOverAllocated ? 'bg-danger' : ($allocatedPercent == 100 ? 'bg-success' : 'bg-primary') }} ms-1">
+                        {{ $allocatedPercent }}% {{ __('projects.allocated') }}
+                    </span>
+                </span>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2" style="min-width: 180px;">
+            <div class="progress ht-6 flex-grow-1">
+                <div class="progress-bar {{ $isOverAllocated ? 'bg-danger' : 'bg-success' }}" style="width: {{ $allocatedPercent }}%"></div>
+            </div>
+        </div>
+    </div>
+@elseif ($project->billing_method === 'Milestone Based' && $project->budget_type !== 'Time & Material')
+    @php
+        $totalMilestoneValue = (float) $milestones->sum('billing_amount');
+        $invoicedMilestonesValue = (float) $milestones->where('is_invoiced', true)->sum('billing_amount');
+        $unbilledMilestonesValue = (float) $milestones->where('is_invoiced', false)->sum('billing_amount');
+        $totalCount = $milestones->count();
+        $estimatedBudget = (float) ($project->budget_amount ?? 0);
+        $hasBudget = $estimatedBudget > 0;
+        $isOverBudget = $hasBudget && ($totalMilestoneValue > $estimatedBudget);
+        $overBudgetAmount = $isOverBudget ? ($totalMilestoneValue - $estimatedBudget) : 0;
+        $budgetPercent = $hasBudget ? round(($totalMilestoneValue / $estimatedBudget) * 100, 1) : null;
+    @endphp
+    <div class="p-3 mb-3 bg-light rounded-3 border">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <span class="avatar-text avatar-sm {{ $isOverBudget ? 'bg-warning-subtle text-warning' : 'bg-info-subtle text-info' }} rounded-circle">
+                    <i class="{{ $isOverBudget ? 'feather-alert-triangle' : 'feather-layers' }}"></i>
+                </span>
+                <div>
+                    <span class="fs-12 text-muted text-uppercase fw-semibold d-block">{{ __('projects.deliverables_summary') }}</span>
+                    <span class="fs-14 fw-bold text-dark">
+                        {{ format_currency($totalMilestoneValue) }}
+                        @if ($hasBudget)
+                            <span class="text-muted fw-normal fs-12">/ {{ __('projects.estimated_budget') }}: {{ format_currency($estimatedBudget) }}</span>
+                            @if ($isOverBudget)
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1 fs-11" title="{{ __('projects.budget_exceeded_notice') }}">
+                                    <i class="feather-alert-circle me-1"></i>+{{ format_currency($overBudgetAmount) }} ({{ $budgetPercent }}%)
+                                </span>
+                            @else
+                                <span class="badge bg-success-subtle text-success border border-success-subtle ms-1 fs-11">
+                                    {{ $budgetPercent }}%
+                                </span>
+                            @endif
+                        @else
+                            <span class="fs-12 text-muted fw-normal ms-1">({{ $totalCount }} {{ __('projects.milestones') }})</span>
+                        @endif
+                    </span>
+                </div>
+            </div>
+
+            @if ($hasBudget)
+                <div class="d-none d-lg-block" style="min-width: 160px; max-width: 200px;">
+                    <div class="d-flex justify-content-between fs-11 text-muted mb-1">
+                        <span>{{ __('projects.estimate_used') }}</span>
+                        <span class="fw-semibold {{ $isOverBudget ? 'text-warning-emphasis' : 'text-dark' }}">{{ $budgetPercent }}%</span>
+                    </div>
+                    <div class="progress ht-6">
+                        <div class="progress-bar {{ $isOverBudget ? 'bg-warning' : 'bg-info' }}" style="width: {{ min(100, $budgetPercent) }}%"></div>
+                    </div>
+                </div>
+            @endif
+
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                <div class="text-end">
+                    <span class="fs-11 text-muted text-uppercase d-block">{{ __('projects.total_deliverables_billed') }}</span>
+                    <span class="fs-13 fw-bold text-success">{{ format_currency($invoicedMilestonesValue) }}</span>
+                </div>
+                <div class="vr opacity-25 d-none d-sm-block"></div>
+                <div class="text-end">
+                    <span class="fs-11 text-muted text-uppercase d-block">{{ __('projects.total_deliverables_unbilled') }}</span>
+                    <span class="fs-13 fw-bold text-primary">{{ format_currency($unbilledMilestonesValue) }}</span>
+                </div>
+            </div>
+        </div>
+
+        @if ($isOverBudget)
+            <div class="mt-2 pt-2 border-top fs-11 text-muted d-flex align-items-center gap-1">
+                <i class="feather-info text-warning me-1"></i>
+                <span>{{ __('projects.over_estimate_advisory', ['amount' => format_currency($overBudgetAmount)]) }}</span>
+            </div>
+        @endif
+    </div>
+@elseif ($project->budget_type === 'Time & Material')
+    @php
+        $totalCount = $milestones->count();
+        $completedCount = $milestones->where('status', 'Completed')->count();
+        $progress = $totalCount > 0 ? round(($completedCount / $totalCount) * 100) : 0;
+    @endphp
+    @if ($totalCount > 0)
+        <div class="p-3 mb-3 bg-light rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="avatar-text avatar-sm bg-info-subtle text-info rounded-circle">
+                    <i class="feather-flag"></i>
+                </span>
+                <div>
+                    <span class="fs-12 text-muted text-uppercase fw-semibold d-block">{{ __('projects.timeline_phases') }}</span>
+                    <span class="fs-13 fw-bold text-dark">
+                        {{ $completedCount }} / {{ $totalCount }} {{ __('projects.milestones_completed') }}
+                        <span class="badge bg-info-subtle text-info border border-info-subtle ms-1">
+                            {{ __('projects.billed_via_timesheets') }}
+                        </span>
+                    </span>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2" style="min-width: 180px;">
+                <div class="progress ht-6 flex-grow-1">
+                    <div class="progress-bar bg-info" style="width: {{ $progress }}%"></div>
+                </div>
+                <span class="fs-12 fw-semibold text-muted">{{ $progress }}%</span>
+            </div>
+        </div>
+    @endif
+@endif
+
 {{-- Toolbar --}}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
     <form method="GET" action="{{ route('projects.show', $project) }}" class="d-flex flex-wrap align-items-center gap-2">
@@ -226,6 +358,7 @@
                             dueDate: @js(old('due_date')),
                             status: @js(old('status')),
                             completionPercentage: @js(old('completion_percentage')),
+                            billingAmount: @js(old('billing_amount')),
                         });
                     @else
                         openMilestoneModal('add', {
@@ -236,6 +369,7 @@
                             dueDate: @js(old('due_date')),
                             status: @js(old('status')),
                             completionPercentage: @js(old('completion_percentage')),
+                            billingAmount: @js(old('billing_amount')),
                         });
                     @endif
                 });

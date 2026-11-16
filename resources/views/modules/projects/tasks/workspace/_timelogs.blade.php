@@ -2,6 +2,9 @@
     $timeLogs = $task->timeLogs()->with(['user', 'approver'])->orderByDesc('log_date')->orderByDesc('id')->get();
     $totalHours = (float) $task->actual_hours;
     $canLogTime = auth()->user()?->can('create', [\App\Domains\Projects\Models\TimeLog::class, $project]);
+    $isPrivilegedUser = (int) auth()->id() === (int) $project->owner_id
+        || (int) auth()->id() === (int) $project->manager_id
+        || (bool) auth()->user()?->hasAnyRole('owner', 'tenant_owner', 'admin', 'super_admin');
 @endphp
 
 <div class="border rounded-3 p-3 mb-4">
@@ -80,7 +83,7 @@
                                 </span>
                             </td>
                             <td class="text-end text-nowrap">
-                                @if ($log->approval_status === 'Pending' && (auth()->user()?->can('approve', $log) || auth()->id() === (int)$project->owner_id || auth()->id() === (int)$project->manager_id || auth()->user()?->hasAnyRole('owner', 'tenant_owner', 'admin', 'super_admin')))
+                                @if ($log->approval_status === 'Pending' && ($isPrivilegedUser || ((int) auth()->id() !== (int) $log->user_id && auth()->user()?->can('approve', $log))))
                                     <form method="POST" action="{{ route('projects.timesheets.approve', $log) }}" class="d-inline" onsubmit="return confirm('{{ __('projects.confirm_approve_timelog', ['default' => 'Approve this time entry?']) }}');">
                                         @csrf
                                         @method('PATCH')

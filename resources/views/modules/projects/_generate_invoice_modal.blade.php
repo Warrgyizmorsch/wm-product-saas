@@ -67,7 +67,15 @@
             </div>
         </div>
 
+        @php
+            $isTm = ($project->budget_type === \App\Domains\Projects\Models\Project::BUDGET_TYPE_TIME_AND_MATERIAL);
+            $showTimeLogs = $unbilledTimeLogs->isNotEmpty() || $isTm || $project->billing_method === \App\Domains\Projects\Models\Project::BILLING_METHOD_USER_BASED;
+            $showMilestones = $unbilledMilestones->isNotEmpty() || (!$isTm && in_array($project->billing_method, [\App\Domains\Projects\Models\Project::BILLING_METHOD_PROJECT_BASED, \App\Domains\Projects\Models\Project::BILLING_METHOD_MILESTONE_BASED], true));
+            $showTasks = $unbilledTasks->isNotEmpty() || (!$isTm && $project->billing_method === \App\Domains\Projects\Models\Project::BILLING_METHOD_TASK_BASED);
+        @endphp
+
         {{-- Unbilled Time Logs Selection --}}
+        @if ($showTimeLogs)
         <div class="mb-4">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="fw-bold text-dark mb-0 d-flex align-items-center">
@@ -125,8 +133,10 @@
                 </div>
             @endif
         </div>
+        @endif
 
         {{-- Completed Milestones Selection --}}
+        @if ($showMilestones)
         <div class="mb-4">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="fw-bold text-dark mb-0 d-flex align-items-center">
@@ -175,6 +185,59 @@
                 </div>
             @endif
         </div>
+        @endif
+
+        {{-- Completed Tasks Selection (Fixed Price) --}}
+        @if ($showTasks)
+        <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold text-dark mb-0 d-flex align-items-center">
+                    <i class="feather-check-square me-2 text-primary"></i>
+                    {{ __('projects.unbilled_tasks') }}
+                    <span class="badge bg-secondary-subtle text-secondary ms-2 fs-11">{{ $unbilledTasks->count() }}</span>
+                </h6>
+                @if ($unbilledTasks->isNotEmpty())
+                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fs-12" id="btnToggleAllTasks">
+                        {{ __('projects.select_all') }}
+                    </button>
+                @endif
+            </div>
+
+            @if ($unbilledTasks->isEmpty())
+                <div class="p-3 bg-light rounded text-center text-muted fs-12">
+                    {{ __('projects.no_unbilled_tasks') }}
+                </div>
+            @else
+                <div class="table-responsive border rounded" style="max-height: 200px; overflow-y: auto;">
+                    <x-ui.odoo-form-ui type="table" tableClass="table table-sm table-hover align-middle mb-0 fs-12">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="width: 36px;" class="text-center">
+                                    <input type="checkbox" class="form-check-input" id="checkAllTasks">
+                                </th>
+                                <th>{{ __('projects.task_name') }}</th>
+                                <th>{{ __('projects.task_list') }}</th>
+                                <th class="text-end pe-3">{{ __('projects.fixed_price') }} ({{ active_currency_symbol() }})</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($unbilledTasks as $taskItem)
+                                <tr>
+                                    <td class="text-center">
+                                        <input type="checkbox" name="task_ids[]" value="{{ $taskItem->id }}"
+                                               data-amount="{{ (float)$taskItem->billing_amount }}" class="form-check-input check-task">
+                                    </td>
+                                    <td class="fw-semibold text-dark">{{ $taskItem->title }}</td>
+                                    <td class="text-muted">{{ $taskItem->taskList?->name ?? '—' }}</td>
+                                    <td class="text-end pe-3 fw-bold text-primary">{{ format_currency($taskItem->billing_amount) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </x-ui.odoo-form-ui>
+                </div>
+            @endif
+        </div>
+        @endif
 
         {{-- Live Summary Calculation Box --}}
         <div class="p-3 bg-light rounded border d-flex justify-content-between align-items-center mb-3">
@@ -204,13 +267,16 @@
 document.addEventListener('DOMContentLoaded', function () {
     const checkAllTimeLogs = document.getElementById('checkAllTimeLogs');
     const checkAllMilestones = document.getElementById('checkAllMilestones');
+    const checkAllTasks = document.getElementById('checkAllTasks');
     const timeLogCheckboxes = document.querySelectorAll('.check-time-log');
     const milestoneCheckboxes = document.querySelectorAll('.check-milestone');
+    const taskCheckboxes = document.querySelectorAll('.check-task');
     const txtCount = document.getElementById('txtSelectedCount');
     const txtSubtotal = document.getElementById('txtSelectedSubtotal');
     const btnSubmit = document.getElementById('btnSubmitGenerateInvoice');
     const btnToggleAllTimeLogs = document.getElementById('btnToggleAllTimeLogs');
     const btnToggleAllMilestones = document.getElementById('btnToggleAllMilestones');
+    const btnToggleAllTasks = document.getElementById('btnToggleAllTasks');
 
     function recalculate() {
         let count = 0;
@@ -224,6 +290,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         milestoneCheckboxes.forEach(cb => {
+            if (cb.checked) {
+                count++;
+                subtotal += parseFloat(cb.getAttribute('data-amount') || 0);
+            }
+        });
+
+        taskCheckboxes.forEach(cb => {
             if (cb.checked) {
                 count++;
                 subtotal += parseFloat(cb.getAttribute('data-amount') || 0);
@@ -278,6 +351,22 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    if (checkAllTasks) {
+        checkAllTasks.addEventListener('change', function () {
+            taskCheckboxes.forEach(cb => { cb.checked = checkAllTasks.checked; });
+            recalculate();
+        });
+    }
+
+    if (btnToggleAllTasks) {
+        btnToggleAllTasks.addEventListener('click', function () {
+            const anyUnchecked = Array.from(taskCheckboxes).some(cb => !cb.checked);
+            taskCheckboxes.forEach(cb => { cb.checked = anyUnchecked; });
+            if (checkAllTasks) checkAllTasks.checked = anyUnchecked;
+            recalculate();
+        });
+    }
+
     timeLogCheckboxes.forEach(cb => {
         cb.addEventListener('change', function () {
             if (checkAllTimeLogs) {
@@ -291,6 +380,15 @@ document.addEventListener('DOMContentLoaded', function () {
         cb.addEventListener('change', function () {
             if (checkAllMilestones) {
                 checkAllMilestones.checked = Array.from(milestoneCheckboxes).every(c => c.checked);
+            }
+            recalculate();
+        });
+    });
+
+    taskCheckboxes.forEach(cb => {
+        cb.addEventListener('change', function () {
+            if (checkAllTasks) {
+                checkAllTasks.checked = Array.from(taskCheckboxes).every(c => c.checked);
             }
             recalculate();
         });
