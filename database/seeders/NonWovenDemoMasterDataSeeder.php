@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domains\HRMS\Models\Employee;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionBomItem;
@@ -10,9 +11,12 @@ use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Models\WorkCenterSection;
+use App\Domains\Production\Services\BomLifecycleService;
 use App\Domains\Production\Services\CountdownCalculationEngine;
+use App\Domains\Production\Services\RoutingLifecycleService;
 use App\Domains\Production\Services\RoutingOperationCostCalculator;
 use App\Domains\Production\Services\SectionCalculationService;
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -30,15 +34,16 @@ use Illuminate\Support\Facades\Schema;
  *  - Machines (NW-EXT-*, NW-BAG-*, etc.)
  *  - Manual Batches (NW-BAT-*)
  *  - External Worker Pay Grades (NW-PG-*)
+ *  - Dedicated Demo Employees (NW-EMP-* for Branch 3)
  *  - Work Center & Section Employees (production_work_center_employees)
  *  - Manual Batch Employees (production_section_manual_production_employees)
  *  - External Worker Allocations (production_external_worker_allocations)
  *  - Work Center & Section Calculation Snapshots (via CountdownCalculationEngine)
- *  - Routings (RT-*)
- *  - Routing Operations (OP-010, OP-020, etc., stamped with resource snapshot)
- *  - BOMs (BOM-*)
- *  - BOM Items (Tier 1 Recipe covering all operations)
- *  - Routing Operation Materials (Tier 2 Allocations covering all operations)
+ *  - Routings (RT-*) - Approved with cost_snapshot and audit log
+ *  - Routing Operations (calculated & resource stamped, sequenced and chained)
+ *  - BOMs (BOM-*) - Approved with audit log
+ *  - BOM Items (Tier 1 Recipe)
+ *  - Routing Operation Materials (Tier 2 Allocations with child BOM links)
  *
  * Safely matched on CODE (never on fixed IDs). Nothing is wiped; foreign-key checks stay on.
  * Money in the data file is in INR and converted to base currency using config/currency.php (rate 85).
@@ -92,13 +97,17 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         // 8b. External Worker Pay Grades
         $payGradesCount = $this->seedPayGrades($data['production_external_worker_pay_grades'] ?? [], $tenantId, $rate);
 
-        // 8c. Work Center & Section Employees
-        $wcEmployeesCount = $this->seedWorkCenterEmployees($data['production_work_center_employees'] ?? [], $tenantId);
+        // 8c. Dedicated Demo Employees (Branch 3)
+        $empMap = $this->seedEmployees($data['employees'] ?? [], $tenantId, self::DEMO_COMPANY_ID, self::DEMO_BRANCH_ID, $rate);
+        $employeesCount = count($empMap);
 
-        // 8d. Manual Batch Employees
-        $batchEmpCount = $this->seedManualBatchEmployees($data['production_section_manual_production_employees'] ?? [], $tenantId);
+        // 8d. Work Center & Section Employees
+        $wcEmployeesCount = $this->seedWorkCenterEmployees($data['production_work_center_employees'] ?? [], $tenantId, $empMap);
 
-        // 8e. External Worker Allocations
+        // 8e. Manual Batch Employees
+        $batchEmpCount = $this->seedManualBatchEmployees($data['production_section_manual_production_employees'] ?? [], $tenantId, $empMap);
+
+        // 8f. External Worker Allocations
         $extAllocCount = $this->seedExternalWorkerAllocations($data['production_external_worker_allocations'] ?? [], $tenantId);
 
         // 9. Work Center Calculations (Full Snapshot)
@@ -110,6 +119,9 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         // 11. Routing Operations (calculated & stamped)
         $opsCount = $this->seedRoutingOperations($data['production_routing_operations'] ?? [], $tenantId);
 
+        // 11b. Approve Routings (generates cost_snapshot and RoutingApproval audit logs)
+        $approvedRoutingsCount = $this->approveRoutings($data['production_routings'] ?? [], $tenantId);
+
         // 12. BOMs
         $bomsCount = $this->seedBoms($data['production_boms'] ?? [], $tenantId);
 
@@ -119,12 +131,15 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         // 14. Routing Operation Materials (Tier 2 Allocations)
         $allocCount = $this->seedRoutingOperationMaterials($data['production_routing_operation_materials'] ?? [], $tenantId);
 
+        // 14b. Approve BOMs (generates status=approved, ProductionBomApproval audit logs)
+        $approvedBomsCount = $this->approveBoms($data['production_boms'] ?? [], $tenantId);
+
         $this->command?->info("NonWovenDemoMasterDataSeeder completed for tenant {$tenantId}:");
         $this->command?->info("  Shifts: {$shiftsCount}, Warehouses: {$warehousesCount}, Products: {$productsCount}, Stock Rows: {$stockCount}");
         $this->command?->info("  Work Centers: {$wcCount}, Sections: {$secCount}, Machines: {$machinesCount}, Batches: {$batchesCount}");
-        $this->command?->info("  Pay Grades: {$payGradesCount}, Staff: {$wcEmployeesCount}, Batch Links: {$batchEmpCount}, Allocations: {$extAllocCount}");
-        $this->command?->info("  Calculations: {$calcsCount}, Routings: {$routingsCount}, Operations: {$opsCount}");
-        $this->command?->info("  BOMs: {$bomsCount}, BOM Items: {$bomItemsCount}, Material Allocations: {$allocCount}");
+        $this->command?->info("  Pay Grades: {$payGradesCount}, Employees: {$employeesCount}, Staff Links: {$wcEmployeesCount}, Batch Links: {$batchEmpCount}, Allocations: {$extAllocCount}");
+        $this->command?->info("  Calculations: {$calcsCount}, Routings: {$routingsCount} (Approved: {$approvedRoutingsCount}), Operations: {$opsCount}");
+        $this->command?->info("  BOMs: {$bomsCount} (Approved: {$approvedBomsCount}), BOM Items: {$bomItemsCount}, Material Allocations: {$allocCount}");
     }
 
     public static function loadData(): ?array
@@ -138,19 +153,26 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         return is_array($data) ? $data : null;
     }
 
-    /** Units of the data file's currency per 1 unit of base currency (1 when the file is already in base). */
+    /** Units of the data file's currency per 1 unit of base currency (85 INR per USD). */
     public static function rateToBase(?string $currency): float
     {
-        if (!$currency || $currency === config('currency.base', 'USD')) {
+        if (!$currency) {
             return 1.0;
         }
 
-        $rate = (float) config("currency.currencies.{$currency}.rate", 0);
-        if ($rate <= 0) {
-            throw new \RuntimeException("No exchange rate configured for {$currency} in config/currency.php.");
+        if (config('currency.base') === 'USD') {
+            return (float) config("currency.currencies.{$currency}.rate", 85.0);
         }
 
-        return $rate;
+        if ($currency === 'INR') {
+            $usdRate = (float) config('currency.currencies.USD.rate', 0.011765);
+
+            return $usdRate > 0 ? round(1.0 / $usdRate, 4) : 85.0;
+        }
+
+        $rate = (float) config("currency.currencies.{$currency}.rate", 0);
+
+        return $rate > 0 ? $rate : 1.0;
     }
 
     // ─── 1. SHIFTS ────────────────────────────────────────────────────────────
@@ -227,7 +249,13 @@ class NonWovenDemoMasterDataSeeder extends Seeder
             unset($values['id'], $values['tenant_id'], $values['sku']);
 
             if (isset($row['unit_cost'])) {
-                $values['cost_price'] = round((float) $row['unit_cost'] / $rate, 4);
+                $convertedCost = round((float) $row['unit_cost'] / $rate, 4);
+                $values['unit_cost'] = $convertedCost;
+                $values['cost_price'] = $convertedCost;
+            }
+
+            if (isset($row['selling_price'])) {
+                $values['selling_price'] = round((float) $row['selling_price'] / $rate, 4);
             }
 
             $values['sku'] = $code;
@@ -265,7 +293,12 @@ class NonWovenDemoMasterDataSeeder extends Seeder
             $productId = $pMap[$productSku] ?? null;
             $warehouseId = $wMap[$whCode] ?? null;
 
-            if (!$productId || !$warehouseId) continue;
+            if (!$productId) {
+                throw new \RuntimeException("Product {$productSku} not found for opening stock");
+            }
+            if (!$warehouseId) {
+                throw new \RuntimeException("Warehouse {$whCode} not found for opening stock in Branch {$branchId}");
+            }
 
             $stockKey = [
                 'tenant_id' => $tenantId,
@@ -330,7 +363,9 @@ class NonWovenDemoMasterDataSeeder extends Seeder
 
         foreach ($rows as $row) {
             $code = $row['code'] ?? null;
-            if (!$code) continue;
+            if (!$code) {
+                throw new \RuntimeException("Work center row missing code");
+            }
 
             $values = array_intersect_key($row, array_flip($columns));
             unset($values['id'], $values['tenant_id'], $values['code']);
@@ -367,7 +402,9 @@ class NonWovenDemoMasterDataSeeder extends Seeder
             $wcCode = $row['work_center_code'] ?? null;
             $wcId = $wcMap[$wcCode] ?? null;
 
-            if (!$code || !$wcId) continue;
+            if (!$code || !$wcId) {
+                throw new \RuntimeException("Section code {$code} or work center {$wcCode} invalid");
+            }
 
             $values = array_intersect_key($row, array_flip($columns));
             unset($values['id'], $values['tenant_id'], $values['work_center_id'], $values['code']);
@@ -381,6 +418,8 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 foreach ($row['assigned_shifts'] as $sCode) {
                     if (isset($shiftsMap[$sCode])) {
                         $shiftIds[] = (int) $shiftsMap[$sCode];
+                    } else {
+                        throw new \RuntimeException("Shift {$sCode} not found for section {$code}");
                     }
                 }
             }
@@ -421,7 +460,9 @@ class NonWovenDemoMasterDataSeeder extends Seeder
 
         foreach ($rows as $row) {
             $code = $row['code'] ?? null;
-            if (!$code) continue;
+            if (!$code) {
+                throw new \RuntimeException("Machine row missing code");
+            }
 
             $values = array_intersect_key($row, array_flip($columns));
             unset($values['id'], $values['tenant_id'], $values['code']);
@@ -432,7 +473,10 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 }
             }
 
-            if (isset($row['section_code']) && isset($secMap[$row['section_code']])) {
+            if (isset($row['section_code'])) {
+                if (!isset($secMap[$row['section_code']])) {
+                    throw new \RuntimeException("Section {$row['section_code']} not found for machine {$code}");
+                }
                 $values['section_id'] = (int) $secMap[$row['section_code']];
             }
 
@@ -458,17 +502,54 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         $columns = Schema::getColumnListing('production_section_manual_productions');
         $secMap = DB::table('production_work_center_sections')->where('tenant_id', $tenantId)->pluck('id', 'code')->all();
         $shiftsMap = DB::table('production_shifts')->where('tenant_id', $tenantId)->pluck('id', 'code')->all();
-        $count = 0;
 
+        // Remove obsolete demo batches in machine sections (NW-SEC-RCY, NW-SEC-WRP, NW-SEC-BAG) so re-running clears old phantom rows
+        $validBatchNames = array_column($rows, 'batch_name');
+        $obsoleteBatches = DB::table('production_section_manual_productions')
+            ->where('tenant_id', $tenantId)
+            ->where('batch_name', 'like', 'NW-BAT-%')
+            ->whereNotIn('batch_name', $validBatchNames)
+            ->get();
+
+        foreach ($obsoleteBatches as $obs) {
+            DB::table('production_external_worker_allocations')
+                ->where('tenant_id', $tenantId)
+                ->where('manual_production_id', $obs->id)
+                ->update(['manual_production_id' => null]);
+
+            DB::table('production_section_manual_production_employees')
+                ->where('manual_production_id', $obs->id)
+                ->delete();
+
+            DB::table('production_routing_operations')
+                ->where('tenant_id', $tenantId)
+                ->where('section_manual_production_id', $obs->id)
+                ->update(['section_manual_production_id' => null]);
+
+            DB::table('production_section_manual_productions')
+                ->where('id', $obs->id)
+                ->delete();
+        }
+
+        $count = 0;
         foreach ($rows as $row) {
             $batchName = $row['batch_name'] ?? null;
             $secCode = $row['section_code'] ?? null;
             $shiftCode = $row['shift_code'] ?? null;
 
-            $secId = $secMap[$secCode] ?? null;
-            $shiftId = $shiftsMap[$shiftCode] ?? null;
+            if (!$batchName) {
+                throw new \RuntimeException("Manual batch row missing batch_name");
+            }
 
-            if (!$batchName || !$secId || !$shiftId) continue;
+            $secId = $secMap[$secCode] ?? null;
+            if (!$secId) {
+                throw new \RuntimeException("Section {$secCode} not found for manual batch {$batchName}");
+            }
+
+            $shiftId = $shiftsMap[$shiftCode] ?? null;
+            if (!$shiftId) {
+                throw new \RuntimeException("Shift {$shiftCode} not found for manual batch {$batchName}");
+            }
 
             $values = array_intersect_key($row, array_flip($columns));
             unset($values['id'], $values['tenant_id'], $values['section_id'], $values['shift_id'], $values['batch_name']);
@@ -496,7 +577,9 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         $count = 0;
         foreach ($rows as $row) {
             $code = $row['code'] ?? null;
-            if (!$code) continue;
+            if (!$code) {
+                throw new \RuntimeException("Pay grade row missing code");
+            }
 
             $hourlyRateBase = isset($row['hourly_rate']) ? round((float) $row['hourly_rate'] / $rate, 4) : 1.0;
 
@@ -517,27 +600,94 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         return $count;
     }
 
-    // ─── 8C. WORK CENTER & SECTION EMPLOYEES ──────────────────────────────────
+    // ─── 8C. DEDICATED DEMO EMPLOYEES (BRANCH 3) ──────────────────────────────
 
-    private function seedWorkCenterEmployees(array $rows, int $tenantId): int
+    private function seedEmployees(array $rows, int $tenantId, int $companyId, int $branchId, float $rate): array
+    {
+        $shiftMap = DB::table('production_shifts')->where('tenant_id', $tenantId)->pluck('id', 'code')->all();
+        $empMap = [];
+
+        foreach ($rows as $row) {
+            $code = $row['employee_code'] ?? null;
+            if (!$code) {
+                throw new \RuntimeException("Employee row missing employee_code");
+            }
+
+            $shiftCode = $row['shift_code'] ?? null;
+            $shiftId = $shiftMap[$shiftCode] ?? null;
+            if (!$shiftId) {
+                throw new \RuntimeException("Shift {$shiftCode} not found for employee {$code}");
+            }
+
+            $monthlyInr = (float) ($row['monthly_salary_inr'] ?? 0);
+            $annualInr = $monthlyInr * 12;
+            $annualBase = round($annualInr / $rate, 4);
+
+            $emp = Employee::withoutGlobalScopes()->updateOrCreate([
+                'tenant_id' => $tenantId,
+                'employee_id' => $code,
+            ], [
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'full_name' => $row['full_name'],
+                'job_title' => $row['job_title'],
+                'shift_id' => $shiftId,
+                'current_salary' => $annualBase,
+                'status' => 1,
+                'employment_type' => 'Full-time',
+                'employee_stage' => 'Confirmed',
+                'date_of_joining' => now()->subMonths(6)->toDateString(),
+            ]);
+
+            $empMap[$code] = $emp->id;
+        }
+
+        return $empMap;
+    }
+
+    // ─── 8D. WORK CENTER & SECTION EMPLOYEES ──────────────────────────────────
+
+    private function seedWorkCenterEmployees(array $rows, int $tenantId, array $empMap): int
     {
         $wcMap = DB::table('production_work_centers')->where('tenant_id', $tenantId)->pluck('id', 'code')->all();
         $secMap = DB::table('production_work_center_sections')->where('tenant_id', $tenantId)->pluck('id', 'code')->all();
+
+        // Clean stale assignments for demo work centers before inserting
+        $demoWcCodes = ['NW-WC-EXT', 'NW-WC-CNV', 'NW-WC-FAB'];
+        $demoWcIds = array_values(array_intersect_key($wcMap, array_flip($demoWcCodes)));
+        if (!empty($demoWcIds)) {
+            DB::table('production_work_center_employees')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('work_center_id', $demoWcIds)
+                ->delete();
+        }
+
         $count = 0;
-
         foreach ($rows as $row) {
-            $wcId = $wcMap[$row['work_center_code']] ?? null;
-            $secId = !empty($row['section_code']) ? ($secMap[$row['section_code']] ?? null) : null;
-            $empId = (int) $row['employee_id'];
+            $wcCode = $row['work_center_code'] ?? null;
+            $secCode = $row['section_code'] ?? null;
+            $empCode = $row['employee_code'] ?? null;
 
-            if (!$wcId || !$empId) continue;
+            $wcId = $wcMap[$wcCode] ?? null;
+            if (!$wcId) {
+                throw new \RuntimeException("Work center {$wcCode} not found for employee assignment {$empCode}");
+            }
 
-            DB::table('production_work_center_employees')->updateOrInsert([
+            $secId = !empty($secCode) ? ($secMap[$secCode] ?? null) : null;
+            if (!empty($secCode) && !$secId) {
+                throw new \RuntimeException("Section {$secCode} not found for employee assignment {$empCode}");
+            }
+
+            $empId = $empMap[$empCode] ?? null;
+            if (!$empId) {
+                throw new \RuntimeException("Employee {$empCode} not found in employee map");
+            }
+
+            DB::table('production_work_center_employees')->insert([
                 'tenant_id' => $tenantId,
                 'work_center_id' => $wcId,
                 'section_id' => $secId,
                 'employee_id' => $empId,
-            ], [
                 'active' => $row['active'] ?? 1,
                 'updated_at' => now(),
                 'created_at' => now(),
@@ -548,33 +698,56 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         return $count;
     }
 
-    // ─── 8D. MANUAL BATCH EMPLOYEES ───────────────────────────────────────────
+    // ─── 8E. MANUAL BATCH EMPLOYEES ───────────────────────────────────────────
 
-    private function seedManualBatchEmployees(array $rows, int $tenantId): int
+    private function seedManualBatchEmployees(array $rows, int $tenantId, array $empMap): int
     {
+        // First delete stale batch employee links for all demo batches
+        $demoBatchIds = DB::table('production_section_manual_productions')
+            ->where('tenant_id', $tenantId)
+            ->where('batch_name', 'like', 'NW-BAT-%')
+            ->pluck('id')
+            ->all();
+
+        if (!empty($demoBatchIds)) {
+            DB::table('production_section_manual_production_employees')
+                ->whereIn('manual_production_id', $demoBatchIds)
+                ->delete();
+        }
+
         $count = 0;
         foreach ($rows as $row) {
             $batchName = $row['batch_name'] ?? null;
-            $empId = (int) $row['employee_id'];
+            $empCode = $row['employee_code'] ?? null;
 
-            $batchId = DB::table('production_section_manual_productions')
+            $batch = DB::table('production_section_manual_productions')
                 ->where('tenant_id', $tenantId)
                 ->where('batch_name', $batchName)
-                ->value('id');
+                ->first();
 
-            if (!$batchId || !$empId) continue;
+            if (!$batch) {
+                throw new \RuntimeException("Batch {$batchName} not found when linking employee {$empCode}");
+            }
 
+            $empId = $empMap[$empCode] ?? null;
+            if (!$empId) {
+                throw new \RuntimeException("Employee {$empCode} not found when linking to batch {$batchName}");
+            }
+
+            // Must match employee_id AND section_id = batch->section_id!
             $wcEmpId = DB::table('production_work_center_employees')
                 ->where('tenant_id', $tenantId)
                 ->where('employee_id', $empId)
+                ->where('section_id', $batch->section_id)
                 ->value('id');
 
-            if (!$wcEmpId) continue;
+            if (!$wcEmpId) {
+                throw new \RuntimeException("Work center employee record not found for employee {$empCode} in section {$batch->section_id} of batch {$batchName}");
+            }
 
-            DB::table('production_section_manual_production_employees')->updateOrInsert([
-                'manual_production_id' => $batchId,
+            DB::table('production_section_manual_production_employees')->insert([
+                'manual_production_id' => $batch->id,
                 'work_center_employee_id' => $wcEmpId,
-            ], [
                 'updated_at' => now(),
                 'created_at' => now(),
             ]);
@@ -584,7 +757,7 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         return $count;
     }
 
-    // ─── 8E. EXTERNAL WORKER ALLOCATIONS ──────────────────────────────────────
+    // ─── 8F. EXTERNAL WORKER ALLOCATIONS ──────────────────────────────────────
 
     private function seedExternalWorkerAllocations(array $rows, int $tenantId): int
     {
@@ -593,22 +766,52 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         $pgMap = DB::table('production_external_worker_pay_grades')->where('tenant_id', $tenantId)->pluck('id', 'code')->all();
         $batchMap = DB::table('production_section_manual_productions')->where('tenant_id', $tenantId)->pluck('id', 'batch_name')->all();
 
+        // Clear stale allocations for demo sections
+        $demoSecCodes = [
+            'NW-SEC-EXT', 'NW-SEC-MB', 'NW-SEC-RCY', 'NW-SEC-SLT', 'NW-SEC-PRT',
+            'NW-SEC-WRP', 'NW-SEC-BAG', 'NW-SEC-MSK', 'NW-SEC-PCK'
+        ];
+        $demoSecIds = array_values(array_intersect_key($secMap, array_flip($demoSecCodes)));
+        if (!empty($demoSecIds)) {
+            DB::table('production_external_worker_allocations')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('section_id', $demoSecIds)
+                ->delete();
+        }
+
         $count = 0;
         foreach ($rows as $row) {
-            $secId = $secMap[$row['section_code']] ?? null;
-            $shiftId = $shiftMap[$row['shift_code']] ?? null;
-            $pgId = $pgMap[$row['pay_grade_code']] ?? null;
-            $batchId = !empty($row['batch_name']) ? ($batchMap[$row['batch_name']] ?? null) : null;
+            $secCode = $row['section_code'] ?? null;
+            $shiftCode = $row['shift_code'] ?? null;
+            $pgCode = $row['pay_grade_code'] ?? null;
+            $batchName = $row['batch_name'] ?? null;
 
-            if (!$secId || !$shiftId || !$pgId) continue;
+            $secId = $secMap[$secCode] ?? null;
+            if (!$secId) {
+                throw new \RuntimeException("Section {$secCode} not found for external worker allocation");
+            }
 
-            DB::table('production_external_worker_allocations')->updateOrInsert([
+            $shiftId = $shiftMap[$shiftCode] ?? null;
+            if (!$shiftId) {
+                throw new \RuntimeException("Shift {$shiftCode} not found for external worker allocation");
+            }
+
+            $pgId = $pgMap[$pgCode] ?? null;
+            if (!$pgId) {
+                throw new \RuntimeException("Pay grade {$pgCode} not found for external worker allocation");
+            }
+
+            $batchId = !empty($batchName) ? ($batchMap[$batchName] ?? null) : null;
+            if (!empty($batchName) && !$batchId) {
+                throw new \RuntimeException("Batch {$batchName} not found for external worker allocation");
+            }
+
+            DB::table('production_external_worker_allocations')->insert([
                 'tenant_id' => $tenantId,
                 'section_id' => $secId,
                 'shift_id' => $shiftId,
                 'pay_grade_id' => $pgId,
                 'manual_production_id' => $batchId,
-            ], [
                 'number_of_external_workers' => (int) ($row['workers_count'] ?? 1),
                 'active' => $row['active'] ?? 1,
                 'updated_at' => now(),
@@ -638,7 +841,7 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 $engine->recalculateNow($wc, 'manual', CountdownCalculationEngine::SCOPE_ALL);
                 $count++;
             } catch (\Throwable $e) {
-                $this->command?->warn("Calculation for WC {$wc->code} deferred: {$e->getMessage()}");
+                throw new \RuntimeException("Calculation failed for Work Center {$wc->code}: " . $e->getMessage(), 0, $e);
             }
         }
 
@@ -651,17 +854,33 @@ class NonWovenDemoMasterDataSeeder extends Seeder
     {
         $count = 0;
         foreach ($rows as $row) {
-            Routing::withoutGlobalScopes()->updateOrCreate([
-                'tenant_id' => $tenantId,
-                'routing_number' => $row['routing_number'],
-            ], [
+            $routing = Routing::withTrashed()
+                ->where('tenant_id', $tenantId)
+                ->where('routing_number', $row['routing_number'])
+                ->first();
+
+            $routingData = [
                 'name' => $row['name'],
-                'version' => $row['version'] ?? '1.0',
+                'version' => $row['version'] ?? '1.0.0',
                 'revision' => 1,
                 'is_default' => $row['is_default'] ?? 1,
-                'status' => 'active',
-                'effective_from' => now()->subDay()->toDateString(),
-            ]);
+                'status' => 'draft',
+                'effective_from' => now()->toDateString(),
+                'created_by' => 1,
+                'deleted_at' => null,
+            ];
+
+            if ($routing) {
+                if ($routing->trashed()) {
+                    $routing->restore();
+                }
+                $routing->update($routingData);
+            } else {
+                Routing::withoutGlobalScopes()->create(array_merge([
+                    'tenant_id' => $tenantId,
+                    'routing_number' => $row['routing_number'],
+                ], $routingData));
+            }
             $count++;
         }
 
@@ -676,6 +895,157 @@ class NonWovenDemoMasterDataSeeder extends Seeder
         $sectionService = app(SectionCalculationService::class);
         $count = 0;
 
+        // Group rows by routing_number to clean stale operations and handle chaining
+        $rowsByRouting = [];
+        foreach ($rows as $row) {
+            $rowsByRouting[$row['routing_number']][] = $row;
+        }
+
+        foreach ($rowsByRouting as $routingNumber => $routingOps) {
+            $routing = Routing::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('routing_number', $routingNumber)
+                ->first();
+
+            if (!$routing) {
+                throw new \RuntimeException("Routing {$routingNumber} not found for operations seeding");
+            }
+
+            // Identify active sequences in this seed run
+            $seedSequences = array_column($routingOps, 'sequence');
+
+            // Find any stale operations in this routing that are not in the seed data
+            $staleOps = RoutingOperation::withTrashed()
+                ->where('tenant_id', $tenantId)
+                ->where('routing_id', $routing->id)
+                ->whereNotIn('sequence', $seedSequences)
+                ->get();
+
+            foreach ($staleOps as $staleOp) {
+                // Delete ROM allocations pointing to stale op first (due to restrictOnDelete)
+                DB::table('production_routing_operation_materials')
+                    ->where('tenant_id', $tenantId)
+                    ->where('routing_operation_id', $staleOp->id)
+                    ->delete();
+
+                $staleOp->forceDelete();
+            }
+
+            $createdOps = [];
+
+            // First pass: create/update all operations with cost calculation & snapshots
+            foreach ($routingOps as $row) {
+                $section = WorkCenterSection::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('code', $row['section_code'])
+                    ->first();
+
+                if (!$section) {
+                    throw new \RuntimeException("Section {$row['section_code']} not found for operation {$row['operation_number']} in routing {$routingNumber}");
+                }
+
+                $machineId = null;
+                if (!empty($row['machine_code'])) {
+                    $machineId = DB::table('production_machines')
+                        ->where('tenant_id', $tenantId)
+                        ->where('code', $row['machine_code'])
+                        ->value('id');
+
+                    if (!$machineId) {
+                        throw new \RuntimeException("Machine {$row['machine_code']} not found for operation {$row['operation_number']} in routing {$routingNumber}");
+                    }
+                }
+
+                $batchId = null;
+                if (!empty($row['batch_name'])) {
+                    $batchId = DB::table('production_section_manual_productions')
+                        ->where('tenant_id', $tenantId)
+                        ->where('batch_name', $row['batch_name'])
+                        ->value('id');
+
+                    if (!$batchId) {
+                        throw new \RuntimeException("Batch {$row['batch_name']} not found for operation {$row['operation_number']} in routing {$routingNumber}");
+                    }
+                }
+
+                $opData = [
+                    'tenant_id' => $tenantId,
+                    'routing_id' => $routing->id,
+                    'sequence' => $row['sequence'],
+                    'operation_number' => $row['operation_number'],
+                    'name' => $row['name'],
+                    'operation_type' => $row['operation_type'] ?? 'manufacturing',
+                    'work_center_id' => $section->work_center_id,
+                    'section_id' => $section->id,
+                    'machine_id' => $machineId,
+                    'section_manual_production_id' => $batchId,
+                    'setup_time_minutes' => (float) ($row['setup_time_minutes'] ?? 0),
+                    'setup_time_per_piece_minutes' => (float) ($row['setup_time_per_piece_minutes'] ?? 0),
+                    'processing_time_minutes' => (float) ($row['processing_time_minutes'] ?? 0),
+                    'expected_yield_percentage' => (float) ($row['expected_yield_percentage'] ?? 100),
+                    'quality_required' => (bool) ($row['quality_required'] ?? false),
+                    'deleted_at' => null,
+                ];
+
+                $resources = $sectionService->getSnapshotResourceCosts($section);
+                $calcResult = $calc->calculate($opData, $resources);
+
+                if ($calcResult['error'] !== null) {
+                    throw new \RuntimeException("Cost calculation error for operation {$row['operation_number']} in {$routingNumber}: {$calcResult['error']}");
+                }
+
+                foreach (RoutingOperationCostCalculator::FIELDS as $field) {
+                    $opData[$field] = $calcResult['figures'][$field] ?? 0;
+                }
+                $opData['resource_snapshot'] = $calc->buildResourceSnapshot($opData, $calcResult['resource'], $resources);
+                $opData['section_calculation_id'] = $resources['section_calculation_id'] ?? null;
+                $opData['section_snapshot_number'] = $resources['snapshot_number'] ?? null;
+                $opData['work_center_calculation_id'] = $resources['work_center_calculation_id'] ?? null;
+                $opData['costs_calculated_at'] = now();
+
+                $existingOp = RoutingOperation::withTrashed()
+                    ->where('tenant_id', $tenantId)
+                    ->where('routing_id', $routing->id)
+                    ->where('sequence', $row['sequence'])
+                    ->first();
+
+                if ($existingOp) {
+                    if ($existingOp->trashed()) {
+                        $existingOp->restore();
+                    }
+                    $existingOp->update($opData);
+                    $op = $existingOp;
+                } else {
+                    $op = RoutingOperation::withoutGlobalScopes()->create($opData);
+                }
+
+                $createdOps[$row['operation_number']] = $op;
+                $count++;
+            }
+
+            // Second pass: chain previous_operation_id
+            foreach ($routingOps as $row) {
+                if (!empty($row['previous_operation_number'])) {
+                    $prevOp = $createdOps[$row['previous_operation_number']] ?? null;
+                    if ($prevOp && isset($createdOps[$row['operation_number']])) {
+                        $createdOps[$row['operation_number']]->update([
+                            'previous_operation_id' => $prevOp->id,
+                        ]);
+                    }
+                }
+            }
+        }
+
+        return $count;
+    }
+
+    // ─── 11B. APPROVE ROUTINGS ────────────────────────────────────────────────
+
+    private function approveRoutings(array $rows, int $tenantId): int
+    {
+        $lifecycle = app(RoutingLifecycleService::class);
+        $count = 0;
+
         foreach ($rows as $row) {
             $routing = Routing::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
@@ -683,73 +1053,10 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 ->first();
 
             if (!$routing) {
-                continue;
+                throw new \RuntimeException("Routing {$row['routing_number']} not found for approval");
             }
 
-            $section = WorkCenterSection::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('code', $row['section_code'])
-                ->first();
-
-            $machineId = null;
-            if (!empty($row['machine_code'])) {
-                $machineId = DB::table('production_machines')
-                    ->where('tenant_id', $tenantId)
-                    ->where('code', $row['machine_code'])
-                    ->value('id');
-            }
-
-            $batchId = null;
-            if (!empty($row['batch_name'])) {
-                $batchId = DB::table('production_section_manual_productions')
-                    ->where('tenant_id', $tenantId)
-                    ->where('batch_name', $row['batch_name'])
-                    ->value('id');
-            }
-
-            $opData = [
-                'tenant_id' => $tenantId,
-                'routing_id' => $routing->id,
-                'sequence' => $row['sequence'],
-                'operation_number' => $row['operation_number'],
-                'name' => $row['name'],
-                'operation_type' => $row['operation_type'] ?? 'manufacturing',
-                'work_center_id' => $section?->work_center_id,
-                'section_id' => $section?->id,
-                'machine_id' => $machineId,
-                'section_manual_production_id' => $batchId,
-                'setup_time_minutes' => (float) ($row['setup_time_minutes'] ?? 0),
-                'processing_time_minutes' => (float) ($row['processing_time_minutes'] ?? 0),
-                'expected_yield_percentage' => (float) ($row['expected_yield_percentage'] ?? 100),
-                'quality_required' => (bool) ($row['quality_required'] ?? false),
-            ];
-
-            if ($section) {
-                try {
-                    $resources = $sectionService->getSnapshotResourceCosts($section);
-                    $calcResult = $calc->calculate($opData, $resources);
-
-                    if ($calcResult['error'] === null) {
-                        foreach (RoutingOperationCostCalculator::FIELDS as $field) {
-                            $opData[$field] = $calcResult['figures'][$field] ?? 0;
-                        }
-                        $opData['resource_snapshot'] = $calc->buildResourceSnapshot($opData, $calcResult['resource'], $resources);
-                        $opData['section_calculation_id'] = $resources['section_calculation_id'] ?? null;
-                        $opData['section_snapshot_number'] = $resources['snapshot_number'] ?? null;
-                        $opData['work_center_calculation_id'] = $resources['work_center_calculation_id'] ?? null;
-                        $opData['costs_calculated_at'] = now();
-                    }
-                } catch (\Throwable $e) {
-                    // Fallback: save without snapshot if engine not ready
-                }
-            }
-
-            RoutingOperation::withoutGlobalScopes()->updateOrCreate([
-                'tenant_id' => $tenantId,
-                'routing_id' => $routing->id,
-                'sequence' => $row['sequence'],
-            ], $opData);
-
+            $lifecycle->transitionOnApproval($routing, 1);
             $count++;
         }
 
@@ -768,19 +1075,27 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 ->first();
 
             if (!$product) {
-                continue;
+                throw new \RuntimeException("Product {$row['product_code']} not found for BOM {$row['bom_number']}");
             }
 
-            $routing = Routing::withoutGlobalScopes()
+            $routing = null;
+            if (!empty($row['routing_number'])) {
+                $routing = Routing::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('routing_number', $row['routing_number'])
+                    ->first();
+
+                if (!$routing) {
+                    throw new \RuntimeException("Routing {$row['routing_number']} not found for BOM {$row['bom_number']}");
+                }
+            }
+
+            $bom = ProductionBom::withTrashed()
                 ->where('tenant_id', $tenantId)
-                ->where('routing_number', $row['routing_number'])
+                ->where('bom_number', $row['bom_number'])
                 ->first();
 
-            ProductionBom::withoutGlobalScopes()->updateOrCreate([
-                'tenant_id' => $tenantId,
-                'bom_number' => $row['bom_number'],
-                'version' => $row['version'] ?? '1.0',
-            ], [
+            $bomData = [
                 'bom_name' => $row['bom_name'],
                 'bom_type' => 'manufacturing',
                 'usage_context' => 'manufacturing',
@@ -788,12 +1103,27 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 'routing_id' => $routing?->id,
                 'base_quantity' => (float) ($row['base_quantity'] ?? 1.0),
                 'base_uom_id' => $row['uom_id'] ?? 4,
+                'version' => $row['version'] ?? '1.0.0',
                 'revision' => 1,
-                'status' => 'approved',
+                'status' => 'draft',
                 'is_active' => true,
                 'is_default' => $row['is_default'] ?? 1,
-                'effective_date' => now()->subDay()->toDateString(),
-            ]);
+                'effective_date' => now()->toDateString(),
+                'created_by' => 1,
+                'deleted_at' => null,
+            ];
+
+            if ($bom) {
+                if ($bom->trashed()) {
+                    $bom->restore();
+                }
+                $bom->update($bomData);
+            } else {
+                ProductionBom::withoutGlobalScopes()->create(array_merge([
+                    'tenant_id' => $tenantId,
+                    'bom_number' => $row['bom_number'],
+                ], $bomData));
+            }
 
             $count++;
         }
@@ -805,7 +1135,24 @@ class NonWovenDemoMasterDataSeeder extends Seeder
 
     private function seedBomItems(array $rows, int $tenantId): int
     {
+        // Delete stale BOM items for demo BOMs
+        $bomNumbers = array_unique(array_column($rows, 'bom_number'));
+        $bomIds = DB::table('production_boms')
+            ->where('tenant_id', $tenantId)
+            ->whereIn('bom_number', $bomNumbers)
+            ->pluck('id')
+            ->all();
+
+        if (!empty($bomIds)) {
+            DB::table('production_bom_items')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('bom_id', $bomIds)
+                ->delete();
+        }
+
+        $hasChildBom = Schema::hasColumn('production_bom_items', 'child_bom_id');
         $count = 0;
+
         foreach ($rows as $row) {
             $bom = ProductionBom::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
@@ -817,23 +1164,42 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 ->where('sku', $row['material_code'])
                 ->first();
 
-            if (!$bom || !$material) {
-                continue;
+            if (!$bom) {
+                throw new \RuntimeException("BOM {$row['bom_number']} not found for BOM item");
+            }
+            if (!$material) {
+                throw new \RuntimeException("Material {$row['material_code']} not found for BOM {$row['bom_number']}");
             }
 
-            ProductionBomItem::withoutGlobalScopes()->updateOrCreate([
+            $childBomId = null;
+            if (!empty($row['child_bom_code'])) {
+                $childBomId = DB::table('production_boms')
+                    ->where('tenant_id', $tenantId)
+                    ->where('bom_number', $row['child_bom_code'])
+                    ->value('id');
+
+                if (!$childBomId) {
+                    throw new \RuntimeException("Child BOM {$row['child_bom_code']} not found for BOM {$row['bom_number']}");
+                }
+            }
+
+            $itemData = [
                 'tenant_id' => $tenantId,
                 'bom_id' => $bom->id,
                 'material_id' => $material->id,
-            ], [
                 'quantity' => (float) $row['quantity'],
                 'alternative_quantity' => isset($row['alternative_quantity']) ? (float) $row['alternative_quantity'] : null,
                 'gross_quantity' => (float) ($row['gross_quantity'] ?? $row['quantity']),
                 'uom_id' => $row['uom_id'] ?? 4,
                 'allocation_role' => $row['allocation_role'] ?? 'primary',
                 'material_scrap_percentage' => (float) ($row['material_scrap_percentage'] ?? 0.0),
-            ]);
+            ];
 
+            if ($hasChildBom && $childBomId) {
+                $itemData['child_bom_id'] = $childBomId;
+            }
+
+            ProductionBomItem::withoutGlobalScopes()->create($itemData);
             $count++;
         }
 
@@ -844,6 +1210,21 @@ class NonWovenDemoMasterDataSeeder extends Seeder
 
     private function seedRoutingOperationMaterials(array $rows, int $tenantId): int
     {
+        // Delete stale routing operation materials for demo BOMs
+        $bomNumbers = array_unique(array_column($rows, 'bom_number'));
+        $bomIds = DB::table('production_boms')
+            ->where('tenant_id', $tenantId)
+            ->whereIn('bom_number', $bomNumbers)
+            ->pluck('id')
+            ->all();
+
+        if (!empty($bomIds)) {
+            DB::table('production_routing_operation_materials')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('bom_id', $bomIds)
+                ->delete();
+        }
+
         $count = 0;
         foreach ($rows as $row) {
             $bom = ProductionBom::withoutGlobalScopes()
@@ -856,8 +1237,11 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 ->where('routing_number', $row['routing_number'])
                 ->first();
 
-            if (!$bom || !$routing) {
-                continue;
+            if (!$bom) {
+                throw new \RuntimeException("BOM {$row['bom_number']} not found for ROM");
+            }
+            if (!$routing) {
+                throw new \RuntimeException("Routing {$row['routing_number']} not found for ROM in BOM {$row['bom_number']}");
             }
 
             $op = RoutingOperation::withoutGlobalScopes()
@@ -871,8 +1255,11 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 ->where('sku', $row['material_code'])
                 ->first();
 
-            if (!$op || !$material) {
-                continue;
+            if (!$op) {
+                throw new \RuntimeException("Operation sequence {$row['operation_sequence']} in {$routing->routing_number} not found for ROM in BOM {$bom->bom_number}");
+            }
+            if (!$material) {
+                throw new \RuntimeException("Material {$row['material_code']} not found for ROM in BOM {$bom->bom_number}");
             }
 
             $bomItem = ProductionBomItem::withoutGlobalScopes()
@@ -880,6 +1267,18 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 ->where('bom_id', $bom->id)
                 ->where('material_id', $material->id)
                 ->first();
+
+            $childBomId = null;
+            if (!empty($row['child_bom_code'])) {
+                $childBomId = DB::table('production_boms')
+                    ->where('tenant_id', $tenantId)
+                    ->where('bom_number', $row['child_bom_code'])
+                    ->value('id');
+
+                if (!$childBomId) {
+                    throw new \RuntimeException("Child BOM {$row['child_bom_code']} not found for ROM in BOM {$bom->bom_number}");
+                }
+            }
 
             $replacesId = null;
             if (!empty($row['replaces_material_code'])) {
@@ -901,14 +1300,14 @@ class NonWovenDemoMasterDataSeeder extends Seeder
 
             $isAlt = (bool) ($row['is_alternative'] ?? false);
 
-            RoutingOperationMaterial::withoutGlobalScopes()->updateOrCreate([
+            RoutingOperationMaterial::withoutGlobalScopes()->create([
                 'tenant_id' => $tenantId,
                 'bom_id' => $bom->id,
                 'routing_operation_id' => $op->id,
                 'material_id' => $material->id,
-                'is_alternative' => $isAlt,
-            ], [
+                'child_bom_id' => $childBomId,
                 'bom_item_id' => $bomItem?->id,
+                'is_alternative' => $isAlt,
                 'quantity' => (float) $row['quantity'],
                 'uom_id' => $row['uom_id'] ?? 4,
                 'priority' => isset($row['priority']) ? (int) $row['priority'] : null,
@@ -917,6 +1316,30 @@ class NonWovenDemoMasterDataSeeder extends Seeder
                 'gross_quantity' => RoutingOperationMaterial::calculateGrossQuantity((float) $row['quantity'], (float) ($row['material_scrap_percentage'] ?? 0.0)),
             ]);
 
+            $count++;
+        }
+
+        return $count;
+    }
+
+    // ─── 14B. APPROVE BOMS ────────────────────────────────────────────────────
+
+    private function approveBoms(array $rows, int $tenantId): int
+    {
+        $lifecycle = app(BomLifecycleService::class);
+        $count = 0;
+
+        foreach ($rows as $row) {
+            $bom = ProductionBom::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('bom_number', $row['bom_number'])
+                ->first();
+
+            if (!$bom) {
+                throw new \RuntimeException("BOM {$row['bom_number']} not found for approval");
+            }
+
+            $lifecycle->transitionOnApproval($bom, 1);
             $count++;
         }
 

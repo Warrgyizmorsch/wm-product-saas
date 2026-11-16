@@ -5,6 +5,7 @@ $app = require_once __DIR__ . '/../bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
+use App\Domains\HRMS\Models\Employee;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Production\Controllers\MachineController;
@@ -75,6 +76,12 @@ $prodCount = DB::table('products')->where('tenant_id', $tenantId)->whereIn('sku'
 $expectedProdTotal = count($expectedProductCodes);
 assertCheck("Non-woven demo products seeded (tenant-wide, branch_id null)", $prodCount === $expectedProdTotal, "Found {$prodCount}/{$expectedProdTotal} expected products");
 
+// 1.3b Currency Conversion check (PP Granules RM-PP unit_cost is USD 1.20, not raw INR 102)
+$ppGranules = DB::table('products')->where('tenant_id', $tenantId)->where('sku', 'RM-PP')->first();
+$ppUnitCost = (float) ($ppGranules->unit_cost ?? 0);
+$ppCostConverted = abs($ppUnitCost - 1.2000) < 0.01;
+assertCheck("Product unit_cost converted to base USD (RM-PP)", $ppCostConverted, "Stored unit_cost: \${$ppUnitCost} (expected ~\$1.20, not ₹102)");
+
 // 1.4 Opening Stock in Branch 3
 $expectedStockCount = count($data['opening_stock'] ?? []);
 $stockCount = DB::table('product_warehouse_stocks')
@@ -105,27 +112,40 @@ $machCount = DB::table('production_machines')->where('tenant_id', $tenantId)->wh
 $unassignedMach = DB::table('production_machines')->where('tenant_id', $tenantId)->where('code', 'like', 'NW-%')->whereNull('section_id')->count();
 assertCheck("Machines seeded and linked to sections", $machCount === 12 && $unassignedMach === 0, "Found {$machCount}/12 machines (Unassigned: {$unassignedMach})");
 
-// 1.7 Manual Batches
+// 1.7 Manual Batches (only packing batches NW-BAT-PCK-DAY and NW-BAT-PCK-EVE)
+$expectedBatchCount = count($data['production_section_manual_productions'] ?? []);
 $batchCount = DB::table('production_section_manual_productions')->where('tenant_id', $tenantId)->where('batch_name', 'like', 'NW-BAT-%')->count();
-assertCheck("Manual Batches seeded and linked", $batchCount === 6, "Found {$batchCount}/6 batches");
+assertCheck("Manual Batches seeded only for crew-output sections (Packing)", $batchCount === $expectedBatchCount, "Found {$batchCount}/{$expectedBatchCount} batches (Machine sections have 0 phantom batches)");
 
-// 1.8b Workers & Pay Grades
+// 1.8b Workers, Dedicated Employees & Pay Grades
 $pgCount = DB::table('production_external_worker_pay_grades')->where('tenant_id', $tenantId)->where('code', 'like', 'NW-PG-%')->count();
 assertCheck("External Worker Pay Grades seeded", $pgCount === 3, "Found {$pgCount}/3 pay grades");
 
-$wcEmpCount = DB::table('production_work_center_employees')->where('tenant_id', $tenantId)->whereIn('work_center_id', DB::table('production_work_centers')->where('code', 'like', 'NW-WC-%')->pluck('id'))->count();
+$demoEmpCount = Employee::withoutGlobalScopes()
+    ->where('tenant_id', $tenantId)
+    ->where('branch_id', $branchId)
+    ->where('employee_id', 'like', 'NW-EMP-%')
+    ->count();
+assertCheck("Dedicated Branch 3 Demo Employees (NW-EMP-001..017)", $demoEmpCount === 17, "Found {$demoEmpCount}/17 dedicated branch employees");
+
+$wcEmpCount = DB::table('production_work_center_employees')
+    ->where('tenant_id', $tenantId)
+    ->whereIn('work_center_id', DB::table('production_work_centers')->where('code', 'like', 'NW-WC-%')->pluck('id'))
+    ->count();
 assertCheck("Work Center & Section staff assigned", $wcEmpCount === 17, "Found {$wcEmpCount}/17 staff assignments");
 
+$expectedBatchEmpCount = count($data['production_section_manual_production_employees'] ?? []);
 $batchEmpCount = DB::table('production_section_manual_production_employees')
     ->whereIn('manual_production_id', DB::table('production_section_manual_productions')->where('batch_name', 'like', 'NW-BAT-%')->pluck('id'))
     ->count();
-assertCheck("Manual Batch internal employees linked", $batchEmpCount === 6, "Found {$batchEmpCount}/6 manual batch links");
+assertCheck("Manual Batch internal employees linked to section-matched workers", $batchEmpCount === $expectedBatchEmpCount, "Found {$batchEmpCount}/{$expectedBatchEmpCount} manual batch links");
 
+$expectedAllocCount = count($data['production_external_worker_allocations'] ?? []);
 $allocCount = DB::table('production_external_worker_allocations')
     ->where('tenant_id', $tenantId)
     ->whereIn('pay_grade_id', DB::table('production_external_worker_pay_grades')->where('code', 'like', 'NW-PG-%')->pluck('id'))
     ->count();
-assertCheck("External Worker allocations active", $allocCount === 18, "Found {$allocCount}/18 allocations");
+assertCheck("External Worker allocations active", $allocCount === $expectedAllocCount, "Found {$allocCount}/{$expectedAllocCount} allocations");
 
 // 1.8 Section Calculation Snapshots
 $secIds = DB::table('production_work_center_sections')->where('tenant_id', $tenantId)->where('code', 'like', 'NW-SEC-%')->pluck('id');
@@ -133,19 +153,42 @@ $snapCount = DB::table('production_work_center_section_calculations')->whereIn('
 assertCheck("Section calculation snapshots generated", $snapCount === 9, "{$snapCount}/9 sections have calculation snapshots with non-zero labor");
 
 // 1.9 Routings & Operations
+$expectedRtTotal = count($expectedRoutingNumbers);
 $rtCount = DB::table('routings')->where('tenant_id', $tenantId)->whereIn('routing_number', $expectedRoutingNumbers)->count();
-assertCheck("Routings seeded", $rtCount === 4, "Found {$rtCount}/4 routings");
+$approvedRtCount = DB::table('routings')
+    ->where('tenant_id', $tenantId)
+    ->whereIn('routing_number', $expectedRoutingNumbers)
+    ->where('status', 'active')
+    ->whereNotNull('approved_by')
+    ->whereNotNull('cost_snapshot')
+    ->count();
+assertCheck("Routings seeded and approved with cost snapshots", $rtCount === $expectedRtTotal && $approvedRtCount === $expectedRtTotal, "Found {$rtCount}/{$expectedRtTotal} routings ({$approvedRtCount} approved with cost snapshot)");
 
+$expectedOpCount = count($data['production_routing_operations'] ?? []);
 $opCount = DB::table('production_routing_operations')
     ->join('routings', 'production_routing_operations.routing_id', '=', 'routings.id')
     ->where('routings.tenant_id', $tenantId)
     ->whereIn('routings.routing_number', $expectedRoutingNumbers)
     ->count();
-assertCheck("Routing operations seeded", $opCount === 10, "Found {$opCount}/10 operations");
+assertCheck("Routing operations seeded", $opCount === $expectedOpCount, "Found {$opCount}/{$expectedOpCount} operations");
+
+$chainedOpsCount = DB::table('production_routing_operations')
+    ->join('routings', 'production_routing_operations.routing_id', '=', 'routings.id')
+    ->where('routings.tenant_id', $tenantId)
+    ->whereIn('routings.routing_number', $expectedRoutingNumbers)
+    ->whereNotNull('production_routing_operations.previous_operation_id')
+    ->count();
+assertCheck("Routing operations chained with previous_operation_id", $chainedOpsCount >= 6, "Found {$chainedOpsCount} operations with sequential operation predecessor links");
 
 // 1.10 BOMs & Items
-$bomCount = DB::table('production_boms')->where('tenant_id', $tenantId)->whereIn('bom_number', $expectedBomNumbers)->where('status', 'approved')->count();
-assertCheck("BOMs seeded with approved status", $bomCount === 8, "Found {$bomCount}/8 approved BOMs");
+$expectedBomCount = count($expectedBomNumbers);
+$bomCount = DB::table('production_boms')
+    ->where('tenant_id', $tenantId)
+    ->whereIn('bom_number', $expectedBomNumbers)
+    ->where('status', 'approved')
+    ->whereNotNull('approved_by')
+    ->count();
+assertCheck("BOMs seeded with approved status and approver", $bomCount === $expectedBomCount, "Found {$bomCount}/{$expectedBomCount} approved BOMs");
 
 $expectedBomItemCount = count($data['production_bom_items'] ?? []);
 $bomItemCount = DB::table('production_bom_items')
@@ -162,6 +205,15 @@ $romCount = DB::table('production_routing_operation_materials')
     ->whereIn('production_boms.bom_number', $expectedBomNumbers)
     ->count();
 assertCheck("Tier 2 Routing operation material allocations seeded", $romCount === $expectedRomCount, "Found {$romCount}/{$expectedRomCount} workstation allocations");
+
+// 1.10b Child BOM Links on Sub-Assemblies
+$childBomLinksCount = DB::table('production_routing_operation_materials')
+    ->join('production_boms', 'production_routing_operation_materials.bom_id', '=', 'production_boms.id')
+    ->where('production_boms.tenant_id', $tenantId)
+    ->whereIn('production_boms.bom_number', $expectedBomNumbers)
+    ->whereNotNull('production_routing_operation_materials.child_bom_id')
+    ->count();
+assertCheck("Intermediate rolls configured with child_bom_id", $childBomLinksCount >= 4, "Found {$childBomLinksCount} intermediate roll links to child BOMs");
 
 // 1.11 Alternative Materials Configuration on BOM-BAG-DCUT
 $bagBom = ProductionBom::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('bom_number', 'BOM-BAG-DCUT')->first();
@@ -183,20 +235,24 @@ assertCheck("D-Cut Bag BOM alternative materials linked to primary", $altCount =
 echo PHP_EOL;
 
 // ==============================================================================
-// 2. COST FRESHNESS & PRODUCTION ENGINEERING VALIDATION
+// 2. COST FRESHNESS & PRODUCTION ENGINEERING VALIDATION (ALL 8 PRODUCTS)
 // ==============================================================================
-echo ">>> PART 2: Cost Freshness & Engineering Pre-Order Validation" . PHP_EOL;
+echo ">>> PART 2: Cost Freshness & Engineering Pre-Order Validation (All 8 Products)" . PHP_EOL;
 
 $engService = app(ProductionOrderEngineeringService::class);
 
-$testProducts = [
-    'FG-BAG-DCUT'     => 'D-Cut Bag (Multi-Tier Alternatives: Jumbo + 50IN + 20IN)',
-    'FG-MASK-3PLY'    => '3-Ply Mask (5 Materials: 3 Rolls + Earloops + Nosewire)',
-    'SFG-ROLL-50-WHT' => '50 GSM White Jumbo Roll (Extrusion: PP + MB + Filler)',
-    'SFG-SLIT-50-50IN'=> '50 GSM Slit Roll 50 inch (Slitter: Jumbo roll conversion)',
+$allManufacturedProducts = [
+    'SFG-ROLL-50-WHT'  => '50 GSM White Jumbo Roll (Extrusion Line 1: 100")',
+    'SFG-ROLL-50-BLU'  => '50 GSM Blue Jumbo Roll (Extrusion Line 1: 100")',
+    'SFG-ROLL-20-WHT'  => '20 GSM White Jumbo Roll (Extrusion Line 2: 63")',
+    'SFG-ROLL-20-BLU'  => '20 GSM Blue Jumbo Roll (Extrusion Line 2: 63")',
+    'SFG-SLIT-50-50IN' => '50 GSM Slit Roll 50 inch (Slitter: Jumbo roll conversion)',
+    'SFG-SLIT-50-20IN' => '50 GSM Slit Roll 20 inch (Slitter: Jumbo roll conversion)',
+    'FG-BAG-DCUT'      => 'D-Cut Bag (Multi-Tier Alternatives: Jumbo + 50IN + 20IN)',
+    'FG-MASK-3PLY'     => '3-Ply Mask (5 Materials: 3 Rolls + Earloops + Nosewire)',
 ];
 
-foreach ($testProducts as $sku => $label) {
+foreach ($allManufacturedProducts as $sku => $label) {
     $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('sku', $sku)->first();
     if (!$product) {
         assertCheck("Product exists: {$sku}", false, "Not found");
@@ -282,7 +338,7 @@ if (!$user) {
         assertCheck("Routings Index UI (/production/routing)", false, "Exception: {$e->getMessage()}");
     }
 
-    // 3.4 Routing Details View (Extrusion Routing)
+    // 3.4 Routing Details View (Extrusion Routing Line 1)
     try {
         $extRouting = Routing::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('routing_number', 'RT-EXT-SPUNBOND')->first();
         $controller = app(RoutingController::class);

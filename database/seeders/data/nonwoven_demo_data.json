@@ -99,7 +99,8 @@
             "supplier_method": "trade",
             "unit_cost": 102,
             "_base_cost": 1.2,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-MB-WHT",
@@ -109,7 +110,8 @@
             "supplier_method": "trade",
             "unit_cost": 255,
             "_base_cost": 3,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-MB-BLU",
@@ -119,7 +121,8 @@
             "supplier_method": "trade",
             "unit_cost": 255,
             "_base_cost": 3,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-FILLER",
@@ -129,7 +132,8 @@
             "supplier_method": "trade",
             "unit_cost": 42.5,
             "_base_cost": 0.5,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-RECYCLE",
@@ -139,7 +143,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 59.5,
             "_base_cost": 0.7,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-MELTBLOWN",
@@ -149,7 +154,8 @@
             "supplier_method": "trade",
             "unit_cost": 425,
             "_base_cost": 5,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-EARLOOP",
@@ -159,7 +165,8 @@
             "supplier_method": "trade",
             "unit_cost": 340,
             "_base_cost": 4,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-NOSEWIRE",
@@ -169,7 +176,8 @@
             "supplier_method": "trade",
             "unit_cost": 170,
             "_base_cost": 2,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "SFG-ROLL-50-WHT",
@@ -179,7 +187,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 127.5,
             "_base_cost": 1.5,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "SFG-ROLL-50-BLU",
@@ -189,7 +198,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 127.5,
             "_base_cost": 1.5,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "SFG-ROLL-20-WHT",
@@ -199,7 +209,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 136,
             "_base_cost": 1.6,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "SFG-ROLL-20-BLU",
@@ -209,7 +220,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 136,
             "_base_cost": 1.6,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "SFG-SLIT-50-50IN",
@@ -219,7 +231,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 127.5,
             "_base_cost": 1.5,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "SFG-SLIT-50-20IN",
@@ -229,7 +242,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 127.5,
             "_base_cost": 1.5,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "FG-BAG-DCUT",
@@ -239,7 +253,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 2.55,
             "_base_cost": 0.03,
-            "status": "active"
+            "status": "active",
+            "selling_price": 4.25
         },
         {
             "code": "FG-MASK-3PLY",
@@ -249,7 +264,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 1.7,
             "_base_cost": 0.02,
-            "status": "active"
+            "status": "active",
+            "selling_price": 3.4
         },
         {
             "code": "SCR-RECYCLABLE",
@@ -259,7 +275,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 0,
             "_base_cost": 0,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "SCR-WASTE",
@@ -269,7 +286,8 @@
             "supplier_method": "manufacture",
             "unit_cost": 0,
             "_base_cost": 0,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-CORE-TUBE",
@@ -279,7 +297,8 @@
             "supplier_method": "trade",
             "unit_cost": 42.5,
             "_base_cost": 0.5,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-WRAP-FILM",
@@ -289,7 +308,8 @@
             "supplier_method": "trade",
             "unit_cost": 127.5,
             "_base_cost": 1.5,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-LABEL-ROLL",
@@ -299,7 +319,8 @@
             "supplier_method": "trade",
             "unit_cost": 0.85,
             "_base_cost": 0.01,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-BOX-BAG",
@@ -309,7 +330,8 @@
             "supplier_method": "trade",
             "unit_cost": 42.5,
             "_base_cost": 0.5,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         },
         {
             "code": "RM-BOX-MASK",
@@ -319,7 +341,8 @@
             "supplier_method": "trade",
             "unit_cost": 8.5,
             "_base_cost": 0.1,
-            "status": "active"
+            "status": "active",
+            "selling_price": 0
         }
     ],
     "opening_stock": [
@@ -592,56 +615,6 @@
             "machine_codes": []
         }
     ],
-    "production_section_manual_productions": [
-        {
-            "section_code": "NW-SEC-RCY",
-            "shift_code": "NW-SH-DAY",
-            "batch_name": "NW-BAT-RCY-FEED",
-            "capacity_per_hour": 120,
-            "active": 1,
-            "_role": "Scrap sorting and pelletizer hopper loading batch"
-        },
-        {
-            "section_code": "NW-SEC-WRP",
-            "shift_code": "NW-SH-DAY",
-            "batch_name": "NW-BAT-WRP-DAY",
-            "capacity_per_hour": 800,
-            "active": 1,
-            "_role": "Day shift roll weighing, core inspection, and barcode labeling batch"
-        },
-        {
-            "section_code": "NW-SEC-WRP",
-            "shift_code": "NW-SH-EVE",
-            "batch_name": "NW-BAT-WRP-EVE",
-            "capacity_per_hour": 800,
-            "active": 1,
-            "_role": "Evening shift pallet strapping and staging batch"
-        },
-        {
-            "section_code": "NW-SEC-BAG",
-            "shift_code": "NW-SH-DAY",
-            "batch_name": "NW-BAT-BAG-INSP",
-            "capacity_per_hour": 2500,
-            "active": 1,
-            "_role": "D-Cut bag manual sample counting and QC check batch"
-        },
-        {
-            "section_code": "NW-SEC-PCK",
-            "shift_code": "NW-SH-DAY",
-            "batch_name": "NW-BAT-PCK-DAY",
-            "capacity_per_hour": 600,
-            "active": 1,
-            "_role": "Day shift bag & mask carton boxing team"
-        },
-        {
-            "section_code": "NW-SEC-PCK",
-            "shift_code": "NW-SH-EVE",
-            "batch_name": "NW-BAT-PCK-EVE",
-            "capacity_per_hour": 600,
-            "active": 1,
-            "_role": "Evening shift bag & mask carton boxing team"
-        }
-    ],
     "production_machines": [
         {
             "code": "NW-EXT-01",
@@ -849,949 +822,22 @@
             "current_state": "Idle"
         }
     ],
-    "production_routings": [
+    "production_section_manual_productions": [
         {
-            "routing_number": "RT-EXT-SPUNBOND",
-            "name": "Spunbond Fabric Extrusion Routing",
-            "version": "1.0",
-            "status": "active",
-            "is_default": 1
-        },
-        {
-            "routing_number": "RT-SLT-ROLLS",
-            "name": "Roll Slitting & Rewinding Routing",
-            "version": "1.0",
-            "status": "active",
-            "is_default": 1
-        },
-        {
-            "routing_number": "RT-BAG-DCUT",
-            "name": "D-Cut Bag Making Routing",
-            "version": "1.0",
-            "status": "active",
-            "is_default": 1
-        },
-        {
-            "routing_number": "RT-MASK-3PLY",
-            "name": "3-Ply Surgical Face Mask Routing",
-            "version": "1.0",
-            "status": "active",
-            "is_default": 1
-        }
-    ],
-    "production_routing_operations": [
-        {
-            "routing_number": "RT-EXT-SPUNBOND",
-            "sequence": 10,
-            "operation_number": "OP-010",
-            "name": "Continuous Extrusion & Calender Bonding",
-            "operation_type": "manufacturing",
-            "section_code": "NW-SEC-EXT",
-            "machine_code": "NW-EXT-01",
-            "setup_time_minutes": 30,
-            "processing_time_minutes": 0.24,
-            "expected_yield_percentage": 96.15,
-            "quality_required": 0
-        },
-        {
-            "routing_number": "RT-EXT-SPUNBOND",
-            "sequence": 20,
-            "operation_number": "OP-020",
-            "name": "In-Line Winding & Roll Doffing",
-            "operation_type": "manufacturing",
-            "section_code": "NW-SEC-EXT",
-            "machine_code": "NW-EXT-01",
-            "setup_time_minutes": 10,
-            "processing_time_minutes": 0.24,
-            "expected_yield_percentage": 100,
-            "quality_required": 0
-        },
-        {
-            "routing_number": "RT-EXT-SPUNBOND",
-            "sequence": 30,
-            "operation_number": "OP-030",
-            "name": "Roll Inspection, Weighing & Tagging",
-            "operation_type": "inspection",
-            "section_code": "NW-SEC-WRP",
-            "batch_name": "NW-BAT-WRP-DAY",
-            "setup_time_minutes": 5,
-            "processing_time_minutes": 0.075,
-            "expected_yield_percentage": 100,
-            "quality_required": 1
-        },
-        {
-            "routing_number": "RT-SLT-ROLLS",
-            "sequence": 10,
-            "operation_number": "OP-010",
-            "name": "Rotary Shear Width Slitting & Rewinding",
-            "operation_type": "manufacturing",
-            "section_code": "NW-SEC-SLT",
-            "machine_code": "NW-SLT-01",
-            "setup_time_minutes": 20,
-            "processing_time_minutes": 0.1,
-            "expected_yield_percentage": 98,
-            "quality_required": 0
-        },
-        {
-            "routing_number": "RT-SLT-ROLLS",
-            "sequence": 20,
-            "operation_number": "OP-020",
-            "name": "Slit Roll Palletizing & Strapping",
-            "operation_type": "manufacturing",
-            "section_code": "NW-SEC-WRP",
-            "batch_name": "NW-BAT-WRP-DAY",
-            "setup_time_minutes": 5,
-            "processing_time_minutes": 0.075,
-            "expected_yield_percentage": 100,
-            "quality_required": 1
-        },
-        {
-            "routing_number": "RT-BAG-DCUT",
-            "sequence": 10,
-            "operation_number": "OP-010",
-            "name": "Roll Conversion & D-Cut Punching",
-            "operation_type": "manufacturing",
-            "section_code": "NW-SEC-BAG",
-            "machine_code": "NW-BAG-01",
-            "setup_time_minutes": 30,
-            "processing_time_minutes": 0.0125,
-            "expected_yield_percentage": 98,
-            "quality_required": 0
-        },
-        {
-            "routing_number": "RT-BAG-DCUT",
-            "sequence": 20,
-            "operation_number": "OP-020",
-            "name": "Manual Bundle Counting & QC Check",
-            "operation_type": "inspection",
-            "section_code": "NW-SEC-BAG",
-            "batch_name": "NW-BAT-BAG-INSP",
-            "setup_time_minutes": 5,
-            "processing_time_minutes": 0.024,
-            "expected_yield_percentage": 100,
-            "quality_required": 1
-        },
-        {
-            "routing_number": "RT-BAG-DCUT",
-            "sequence": 30,
-            "operation_number": "OP-030",
-            "name": "Carton Boxing & Pallet Packing",
-            "operation_type": "manufacturing",
             "section_code": "NW-SEC-PCK",
+            "shift_code": "NW-SH-DAY",
             "batch_name": "NW-BAT-PCK-DAY",
-            "setup_time_minutes": 10,
-            "processing_time_minutes": 0.1,
-            "expected_yield_percentage": 100,
-            "quality_required": 0
+            "capacity_per_hour": 700,
+            "uom_id": 4,
+            "active": 1
         },
         {
-            "routing_number": "RT-MASK-3PLY",
-            "sequence": 10,
-            "operation_number": "OP-010",
-            "name": "Pleating, Nose Wire & Earloop Welding",
-            "operation_type": "manufacturing",
-            "section_code": "NW-SEC-MSK",
-            "machine_code": "NW-MSK-01",
-            "setup_time_minutes": 25,
-            "processing_time_minutes": 0.01,
-            "expected_yield_percentage": 97,
-            "quality_required": 0
-        },
-        {
-            "routing_number": "RT-MASK-3PLY",
-            "sequence": 20,
-            "operation_number": "OP-020",
-            "name": "Dispenser Box Packing (50 Pcs/Box) & QC",
-            "operation_type": "inspection",
             "section_code": "NW-SEC-PCK",
-            "batch_name": "NW-BAT-PCK-DAY",
-            "setup_time_minutes": 5,
-            "processing_time_minutes": 0.1,
-            "expected_yield_percentage": 100,
-            "quality_required": 1
-        }
-    ],
-    "production_boms": [
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "bom_name": "50 GSM White Spunbond Jumbo Roll (100 inch)",
-            "product_code": "SFG-ROLL-50-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "base_quantity": 100,
+            "shift_code": "NW-SH-EVE",
+            "batch_name": "NW-BAT-PCK-EVE",
+            "capacity_per_hour": 700,
             "uom_id": 4,
-            "version": "1.0",
-            "status": "approved",
-            "is_default": 1
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "bom_name": "50 GSM Blue Spunbond Jumbo Roll (100 inch)",
-            "product_code": "SFG-ROLL-50-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "base_quantity": 100,
-            "uom_id": 4,
-            "version": "1.0",
-            "status": "approved",
-            "is_default": 1
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "bom_name": "20 GSM White Spunbond Jumbo Roll (63 inch)",
-            "product_code": "SFG-ROLL-20-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "base_quantity": 100,
-            "uom_id": 4,
-            "version": "1.0",
-            "status": "approved",
-            "is_default": 1
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "bom_name": "20 GSM Blue Spunbond Jumbo Roll (63 inch)",
-            "product_code": "SFG-ROLL-20-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "base_quantity": 100,
-            "uom_id": 4,
-            "version": "1.0",
-            "status": "approved",
-            "is_default": 1
-        },
-        {
-            "bom_number": "BOM-SLIT-50-50IN",
-            "bom_name": "Slit Roll 50 GSM White (50 inch Width)",
-            "product_code": "SFG-SLIT-50-50IN",
-            "routing_number": "RT-SLT-ROLLS",
-            "base_quantity": 100,
-            "uom_id": 4,
-            "version": "1.0",
-            "status": "approved",
-            "is_default": 1
-        },
-        {
-            "bom_number": "BOM-SLIT-50-20IN",
-            "bom_name": "Slit Roll 50 GSM White (20 inch Width)",
-            "product_code": "SFG-SLIT-50-20IN",
-            "routing_number": "RT-SLT-ROLLS",
-            "base_quantity": 100,
-            "uom_id": 4,
-            "version": "1.0",
-            "status": "approved",
-            "is_default": 1
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "bom_name": "D-Cut Non-Woven Shopping Bag 12x16 White",
-            "product_code": "FG-BAG-DCUT",
-            "routing_number": "RT-BAG-DCUT",
-            "base_quantity": 1000,
-            "uom_id": 1,
-            "version": "1.0",
-            "status": "approved",
-            "is_default": 1
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "bom_name": "3-Ply Surgical Face Mask (Blue)",
-            "product_code": "FG-MASK-3PLY",
-            "routing_number": "RT-MASK-3PLY",
-            "base_quantity": 1000,
-            "uom_id": 1,
-            "version": "1.0",
-            "status": "approved",
-            "is_default": 1
-        }
-    ],
-    "production_bom_items": [
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "material_code": "RM-PP",
-            "quantity": 95.68,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "material_code": "RM-MB-WHT",
-            "quantity": 3.12,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "material_code": "RM-FILLER",
-            "quantity": 5.2,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "material_code": "RM-PP",
-            "quantity": 95.68,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "material_code": "RM-MB-BLU",
-            "quantity": 3.12,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "material_code": "RM-FILLER",
-            "quantity": 5.2,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "material_code": "RM-PP",
-            "quantity": 99.84,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "material_code": "RM-MB-WHT",
-            "quantity": 3.12,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "material_code": "RM-FILLER",
-            "quantity": 1.04,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "material_code": "RM-PP",
-            "quantity": 99.84,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "material_code": "RM-MB-BLU",
-            "quantity": 3.12,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "material_code": "RM-FILLER",
-            "quantity": 1.04,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-50IN",
-            "material_code": "SFG-ROLL-50-WHT",
-            "quantity": 102.04,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 2
-        },
-        {
-            "bom_number": "BOM-SLIT-50-50IN",
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-50IN",
-            "material_code": "RM-WRAP-FILM",
-            "quantity": 0.5,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-50IN",
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-20IN",
-            "material_code": "SFG-ROLL-50-WHT",
-            "quantity": 102.04,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 2
-        },
-        {
-            "bom_number": "BOM-SLIT-50-20IN",
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-20IN",
-            "material_code": "RM-WRAP-FILM",
-            "quantity": 0.5,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-20IN",
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "material_code": "SFG-ROLL-50-WHT",
-            "quantity": 13.6,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "material_code": "SFG-SLIT-50-50IN",
-            "quantity": 13.6,
-            "uom_id": 4,
-            "allocation_role": "alternative",
-            "material_scrap_percentage": 0,
-            "alternative_quantity": 13.6
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "material_code": "SFG-SLIT-50-20IN",
-            "quantity": 13.6,
-            "uom_id": 4,
-            "allocation_role": "alternative",
-            "material_scrap_percentage": 0,
-            "alternative_quantity": 13.6
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "material_code": "RM-BOX-BAG",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "material_code": "SFG-ROLL-20-BLU",
-            "quantity": 0.66,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "material_code": "SFG-ROLL-20-WHT",
-            "quantity": 0.66,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "material_code": "RM-MELTBLOWN",
-            "quantity": 0.83,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "material_code": "RM-EARLOOP",
-            "quantity": 0.5,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "material_code": "RM-NOSEWIRE",
-            "quantity": 0.3,
-            "uom_id": 4,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "material_code": "RM-BOX-MASK",
-            "quantity": 20,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "allocation_role": "primary",
-            "material_scrap_percentage": 0
-        }
-    ],
-    "production_routing_operation_materials": [
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-PP",
-            "quantity": 95.68,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-MB-WHT",
-            "quantity": 3.12,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-FILLER",
-            "quantity": 5.2,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 20,
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 30,
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-PP",
-            "quantity": 95.68,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-MB-BLU",
-            "quantity": 3.12,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-FILLER",
-            "quantity": 5.2,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 20,
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-50-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 30,
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-PP",
-            "quantity": 99.84,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-MB-WHT",
-            "quantity": 3.12,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-FILLER",
-            "quantity": 1.04,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 20,
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-WHT",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 30,
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-PP",
-            "quantity": 99.84,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-MB-BLU",
-            "quantity": 3.12,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 10,
-            "material_code": "RM-FILLER",
-            "quantity": 1.04,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 20,
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-ROLL-20-BLU",
-            "routing_number": "RT-EXT-SPUNBOND",
-            "operation_sequence": 30,
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-50IN",
-            "routing_number": "RT-SLT-ROLLS",
-            "operation_sequence": 10,
-            "material_code": "SFG-ROLL-50-WHT",
-            "quantity": 102.04,
-            "uom_id": 4,
-            "is_alternative": 0,
-            "material_scrap_percentage": 2
-        },
-        {
-            "bom_number": "BOM-SLIT-50-50IN",
-            "routing_number": "RT-SLT-ROLLS",
-            "operation_sequence": 10,
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-50IN",
-            "routing_number": "RT-SLT-ROLLS",
-            "operation_sequence": 20,
-            "material_code": "RM-WRAP-FILM",
-            "quantity": 0.5,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-50IN",
-            "routing_number": "RT-SLT-ROLLS",
-            "operation_sequence": 20,
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-20IN",
-            "routing_number": "RT-SLT-ROLLS",
-            "operation_sequence": 10,
-            "material_code": "SFG-ROLL-50-WHT",
-            "quantity": 102.04,
-            "uom_id": 4,
-            "is_alternative": 0,
-            "material_scrap_percentage": 2
-        },
-        {
-            "bom_number": "BOM-SLIT-50-20IN",
-            "routing_number": "RT-SLT-ROLLS",
-            "operation_sequence": 10,
-            "material_code": "RM-CORE-TUBE",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-20IN",
-            "routing_number": "RT-SLT-ROLLS",
-            "operation_sequence": 20,
-            "material_code": "RM-WRAP-FILM",
-            "quantity": 0.5,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-SLIT-50-20IN",
-            "routing_number": "RT-SLT-ROLLS",
-            "operation_sequence": 20,
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "routing_number": "RT-BAG-DCUT",
-            "operation_sequence": 10,
-            "material_code": "SFG-ROLL-50-WHT",
-            "quantity": 13.6,
-            "uom_id": 4,
-            "is_alternative": 0,
-            "priority": 1
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "routing_number": "RT-BAG-DCUT",
-            "operation_sequence": 10,
-            "material_code": "SFG-SLIT-50-50IN",
-            "quantity": 13.6,
-            "uom_id": 4,
-            "is_alternative": 1,
-            "priority": 2,
-            "replaces_material_code": "SFG-ROLL-50-WHT"
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "routing_number": "RT-BAG-DCUT",
-            "operation_sequence": 10,
-            "material_code": "SFG-SLIT-50-20IN",
-            "quantity": 13.6,
-            "uom_id": 4,
-            "is_alternative": 1,
-            "priority": 3,
-            "replaces_material_code": "SFG-ROLL-50-WHT"
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "routing_number": "RT-BAG-DCUT",
-            "operation_sequence": 20,
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-BAG-DCUT",
-            "routing_number": "RT-BAG-DCUT",
-            "operation_sequence": 30,
-            "material_code": "RM-BOX-BAG",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "routing_number": "RT-MASK-3PLY",
-            "operation_sequence": 10,
-            "material_code": "SFG-ROLL-20-BLU",
-            "quantity": 0.66,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "routing_number": "RT-MASK-3PLY",
-            "operation_sequence": 10,
-            "material_code": "SFG-ROLL-20-WHT",
-            "quantity": 0.66,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "routing_number": "RT-MASK-3PLY",
-            "operation_sequence": 10,
-            "material_code": "RM-MELTBLOWN",
-            "quantity": 0.83,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "routing_number": "RT-MASK-3PLY",
-            "operation_sequence": 10,
-            "material_code": "RM-EARLOOP",
-            "quantity": 0.5,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "routing_number": "RT-MASK-3PLY",
-            "operation_sequence": 10,
-            "material_code": "RM-NOSEWIRE",
-            "quantity": 0.3,
-            "uom_id": 4,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "routing_number": "RT-MASK-3PLY",
-            "operation_sequence": 20,
-            "material_code": "RM-BOX-MASK",
-            "quantity": 20,
-            "uom_id": 1,
-            "is_alternative": 0
-        },
-        {
-            "bom_number": "BOM-MASK-3PLY",
-            "routing_number": "RT-MASK-3PLY",
-            "operation_sequence": 20,
-            "material_code": "RM-LABEL-ROLL",
-            "quantity": 1,
-            "uom_id": 1,
-            "is_alternative": 0
+            "active": 1
         }
     ],
     "production_external_worker_pay_grades": [
@@ -1820,297 +866,1498 @@
             "active": 1
         }
     ],
+    "employees": [
+        {
+            "employee_code": "NW-EMP-001",
+            "full_name": "Kavitha Raman",
+            "job_title": "Extrusion Line Operator",
+            "work_center_code": "NW-WC-EXT",
+            "section_code": "NW-SEC-EXT",
+            "shift_code": "NW-SH-MRN",
+            "monthly_salary_inr": 35000
+        },
+        {
+            "employee_code": "NW-EMP-002",
+            "full_name": "Rajesh Nair",
+            "job_title": "Extrusion Line Operator",
+            "work_center_code": "NW-WC-EXT",
+            "section_code": "NW-SEC-EXT",
+            "shift_code": "NW-SH-EVE",
+            "monthly_salary_inr": 35000
+        },
+        {
+            "employee_code": "NW-EMP-003",
+            "full_name": "Manjunath K",
+            "job_title": "Extrusion Line Operator",
+            "work_center_code": "NW-WC-EXT",
+            "section_code": "NW-SEC-EXT",
+            "shift_code": "NW-SH-NGT",
+            "monthly_salary_inr": 38000
+        },
+        {
+            "employee_code": "NW-EMP-004",
+            "full_name": "Deepak Gowda",
+            "job_title": "Meltblown Line Specialist",
+            "work_center_code": "NW-WC-EXT",
+            "section_code": "NW-SEC-MB",
+            "shift_code": "NW-SH-MRN",
+            "monthly_salary_inr": 40000
+        },
+        {
+            "employee_code": "NW-EMP-005",
+            "full_name": "Srinivas Murthy",
+            "job_title": "Meltblown Line Technician",
+            "work_center_code": "NW-WC-EXT",
+            "section_code": "NW-SEC-MB",
+            "shift_code": "NW-SH-EVE",
+            "monthly_salary_inr": 36000
+        },
+        {
+            "employee_code": "NW-EMP-006",
+            "full_name": "Shivakumar B",
+            "job_title": "Pelletizer Machine Operator",
+            "work_center_code": "NW-WC-EXT",
+            "section_code": "NW-SEC-RCY",
+            "shift_code": "NW-SH-DAY",
+            "monthly_salary_inr": 28000
+        },
+        {
+            "employee_code": "NW-EMP-007",
+            "full_name": "Harish Patel",
+            "job_title": "Slitter Rewinder Operator",
+            "work_center_code": "NW-WC-CNV",
+            "section_code": "NW-SEC-SLT",
+            "shift_code": "NW-SH-MRN",
+            "monthly_salary_inr": 32000
+        },
+        {
+            "employee_code": "NW-EMP-008",
+            "full_name": "Anand Kumar",
+            "job_title": "Slitter Rewinder Operator",
+            "work_center_code": "NW-WC-CNV",
+            "section_code": "NW-SEC-SLT",
+            "shift_code": "NW-SH-EVE",
+            "monthly_salary_inr": 32000
+        },
+        {
+            "employee_code": "NW-EMP-009",
+            "full_name": "Pradeep Shenoy",
+            "job_title": "Flexo Print Master",
+            "work_center_code": "NW-WC-CNV",
+            "section_code": "NW-SEC-PRT",
+            "shift_code": "NW-SH-DAY",
+            "monthly_salary_inr": 34000
+        },
+        {
+            "employee_code": "NW-EMP-010",
+            "full_name": "Venkatesh Rao",
+            "job_title": "Roll Finishing Operator",
+            "work_center_code": "NW-WC-CNV",
+            "section_code": "NW-SEC-WRP",
+            "shift_code": "NW-SH-DAY",
+            "monthly_salary_inr": 30000
+        },
+        {
+            "employee_code": "NW-EMP-011",
+            "full_name": "Girish Prasad",
+            "job_title": "Roll Finishing Operator",
+            "work_center_code": "NW-WC-CNV",
+            "section_code": "NW-SEC-WRP",
+            "shift_code": "NW-SH-EVE",
+            "monthly_salary_inr": 30000
+        },
+        {
+            "employee_code": "NW-EMP-012",
+            "full_name": "Ramesh Babu",
+            "job_title": "Bag Machine Lead Operator",
+            "work_center_code": "NW-WC-FAB",
+            "section_code": "NW-SEC-BAG",
+            "shift_code": "NW-SH-MRN",
+            "monthly_salary_inr": 30000
+        },
+        {
+            "employee_code": "NW-EMP-013",
+            "full_name": "Suresh Reddy",
+            "job_title": "Bag Machine Operator",
+            "work_center_code": "NW-WC-FAB",
+            "section_code": "NW-SEC-BAG",
+            "shift_code": "NW-SH-EVE",
+            "monthly_salary_inr": 30000
+        },
+        {
+            "employee_code": "NW-EMP-014",
+            "full_name": "Pooja Hegde",
+            "job_title": "Ultrasonic Mask Line Operator",
+            "work_center_code": "NW-WC-FAB",
+            "section_code": "NW-SEC-MSK",
+            "shift_code": "NW-SH-MRN",
+            "monthly_salary_inr": 28000
+        },
+        {
+            "employee_code": "NW-EMP-015",
+            "full_name": "Geetha Lakshmi",
+            "job_title": "Mask Line Operator",
+            "work_center_code": "NW-WC-FAB",
+            "section_code": "NW-SEC-MSK",
+            "shift_code": "NW-SH-EVE",
+            "monthly_salary_inr": 28000
+        },
+        {
+            "employee_code": "NW-EMP-016",
+            "full_name": "Radha Krishna",
+            "job_title": "Packing Crew Lead",
+            "work_center_code": "NW-WC-FAB",
+            "section_code": "NW-SEC-PCK",
+            "shift_code": "NW-SH-DAY",
+            "monthly_salary_inr": 26000
+        },
+        {
+            "employee_code": "NW-EMP-017",
+            "full_name": "Santosh Patil",
+            "job_title": "Packing Crew Lead",
+            "work_center_code": "NW-WC-FAB",
+            "section_code": "NW-SEC-PCK",
+            "shift_code": "NW-SH-EVE",
+            "monthly_salary_inr": 26000
+        }
+    ],
     "production_work_center_employees": [
         {
             "work_center_code": "NW-WC-EXT",
             "section_code": "NW-SEC-EXT",
-            "employee_id": 44,
-            "active": 1,
-            "_role": "Extrusion Lead Operator"
+            "employee_code": "NW-EMP-001",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-EXT",
             "section_code": "NW-SEC-EXT",
-            "employee_id": 45,
-            "active": 1,
-            "_role": "Calender Operator"
+            "employee_code": "NW-EMP-002",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-EXT",
             "section_code": "NW-SEC-EXT",
-            "employee_id": 46,
-            "active": 1,
-            "_role": "Winder Operator"
+            "employee_code": "NW-EMP-003",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-EXT",
             "section_code": "NW-SEC-MB",
-            "employee_id": 47,
-            "active": 1,
-            "_role": "Meltblown Line Operator"
+            "employee_code": "NW-EMP-004",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-EXT",
             "section_code": "NW-SEC-MB",
-            "employee_id": 48,
-            "active": 1,
-            "_role": "Meltblown Assistant"
+            "employee_code": "NW-EMP-005",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-EXT",
             "section_code": "NW-SEC-RCY",
-            "employee_id": 49,
-            "active": 1,
-            "_role": "Recycle Pelletizer Lead"
+            "employee_code": "NW-EMP-006",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-CNV",
             "section_code": "NW-SEC-SLT",
-            "employee_id": 50,
-            "active": 1,
-            "_role": "Slitter Machine Operator"
+            "employee_code": "NW-EMP-007",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-CNV",
             "section_code": "NW-SEC-SLT",
-            "employee_id": 51,
-            "active": 1,
-            "_role": "Rewinder Operator"
+            "employee_code": "NW-EMP-008",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-CNV",
             "section_code": "NW-SEC-PRT",
-            "employee_id": 52,
-            "active": 1,
-            "_role": "Printing & Lamination Operator"
+            "employee_code": "NW-EMP-009",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-CNV",
             "section_code": "NW-SEC-WRP",
-            "employee_id": 53,
-            "active": 1,
-            "_role": "Packaging Team Lead (Day)"
+            "employee_code": "NW-EMP-010",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-CNV",
             "section_code": "NW-SEC-WRP",
-            "employee_id": 54,
-            "active": 1,
-            "_role": "Packaging Team Lead (Eve)"
+            "employee_code": "NW-EMP-011",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-FAB",
             "section_code": "NW-SEC-BAG",
-            "employee_id": 55,
-            "active": 1,
-            "_role": "D-Cut Bag Machine Operator"
+            "employee_code": "NW-EMP-012",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-FAB",
             "section_code": "NW-SEC-BAG",
-            "employee_id": 56,
-            "active": 1,
-            "_role": "Bag Quality Inspector"
+            "employee_code": "NW-EMP-013",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-FAB",
             "section_code": "NW-SEC-MSK",
-            "employee_id": 57,
-            "active": 1,
-            "_role": "Mask Machine Operator"
+            "employee_code": "NW-EMP-014",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-FAB",
             "section_code": "NW-SEC-MSK",
-            "employee_id": 58,
-            "active": 1,
-            "_role": "Mask Ultrasonic Welding Tech"
+            "employee_code": "NW-EMP-015",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-FAB",
             "section_code": "NW-SEC-PCK",
-            "employee_id": 59,
-            "active": 1,
-            "_role": "Final Packing Lead (Day)"
+            "employee_code": "NW-EMP-016",
+            "active": 1
         },
         {
             "work_center_code": "NW-WC-FAB",
             "section_code": "NW-SEC-PCK",
-            "employee_id": 60,
-            "active": 1,
-            "_role": "Final Packing Lead (Eve)"
+            "employee_code": "NW-EMP-017",
+            "active": 1
         }
     ],
     "production_section_manual_production_employees": [
         {
-            "batch_name": "NW-BAT-RCY-FEED",
-            "employee_id": 49
-        },
-        {
-            "batch_name": "NW-BAT-WRP-DAY",
-            "employee_id": 53
-        },
-        {
-            "batch_name": "NW-BAT-WRP-EVE",
-            "employee_id": 54
-        },
-        {
-            "batch_name": "NW-BAT-BAG-INSP",
-            "employee_id": 56
-        },
-        {
             "batch_name": "NW-BAT-PCK-DAY",
-            "employee_id": 59
+            "employee_code": "NW-EMP-016"
         },
         {
             "batch_name": "NW-BAT-PCK-EVE",
-            "employee_id": 60
+            "employee_code": "NW-EMP-017"
         }
     ],
     "production_external_worker_allocations": [
         {
             "section_code": "NW-SEC-RCY",
-            "shift_code": "NW-SH-NGT",
+            "shift_code": "NW-SH-DAY",
             "pay_grade_code": "NW-PG-UNSKILL",
-            "batch_name": "NW-BAT-RCY-FEED",
             "workers_count": 2,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-RCY",
-            "shift_code": "NW-SH-DAY",
+            "shift_code": "NW-SH-NGT",
             "pay_grade_code": "NW-PG-UNSKILL",
-            "batch_name": "NW-BAT-RCY-FEED",
             "workers_count": 2,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-WRP",
             "shift_code": "NW-SH-DAY",
             "pay_grade_code": "NW-PG-SEMISKILL",
-            "batch_name": "NW-BAT-WRP-DAY",
             "workers_count": 2,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-WRP",
             "shift_code": "NW-SH-EVE",
             "pay_grade_code": "NW-PG-SEMISKILL",
-            "batch_name": "NW-BAT-WRP-EVE",
             "workers_count": 2,
-            "active": 1
-        },
-        {
-            "section_code": "NW-SEC-BAG",
-            "shift_code": "NW-SH-DAY",
-            "pay_grade_code": "NW-PG-SKILLED",
-            "batch_name": "NW-BAT-BAG-INSP",
-            "workers_count": 2,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-PCK",
             "shift_code": "NW-SH-DAY",
             "pay_grade_code": "NW-PG-SEMISKILL",
+            "workers_count": 3,
             "batch_name": "NW-BAT-PCK-DAY",
-            "workers_count": 3,
             "active": 1
         },
         {
             "section_code": "NW-SEC-PCK",
             "shift_code": "NW-SH-EVE",
             "pay_grade_code": "NW-PG-SEMISKILL",
-            "batch_name": "NW-BAT-PCK-EVE",
             "workers_count": 3,
+            "batch_name": "NW-BAT-PCK-EVE",
             "active": 1
         },
         {
             "section_code": "NW-SEC-EXT",
             "shift_code": "NW-SH-MRN",
             "pay_grade_code": "NW-PG-SKILLED",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-EXT",
             "shift_code": "NW-SH-EVE",
             "pay_grade_code": "NW-PG-SKILLED",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-EXT",
             "shift_code": "NW-SH-NGT",
             "pay_grade_code": "NW-PG-SKILLED",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-MB",
             "shift_code": "NW-SH-MRN",
             "pay_grade_code": "NW-PG-SKILLED",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-MB",
             "shift_code": "NW-SH-EVE",
             "pay_grade_code": "NW-PG-SKILLED",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-SLT",
             "shift_code": "NW-SH-MRN",
             "pay_grade_code": "NW-PG-SEMISKILL",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-SLT",
             "shift_code": "NW-SH-EVE",
             "pay_grade_code": "NW-PG-SEMISKILL",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-BAG",
-            "shift_code": "NW-SH-DAY",
+            "shift_code": "NW-SH-MRN",
             "pay_grade_code": "NW-PG-SEMISKILL",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-BAG",
             "shift_code": "NW-SH-EVE",
             "pay_grade_code": "NW-PG-SEMISKILL",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-MSK",
-            "shift_code": "NW-SH-DAY",
+            "shift_code": "NW-SH-MRN",
             "pay_grade_code": "NW-PG-SEMISKILL",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
         },
         {
             "section_code": "NW-SEC-MSK",
             "shift_code": "NW-SH-EVE",
             "pay_grade_code": "NW-PG-SEMISKILL",
-            "batch_name": null,
             "workers_count": 1,
+            "batch_name": null,
             "active": 1
+        }
+    ],
+    "production_routings": [
+        {
+            "routing_number": "RT-EXT-SPUNBOND",
+            "name": "Spunbond Fabric Extrusion Routing (100 inch Line 1)",
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "name": "Spunbond Fabric Extrusion Routing (63 inch Line 2)",
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "routing_number": "RT-SLT-ROLLS",
+            "name": "Roll Slitting & Rewinding Routing",
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "routing_number": "RT-BAG-DCUT",
+            "name": "D-Cut Bag Making Routing",
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "routing_number": "RT-MASK-3PLY",
+            "name": "3-Ply Surgical Face Mask Routing",
+            "version": "1.0.0",
+            "is_default": 1
+        }
+    ],
+    "production_routing_operations": [
+        {
+            "routing_number": "RT-EXT-SPUNBOND",
+            "sequence": 10,
+            "operation_number": "OP-010",
+            "previous_operation_number": null,
+            "name": "Spunbond Continuous Extrusion, Bonding & In-Line Winding",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-EXT",
+            "machine_code": "NW-EXT-01",
+            "batch_name": null,
+            "setup_time_minutes": 30,
+            "setup_time_per_piece_minutes": 0.001,
+            "processing_time_minutes": 0.24,
+            "expected_yield_percentage": 100,
+            "quality_required": true
+        },
+        {
+            "routing_number": "RT-EXT-SPUNBOND",
+            "sequence": 20,
+            "operation_number": "OP-020",
+            "previous_operation_number": "OP-010",
+            "name": "Roll Finishing, Inspection & Wrapping",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-WRP",
+            "machine_code": "NW-WRP-01",
+            "batch_name": null,
+            "setup_time_minutes": 5,
+            "setup_time_per_piece_minutes": 0.0005,
+            "processing_time_minutes": 0.05,
+            "expected_yield_percentage": 100,
+            "quality_required": true
+        },
+        {
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "sequence": 10,
+            "operation_number": "OP-010",
+            "previous_operation_number": null,
+            "name": "Spunbond Continuous Extrusion, Bonding & In-Line Winding (Line 2)",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-EXT",
+            "machine_code": "NW-EXT-02",
+            "batch_name": null,
+            "setup_time_minutes": 30,
+            "setup_time_per_piece_minutes": 0.001,
+            "processing_time_minutes": 0.4,
+            "expected_yield_percentage": 100,
+            "quality_required": true
+        },
+        {
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "sequence": 20,
+            "operation_number": "OP-020",
+            "previous_operation_number": "OP-010",
+            "name": "Roll Finishing, Inspection & Wrapping",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-WRP",
+            "machine_code": "NW-WRP-01",
+            "batch_name": null,
+            "setup_time_minutes": 5,
+            "setup_time_per_piece_minutes": 0.0005,
+            "processing_time_minutes": 0.05,
+            "expected_yield_percentage": 100,
+            "quality_required": true
+        },
+        {
+            "routing_number": "RT-SLT-ROLLS",
+            "sequence": 10,
+            "operation_number": "OP-010",
+            "previous_operation_number": null,
+            "name": "Rotary Shear Width Slitting & Rewinding",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-SLT",
+            "machine_code": "NW-SLT-01",
+            "batch_name": null,
+            "setup_time_minutes": 20,
+            "setup_time_per_piece_minutes": 0.001,
+            "processing_time_minutes": 0.1,
+            "expected_yield_percentage": 100,
+            "quality_required": true
+        },
+        {
+            "routing_number": "RT-SLT-ROLLS",
+            "sequence": 20,
+            "operation_number": "OP-020",
+            "previous_operation_number": "OP-010",
+            "name": "Slit Roll Palletizing, Strapping & Wrapping",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-WRP",
+            "machine_code": "NW-WRP-01",
+            "batch_name": null,
+            "setup_time_minutes": 5,
+            "setup_time_per_piece_minutes": 0.0005,
+            "processing_time_minutes": 0.05,
+            "expected_yield_percentage": 100,
+            "quality_required": true
+        },
+        {
+            "routing_number": "RT-BAG-DCUT",
+            "sequence": 10,
+            "operation_number": "OP-010",
+            "previous_operation_number": null,
+            "name": "Roll Conversion & D-Cut Punching",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-BAG",
+            "machine_code": "NW-BAG-01",
+            "batch_name": null,
+            "setup_time_minutes": 30,
+            "setup_time_per_piece_minutes": 0.0002,
+            "processing_time_minutes": 0.0125,
+            "expected_yield_percentage": 100,
+            "quality_required": true
+        },
+        {
+            "routing_number": "RT-BAG-DCUT",
+            "sequence": 20,
+            "operation_number": "OP-020",
+            "previous_operation_number": "OP-010",
+            "name": "Manual Bundle Counting & QC Inspection",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-PCK",
+            "machine_code": null,
+            "batch_name": "NW-BAT-PCK-DAY",
+            "setup_time_minutes": 5,
+            "setup_time_per_piece_minutes": 0.0002,
+            "processing_time_minutes": 0.024,
+            "expected_yield_percentage": 100,
+            "quality_required": true
+        },
+        {
+            "routing_number": "RT-BAG-DCUT",
+            "sequence": 30,
+            "operation_number": "OP-030",
+            "previous_operation_number": "OP-020",
+            "name": "Carton Boxing & Pallet Packing",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-PCK",
+            "machine_code": null,
+            "batch_name": "NW-BAT-PCK-DAY",
+            "setup_time_minutes": 10,
+            "setup_time_per_piece_minutes": 0.0005,
+            "processing_time_minutes": 0.0857,
+            "expected_yield_percentage": 100,
+            "quality_required": false
+        },
+        {
+            "routing_number": "RT-MASK-3PLY",
+            "sequence": 10,
+            "operation_number": "OP-010",
+            "previous_operation_number": null,
+            "name": "Pleating, Nose Wire & Earloop Ultrasonic Welding",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-MSK",
+            "machine_code": "NW-MSK-01",
+            "batch_name": null,
+            "setup_time_minutes": 25,
+            "setup_time_per_piece_minutes": 0.0002,
+            "processing_time_minutes": 0.01,
+            "expected_yield_percentage": 100,
+            "quality_required": true
+        },
+        {
+            "routing_number": "RT-MASK-3PLY",
+            "sequence": 20,
+            "operation_number": "OP-020",
+            "previous_operation_number": "OP-010",
+            "name": "Dispenser Box Packing (50 Pcs/Box) & QC",
+            "operation_type": "manufacturing",
+            "section_code": "NW-SEC-PCK",
+            "machine_code": null,
+            "batch_name": "NW-BAT-PCK-DAY",
+            "setup_time_minutes": 5,
+            "setup_time_per_piece_minutes": 0.0005,
+            "processing_time_minutes": 0.0857,
+            "expected_yield_percentage": 100,
+            "quality_required": true
+        }
+    ],
+    "production_boms": [
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "bom_name": "50 GSM White Spunbond Jumbo Roll (100 inch)",
+            "product_code": "SFG-ROLL-50-WHT",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "base_quantity": 100,
+            "uom_id": 4,
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "bom_name": "50 GSM Blue Spunbond Jumbo Roll (100 inch)",
+            "product_code": "SFG-ROLL-50-BLU",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "base_quantity": 100,
+            "uom_id": 4,
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "bom_name": "20 GSM White Spunbond Jumbo Roll (63 inch)",
+            "product_code": "SFG-ROLL-20-WHT",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "base_quantity": 100,
+            "uom_id": 4,
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "bom_name": "20 GSM Blue Spunbond Jumbo Roll (63 inch)",
+            "product_code": "SFG-ROLL-20-BLU",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "base_quantity": 100,
+            "uom_id": 4,
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "bom_number": "BOM-SLIT-50-50IN",
+            "bom_name": "Slit Roll 50 GSM White (50 inch Width)",
+            "product_code": "SFG-SLIT-50-50IN",
+            "routing_number": "RT-SLT-ROLLS",
+            "base_quantity": 100,
+            "uom_id": 4,
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "bom_number": "BOM-SLIT-50-20IN",
+            "bom_name": "Slit Roll 50 GSM White (20 inch Width)",
+            "product_code": "SFG-SLIT-50-20IN",
+            "routing_number": "RT-SLT-ROLLS",
+            "base_quantity": 100,
+            "uom_id": 4,
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "bom_name": "D-Cut Non-Woven Shopping Bag 12x16 White",
+            "product_code": "FG-BAG-DCUT",
+            "routing_number": "RT-BAG-DCUT",
+            "base_quantity": 1000,
+            "uom_id": 4,
+            "version": "1.0.0",
+            "is_default": 1
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "bom_name": "3-Ply Surgical Face Mask (Blue)",
+            "product_code": "FG-MASK-3PLY",
+            "routing_number": "RT-MASK-3PLY",
+            "base_quantity": 1000,
+            "uom_id": 4,
+            "version": "1.0.0",
+            "is_default": 1
+        }
+    ],
+    "production_bom_items": [
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "material_code": "RM-PP",
+            "quantity": 95.68,
+            "gross_quantity": 95.68,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "material_code": "RM-MB-WHT",
+            "quantity": 3.12,
+            "gross_quantity": 3.12,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "material_code": "RM-FILLER",
+            "quantity": 5.2,
+            "gross_quantity": 5.2,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "material_code": "RM-PP",
+            "quantity": 95.68,
+            "gross_quantity": 95.68,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "material_code": "RM-MB-BLU",
+            "quantity": 3.12,
+            "gross_quantity": 3.12,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "material_code": "RM-FILLER",
+            "quantity": 5.2,
+            "gross_quantity": 5.2,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "material_code": "RM-PP",
+            "quantity": 99.84,
+            "gross_quantity": 99.84,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "material_code": "RM-MB-WHT",
+            "quantity": 3.12,
+            "gross_quantity": 3.12,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "material_code": "RM-FILLER",
+            "quantity": 1.04,
+            "gross_quantity": 1.04,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "material_code": "RM-PP",
+            "quantity": 99.84,
+            "gross_quantity": 99.84,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "material_code": "RM-MB-BLU",
+            "quantity": 3.12,
+            "gross_quantity": 3.12,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "material_code": "RM-FILLER",
+            "quantity": 1.04,
+            "gross_quantity": 1.04,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-50IN",
+            "material_code": "SFG-ROLL-50-WHT",
+            "quantity": 100,
+            "gross_quantity": 102.0408,
+            "uom_id": 4,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-ROLL-50-WHT"
+        },
+        {
+            "bom_number": "BOM-SLIT-50-50IN",
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 2,
+            "gross_quantity": 2,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-50IN",
+            "material_code": "RM-WRAP-FILM",
+            "quantity": 0.5,
+            "gross_quantity": 0.5,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-50IN",
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 2,
+            "gross_quantity": 2,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-20IN",
+            "material_code": "SFG-ROLL-50-WHT",
+            "quantity": 100,
+            "gross_quantity": 102.0408,
+            "uom_id": 4,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-ROLL-50-WHT"
+        },
+        {
+            "bom_number": "BOM-SLIT-50-20IN",
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 5,
+            "gross_quantity": 5,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-20IN",
+            "material_code": "RM-WRAP-FILM",
+            "quantity": 0.5,
+            "gross_quantity": 0.5,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-20IN",
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 5,
+            "gross_quantity": 5,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "material_code": "SFG-ROLL-50-WHT",
+            "quantity": 13.6,
+            "gross_quantity": 13.8776,
+            "uom_id": 4,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-ROLL-50-WHT"
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "material_code": "SFG-SLIT-50-50IN",
+            "quantity": 13.6,
+            "gross_quantity": 13.8776,
+            "uom_id": 4,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-SLIT-50-50IN"
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "material_code": "SFG-SLIT-50-20IN",
+            "quantity": 13.6,
+            "gross_quantity": 13.8776,
+            "uom_id": 4,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-SLIT-50-20IN"
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "material_code": "RM-BOX-BAG",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "material_code": "SFG-ROLL-20-BLU",
+            "quantity": 0.66,
+            "gross_quantity": 0.6735,
+            "uom_id": 4,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-ROLL-20-BLU"
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "material_code": "SFG-ROLL-20-WHT",
+            "quantity": 0.66,
+            "gross_quantity": 0.6735,
+            "uom_id": 4,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-ROLL-20-WHT"
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "material_code": "RM-MELTBLOWN",
+            "quantity": 0.6,
+            "gross_quantity": 0.6122,
+            "uom_id": 4,
+            "material_scrap_percentage": 2,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "material_code": "RM-EARLOOP",
+            "quantity": 0.4,
+            "gross_quantity": 0.4,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "material_code": "RM-NOSEWIRE",
+            "quantity": 0.35,
+            "gross_quantity": 0.35,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "material_code": "RM-BOX-MASK",
+            "quantity": 20,
+            "gross_quantity": 20,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "material_code": "RM-BOX-BAG",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "gross_quantity": 1,
+            "uom_id": 4,
+            "material_scrap_percentage": 0,
+            "child_bom_code": null
+        }
+    ],
+    "production_routing_operation_materials": [
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "operation_sequence": 10,
+            "material_code": "RM-PP",
+            "quantity": 95.68,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "operation_sequence": 10,
+            "material_code": "RM-MB-WHT",
+            "quantity": 3.12,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "operation_sequence": 10,
+            "material_code": "RM-FILLER",
+            "quantity": 5.2,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "operation_sequence": 10,
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-WHT",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "operation_sequence": 20,
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "operation_sequence": 10,
+            "material_code": "RM-PP",
+            "quantity": 95.68,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "operation_sequence": 10,
+            "material_code": "RM-MB-BLU",
+            "quantity": 3.12,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "operation_sequence": 10,
+            "material_code": "RM-FILLER",
+            "quantity": 5.2,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "operation_sequence": 10,
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-50-BLU",
+            "routing_number": "RT-EXT-SPUNBOND",
+            "operation_sequence": 20,
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "operation_sequence": 10,
+            "material_code": "RM-PP",
+            "quantity": 99.84,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "operation_sequence": 10,
+            "material_code": "RM-MB-WHT",
+            "quantity": 3.12,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "operation_sequence": 10,
+            "material_code": "RM-FILLER",
+            "quantity": 1.04,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "operation_sequence": 10,
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-WHT",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "operation_sequence": 20,
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "operation_sequence": 10,
+            "material_code": "RM-PP",
+            "quantity": 99.84,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "operation_sequence": 10,
+            "material_code": "RM-MB-BLU",
+            "quantity": 3.12,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "operation_sequence": 10,
+            "material_code": "RM-FILLER",
+            "quantity": 1.04,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "operation_sequence": 10,
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-ROLL-20-BLU",
+            "routing_number": "RT-EXT-SPUNBOND-63",
+            "operation_sequence": 20,
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-50IN",
+            "routing_number": "RT-SLT-ROLLS",
+            "operation_sequence": 10,
+            "material_code": "SFG-ROLL-50-WHT",
+            "quantity": 100,
+            "uom_id": 4,
+            "is_alternative": false,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-ROLL-50-WHT"
+        },
+        {
+            "bom_number": "BOM-SLIT-50-50IN",
+            "routing_number": "RT-SLT-ROLLS",
+            "operation_sequence": 10,
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 2,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-50IN",
+            "routing_number": "RT-SLT-ROLLS",
+            "operation_sequence": 20,
+            "material_code": "RM-WRAP-FILM",
+            "quantity": 0.5,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-50IN",
+            "routing_number": "RT-SLT-ROLLS",
+            "operation_sequence": 20,
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 2,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-20IN",
+            "routing_number": "RT-SLT-ROLLS",
+            "operation_sequence": 10,
+            "material_code": "SFG-ROLL-50-WHT",
+            "quantity": 100,
+            "uom_id": 4,
+            "is_alternative": false,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-ROLL-50-WHT"
+        },
+        {
+            "bom_number": "BOM-SLIT-50-20IN",
+            "routing_number": "RT-SLT-ROLLS",
+            "operation_sequence": 10,
+            "material_code": "RM-CORE-TUBE",
+            "quantity": 5,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-20IN",
+            "routing_number": "RT-SLT-ROLLS",
+            "operation_sequence": 20,
+            "material_code": "RM-WRAP-FILM",
+            "quantity": 0.5,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-SLIT-50-20IN",
+            "routing_number": "RT-SLT-ROLLS",
+            "operation_sequence": 20,
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 5,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "routing_number": "RT-BAG-DCUT",
+            "operation_sequence": 10,
+            "material_code": "SFG-ROLL-50-WHT",
+            "quantity": 13.6,
+            "uom_id": 4,
+            "is_alternative": false,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-ROLL-50-WHT"
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "routing_number": "RT-BAG-DCUT",
+            "operation_sequence": 10,
+            "material_code": "SFG-SLIT-50-50IN",
+            "quantity": 13.6,
+            "uom_id": 4,
+            "is_alternative": true,
+            "priority": 2,
+            "replaces_material_code": "SFG-ROLL-50-WHT",
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-SLIT-50-50IN"
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "routing_number": "RT-BAG-DCUT",
+            "operation_sequence": 10,
+            "material_code": "SFG-SLIT-50-20IN",
+            "quantity": 13.6,
+            "uom_id": 4,
+            "is_alternative": true,
+            "priority": 3,
+            "replaces_material_code": "SFG-ROLL-50-WHT",
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-SLIT-50-20IN"
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "routing_number": "RT-BAG-DCUT",
+            "operation_sequence": 20,
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-BAG-DCUT",
+            "routing_number": "RT-BAG-DCUT",
+            "operation_sequence": 30,
+            "material_code": "RM-BOX-BAG",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "routing_number": "RT-MASK-3PLY",
+            "operation_sequence": 10,
+            "material_code": "SFG-ROLL-20-BLU",
+            "quantity": 0.66,
+            "uom_id": 4,
+            "is_alternative": false,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-ROLL-20-BLU"
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "routing_number": "RT-MASK-3PLY",
+            "operation_sequence": 10,
+            "material_code": "SFG-ROLL-20-WHT",
+            "quantity": 0.66,
+            "uom_id": 4,
+            "is_alternative": false,
+            "material_scrap_percentage": 2,
+            "child_bom_code": "BOM-ROLL-20-WHT"
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "routing_number": "RT-MASK-3PLY",
+            "operation_sequence": 10,
+            "material_code": "RM-MELTBLOWN",
+            "quantity": 0.6,
+            "uom_id": 4,
+            "is_alternative": false,
+            "material_scrap_percentage": 2,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "routing_number": "RT-MASK-3PLY",
+            "operation_sequence": 10,
+            "material_code": "RM-EARLOOP",
+            "quantity": 0.4,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "routing_number": "RT-MASK-3PLY",
+            "operation_sequence": 10,
+            "material_code": "RM-NOSEWIRE",
+            "quantity": 0.35,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "routing_number": "RT-MASK-3PLY",
+            "operation_sequence": 20,
+            "material_code": "RM-BOX-MASK",
+            "quantity": 20,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "routing_number": "RT-MASK-3PLY",
+            "operation_sequence": 20,
+            "material_code": "RM-BOX-BAG",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
+        },
+        {
+            "bom_number": "BOM-MASK-3PLY",
+            "routing_number": "RT-MASK-3PLY",
+            "operation_sequence": 20,
+            "material_code": "RM-LABEL-ROLL",
+            "quantity": 1,
+            "uom_id": 4,
+            "is_alternative": false,
+            "child_bom_code": null
         }
     ]
 }

@@ -140,16 +140,20 @@
 
 ### 3.3 Manual Production Batches (`production_section_manual_productions`)
 
+> **Architecture Principle:** Manual batches are defined **only** where human crew constitutes the direct production output (e.g., manual packing, sorting, boxing). In machine-operated sections (`NW-SEC-RCY`, `NW-SEC-WRP`, `NW-SEC-BAG`), personnel serve as machine operators; their labor is pooled and apportioned to machines by `SectionCalculationService` (`operator_labor_cost_per_machine_per_hour = non_batch_daily_labor ÷ section_hours ÷ active_machines`), eliminating capacity doubling and phantom batch outputs.
+
 | Section Code | Batch Name | Shift Code | Cap/Hour | Unit | Purpose |
 |---|---|---|:---:|:---:|---|
-| `NW-SEC-RCY` | `NW-BAT-RCY-FEED` | `NW-SH-DAY` | 120 | kg | Scrap sorting and pelletizer hopper loading batch |
-| `NW-SEC-WRP` | `NW-BAT-WRP-DAY` | `NW-SH-DAY` | 800 | kg | Day shift roll weighing, core inspection, and barcode labeling batch |
-| `NW-SEC-WRP` | `NW-BAT-WRP-EVE` | `NW-SH-EVE` | 800 | kg | Evening shift pallet strapping and staging batch |
-| `NW-SEC-BAG` | `NW-BAT-BAG-INSP` | `NW-SH-DAY` | 2,500 | pcs | D-Cut bag manual sample counting and QC check batch |
-| `NW-SEC-PCK` | `NW-BAT-PCK-DAY` | `NW-SH-DAY` | 600 | pcs | Day shift bag & mask carton boxing team |
-| `NW-SEC-PCK` | `NW-BAT-PCK-EVE` | `NW-SH-EVE` | 600 | pcs | Evening shift bag & mask carton boxing team |
+| `NW-SEC-PCK` | `NW-BAT-PCK-DAY` | `NW-SH-DAY` | 600 | pcs | Day shift bag & mask carton boxing team (NW-EMP-016) |
+| `NW-SEC-PCK` | `NW-BAT-PCK-EVE` | `NW-SH-EVE` | 600 | pcs | Evening shift bag & mask carton boxing team (NW-EMP-017) |
 
-### 3.4 Warehouses (Branch 3) & Opening Stock
+### 3.4 Dedicated Demo Staff (`employees` & `production_work_center_employees`)
+
+* **17 Dedicated Employees (`NW-EMP-001` .. `NW-EMP-017`):** Created specifically for Tenant 1, Branch 3 (Bangalore Tech Center) with shift allocations matching their section's active shifts, avoiding cross-contamination with older test plant employees (44–60).
+* **Shift Alignment:** All employees work shifts that their assigned section actually runs (e.g. continuous shifts MRN/EVE/NGT for 24h Extrusion, DAY/EVE for Converting and Packaging).
+* **Labor Cost Windows:** Full harmony between the 24-hour section burn rate and minute-by-minute operational windows without orphan labor gaps.
+
+### 3.5 Warehouses (Branch 3) & Opening Stock
 
 * **`NW-WH-RM`**: Raw Materials Store (Granules, Masterbatch, Filter, Earloops, Nose wire)
 * **`NW-WH-ROLL`**: Jumbo & Slit Roll Store (SFG White & Blue rolls)
@@ -173,67 +177,66 @@
 
 ---
 
-### 4.2 Routing 1: Spunbond Fabric Extrusion (`RT-EXT-SPUNBOND`)
-* **Produces:** All Spunbond Master Jumbo Rolls (50 GSM White/Blue, 20 GSM White/Blue)
-* **Output Unit:** Kg | **Version:** 1.0 | **Default:** Yes
+### 4.2 Routing 1: Spunbond Fabric Extrusion Line 1 100" (`RT-EXT-SPUNBOND`)
+* **Produces:** 100-inch Spunbond Master Jumbo Rolls (`SFG-ROLL-50-WHT`, `SFG-ROLL-50-BLU`)
+* **Output Unit:** Kg | **Version:** 1.0.0 | **Status:** Active (Approved with Cost Snapshot) | **Default:** Yes
 
-| Seq | Op # | Operation Name | Section | Planned Resource | Setup (min) | Run Time (min/kg) | Expected Yield % | QC Req? |
-|:---:|:---:|---|---|---|:---:|:---:|:---:|:---:|
-| **10** | `OP-010` | Continuous Extrusion & Calender Bonding | `NW-SEC-EXT` | `NW-EXT-01` *(100″, 250 kg/h)* | 30.0 | 0.2400 | 96.15% | No |
-| **20** | `OP-020` | In-Line Winding & Roll Doffing | `NW-SEC-EXT` | `NW-EXT-01` *(Winder)* | 10.0 | 0.2400 | 100.00% | No |
-| **30** | `OP-030` | Roll Inspection, Weighing & Tagging | `NW-SEC-WRP` | `NW-BAT-WRP-DAY` *(800 kg/h)* | 5.0 | 0.0750 | 100.00% | **Yes** |
+| Seq | Op # | Operation Name | Section | Planned Resource | Setup (min) | Run Time (min/kg) | Expected Yield % | Predecessor | QC Req? |
+|:---:|:---:|---|---|---|:---:|:---:|:---:|:---:|:---:|
+| **10** | `OP-010` | Spunbond Continuous Extrusion, Bonding & In-Line Winding | `NW-SEC-EXT` | `NW-EXT-01` *(100″, 250 kg/h)* | 30.0 | 0.2400 | 100.00% | *None* | **Yes** |
+| **20** | `OP-020` | Jumbo Roll Stretch Wrapping & Barcode Tagging | `NW-SEC-WRP` | `NW-WRP-01` *(1,200 kg/h)* | 5.0 | 0.0500 | 100.00% | `OP-010` | **Yes** |
 
 *Notes:*
-- Op 10 consumes raw polymer mix (PP + MB + Filler).
-- Op 20 synchronizes with line speed; consumes zero raw materials (*TRACK-05 Rule 1*).
-- Op 30 performs catch-weight measurement, GSM verification, and prints the unique Roll Barcode.
+- Op 10 represents single continuous extrusion, thermal calender bonding, and integrated turret winding. Consumes PP polymer mix + masterbatch + filler + paper core tube. Eliminates double equipment rate charges.
+- Op 20 wraps the jumbo roll, prints barcode roll tags, and stages for slitting or warehouse storage.
 
 ---
 
-### 4.3 Routing 2: Roll Slitting & Rewinding (`RT-SLT-ROLLS`)
-* **Produces:** Child/Slit Rolls cut by width (e.g., 100″ → 80″ + 20″) or length (e.g., 1000m → 700m + 300m)
-* **Output Unit:** Kg | **Version:** 1.0 | **Default:** Yes
+### 4.3 Routing 2: Spunbond Fabric Extrusion Line 2 63" (`RT-EXT-SPUNBOND-63`)
+* **Produces:** 63-inch Spunbond Master Jumbo Rolls (`SFG-ROLL-20-WHT`, `SFG-ROLL-20-BLU`)
+* **Output Unit:** Kg | **Version:** 1.0.0 | **Status:** Active (Approved with Cost Snapshot) | **Default:** Yes
 
-| Seq | Op # | Operation Name | Section | Planned Resource | Setup (min) | Run Time (min/kg) | Expected Yield % | QC Req? |
-|:---:|:---:|---|---|---|:---:|:---:|:---:|:---:|
-| **10** | `OP-010` | Rotary Shear Width Slitting & Rewinding | `NW-SEC-SLT` | `NW-SLT-01` *(600 kg/h)* | 20.0 | 0.1000 | 98.00% | No |
-| **20** | `OP-020` | Slit Roll Palletizing & Strapping | `NW-SEC-WRP` | `NW-BAT-WRP-DAY` *(800 kg/h)* | 5.0 | 0.0750 | 100.00% | **Yes** |
+| Seq | Op # | Operation Name | Section | Planned Resource | Setup (min) | Run Time (min/kg) | Expected Yield % | Predecessor | QC Req? |
+|:---:|:---:|---|---|---|:---:|:---:|:---:|:---:|:---:|
+| **10** | `OP-010` | Spunbond 63" Extrusion, Calendering & Turret Winding | `NW-SEC-EXT` | `NW-EXT-02` *(63″, 150 kg/h)* | 30.0 | 0.4000 | 100.00% | *None* | **Yes** |
+| **20** | `OP-020` | 63" Roll Protective Film Wrapping & Weighing | `NW-SEC-WRP` | `NW-WRP-01` *(1,200 kg/h)* | 5.0 | 0.0500 | 100.00% | `OP-010` | **Yes** |
 
 *Notes:*
-- Op 10 unrolls parent jumbo roll and slits into specified widths, generating recyclable edge trim.
-- Op 20 applies child roll barcode labels and packages rolls for storage or direct customer dispatch.
+- Dedicated process line for 63-inch widths using Line 2 (`NW-EXT-02`), correctly mapping 20 GSM mask roll production to its physical manufacturing asset.
 
 ---
 
-### 4.4 Routing 3: D-Cut Bag Making (`RT-BAG-DCUT`) — *3 Operations Split*
+### 4.4 Routing 3: Roll Slitting & Rewinding (`RT-SLT-ROLLS`)
+* **Produces:** Child/Slit Rolls (`SFG-SLIT-50-50IN`, `SFG-SLIT-50-20IN`)
+* **Output Unit:** Kg | **Version:** 1.0.0 | **Status:** Active (Approved with Cost Snapshot) | **Default:** Yes
+
+| Seq | Op # | Operation Name | Section | Planned Resource | Setup (min) | Run Time (min/kg) | Expected Yield % | Predecessor | QC Req? |
+|:---:|:---:|---|---|---|:---:|:---:|:---:|:---:|:---:|
+| **10** | `OP-010` | Precision Multi-Knife Width Slitting & Rewinding | `NW-SEC-SLT` | `NW-SLT-01` *(600 kg/h)* | 20.0 | 0.1000 | 98.00% | *None* | No |
+| **20** | `OP-020` | Slit Roll Palletizing, Stretch-Wrapping & Strapping | `NW-SEC-WRP` | `NW-WRP-01` *(1,200 kg/h)* | 10.0 | 0.0500 | 100.00% | `OP-010` | **Yes** |
+
+---
+
+### 4.5 Routing 4: D-Cut Bag Making (`RT-BAG-DCUT`)
 * **Produces:** `FG-BAG-DCUT` (D-Cut Non-Woven Bags)
-* **Output Unit:** Pcs | **Version:** 1.0 | **Default:** Yes
+* **Output Unit:** Pcs | **Version:** 1.0.0 | **Status:** Active (Approved with Cost Snapshot) | **Default:** Yes
 
-| Seq | Op # | Operation Name | Section | Planned Resource | Setup (min) | Run Time (min/pc) | Expected Yield % | QC Req? |
-|:---:|:---:|---|---|---|:---:|:---:|:---:|:---:|
-| **10** | `OP-010` | Roll Conversion & D-Cut Punching | `NW-SEC-BAG` | `NW-BAG-01` *(4,800 pcs/h)* | 30.0 | 0.0125 | 98.00% | No |
-| **20** | `OP-020` | Manual Bundle Counting & QC Check | `NW-SEC-BAG` | `NW-BAT-BAG-INSP` *(2,500 pcs/h)* | 5.0 | 0.0240 | 100.00% | **Yes** |
-| **30** | `OP-030` | Carton Boxing & Pallet Packing | `NW-SEC-PCK` | `NW-BAT-PCK-DAY` *(600 pcs/h)* | 10.0 | 0.1000 | 100.00% | No |
-
-*Notes:*
-- Op 10 consumes 50 GSM White roll; continuous bottom gusset folding, side ultrasonic welding, and die punching.
-- Op 20 performs 50/100-pc bundle banding, seal strength checks, and defect sorting.
-- Op 30 packs bundles into 1,000-pc master cartons with packing list labels.
+| Seq | Op # | Operation Name | Section | Planned Resource | Setup (min) | Run Time (min/pc) | Expected Yield % | Predecessor | QC Req? |
+|:---:|:---:|---|---|---|:---:|:---:|:---:|:---:|:---:|
+| **10** | `OP-010` | Continuous Gusset Folding, Welding & D-Cut Punching | `NW-SEC-BAG` | `NW-BAG-01` *(4,800 pcs/h)* | 30.0 | 0.0125 | 98.00% | *None* | No |
+| **20** | `OP-020` | In-Line Handle Reinforcement & Seal Quality Inspection | `NW-SEC-BAG` | `NW-BAG-01` *(Machine Lead)* | 10.0 | 0.0125 | 100.00% | `OP-010` | **Yes** |
+| **30** | `OP-030` | Manual Carton Boxing & Pallet Packing | `NW-SEC-PCK` | `NW-BAT-PCK-DAY` *(600 pcs/h)* | 10.0 | 0.1000 | 100.00% | `OP-020` | No |
 
 ---
 
-### 4.5 Routing 4: 3-Ply Surgical Face Mask (`RT-MASK-3PLY`)
+### 4.6 Routing 5: 3-Ply Surgical Face Mask (`RT-MASK-3PLY`)
 * **Produces:** `FG-MASK-3PLY` (3-Ply Surgical Masks)
-* **Output Unit:** Pcs | **Version:** 1.0 | **Default:** Yes
+* **Output Unit:** Pcs | **Version:** 1.0.0 | **Status:** Active (Approved with Cost Snapshot) | **Default:** Yes
 
-| Seq | Op # | Operation Name | Section | Planned Resource | Setup (min) | Run Time (min/pc) | Expected Yield % | QC Req? |
-|:---:|:---:|---|---|---|:---:|:---:|:---:|:---:|
-| **10** | `OP-010` | Pleating, Nose Wire & Earloop Welding | `NW-SEC-MSK` | `NW-MSK-01` *(6,000 pcs/h)* | 25.0 | 0.0100 | 97.00% | No |
-| **20** | `OP-020` | Dispenser Box Packing (50 Pcs/Box) & QC | `NW-SEC-PCK` | `NW-BAT-PCK-DAY` *(600 pcs/h)* | 5.0 | 0.1000 | 100.00% | **Yes** |
-
-*Notes:*
-- Op 10 feeds 3 rolls (Spunbond Blue outer + Meltblown filter + Spunbond White inner) + nose bridge + ultrasonic earloops.
-- Op 20 performs visual QC and packs masks into 50-piece retail dispenser boxes.
+| Seq | Op # | Operation Name | Section | Planned Resource | Setup (min) | Run Time (min/pc) | Expected Yield % | Predecessor | QC Req? |
+|:---:|:---:|---|---|---|:---:|:---:|:---:|:---:|:---:|
+| **10** | `OP-010` | Multi-Roll Ultrasonic Pleating, Nose Wire & Earloop Welding | `NW-SEC-MSK` | `NW-MSK-01` *(6,000 pcs/h)* | 25.0 | 0.0100 | 97.00% | *None* | No |
+| **20** | `OP-020` | Manual Dispenser Box Packing (50 Pcs/Box) & Master Boxing | `NW-SEC-PCK` | `NW-BAT-PCK-DAY` *(600 pcs/h)* | 5.0 | 0.1000 | 100.00% | `OP-010` | **Yes** |
 
 ---
 
