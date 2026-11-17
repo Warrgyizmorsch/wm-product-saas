@@ -77,6 +77,22 @@ class EmployeeApiController extends Controller
     }
 
     /**
+     * Resolve employee by numeric primary key ID or alphanumeric employee_code (stored in employee_id).
+     */
+    private function resolveEmployee(mixed $id): ?Employee
+    {
+        if (empty($id)) {
+            return null;
+        }
+
+        if (is_numeric($id)) {
+            return Employee::find($id) ?: Employee::where('employee_id', $id)->first();
+        }
+
+        return Employee::where('employee_id', $id)->first();
+    }
+
+    /**
      * Null-safe authorization check supporting Web Sessions & HTTP Basic Auth.
      */
     private function authorizeUser(): ?JsonResponse
@@ -204,7 +220,7 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
-        $employee = Employee::find($id);
+        $employee = $this->resolveEmployee($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
@@ -419,7 +435,7 @@ class EmployeeApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to update employee profile.', 403);
         }
 
-        $employee = Employee::find($id);
+        $employee = $this->resolveEmployee($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
@@ -487,7 +503,7 @@ class EmployeeApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to delete employee profile.', 403);
         }
 
-        $employee = Employee::find($id);
+        $employee = $this->resolveEmployee($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
@@ -507,7 +523,7 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
-        $employee = Employee::find($id);
+        $employee = $this->resolveEmployee($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
@@ -564,7 +580,7 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
-        $employee = Employee::find($id);
+        $employee = $this->resolveEmployee($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
@@ -612,7 +628,7 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
-        $employee = Employee::find($id);
+        $employee = $this->resolveEmployee($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
@@ -656,7 +672,7 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
-        $employee = Employee::find($id);
+        $employee = $this->resolveEmployee($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
@@ -1054,6 +1070,10 @@ class EmployeeApiController extends Controller
     {
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
 
+        if ($request->filled('employee_code') && !$request->filled('employee_id')) {
+            $request->merge(['employee_id' => $request->input('employee_code')]);
+        }
+
         return $request->validate([
             'company_id'                  => ['required', 'exists:companies,id'],
             'business_unit_id'            => ['nullable', 'exists:business_units,id'],
@@ -1065,6 +1085,7 @@ class EmployeeApiController extends Controller
             'leave_transition_action'     => ['nullable', 'string', 'in:transfer,prorate'],
             'leave_transition_unused'     => ['nullable', 'string', 'in:carry,lapse'],
             'employee_id'                 => ['nullable', 'string', 'max:255', Rule::unique('employees', 'employee_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
+            'employee_code'               => ['nullable', 'string', 'max:255'],
             'user_id'                     => ['required', Rule::unique('employees', 'user_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
             // Written straight to users.role_id — only roles the acting user may hand out.
             'role_id'                     => ['nullable', Rule::in(auth()->check()
@@ -1079,6 +1100,8 @@ class EmployeeApiController extends Controller
             'employment_type'             => ['nullable', 'string', 'max:255'],
             'date_of_joining'             => ['required', 'date'],
             'office'                      => ['nullable', 'string', 'in:office,wfh,onsite'],
+            'timezone'                    => ['nullable', 'string', 'max:64'],
+            'time_zone'                   => ['nullable', 'string', 'max:64'],
             'wfh_latitude'                => ['nullable', 'numeric', 'between:-90,90'],
             'wfh_longitude'               => ['nullable', 'numeric', 'between:-180,180'],
             'gender'                      => ['required', Rule::in(['male', 'female', 'other', 'Male', 'Female', 'Other'])],
@@ -1210,6 +1233,8 @@ class EmployeeApiController extends Controller
         $validated['branch_id']        = $branch?->id;
         $validated['pay_group_id']     = $payGroup?->id;
         $validated['leave_plan_id']    = $leavePlan?->id;
+        $validated['timezone']         = $validated['timezone'] ?? $validated['time_zone'] ?? null;
+        unset($validated['time_zone']);
 
         return $validated;
     }
@@ -1220,7 +1245,7 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
-        $employee = Employee::find($id);
+        $employee = $this->resolveEmployee($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }

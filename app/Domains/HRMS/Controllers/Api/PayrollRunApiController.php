@@ -346,7 +346,7 @@ class PayrollRunApiController extends Controller
                     $pendingPriorHolds[] = [
                         'id'            => $hold->id,
                         'employee_id'   => $hold->employee->id,
-                        'employee_code' => $hold->employee->employee_id,
+                        'employee_code' => $hold->employee->employee_code ?? $hold->employee->employee_id,
                         'employee_name' => $hold->employee->full_name,
                         'payroll_month' => $hold->payroll_month,
                         'net_payout'    => floatval($calc['summary']['net_payout'] ?? 0.00),

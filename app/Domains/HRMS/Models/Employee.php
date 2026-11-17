@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class Employee extends BaseModel
 {
@@ -31,6 +32,7 @@ class Employee extends BaseModel
         'shift_id',
 
         'employee_id',
+        'employee_code',
         'full_name',
         'nick_name',
         'blood_group',
@@ -43,6 +45,7 @@ class Employee extends BaseModel
         'probation_end_date',
         'confirmation_date',
         'office',
+        'timezone',
         'wfh_latitude',
         'wfh_longitude',
         'gender',
@@ -89,6 +92,22 @@ class Employee extends BaseModel
         'current_salary' => 'decimal:2',
         'status' => 'boolean',
         'weekly_pattern' => 'array',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     * Prevents misleading 'employee_id' string (e.g. 'WRG-001') in API outputs.
+     */
+    protected $hidden = [
+        'employee_id',
+    ];
+
+    /**
+     * The accessors to append to the model's array and JSON form.
+     * Exposes 'employee_code' (e.g. 'WRG-001') in all API outputs.
+     */
+    protected $appends = [
+        'employee_code',
     ];
 
     public function save(array $options = []): bool
@@ -198,6 +217,57 @@ class Employee extends BaseModel
     public function monthlyCtc(): float
     {
         return ((float) ($this->current_salary ?? 0.0)) / 12;
+    }
+
+    /**
+     * Get effective timezone with cascading fallback:
+     * Employee Override -> Branch -> Company -> App Default
+     */
+    public function getTimezoneAttribute(?string $value): string
+    {
+        if (!empty($value)) {
+            return $value;
+        }
+
+        if ($this->relationLoaded('branch') && !empty($this->branch?->timezone)) {
+            return $this->branch->timezone;
+        }
+
+        $branchTz = $this->branch?->timezone;
+        if (!empty($branchTz)) {
+            return $branchTz;
+        }
+
+        if ($this->relationLoaded('company') && !empty($this->company?->timezone)) {
+            return $this->company->timezone;
+        }
+
+        $companyTz = $this->company?->timezone;
+        if (!empty($companyTz)) {
+            return $companyTz;
+        }
+
+        return config('app.timezone', 'Asia/Kolkata');
+    }
+
+    /**
+     * Carbon instance representing current moment in employee's local timezone.
+     */
+    public function getLocalNowAttribute(): Carbon
+    {
+        try {
+            return Carbon::now('UTC')->setTimezone($this->timezone);
+        } catch (\Throwable $e) {
+            return Carbon::now();
+        }
+    }
+
+    /**
+     * Current calendar date (Y-m-d) in employee's local timezone.
+     */
+    public function getLocalTodayAttribute(): string
+    {
+        return $this->local_now->format('Y-m-d');
     }
 
     public function user(): BelongsTo
@@ -395,7 +465,31 @@ class Employee extends BaseModel
 
     public function getEmployeeCodeAttribute(): ?string
     {
-        return $this->employee_id;
+        return $this->attributes['employee_id'] ?? $this->employee_id ?? null;
+    }
+
+    public function setEmployeeCodeAttribute($value): void
+    {
+        $this->attributes['employee_id'] = $value;
+    }
+
+    /**
+     * Retrieve the model for a bound value supporting either numeric ID or employee_code.
+     */
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if ($field) {
+            return parent::resolveRouteBinding($value, $field);
+        }
+
+        if (is_numeric($value)) {
+            $model = $this->where('id', $value)->first();
+            if ($model) {
+                return $model;
+            }
+        }
+
+        return $this->where('employee_id', $value)->first() ?: parent::resolveRouteBinding($value, $field);
     }
 
     public function getJoiningDateAttribute(): mixed

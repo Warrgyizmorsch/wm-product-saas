@@ -86,7 +86,7 @@
                     <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_company') }}" name="company_id" id="{{ $prefix }}_company_id" :required="true" select2-selector="default" :errorText="$errors->first('company_id')" data-field-group="hr_admin" :disabled="$isEmployeeSelfService">
                         <option value="">{{ __('hrms.employees.frm_select_company') }}</option>
                         @foreach($companies as $company)
-                            <option value="{{ $company->id }}" @selected((string) $fieldValue('company_id') === (string) $company->id)>
+                            <option value="{{ $company->id }}" data-timezone="{{ $company->timezone }}" @selected((string) $fieldValue('company_id') === (string) $company->id)>
                                 {{ $company->company_name }}
                             </option>
                         @endforeach
@@ -135,6 +135,11 @@
                                 {{ $shift->name }}
                             </option>
                         @endforeach
+                    </x-ui.odoo-form-ui>
+                </div>
+                <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.timezone') ?? 'Timezone' }}" name="timezone" id="{{ $prefix }}_timezone" select2-selector="tzone" class="geo-timezone" :errorText="$errors->first('timezone')" data-initial-value="{{ $fieldValue('timezone') }}" data-field-group="hr_admin" :disabled="$isEmployeeSelfService">
+                        <option value="">{{ __('hrms.org.select_timezone') }} (Inherit Branch / Company Timezone)</option>
                     </x-ui.odoo-form-ui>
                 </div>
             </div>

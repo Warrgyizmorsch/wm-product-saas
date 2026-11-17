@@ -101,9 +101,10 @@ class AttendanceApiController extends Controller
             return $authError;
         }
 
-        $date = $request->query('date', Carbon::today()->format('Y-m-d'));
         $isHrAdmin = $this->isHrAdmin();
         $employee = $this->getAuthenticatedEmployee();
+        $defaultDate = (!$isHrAdmin && $employee) ? $employee->local_today : Carbon::today()->format('Y-m-d');
+        $date = $request->query('date', $defaultDate);
 
         $baseQuery = Attendance::where('date', $date);
         if (!$isHrAdmin && $employee) {
@@ -131,7 +132,8 @@ class AttendanceApiController extends Controller
         $isHrAdmin = $this->isHrAdmin();
         $employee = $this->getAuthenticatedEmployee();
         $isOwner = $employee && (int)$att->employee_id === (int)$employee->id;
-        $isToday = $att->date && $att->date->isToday();
+        $localToday = ($employee ?? $att->employee)?->local_today ?? Carbon::today()->format('Y-m-d');
+        $isToday = $att->date && $att->date->format('Y-m-d') === $localToday;
         $isActiveShift = !empty($att->check_in) && empty($att->check_out);
         $activeBreak = $att->breaks ? $att->breaks->whereNull('break_out')->first() : null;
         $isOnBreak = !empty($activeBreak);
@@ -143,7 +145,7 @@ class AttendanceApiController extends Controller
         return [
             'id'                  => $att->id,
             'employee_id'         => $att->employee_id,
-            'employee_code'       => $att->employee?->employee_id ?? '',
+            'employee_code'       => $att->employee?->employee_code ?? $att->employee?->employee_id ?? '',
             'employee_name'       => $att->employee?->full_name ?? '',
             'department'          => $att->employee?->department?->name ?? '',
             'date'                => $att->date ? $att->date->format('Y-m-d') : null,
@@ -205,6 +207,15 @@ class AttendanceApiController extends Controller
                 return $this->sendError('Employee profile not found.', 404);
             }
             $query->where('employee_id', $employee->id);
+        } elseif ($request->filled('employee_id')) {
+            $empId = $request->employee_id;
+            if (!is_numeric($empId)) {
+                $empId = Employee::where('employee_id', $empId)->value('id') ?? 0;
+            }
+            $query->where('employee_id', $empId);
+        } elseif ($request->filled('employee_code')) {
+            $empId = Employee::where('employee_id', $request->employee_code)->value('id') ?? 0;
+            $query->where('employee_id', $empId);
         }
 
         if ($date && $date !== 'all') {
@@ -279,7 +290,7 @@ class AttendanceApiController extends Controller
 
         $monthFilter = $request->input('month');
         if (!$request->has('month') && !$request->has('date')) {
-            $monthFilter = now()->format('Y-m');
+            $monthFilter = $employee->local_now->format('Y-m');
         }
 
         $query = Attendance::where('employee_id', $employee->id)
@@ -311,15 +322,16 @@ class AttendanceApiController extends Controller
 
         $paginated = $query->paginate($request->integer('per_page', 10));
 
+        $todayStr = $employee->local_today;
+
         $todayAttendance = Attendance::where('employee_id', $employee->id)
-            ->where('date', now()->format('Y-m-d'))
+            ->where('date', $todayStr)
             ->with(['employee.department', 'breaks'])
             ->first();
 
         $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
 
         // Overall check: 1. Approved WFH request for today -> 2. Employee profile default -> 3. Today's attendance
-        $todayStr = now()->format('Y-m-d');
         $hasWfhToday = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)
             ->where('status', 'approved')
             ->whereDate('start_date', '<=', $todayStr)

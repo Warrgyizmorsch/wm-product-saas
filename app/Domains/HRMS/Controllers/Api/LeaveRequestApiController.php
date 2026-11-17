@@ -149,7 +149,14 @@ class LeaveRequestApiController extends Controller
         if (!$isHrAdmin) {
             $query->where('employee_id', $employee?->id ?? 0);
         } elseif ($request->filled('employee_id')) {
-            $query->where('employee_id', $request->employee_id);
+            $empId = $request->employee_id;
+            if (!is_numeric($empId)) {
+                $empId = Employee::where('employee_id', $empId)->value('id') ?? 0;
+            }
+            $query->where('employee_id', $empId);
+        } elseif ($request->filled('employee_code')) {
+            $empId = Employee::where('employee_id', $request->employee_code)->value('id') ?? 0;
+            $query->where('employee_id', $empId);
         }
 
         if ($request->filled('status')) {
@@ -232,6 +239,19 @@ class LeaveRequestApiController extends Controller
 
         if ($request->filled('start_date') && !$request->filled('end_date')) {
             $request->merge(['end_date' => $request->input('start_date')]);
+        }
+
+        // Gracefully resolve string employee_code (e.g. "WRG-001") to integer primary key ID
+        if ($request->filled('employee_id') && !is_numeric($request->employee_id)) {
+            $found = Employee::where('employee_id', $request->employee_id)->first();
+            if ($found) {
+                $request->merge(['employee_id' => $found->id]);
+            }
+        } elseif ($request->filled('employee_code') && !$request->filled('employee_id')) {
+            $found = Employee::where('employee_id', $request->employee_code)->first();
+            if ($found) {
+                $request->merge(['employee_id' => $found->id]);
+            }
         }
 
         $validated = $request->validate([

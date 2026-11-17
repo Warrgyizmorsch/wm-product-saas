@@ -316,6 +316,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         }
 
         $userIdInput = $validated['user_id'] ?? $request->input('user_id');
+        $validated['timezone'] = $validated['timezone'] ?? $request->input('timezone') ?? $request->input('time_zone') ?? null;
         if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
             $userEmail = !empty($validated['office_email']) ? $validated['office_email'] : (!empty($validated['personal_email']) ? $validated['personal_email'] : null);
             if (!empty($userEmail)) {
@@ -377,6 +378,10 @@ class EmployeeRepository implements EmployeeRepositoryInterface
                 }
             }
             $validated['resume_path'] = $request->file('resume')->storeTenantFile('employees/resumes', 'local');
+        }
+
+        if ($request->has('timezone') || $request->has('time_zone')) {
+            $validated['timezone'] = $request->input('timezone') ?: ($request->input('time_zone') ?: null);
         }
 
         $updated = $employee->update($validated);

@@ -219,6 +219,9 @@
             let emailEl = document.getElementById('modal_view_branch_email');
             if (emailEl) emailEl.innerText = branch.email || 'N/A';
             
+            let tzEl = document.getElementById('modal_view_branch_timezone');
+            if (tzEl) tzEl.innerText = branch.timezone || ((branch.company && branch.company.timezone) ? branch.company.timezone + ' (Company Default)' : 'Asia/Kolkata (Default)');
+            
             let countryEl = document.getElementById('modal_view_branch_country');
             if (countryEl) countryEl.innerText = branch.country || 'N/A';
             
@@ -314,6 +317,11 @@
                 statusSelect.value = (branch.status === true || branch.status === 1 || branch.status === '1') ? '1' : '0';
                 $(statusSelect).trigger('change');
             }
+
+            let tzSelect = document.getElementById('edit_branch_timezone');
+            if (tzSelect) {
+                $(tzSelect).val(branch.timezone || '').trigger('change');
+            }
             
             let form = document.getElementById('branch_edit_form');
             if (form) {
@@ -384,15 +392,56 @@
             }
         }
 
-        $(document).on('change change.select2', '#add_branch_company_id, #add_branch_business_unit_id', function() {
+        function syncBranchParentTimezone(companySelectId, buSelectId, tzSelectId) {
+            let companySelect = document.getElementById(companySelectId);
+            let buSelect = document.getElementById(buSelectId);
+            let tzSelect = document.getElementById(tzSelectId);
+            if (!tzSelect) return;
+
+            let targetTz = '';
+
+            if (companySelect && companySelect.value) {
+                let selectedCompOpt = companySelect.options[companySelect.selectedIndex];
+                if (selectedCompOpt) {
+                    targetTz = selectedCompOpt.getAttribute('data-timezone') || $(selectedCompOpt).data('timezone') || '';
+                }
+            }
+
+            if (!targetTz && buSelect && buSelect.value) {
+                let selectedBuOpt = buSelect.options[buSelect.selectedIndex];
+                if (selectedBuOpt) {
+                    targetTz = selectedBuOpt.getAttribute('data-timezone') || $(selectedBuOpt).data('timezone') || '';
+                }
+            }
+
+            if (targetTz) {
+                tzSelect.dataset.initialValue = targetTz;
+                tzSelect.dataset.userInteracted = 'true';
+                if (!$(tzSelect).find(`option[value="${targetTz}"]`).length) {
+                    $(tzSelect).append(new Option(targetTz, targetTz, true, true));
+                }
+                $(tzSelect).val(targetTz).trigger('change').trigger('change.select2');
+            }
+        }
+
+        $(document).on('change change.select2 select2:select', '#add_branch_company_id, #add_branch_business_unit_id', function() {
             toggleBranchParentRequirements('add_branch_company_id', 'add_branch_business_unit_id');
+            syncBranchParentTimezone('add_branch_company_id', 'add_branch_business_unit_id', 'add_branch_timezone');
         });
-        $(document).on('change change.select2', '#edit_branch_company_id, #edit_branch_bu_id', function() {
+        $(document).on('change change.select2 select2:select', '#edit_branch_company_id, #edit_branch_bu_id', function(e) {
             toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
+            const isUserAction = (e.type === 'select2:select') || Boolean(e.originalEvent && e.originalEvent.isTrusted);
+            let editTzSelect = document.getElementById('edit_branch_timezone');
+            if (isUserAction && (!editTzSelect || !editTzSelect.value)) {
+                syncBranchParentTimezone('edit_branch_company_id', 'edit_branch_bu_id', 'edit_branch_timezone');
+            }
         });
 
         $('#addBranchModal').on('shown.bs.modal', function() {
             toggleBranchParentRequirements('add_branch_company_id', 'add_branch_business_unit_id');
+            if ($('#add_branch_company_id').val() || $('#add_branch_business_unit_id').val()) {
+                syncBranchParentTimezone('add_branch_company_id', 'add_branch_business_unit_id', 'add_branch_timezone');
+            }
         });
         $('#editBranchModal').on('shown.bs.modal', function() {
             toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
@@ -433,7 +482,8 @@
                         <div class="p-3 border rounded-3 bg-light-soft" style="background-color: #f8fafc;">
                             <span class="fs-11 fw-semibold text-muted text-uppercase d-block mb-2 text-primary">{{ __('hrms.org.contact_info') }}</span>
                             <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.phone') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_phone"></span></div>
-                            <div class="mb-0"><strong class="fs-12 text-muted">{{ __('hrms.org.email') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_email"></span></div>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.email') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_email"></span></div>
+                            <div class="mb-0"><strong class="fs-12 text-muted">{{ __('hrms.org.timezone') ?? 'Timezone' }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_timezone"></span></div>
                         </div>
                     </div>
                     <div class="col-12">

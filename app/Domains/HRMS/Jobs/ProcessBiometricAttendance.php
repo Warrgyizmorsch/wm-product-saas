@@ -60,18 +60,19 @@ class ProcessBiometricAttendance implements ShouldQueue
     ): void {
         // 1. Determine shift window boundaries
         $isOvernight = $shift?->isOvernight() ?? false;
+        $empTz = $employee->timezone;
 
         if ($isOvernight) {
-            $shiftStart = Carbon::parse($date . ' ' . $shift->start_time);
-            $shiftEnd = Carbon::parse($date . ' ' . $shift->start_time)->addDay()->setTimeFromTimeString($shift->end_time);
+            $shiftStart = Carbon::parse($date . ' ' . $shift->start_time, $empTz);
+            $shiftEnd = Carbon::parse($date . ' ' . $shift->start_time, $empTz)->addDay()->setTimeFromTimeString($shift->end_time);
             $windowStart = $shiftStart->copy()->subHours(4);
             $windowEnd = $shiftEnd->copy()->addHours(4);
         } elseif ($shift && !empty($shift->start_time) && !empty($shift->end_time)) {
-            $windowStart = Carbon::parse($date . ' ' . $shift->start_time)->subHours(3);
-            $windowEnd = Carbon::parse($date . ' ' . $shift->end_time)->addHours(4);
+            $windowStart = Carbon::parse($date . ' ' . $shift->start_time, $empTz)->subHours(3);
+            $windowEnd = Carbon::parse($date . ' ' . $shift->end_time, $empTz)->addHours(4);
         } else {
-            $windowStart = Carbon::parse($date)->startOfDay();
-            $windowEnd = Carbon::parse($date)->endOfDay();
+            $windowStart = Carbon::parse($date, $empTz)->startOfDay();
+            $windowEnd = Carbon::parse($date, $empTz)->endOfDay();
         }
 
         // If yesterday had an overnight shift ending today morning, ensure today's window does not overlap with yesterday's checkout window
