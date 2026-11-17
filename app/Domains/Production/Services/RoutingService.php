@@ -569,7 +569,7 @@ class RoutingService
 
         // Free every sequence of this routing (kept, removed and older soft-deleted rows) before writing new ones
         RoutingOperation::withTrashed()->where('routing_id', $routing->id)->where('sequence', '>', 0)
-            ->update(['sequence' => DB::raw('0 - id')]);
+            ->update(['sequence' => DB::raw('0 - CAST(id AS SIGNED)')]);
 
         // Removed operations: warn about BOM allocations, soft-delete, audit
         $warnings = [];
