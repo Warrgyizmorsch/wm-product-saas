@@ -10,7 +10,7 @@
         <form id="wsSubtaskAddForm" class="d-flex gap-2 align-items-center" action="{{ route('projects.tasks.subtasks.store', [$project, $task]) }}">
             @csrf
             <div class="flex-grow-1">
-                <x-ui.odoo-form-ui type="input" name="title" placeholder="{{ __('projects.subtask_title_placeholder') }}" :required="true" />
+                <x-ui.odoo-form-ui type="input" name="title" maxlength="255" placeholder="{{ __('projects.subtask_title_placeholder') }}" :required="true" />
             </div>
             <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">{{ __('projects.add') }}</button>
         </form>
@@ -149,7 +149,7 @@
                     remove.className = 'btn btn-link text-danger btn-sm p-0 flex-shrink-0';
                     remove.innerHTML = '<i class="feather-x"></i>';
                     remove.onclick = function () {
-                        confirmAction(@js(__('projects.confirm_remove_subtask')), function () {
+                        (window.confirmAction || function (msg, cb) { if (confirm(msg)) cb(); })(@js(__('projects.confirm_remove_subtask')), function () {
                             remove.disabled = true;
                             wsRequest(subtask.deleteUrl, 'DELETE')
                                 .then(function (result) { apply(result); })

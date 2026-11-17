@@ -66,16 +66,6 @@
         @include('modules.projects.milestones._drawer')
     @endif
 
-    @if ($canManageTaskLists)
-        @include('modules.projects.tasklists._modal')
-        @include('modules.projects.tasklists._drawer')
-    @endif
-
-    @if ($canCreateTasks)
-        @include('modules.projects.tasks._modal')
-        @include('modules.projects.tasks._drawer')
-    @endif
-
     @push('scripts')
         <script type="module" src="{{ asset('assets/js/inline-edit/index.js') }}"></script>
         <script src="{{ asset('assets/js/tasklists/inline-create.js') }}"></script>

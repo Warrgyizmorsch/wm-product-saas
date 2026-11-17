@@ -40,7 +40,7 @@
 
         setTaskListFieldValue('tasklist_name', data.name || '');
         setTaskListFieldValue('tasklist_description', data.description || '');
-        setTaskListMilestone(data.milestoneId);
+        setTaskListMilestone(data.milestoneId || @js($milestone->id ?? ''));
         setTaskListOwner(data.ownerId);
 
         var modalEl = document.getElementById('taskListModal');

@@ -91,7 +91,7 @@ class ProjectReportController extends Controller
         $tenantId = $this->getTenantId();
         $filters = ReportFilterDTO::fromRequest($request, $tenantId);
 
-        $projects = $this->reportService->getProjectSummaryReport($filters);
+        $projects = $this->reportService->getProjectSummaryReport($filters, $this->resolvePerPage($request));
         $clients = Customer::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
         $users = User::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
         $statuses = Project::STATUSES;
@@ -108,7 +108,7 @@ class ProjectReportController extends Controller
         $tenantId = $this->getTenantId();
         $filters = ReportFilterDTO::fromRequest($request, $tenantId);
 
-        $tasks = $this->reportService->getTaskStatusReport($filters);
+        $tasks = $this->reportService->getTaskStatusReport($filters, $this->resolvePerPage($request));
         $projects = Project::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'project_code', 'name']);
         $users = User::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
         $statuses = Task::STATUSES;
@@ -125,7 +125,7 @@ class ProjectReportController extends Controller
         $tenantId = $this->getTenantId();
         $filters = ReportFilterDTO::fromRequest($request, $tenantId);
 
-        $members = $this->reportService->getResourceUtilizationReport($filters);
+        $members = $this->reportService->getResourceUtilizationReport($filters, $this->resolvePerPage($request));
         $projects = Project::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'project_code', 'name']);
         $users = User::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
 
@@ -140,7 +140,7 @@ class ProjectReportController extends Controller
         $tenantId = $this->getTenantId();
         $filters = ReportFilterDTO::fromRequest($request, $tenantId);
 
-        $timeLogs = $this->reportService->getTimesheetBillabilityReport($filters);
+        $timeLogs = $this->reportService->getTimesheetBillabilityReport($filters, $this->resolvePerPage($request));
         $projects = Project::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'project_code', 'name']);
         $users = User::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
         $approvalStatuses = [TimeLog::STATUS_PENDING, TimeLog::STATUS_APPROVED, TimeLog::STATUS_REJECTED];
@@ -156,7 +156,7 @@ class ProjectReportController extends Controller
         $tenantId = $this->getTenantId();
         $filters = ReportFilterDTO::fromRequest($request, $tenantId);
 
-        $issues = $this->reportService->getIssueDefectDensityReport($filters);
+        $issues = $this->reportService->getIssueDefectDensityReport($filters, $this->resolvePerPage($request));
         $projects = Project::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'project_code', 'name']);
         $users = User::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
         $severities = Issue::SEVERITIES;
@@ -174,7 +174,7 @@ class ProjectReportController extends Controller
         $tenantId = $this->getTenantId();
         $filters = ReportFilterDTO::fromRequest($request, $tenantId);
 
-        $milestones = $this->reportService->getMilestoneVarianceReport($filters);
+        $milestones = $this->reportService->getMilestoneVarianceReport($filters, $this->resolvePerPage($request));
         $projects = Project::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'project_code', 'name']);
         $statuses = Milestone::STATUSES;
 
@@ -189,7 +189,7 @@ class ProjectReportController extends Controller
         $tenantId = $this->getTenantId();
         $filters = ReportFilterDTO::fromRequest($request, $tenantId);
 
-        $rows = $this->reportService->getBudgetCostReport($filters);
+        $rows = $this->reportService->getBudgetCostReport($filters, $this->resolvePerPage($request));
         $projects = Project::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'project_code', 'name']);
         $clients = Customer::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
         $statuses = Project::STATUSES;
@@ -197,6 +197,12 @@ class ProjectReportController extends Controller
         return view('modules.projects.reports.budget-cost', compact(
             'rows', 'projects', 'clients', 'statuses', 'filters'
         ));
+    }
+
+    private function resolvePerPage(Request $request): int
+    {
+        $perPage = (int) $request->input('per_page', 10);
+        return ($perPage > 0 && $perPage <= 100) ? $perPage : 10;
     }
 
     public function export(Request $request, string $report, string $format): Response

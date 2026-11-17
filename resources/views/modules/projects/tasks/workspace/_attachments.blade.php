@@ -62,7 +62,7 @@
                 <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.category') }} <span class="text-danger">*</span></label>
                 <x-ui.odoo-form-ui type="select" name="category" required>
                     @foreach (\App\Domains\Projects\Models\ProjectDocument::CATEGORIES as $cat)
-                        <option value="{{ $cat }}" @selected($cat === 'attachment')>
+                        <option value="{{ $cat }}" @selected($cat === \App\Domains\Projects\Models\ProjectDocument::CATEGORY_ATTACHMENT)>
                             {{ __('projects.document_categories.' . $cat) }}
                         </option>
                     @endforeach

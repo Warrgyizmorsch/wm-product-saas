@@ -187,8 +187,10 @@ class DashboardRefreshService
         $end   = Carbon::today()->endOfDay();
 
         $machines = DB::table('production_machines')
-            ->where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
+            ->leftJoin('production_work_center_sections', 'production_work_center_sections.id', '=', 'production_machines.section_id')
+            ->where('production_machines.tenant_id', $tenantId)
+            ->whereNull('production_machines.deleted_at')
+            ->select('production_machines.*', 'production_work_center_sections.work_center_id')
             ->get();
 
         // Preload work centers

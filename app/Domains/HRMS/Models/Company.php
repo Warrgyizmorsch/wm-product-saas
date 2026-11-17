@@ -31,6 +31,14 @@ class Company extends BaseModel
         'status' => 'boolean',
     ];
 
+    /**
+     * Effective company timezone fallback.
+     */
+    public function getTimezoneAttribute(?string $value): string
+    {
+        return !empty($value) ? $value : config('app.timezone', 'Asia/Kolkata');
+    }
+
 
     public function businessUnits()
     {

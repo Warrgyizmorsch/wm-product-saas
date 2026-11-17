@@ -15,22 +15,33 @@ class PurchaseOrderPolicy
     public function viewAny(User $user): bool
     {
         return $this->access->allows($user, 'purchase.orders.view', [
-            'tenant_id' => $user->tenant_id,
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
         ]);
     }
 
     public function view(User $user, PurchaseOrder $order): bool
     {
         return $this->access->allows($user, 'purchase.orders.view', [
-            'tenant_id' => $order->tenant_id,
-            'owner_id' => $order->created_by,
+            'tenant_id'     => $order->tenant_id,
+            'owner_id'      => $order->created_by,
+            'branch_id'     => $order->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $order->company_id,
         ]);
     }
 
     public function create(User $user): bool
     {
         return $this->access->allows($user, 'purchase.orders.create', [
-            'tenant_id' => $user->tenant_id,
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
         ]);
     }
 
@@ -41,8 +52,11 @@ class PurchaseOrderPolicy
         }
 
         return $this->access->allows($user, 'purchase.orders.edit', [
-            'tenant_id' => $order->tenant_id,
-            'owner_id' => $order->created_by,
+            'tenant_id'     => $order->tenant_id,
+            'owner_id'      => $order->created_by,
+            'branch_id'     => $order->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $order->company_id,
         ]);
     }
 
@@ -53,17 +67,28 @@ class PurchaseOrderPolicy
         }
 
         return $this->access->allows($user, 'purchase.orders.delete', [
-            'tenant_id' => $order->tenant_id,
-            'owner_id' => $order->created_by,
+            'tenant_id'     => $order->tenant_id,
+            'owner_id'      => $order->created_by,
+            'branch_id'     => $order->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $order->company_id,
         ]);
     }
 
     public function approve(User $user, PurchaseOrder $order): bool
     {
         return $this->access->allows($user, 'purchase.orders.approve', [
-            'tenant_id' => $order->tenant_id,
+            'tenant_id'     => $order->tenant_id,
+            'owner_id'      => $order->created_by,
+            'branch_id'     => $order->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $order->company_id,
         ]) || $this->access->allows($user, 'purchase.approvals.manage', [
-            'tenant_id' => $order->tenant_id,
+            'tenant_id'     => $order->tenant_id,
+            'owner_id'      => $order->created_by,
+            'branch_id'     => $order->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $order->company_id,
         ]);
     }
 

@@ -14,10 +14,34 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Builder;
 
 class Quotation extends BaseModel
 {
     use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+
+    protected ?string $rbacPermission = 'crm.quotations.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->where(function (Builder $sub) use ($user) {
+            $sub->where('quotations.sales_person_id', $user->id)
+                ->orWhereHas('crmDeal', fn($dq) => $dq->where('owner_id', $user->id)->orWhereHas('account', fn($aq) => $aq->where('owner_id', $user->id)))
+                ->orWhereHas('crmAccount', fn($aq) => $aq->where('owner_id', $user->id))
+                ->orWhereHas('lead', fn($lq) => $lq->where('lead_owner_id', $user->id));
+        });
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($quotation) {
+            if (empty($quotation->sales_person_id) && auth()->check()) {
+                $quotation->sales_person_id = auth()->id();
+            }
+        });
+    }
 
     protected function quotationNumber(): Attribute
     {

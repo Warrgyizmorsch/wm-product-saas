@@ -410,7 +410,7 @@ class MaintenanceWorkOrderService
                 $downtime = ProductionMachineDowntime::create([
                     'tenant_id'        => $tenantId,
                     'machine_id'       => $wo->machine_id,
-                    'work_center_id'   => $machine->work_center_id,
+                    'work_center_id'   => $machine->section?->work_center_id,
                     'reason'           => "Scheduled Maintenance: {$wo->work_order_number}",
                     'category'         => $category,
                     'start_time'       => $start,

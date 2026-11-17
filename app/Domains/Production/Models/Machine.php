@@ -30,9 +30,21 @@ class Machine extends BaseModel
         self::STATUS_DECOMMISSIONED,
     ];
 
+    public const ENERGY_ELECTRICITY = 'electricity';
+    public const ENERGY_PETROL      = 'petrol';
+    public const ENERGY_DIESEL      = 'diesel';
+    public const ENERGY_OTHERS      = 'others';
+
+    public const ENERGY_SOURCES = [
+        self::ENERGY_ELECTRICITY,
+        self::ENERGY_PETROL,
+        self::ENERGY_DIESEL,
+        self::ENERGY_OTHERS,
+    ];
+
     protected $fillable = [
         'tenant_id',
-        'work_center_id',
+        'section_id',
         'asset_id',
         'name',
         'code',
@@ -40,6 +52,10 @@ class Machine extends BaseModel
         'manufacturer',
         'model_number',
         'capacity',
+        'energy_source',
+        'consumption_per_hour',
+        'energy_rate_per_unit',
+        'operating_cost_per_hour',
         'status',
         'installation_date',
         'maintenance_status', // A7: future maintenance module integration point
@@ -51,6 +67,9 @@ class Machine extends BaseModel
 
     protected $casts = [
         'capacity'                  => 'float',
+        'consumption_per_hour'      => 'float',
+        'energy_rate_per_unit'      => 'float',
+        'operating_cost_per_hour'   => 'float',
         'installation_date'         => 'date',
         'last_maintenance_date'     => 'date',
         'next_maintenance_due_date' => 'date',
@@ -58,9 +77,30 @@ class Machine extends BaseModel
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
-    public function workCenter(): BelongsTo
+    public function section(): BelongsTo
     {
-        return $this->belongsTo(WorkCenter::class, 'work_center_id');
+        return $this->belongsTo(WorkCenterSection::class, 'section_id');
+    }
+
+    public function routingOperations(): HasMany
+    {
+        return $this->hasMany(RoutingOperation::class, 'machine_id');
+    }
+
+    /**
+     * Operational Work Center derived through the assigned Section.
+     * Returns null when the machine has no Section assignment.
+     */
+    public function workCenter(): \Illuminate\Database\Eloquent\Relations\HasOneThrough
+    {
+        return $this->hasOneThrough(
+            WorkCenter::class,
+            WorkCenterSection::class,
+            'id',             // Foreign key on WorkCenterSection table
+            'id',             // Foreign key on WorkCenter table
+            'section_id',     // Local key on Machine table
+            'work_center_id'  // Local key on WorkCenterSection table
+        );
     }
 
     /**
@@ -134,11 +174,85 @@ class Machine extends BaseModel
 
     public function scopeForWorkCenter(Builder $query, int $workCenterId): void
     {
-        $query->where('work_center_id', $workCenterId);
+        $query->whereHas('section', fn (Builder $q) => $q->where('work_center_id', $workCenterId));
+    }
+
+    public function scopeForSection(Builder $query, int $sectionId): void
+    {
+        $query->where('section_id', $sectionId);
     }
 
     public function scopeAvailableForProduction(Builder $query): void
     {
         $query->whereIn('status', [self::STATUS_ACTIVE]);
+    }
+
+    // ─── Accessors ────────────────────────────────────────────────────────────
+
+    public function getCapacityPerHourAttribute(): float
+    {
+        return (float) ($this->capacity ?? 0);
+    }
+
+    public function getPowerConsumptionKwAttribute(): float
+    {
+        return (float) ($this->consumption_per_hour ?? 0);
+    }
+
+    // ─── Operating cost (WC-08 / RT-IMPL-11) ──────────────────────────────────
+
+    /**
+     * The one rule for a machine's operating cost per hour, shared by the section calculation and routing:
+     * entered operating cost if > 0, else consumption × energy rate if > 0, else 0.
+     * Also returns the breakdown (base energy cost, additional cost, deductibles) and the explanation type.
+     *
+     * @return array{base_energy_cost: float, entered_cost: float, additional_cost: float, deductibles: float,
+     *               final_cost_per_hour: float, explanation_type: string}
+     */
+    public function operatingCostBreakdown(): array
+    {
+        $consumption = (float) ($this->consumption_per_hour ?? 0.0);
+        $rate        = (float) ($this->energy_rate_per_unit ?? 0.0);
+        $base        = round($consumption * $rate, 4);
+        $entered     = (float) ($this->operating_cost_per_hour ?? 0.0);
+
+        $additional = 0.0;
+        $deductibles = 0.0;
+        if ($entered > 0.0 && $base > 0.0) {
+            if ($entered > $base) {
+                $additional = round($entered - $base, 4);
+                $type = 'additional';
+            } elseif ($entered < $base) {
+                $deductibles = round($base - $entered, 4);
+                $type = 'deductible';
+            } else {
+                $type = 'matches';
+            }
+            $final = $entered;
+        } elseif ($entered > 0.0) {
+            $final = $entered;
+            $type = 'flat';
+        } elseif ($base > 0.0) {
+            $final = $base;
+            $type = 'energy';
+        } else {
+            $final = 0.0;
+            $type = 'none';
+        }
+
+        return [
+            'base_energy_cost'    => $base,
+            'entered_cost'        => $entered,
+            'additional_cost'     => $additional,
+            'deductibles'         => $deductibles,
+            'final_cost_per_hour' => (float) $final,
+            'explanation_type'    => $type,
+        ];
+    }
+
+    /** Final operating cost per hour (base currency) — see operatingCostBreakdown(). */
+    public function finalOperatingCostPerHour(): float
+    {
+        return $this->operatingCostBreakdown()['final_cost_per_hour'];
     }
 }

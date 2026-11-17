@@ -17,6 +17,9 @@ class PurchaseOrder extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
+    protected ?string $rbacPermission = 'purchase.orders.view';
+    protected ?string $rbacOwnerColumn = 'created_by';
+
     protected static function boot()
     {
         parent::boot();

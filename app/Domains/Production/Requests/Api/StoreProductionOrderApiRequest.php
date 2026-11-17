@@ -2,8 +2,12 @@
 
 namespace App\Domains\Production\Requests\Api;
 
+use App\Domains\Production\Requests\Concerns\ValidatesProductionOrderEngineering;
+
 class StoreProductionOrderApiRequest extends ApiFormRequest
 {
+    use ValidatesProductionOrderEngineering;
+
     public function authorize(): bool
     {
         return $this->user()?->can('create', \App\Domains\Production\Models\ProductionOrder::class) ?? false;
@@ -22,6 +26,17 @@ class StoreProductionOrderApiRequest extends ApiFormRequest
             'start_date'                  => 'required|date',
             'end_date'                    => 'required|date|after_or_equal:start_date',
             'description'                 => 'nullable|string|max:1000',
-        ];
+            'branch_id'                   => 'nullable|integer',
+        ] + $this->engineeringSelectionRules(); // PO-IMPL-05
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $tenantId = $this->user()?->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : null);
+            if ($tenantId) {
+                $this->validateProductionOrderEngineering($validator, (int) $tenantId);
+            }
+        });
     }
 }

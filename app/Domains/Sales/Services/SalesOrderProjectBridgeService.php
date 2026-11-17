@@ -79,14 +79,7 @@ class SalesOrderProjectBridgeService
             // 1. Create Project
             $project = $this->projectService->create($projectData);
 
-            // 2. Create Default Task List
-            $taskList = $this->taskListService->create($project, [
-                'name' => 'Fulfillment & Delivery',
-                'description' => "Tasks linked to deliverables for Sales Order {$order->sales_order_number}",
-                'owner_id' => $project->manager_id ?: $project->owner_id,
-            ]);
-
-            // 3. For each SO Item, create Milestone and corresponding Task
+            // 2. For each SO Item, create Milestone, Task List, and Task
             if ($order->items && $order->items->isNotEmpty()) {
                 foreach ($order->items as $item) {
                     $milestoneName = $item->item_name ?: "Item #{$item->id}";
@@ -101,6 +94,13 @@ class SalesOrderProjectBridgeService
                         'owner_id' => $project->manager_id ?: $project->owner_id,
                     ]);
 
+                    $taskList = $this->taskListService->create($project, [
+                        'name' => "Tasks: {$milestoneName}",
+                        'description' => "Tasks linked to deliverables for {$milestoneName}",
+                        'owner_id' => $project->manager_id ?: $project->owner_id,
+                        'milestone_id' => $milestone->id,
+                    ]);
+
                     $this->taskService->create($project, [
                         'milestone_id' => $milestone->id,
                         'task_list_id' => $taskList->id,
@@ -113,6 +113,22 @@ class SalesOrderProjectBridgeService
                         'due_date' => $milestone->due_date,
                     ]);
                 }
+            } else {
+                $milestone = $this->milestoneService->create($project, [
+                    'name' => 'Fulfillment & Delivery',
+                    'description' => "Delivery milestone for Sales Order {$order->sales_order_number}",
+                    'start_date' => $project->start_date,
+                    'due_date' => $order->shipment_date ?: $project->end_date,
+                    'status' => Milestone::STATUS_ACTIVE,
+                    'owner_id' => $project->manager_id ?: $project->owner_id,
+                ]);
+
+                $this->taskListService->create($project, [
+                    'name' => 'Fulfillment & Delivery',
+                    'description' => "Tasks linked to deliverables for Sales Order {$order->sales_order_number}",
+                    'owner_id' => $project->manager_id ?: $project->owner_id,
+                    'milestone_id' => $milestone->id,
+                ]);
             }
 
             return $project;

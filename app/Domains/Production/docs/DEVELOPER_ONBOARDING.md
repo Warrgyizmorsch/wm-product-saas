@@ -59,7 +59,6 @@ app/Domains/Production/
 | `ProductionWipService` | WIP card management, line transfers, SFG consumption | `initializeWip()`, `transferWip()`, `convertWipToFinishedGoods()` |
 | `QualityInspectionService`| In-process inspection execution ("Run QC") & disposition | `processShopfloorInspection()` |
 | `SubcontractProcurementOrchestrator` | Automated PR/PO generation for outsourced operations | `orchestrateSubcontractProcurement()` |
-| `BomFormulaEvaluatorService` | Parameterized mathematical expression evaluation | `evaluateFormula()` |
 | `ProductionExecutionService` | Operational scrap write-off and finished goods receipt | `receiveFinishedGoods()`, `logScrap()` |
 
 ---

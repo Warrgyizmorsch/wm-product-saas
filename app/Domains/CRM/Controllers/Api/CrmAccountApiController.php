@@ -28,6 +28,8 @@ class CrmAccountApiController extends Controller
      */
     public function meta(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CrmAccount::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $owners = User::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'email']);
@@ -47,6 +49,8 @@ class CrmAccountApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CrmAccount::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $query = CrmAccount::where('tenant_id', $tenantId)
@@ -96,6 +100,8 @@ class CrmAccountApiController extends Controller
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
 
+        $this->authorize('view', $account);
+
         if ($account->customer) {
             $customer = $account->customer;
             $invoices = $customer->invoices()->whereNotIn('status', ['cancelled', 'void'])->get();
@@ -136,6 +142,8 @@ class CrmAccountApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', CrmAccount::class);
+
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [
@@ -270,6 +278,8 @@ class CrmAccountApiController extends Controller
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
 
+        $this->authorize('update', $account);
+
         $validator = Validator::make($request->all(), [
             'name'        => 'required|string|max:255',
             'email'       => 'nullable|email|max:255',
@@ -311,6 +321,8 @@ class CrmAccountApiController extends Controller
         if (!$account) {
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
+
+        $this->authorize('update', $account);
 
         $validator = Validator::make($request->all(), [
             'name'            => 'sometimes|required|string|max:255',
@@ -391,6 +403,8 @@ class CrmAccountApiController extends Controller
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
 
+        $this->authorize('update', $account);
+
         $validator = Validator::make($request->all(), [
             'account_owner_id' => 'nullable|integer|exists:users,id',
             'owner_id'         => 'nullable|integer|exists:users,id',
@@ -426,6 +440,8 @@ class CrmAccountApiController extends Controller
      */
     public function bulkAssign(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CrmAccount::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [
@@ -478,6 +494,8 @@ class CrmAccountApiController extends Controller
         if (!$account) {
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
+
+        $this->authorize('delete', $account);
 
         $account->delete();
 

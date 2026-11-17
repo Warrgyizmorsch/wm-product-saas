@@ -3,6 +3,8 @@
         name: '.milestone-create-name',
         owner_id: '.milestone-create-owner',
         due_date: '.milestone-create-due-date',
+        billing_amount: '.milestone-create-billing-amount',
+        billing_percentage: '.milestone-create-billing-percentage',
     };
 
     var activeCard = null;
@@ -121,6 +123,9 @@
         var csrfToken = document.querySelector('meta[name="csrf-token"]');
         csrfToken = csrfToken ? csrfToken.content : '';
 
+        var billingInput = card.querySelector(FIELD_SELECTORS.billing_amount);
+        var pctInput = card.querySelector(FIELD_SELECTORS.billing_percentage);
+
         fetch(storeUrl, {
             method: 'POST',
             headers: {
@@ -133,6 +138,8 @@
                 name: name,
                 owner_id: ownerSelect.value || null,
                 due_date: dueDateInput.value || null,
+                billing_amount: billingInput && billingInput.value !== '' ? billingInput.value : 0,
+                billing_percentage: pctInput && pctInput.value !== '' ? pctInput.value : null,
             }),
         }).then(function (response) {
             return response.json().catch(function () {

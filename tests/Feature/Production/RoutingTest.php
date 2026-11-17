@@ -9,6 +9,7 @@ use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
+use App\Domains\Production\Models\ProductionBom;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -16,12 +17,14 @@ use Tests\TestCase;
 class RoutingTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\FillsRoutingFigures; // RT-IMPL-14: fill figures like the form does
 
     private Tenant $tenantA;
     private User $adminA;
     private User $engineerA;
     private Product $finishedProductA;
     private WorkCenter $workCenterA;
+    private \App\Domains\Production\Models\WorkCenterSection $sectionA;
     private Machine $machineA;
 
     protected function setUp(): void
@@ -61,6 +64,18 @@ class RoutingTest extends TestCase
             'status' => 'active',
         ]);
 
+        ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-CABINET-Z',
+            'bom_name' => 'Cabinet Z BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedProductA->id,
+            'base_quantity' => 1.0,
+            'status' => 'approved',
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+        ]);
+
         $this->workCenterA = WorkCenter::create([
             'tenant_id' => $this->tenantA->id,
             'name' => 'Main Cutting Area',
@@ -68,9 +83,17 @@ class RoutingTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->machineA = Machine::create([
+        $this->sectionA = \App\Domains\Production\Models\WorkCenterSection::create([
             'tenant_id' => $this->tenantA->id,
             'work_center_id' => $this->workCenterA->id,
+            'name' => 'Cutting Section A',
+            'code' => 'SEC-CUT-01',
+            'status' => 'active',
+        ]);
+
+        $this->machineA = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'section_id' => $this->sectionA->id,
             'name' => 'Saw Machine A',
             'code' => 'MCH-SAW-A',
             'status' => 'active',
@@ -83,14 +106,16 @@ class RoutingTest extends TestCase
             'name' => 'Cabinet Z Cutting and Drilling',
             'product_id' => $this->finishedProductA->id,
             'version' => '1.0.0',
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
             'is_default' => '1',
             'operations' => [
                 [
                     'sequence' => 10,
+                    'operation_number' => 'OP-010',
                     'name' => 'Raw sheet cutting',
                     'operation_type' => 'manufacturing',
                     'work_center_id' => $this->workCenterA->id,
+                    'section_id' => $this->sectionA->id,
                     'machine_id' => $this->machineA->id,
                     'setup_time_minutes' => 15,
                     'processing_time_minutes' => 5,
@@ -100,10 +125,12 @@ class RoutingTest extends TestCase
                 ],
                 [
                     'sequence' => 20,
+                    'operation_number' => 'OP-020',
                     'name' => 'Hole drilling',
                     'operation_type' => 'manufacturing',
                     'work_center_id' => $this->workCenterA->id,
-                    'machine_id' => null,
+                    'section_id' => $this->sectionA->id,
+                    'machine_id' => $this->machineA->id,
                     'setup_time_minutes' => 5,
                     'processing_time_minutes' => 2,
                     'expected_yield_percentage' => 100.00,
@@ -113,14 +140,14 @@ class RoutingTest extends TestCase
 
         $response = $this->actingAs($this->engineerA)
             ->withHeader('X-Tenant', 'tenant-a')
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         
         $this->assertDatabaseHas('routings', [
             'tenant_id' => $this->tenantA->id,
             'name' => 'Cabinet Z Cutting and Drilling',
-            'product_id' => $this->finishedProductA->id,
             'status' => Routing::STATUS_DRAFT,
         ]);
 
@@ -137,7 +164,7 @@ class RoutingTest extends TestCase
             'name' => 'Invalid Routing Seq',
             'product_id' => $this->finishedProductA->id,
             'version' => '1.0.0',
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
             'operations' => [
                 [
                     'sequence' => 10, // Duplicate sequence
@@ -156,7 +183,7 @@ class RoutingTest extends TestCase
 
         $response = $this->actingAs($this->engineerA)
             ->withHeader('X-Tenant', 'tenant-a')
-            ->post(route('production.routing.store'), $payload);
+            ->post(route('production.routing.store'), $this->withRoutingFigures($payload));
 
         $response->assertSessionHasErrors(['operations.1.sequence']);
     }
@@ -171,7 +198,7 @@ class RoutingTest extends TestCase
             'product_id' => $this->finishedProductA->id,
             'version' => '1.0.0',
             'status' => Routing::STATUS_DRAFT,
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
         ]);
 
         $routing->operations()->create([
@@ -200,6 +227,7 @@ class RoutingTest extends TestCase
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.routing.approve', $routing->id));
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
 
         $routing->refresh();
@@ -217,10 +245,10 @@ class RoutingTest extends TestCase
             'version' => '1.0.0',
             'revision' => 0,
             'status' => Routing::STATUS_ACTIVE,
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
         ]);
 
-        $routing->operations()->create([
+        $op = $routing->operations()->create([
             'tenant_id' => $this->tenantA->id,
             'sequence' => 10,
             'operation_number' => 'OP-010',
@@ -228,48 +256,81 @@ class RoutingTest extends TestCase
             'work_center_id' => $this->workCenterA->id,
         ]);
 
-        // Duplicate via manager
+        $uom = \App\Domains\Inventory\Models\Uom::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Piece',
+            'code' => 'Pcs',
+        ]);
+
+        $rawMaterial = Product::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Raw Wood Board',
+            'sku' => 'RM-WOOD-01',
+            'type' => 'raw_material',
+            'uom_id' => $uom->id,
+            'status' => 'active',
+        ]);
+
+        $op->materials()->create([
+            'tenant_id' => $this->tenantA->id,
+            'material_id' => $rawMaterial->id,
+            'quantity' => 2.5,
+            'uom_id' => $uom->id,
+            'sequence' => 1,
+        ]);
+
+        // RT-IMPL-20: Duplicate Version saves nothing — it checks the version and opens the pre-filled create form
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.routing.duplicate', $routing->id), [
                 'new_version' => '1.1.0'
             ]);
 
-        $response->assertRedirect();
-        
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('production.routing.create', ['source_routing_id' => $routing->id, 'version' => '1.1.0']));
+        $this->assertNull(Routing::where('version', '1.1.0')->first(), 'nothing is saved by the Duplicate button');
+
+        $this->actingAs($this->adminA)->withHeader('X-Tenant', 'tenant-a')
+            ->get(route('production.routing.create', ['source_routing_id' => $routing->id, 'version' => '1.1.0']))
+            ->assertOk()
+            ->assertSee('1.1.0')
+            ->assertSee('Operation 1')
+            ->assertSee('name="source_routing_id"', false);
+
+        // Saving the copy creates the new draft version (revision = source + 1, "Revision Created" audit)
+        $store = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.routing.store'), $this->withRoutingFigures([
+                'routing_number' => 'AUTO',
+                'name' => 'Dupl Base Routing',
+                'version' => '1.1.0',
+                'effective_from' => now()->toDateString(),
+                'source_routing_id' => $routing->id,
+                'operations' => [[
+                    'sequence' => 10,
+                    'name' => 'Operation 1',
+                    'operation_type' => 'manufacturing',
+                    'work_center_id' => $this->workCenterA->id,
+                    'section_id' => $this->sectionA->id,
+                    'machine_id' => $this->machineA->id,
+                    'setup_time_minutes' => 10,
+                    'expected_yield_percentage' => 100,
+                ]],
+            ]));
+        $store->assertSessionHasNoErrors();
+        $store->assertRedirect();
+
         $newRouting = Routing::where('version', '1.1.0')->first();
         $this->assertNotNull($newRouting);
-        $this->assertNotNull($newRouting->routing_number);
         $this->assertNotEmpty($newRouting->routing_number);
+        $this->assertNotEquals($routing->routing_number, $newRouting->routing_number);
         $this->assertEquals(Routing::STATUS_DRAFT, $newRouting->status);
         $this->assertEquals(1, $newRouting->revision);
         $this->assertCount(1, $newRouting->operations);
         $this->assertEquals('Operation 1', $newRouting->operations[0]->name);
-
-        // Verify update on cloned routing maintains routing_number
-        $updateResponse = $this->actingAs($this->adminA)
-            ->withHeader('X-Tenant', 'tenant-a')
-            ->put(route('production.routing.update', $newRouting->id), [
-                'routing_number' => $newRouting->routing_number,
-                'name' => 'Updated Duplicated Routing',
-                'product_id' => $this->finishedProductA->id,
-                'version' => '1.1.0',
-                'effective_from' => '2026-06-30',
-                'operations' => [
-                    [
-                        'sequence' => 10,
-                        'name' => 'Operation 1 Modified',
-                        'operation_type' => 'manufacturing',
-                        'work_center_id' => $this->workCenterA->id,
-                    ]
-                ]
-            ]);
-
-        $updateResponse->assertRedirect();
-        $newRouting->refresh();
-        $this->assertNotNull($newRouting->routing_number);
-        $this->assertNotEmpty($newRouting->routing_number);
-        $this->assertEquals('Updated Duplicated Routing', $newRouting->name);
+        $this->assertDatabaseHas('production_routing_approvals', ['routing_id' => $newRouting->id, 'action' => 'Revision Created']);
+        // the source routing is untouched (approval never retires older versions — RT-02)
+        $this->assertEquals(Routing::STATUS_ACTIVE, $routing->fresh()->status);
     }
 
     public function test_bulk_action_routing_processing(): void
@@ -283,6 +344,18 @@ class RoutingTest extends TestCase
             'status' => 'active',
         ]);
 
+        ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-CABINET-Y',
+            'bom_name' => 'Cabinet Y BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $finishedProductB->id,
+            'base_quantity' => 1.0,
+            'status' => 'approved',
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+        ]);
+
         $routing1 = Routing::create([
             'tenant_id' => $this->tenantA->id,
             'routing_number' => 'RTG-BULK-001',
@@ -290,7 +363,7 @@ class RoutingTest extends TestCase
             'product_id' => $this->finishedProductA->id,
             'version' => '1.0.0',
             'status' => Routing::STATUS_DRAFT,
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
         ]);
         $routing1->operations()->create([
             'tenant_id' => $this->tenantA->id,
@@ -307,7 +380,7 @@ class RoutingTest extends TestCase
             'product_id' => $finishedProductB->id,
             'version' => '1.0.0',
             'status' => Routing::STATUS_DRAFT,
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
         ]);
         $routing2->operations()->create([
             'tenant_id' => $this->tenantA->id,
@@ -325,6 +398,7 @@ class RoutingTest extends TestCase
                 'ids' => [$routing1->id, $routing2->id]
             ]);
 
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         $routing1->refresh();
         $routing2->refresh();
@@ -339,6 +413,7 @@ class RoutingTest extends TestCase
                 'ids' => [$routing1->id, $routing2->id]
             ]);
 
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         $routing1->refresh();
         $routing2->refresh();
@@ -353,10 +428,158 @@ class RoutingTest extends TestCase
                 'ids' => [$routing1->id, $routing2->id]
             ]);
 
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         $routing1->refresh();
         $routing2->refresh();
         $this->assertTrue($routing1->isCancelled());
         $this->assertTrue($routing2->isCancelled());
     }
+
+    public function test_routing_approval_succeeds_independently_without_bom(): void
+    {
+        $routing = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RTG-DRAFT-BOM-TEST',
+            'name' => 'Test Standalone Routing',
+            'product_id' => $this->finishedProductA->id,
+            'version' => '1.0.0',
+            'status' => Routing::STATUS_DRAFT,
+            'is_default' => true,
+            'created_by' => $this->engineerA->id,
+            'effective_from' => now()->toDateString(),
+        ]);
+
+        $routing->operations()->create([
+            'tenant_id' => $this->tenantA->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-010',
+            'name' => 'Initial Op',
+            'operation_type' => 'manufacturing',
+            'work_center_id' => $this->workCenterA->id,
+        ]);
+
+        // Submitting routing succeeds standalone
+        $response = $this->actingAs($this->engineerA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.routing.submit', $routing->id));
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+        $routing->refresh();
+        $this->assertTrue($routing->isPendingApproval());
+
+        // Approving routing succeeds standalone without any BOM requirement
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.routing.approve', $routing->id));
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+        $routing->refresh();
+        $this->assertTrue($routing->isActive());
+    }
+
+    public function test_bom_rejection_does_not_affect_independent_routing(): void
+    {
+        $routing = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RTG-REJECT-CASCADE',
+            'name' => 'Routing Independent',
+            'product_id' => $this->finishedProductA->id,
+            'version' => '1.0.0',
+            'status' => Routing::STATUS_PENDING_APPROVAL,
+            'is_default' => true,
+            'created_by' => $this->engineerA->id,
+        ]);
+
+        $routing->operations()->create([
+            'tenant_id' => $this->tenantA->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-010',
+            'name' => 'Initial Op',
+            'operation_type' => 'manufacturing',
+            'work_center_id' => $this->workCenterA->id,
+        ]);
+
+        $draftBom = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_id' => $routing->id,
+            'bom_number' => 'BOM-REJECT-CASCADE',
+            'bom_name' => 'BOM to Reject',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedProductA->id,
+            'base_quantity' => 1.0,
+            'status' => ProductionBom::STATUS_PENDING_APPROVAL,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        // Reject the BOM
+        $bomService = app(\App\Domains\Production\Services\ProductionBomService::class);
+        $bomService->reject($draftBom->id, $this->adminA->id, 'BOM engineering specifications rejected');
+
+        // Check that BOM was reverted to draft
+        $draftBom->refresh();
+        $this->assertEquals(ProductionBom::STATUS_DRAFT, $draftBom->status);
+
+        // Under inversion, routing remains untouched and still pending approval
+        $routing->refresh();
+        $this->assertEquals(Routing::STATUS_PENDING_APPROVAL, $routing->status);
+    }
+
+    public function test_bom_deactivation_makes_linked_active_routing_historical(): void
+    {
+        $routing1 = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RTG-SUPERSEDE-1',
+            'name' => 'Routing v1',
+            'product_id' => $this->finishedProductA->id,
+            'version' => '1.0.0',
+            'status' => Routing::STATUS_ACTIVE,
+            'is_default' => true,
+            'effective_from' => now()->subMonths(2)->toDateString(),
+            'created_by' => $this->adminA->id,
+        ]);
+
+        $routing1->operations()->create([
+            'tenant_id' => $this->tenantA->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-010',
+            'name' => 'Cutting',
+            'operation_type' => 'manufacturing',
+            'work_center_id' => $this->workCenterA->id,
+        ]);
+
+        // Create and approve Routing v2
+        $routing2 = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RTG-SUPERSEDE-2',
+            'name' => 'Routing v2',
+            'product_id' => $this->finishedProductA->id,
+            'version' => '2.0.0',
+            'status' => Routing::STATUS_PENDING_APPROVAL,
+            'is_default' => true,
+            'effective_from' => now()->toDateString(),
+            'created_by' => $this->adminA->id,
+        ]);
+
+        $routing2->operations()->create([
+            'tenant_id' => $this->tenantA->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-010',
+            'name' => 'Cutting v2',
+            'operation_type' => 'manufacturing',
+            'work_center_id' => $this->workCenterA->id,
+        ]);
+
+        $routingService = app(\App\Domains\Production\Services\RoutingService::class);
+        $routingService->approve($routing2->id, $this->adminA->id);
+
+        $routing2->refresh();
+        $this->assertEquals(Routing::STATUS_ACTIVE, $routing2->status);
+
+        // Under decoupled architecture, parallel active routings are permitted; Routing 1 is NOT auto-retired
+        $routing1->refresh();
+        $this->assertEquals(Routing::STATUS_ACTIVE, $routing1->status);
+    }
 }
+

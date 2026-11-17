@@ -150,8 +150,14 @@
         </tbody>
     </x-ui.odoo-form-ui>
 
-    <div class="mt-4">
-        {{ $timeLogs->links() }}
+    <div class="mt-3">
+        <x-ui.pagination
+            :paginator="$timeLogs"
+            :currentPage="$timeLogs->currentPage()"
+            :totalPages="$timeLogs->lastPage()"
+            :totalResults="$timeLogs->total()"
+            :perPage="$timeLogs->perPage()"
+        />
     </div>
 </div>
 @endsection

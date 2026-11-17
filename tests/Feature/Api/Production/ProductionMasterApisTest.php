@@ -166,9 +166,23 @@ class ProductionMasterApisTest extends TestCase
 
     public function test_bom_import_succeeds_with_valid_csv(): void
     {
+        $routing = Routing::create([
+            'tenant_id'      => $this->tenant->id,
+            'routing_number' => 'RT-BOM-IMP-01',
+            'name'           => 'BOM Import Test Routing',
+            'status'         => Routing::STATUS_ACTIVE,
+        ]);
+        RoutingOperation::create([
+            'tenant_id'        => $this->tenant->id,
+            'routing_id'       => $routing->id,
+            'sequence'         => 10,
+            'operation_number' => 'OP-10',
+            'name'             => 'Assembly',
+        ]);
+
         $csvContent = implode("\n", [
-            'bom_number,bom_name,product_code,base_quantity,base_uom_code,version,bom_type,usage_context,effective_date,expiry_date,component_code,item_quantity,item_uom_code,material_scrap_percentage,child_bom_number',
-            "BOM-IMP-01,Imported BOM,{$this->finishedGood->sku},1,{$this->uom->code},1.0.0,manufacturing,manufacturing," . now()->toDateString() . ",,{$this->rawMaterial->sku},2,{$this->uom->code},0,",
+            'bom_number,bom_name,product_code,routing_number,base_quantity,base_uom_code,version,bom_type,usage_context,effective_date,expiry_date,component_code,operation_sequence,item_quantity,item_uom_code,material_scrap_percentage,child_bom_number',
+            "BOM-IMP-01,Imported BOM,{$this->finishedGood->sku},RT-BOM-IMP-01,1,{$this->uom->code},1.0.0,manufacturing,manufacturing," . now()->toDateString() . ",,{$this->rawMaterial->sku},10,2,{$this->uom->code},0,",
         ]);
 
         $file = UploadedFile::fake()->createWithContent('boms.csv', $csvContent);

@@ -15,7 +15,9 @@ class ProductionEcoService
 {
     public function __construct(
         private readonly ProductionEcoNumberService $numberService,
-        private readonly ProductionEcoImpactAnalysisService $impactAnalysisService
+        private readonly ProductionEcoImpactAnalysisService $impactAnalysisService,
+        private readonly BomLifecycleService $bomLifecycleService,
+        private readonly RoutingLifecycleService $routingLifecycleService
     ) {
     }
 
@@ -195,49 +197,33 @@ class ProductionEcoService
         return DB::transaction(function () use ($eco, $userId, $effectiveDate) {
             // 1. Release BOM revision if applicable
             if (in_array($eco->change_type, [ProductionEco::CHANGE_TYPE_BOM, ProductionEco::CHANGE_TYPE_BOM_AND_ROUTING], true)) {
-                if ($eco->current_bom_id) {
-                    $currentBom = ProductionBom::find($eco->current_bom_id);
-                    if ($currentBom) {
-                        $currentBom->update([
-                            'status' => 'inactive',
-                            'expiry_date' => $effectiveDate,
-                        ]);
-                    }
-                }
+                $currentBom = $eco->current_bom_id ? ProductionBom::find($eco->current_bom_id) : null;
+                $proposedBom = $eco->proposed_bom_id ? ProductionBom::find($eco->proposed_bom_id) : null;
 
-                if ($eco->proposed_bom_id) {
-                    $proposedBom = ProductionBom::find($eco->proposed_bom_id);
-                    if ($proposedBom) {
-                        $proposedBom->update([
-                            'status' => 'approved',
-                            'revision' => $eco->proposed_bom_revision,
-                            'effective_date' => $effectiveDate,
-                        ]);
-                    }
+                if ($proposedBom) {
+                    $this->bomLifecycleService->transitionOnEcoRelease(
+                        $proposedBom,
+                        $currentBom,
+                        $effectiveDate,
+                        $userId,
+                        $eco->proposed_bom_revision
+                    );
                 }
             }
 
             // 2. Release Routing revision if applicable
             if (in_array($eco->change_type, [ProductionEco::CHANGE_TYPE_ROUTING, ProductionEco::CHANGE_TYPE_BOM_AND_ROUTING], true)) {
-                if ($eco->current_routing_id) {
-                    $currentRouting = Routing::find($eco->current_routing_id);
-                    if ($currentRouting) {
-                        $currentRouting->update([
-                            'status' => Routing::STATUS_HISTORICAL,
-                            'effective_to' => $effectiveDate,
-                        ]);
-                    }
-                }
+                $currentRouting = $eco->current_routing_id ? Routing::find($eco->current_routing_id) : null;
+                $proposedRouting = $eco->proposed_routing_id ? Routing::find($eco->proposed_routing_id) : null;
 
-                if ($eco->proposed_routing_id) {
-                    $proposedRouting = Routing::find($eco->proposed_routing_id);
-                    if ($proposedRouting) {
-                        $proposedRouting->update([
-                            'status' => Routing::STATUS_ACTIVE,
-                            'revision' => $eco->proposed_routing_revision,
-                            'effective_from' => $effectiveDate,
-                        ]);
-                    }
+                if ($proposedRouting) {
+                    $this->routingLifecycleService->transitionOnEcoRelease(
+                        $proposedRouting,
+                        $currentRouting,
+                        $effectiveDate,
+                        $userId,
+                        $eco->proposed_routing_revision
+                    );
                 }
             }
 

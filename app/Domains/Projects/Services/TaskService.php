@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Platform\Services\NotificationRuleService;
 use App\Domains\Projects\Events\TaskAssigned;
 use App\Domains\Projects\Events\TaskCompleted;
 use App\Domains\Projects\Models\Project;
@@ -81,7 +82,7 @@ class TaskService
             $data['tenant_id'] = $project->tenant_id;
             $data['company_id'] = $data['company_id'] ?? $project->company_id;
             $data['branch_id'] = $data['branch_id'] ?? $project->branch_id;
-            $data['milestone_id'] = $data['milestone_id'] ?? $taskList->milestone_id;
+            $data['milestone_id'] = $taskList->milestone_id ?? $data['milestone_id'] ?? null;
             $data['task_code'] = $this->getNextTaskCode($project);
             $data['position'] = $this->nextPosition($taskList);
             $data['status'] = $data['status'] ?? Task::STATUS_OPEN;
@@ -105,6 +106,20 @@ class TaskService
                 $actor = auth()->user() ?? $project->manager ?? $project->owner ?? User::first();
                 if ($actor) {
                     event(new TaskAssigned($task, $actor));
+
+                    try {
+                        NotificationRuleService::trigger('projects.task.assigned', [
+                            'tenant_id'        => $project->tenant_id,
+                            'task_code'        => $task->task_code,
+                            'title'            => $task->title,
+                            'project'          => $project->name,
+                            'actor'            => $actor->name,
+                            'assigned_user_id' => $assigneeId,
+                            'exclude_user_ids' => [$actor->id],
+                        ], $project, $task);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('projects.task.assigned notification failed: ' . $e->getMessage());
+                    }
                 }
             }
 
@@ -152,6 +167,19 @@ class TaskService
                 $actor = auth()->user() ?? $project?->manager ?? User::first();
                 if ($actor) {
                     event(new TaskCompleted($task, $actor));
+
+                    try {
+                        NotificationRuleService::trigger('projects.task.completed', [
+                            'tenant_id'        => $project?->tenant_id ?? $task->tenant_id,
+                            'task_code'        => $task->task_code,
+                            'title'            => $task->title,
+                            'project'          => $project?->name ?? 'Project',
+                            'actor'            => $actor->name,
+                            'exclude_user_ids' => [$actor->id],
+                        ], $project, $task);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('projects.task.completed notification failed: ' . $e->getMessage());
+                    }
                 }
             }
 
@@ -184,6 +212,20 @@ class TaskService
                 $actor = auth()->user() ?? $task->project?->manager ?? User::first();
                 if ($actor) {
                     event(new TaskAssigned($task, $actor, $previousAssigneeId));
+
+                    try {
+                        NotificationRuleService::trigger('projects.task.assigned', [
+                            'tenant_id'        => $task->project?->tenant_id ?? $task->tenant_id,
+                            'task_code'        => $task->task_code,
+                            'title'            => $task->title,
+                            'project'          => $task->project?->name ?? 'Project',
+                            'actor'            => $actor->name,
+                            'assigned_user_id' => (int) $value,
+                            'exclude_user_ids' => [$actor->id],
+                        ], $task->project, $task);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('projects.task.assigned notification failed: ' . $e->getMessage());
+                    }
                 }
             }
 
@@ -276,6 +318,19 @@ class TaskService
                 $actor = auth()->user() ?? $updatedTask->project?->manager ?? User::first();
                 if ($actor) {
                     event(new TaskCompleted($updatedTask, $actor));
+
+                    try {
+                        NotificationRuleService::trigger('projects.task.completed', [
+                            'tenant_id'        => $updatedTask->project?->tenant_id ?? $updatedTask->tenant_id,
+                            'task_code'        => $updatedTask->task_code,
+                            'title'            => $updatedTask->title,
+                            'project'          => $updatedTask->project?->name ?? 'Project',
+                            'actor'            => $actor->name,
+                            'exclude_user_ids' => [$actor->id],
+                        ], $updatedTask->project, $updatedTask);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('projects.task.completed notification failed: ' . $e->getMessage());
+                    }
                 }
             }
 
@@ -305,6 +360,20 @@ class TaskService
                 $actor = auth()->user() ?? $task->project?->manager ?? User::first();
                 if ($actor) {
                     event(new TaskAssigned($task, $actor, $previousAssigneeId));
+
+                    try {
+                        NotificationRuleService::trigger('projects.task.assigned', [
+                            'tenant_id'        => $task->project?->tenant_id ?? $task->tenant_id,
+                            'task_code'        => $task->task_code,
+                            'title'            => $task->title,
+                            'project'          => $task->project?->name ?? 'Project',
+                            'actor'            => $actor->name,
+                            'assigned_user_id' => (int) $newAssigneeId,
+                            'exclude_user_ids' => [$actor->id],
+                        ], $task->project, $task);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('projects.task.assigned notification failed: ' . $e->getMessage());
+                    }
                 }
             }
 
@@ -314,6 +383,12 @@ class TaskService
 
     public function delete(Task $task): bool
     {
+        if ($task->is_invoiced) {
+            throw ValidationException::withMessages([
+                'task' => 'Cannot delete a task that has already been invoiced.',
+            ]);
+        }
+
         return DB::transaction(function () use ($task) {
             $milestoneId = $task->milestone_id;
 

@@ -45,28 +45,6 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
                         
-                        @php
-                            $parentList = [];
-                            foreach ($parentOptions as $po) {
-                                $parentList[$po->id] = "{$po->name} ({$po->code})";
-                            }
-                        @endphp
-                        <x-ui.odoo-form-ui type="select" :label="__('production.parent_work_center')" name="parent_id">
-                            <option value="">{{ __('production.none_top_level') }}</option>
-                            @foreach($parentList as $id => $label)
-                                <option value="{{ $id }}" @selected(old('parent_id') == $id)>{{ $label }}</option>
-                            @endforeach
-                        </x-ui.odoo-form-ui>
-                        
-                        <x-ui.odoo-form-ui type="select" :label="__('production.hierarchy_type')" name="type" :required="true">
-                            <option value="department" @selected(old('type') === 'department')>{{ __('production.wc_type_department') }}</option>
-                            <option value="section" @selected(old('type') === 'section')>{{ __('production.wc_type_section') }}</option>
-                            <option value="work_center" @selected(old('type', 'work_center') === 'work_center')>{{ __('production.wc_type_work_center') }}</option>
-                            <option value="machine_group" @selected(old('type') === 'machine_group')>{{ __('production.wc_type_machine_group') }}</option>
-                        </x-ui.odoo-form-ui>
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.department_name')" name="department_name" placeholder="{{ __('production.dept_name_placeholder') }}" :value="old('department_name')" />
-                        
                         <x-ui.odoo-form-ui type="input" :label="__('production.physical_location')" name="location" placeholder="{{ __('production.location_placeholder') }}" :value="old('location')" />
                         
                         <x-ui.odoo-form-ui type="select" :label="__('production.status')" name="status" :required="true">
@@ -77,26 +55,24 @@
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('production.capacity_per_hour')" name="capacity_per_hour" inputType="number" placeholder="{{ __('production.capacity_placeholder') }}" :value="old('capacity_per_hour')" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.overhead_cost') . ' (' . active_currency_symbol() . ' / day)'" :helperText="__('production.overhead_cost_help')" name="overhead_cost" inputType="number" step="any" placeholder="0" :value="old('overhead_cost', '0.00')" />
                         
-                        <x-ui.odoo-form-ui type="input" :label="__('production.efficiency')" name="efficiency_percentage" inputType="number" placeholder="{{ __('production.efficiency_placeholder') }}" :value="old('efficiency_percentage', '100.00')" :required="true" />
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.cost_per_hour') . ' (' . active_currency_symbol() . ')'" name="cost_per_hour" inputType="number" step="0.01" placeholder="{{ __('production.cost_placeholder') }}" :value="old('cost_per_hour', '0.00')" :required="true" />
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.overhead_cost_rate') . ' (' . active_currency_symbol() . ')'" name="overhead_rate" inputType="number" step="0.01" placeholder="0.00" :value="old('overhead_rate', '0.00')" />
-                        
-                        <x-ui.odoo-form-ui type="select" :label="__('production.active_shifts')" name="shifts[]" :multiple="true" :searchable="true">
-                            @foreach($shifts as $shift)
-                                <option value="{{ $shift->id }}" @selected(in_array($shift->id, old('shifts', [])))>
-                                    {{ $shift->name }} ({{ substr($shift->start_time, 0, 5) }} - {{ substr($shift->end_time, 0, 5) }})
-                                </option>
-                            @endforeach
-                        </x-ui.odoo-form-ui>
-                        
+                        <x-ui.odoo-form-ui type="input" :label="__('production.calculation_countdown_minutes')" name="calculation_countdown_minutes" inputType="number" min="1" max="1440" step="1" placeholder="10" :value="old('calculation_countdown_minutes', 10)" :required="true" />
+
+                        @php
+                            $defaultCalendar = $calendars->firstWhere('is_default', true) ?? $calendars->first();
+                            $selectedCalendarId = old('production_calendar_id', $defaultCalendar?->id);
+                        @endphp
                         <x-ui.odoo-form-ui type="select" label="Production Calendar" name="production_calendar_id">
-                            <option value="">-- Default Factory Calendar --</option>
-                            @foreach($calendars as $cal)
-                                <option value="{{ $cal->id }}" @selected(old('production_calendar_id') == $cal->id)>
+                            @if($defaultCalendar)
+                                <option value="{{ $defaultCalendar->id }}" @selected($selectedCalendarId == $defaultCalendar->id)>
+                                    -- Default Factory Calendar ({{ $defaultCalendar->name }}) --
+                                </option>
+                            @else
+                                <option value="">-- Default Factory Calendar --</option>
+                            @endif
+                            @foreach($calendars->where('id', '!=', $defaultCalendar?->id) as $cal)
+                                <option value="{{ $cal->id }}" @selected($selectedCalendarId == $cal->id)>
                                     {{ $cal->name }}{{ $cal->is_default ? ' (Default)' : '' }}
                                 </option>
                             @endforeach

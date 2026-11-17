@@ -9,6 +9,7 @@ use App\Domains\Purchase\Models\GoodsReceiptNote;
 use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Purchase\Models\PurchaseOrderItem;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\SerialNumber;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Accounting\Services\JournalService;
@@ -85,6 +86,7 @@ class GoodsReceiptNoteController extends Controller
         $this->authorize('create', GoodsReceiptNote::class);
 
         $tenantId = require_tenant_id();
+        $companyId = company_id() ?? current_company_id();
 
         $approvedOrders = PurchaseOrder::where('tenant_id', $tenantId)
             ->whereIn(DB::raw('LOWER(status)'), ['approved', 'partially received', 'partially_received'])
@@ -101,16 +103,52 @@ class GoodsReceiptNoteController extends Controller
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $vendors = Vendor::where('tenant_id', $tenantId)->get();
         $products = Product::where('tenant_id', $tenantId)->with('uom')->sellable()->orderBy('name')->get();
-        $productsPayload = $products->map(function($p) {
+
+        $serialTrackedIds = $products->where('track_serial_number', true)->pluck('id')->toArray();
+        $existingSerialsByProduct = [];
+        if (!empty($serialTrackedIds)) {
+            $allExistingSerials = SerialNumber::where('tenant_id', $tenantId)
+                ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+                ->whereIn('product_id', $serialTrackedIds)
+                ->get(['product_id', 'serial_number']);
+            foreach ($allExistingSerials as $sn) {
+                $existingSerialsByProduct[$sn->product_id][] = $sn->serial_number;
+            }
+        }
+
+        $productsPayload = $products->map(function($p) use ($existingSerialsByProduct) {
+            $code = $p->sku ?? $p->code ?? '';
+            $prefix = ($code ? preg_replace('/[^a-zA-Z0-9]/', '', $code) : 'SN') . '-';
+            $nextStart = 1001;
+
+            if ($p->track_serial_number && isset($existingSerialsByProduct[$p->id])) {
+                $maxNum = 0;
+                foreach ($existingSerialsByProduct[$p->id] as $sn) {
+                    if (str_starts_with($sn, $prefix)) {
+                        $rest = substr($sn, strlen($prefix));
+                        if (preg_match('/^([0-9]+)$/', $rest, $m)) {
+                            $val = (int)$m[1];
+                            if ($val > $maxNum) $maxNum = $val;
+                        }
+                    } else if (preg_match('/(?:^|[^0-9])([0-9]+)$/', $sn, $m)) {
+                        $val = (int)$m[1];
+                        if ($val > $maxNum) $maxNum = $val;
+                    }
+                }
+                $nextStart = $maxNum > 0 ? $maxNum + 1 : 1001;
+            }
+
             return [
                 'id' => $p->id,
                 'name' => $p->name,
-                'code' => $p->sku ?? $p->code ?? '',
+                'code' => $code,
                 'hsn_sac' => $p->hsn_sac ?? $p->hsn_code ?? '',
                 'uom_name' => $p->uom?->name ?? 'Pcs',
                 'cost_price' => round(convert_from_base((float)($p->cost_price ?? $p->unit_cost ?? 0.00)), 4),
                 'track_serial_number' => (bool)$p->track_serial_number,
                 'track_batch' => (bool)$p->track_batch,
+                'next_serial_start' => $nextStart,
+                'existing_serials' => $existingSerialsByProduct[$p->id] ?? [],
             ];
         });
 
@@ -173,6 +211,34 @@ class GoodsReceiptNoteController extends Controller
             $totalItemDisc = ($order->discount_type === 'order_wise') ? $orderDiscShare : $itemDiscount;
             $netUnitRate = ($orderedQty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $orderedQty, 4) : $grossPrice;
 
+            $isSerial = (bool)($first->product?->track_serial_number ?? false);
+            $nextStart = 1001;
+            $existingSerials = [];
+            if ($isSerial) {
+                $code = $first->product?->sku ?? $first->product?->code ?? '';
+                $prefix = ($code ? preg_replace('/[^a-zA-Z0-9]/', '', $code) : 'SN') . '-';
+                $companyId = $order->company_id ?? company_id() ?? current_company_id();
+                $existingSerials = SerialNumber::where('tenant_id', $order->tenant_id)
+                    ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+                    ->where('product_id', $first->product_id)
+                    ->pluck('serial_number')
+                    ->toArray();
+                $maxNum = 0;
+                foreach ($existingSerials as $sn) {
+                    if (str_starts_with($sn, $prefix)) {
+                        $rest = substr($sn, strlen($prefix));
+                        if (preg_match('/^([0-9]+)$/', $rest, $m)) {
+                            $val = (int)$m[1];
+                            if ($val > $maxNum) $maxNum = $val;
+                        }
+                    } else if (preg_match('/(?:^|[^0-9])([0-9]+)$/', $sn, $m)) {
+                        $val = (int)$m[1];
+                        if ($val > $maxNum) $maxNum = $val;
+                    }
+                }
+                $nextStart = $maxNum > 0 ? $maxNum + 1 : 1001;
+            }
+
             return [
                 'purchase_order_item_id' => $first->id,
                 'product_id' => $first->product_id,
@@ -185,8 +251,10 @@ class GoodsReceiptNoteController extends Controller
                 'previous_received_qty' => $prevReceived,
                 'remaining_qty' => $remainingQty,
                 'unit_rate' => round(convert_from_base($netUnitRate), 4),
-                'track_serial_number' => (bool)($first->product?->track_serial_number ?? false),
+                'track_serial_number' => $isSerial,
                 'track_batch' => (bool)($first->product?->track_batch ?? false),
+                'next_serial_start' => $nextStart,
+                'existing_serials' => $existingSerials,
             ];
         })->values();
 
@@ -199,6 +267,85 @@ class GoodsReceiptNoteController extends Controller
             'warehouse_id' => $order->warehouse?->id ?? null,
             'warehouse_name' => $order->location ?? $order->warehouse?->name ?? 'Main Warehouse',
             'items' => $items,
+        ]);
+    }
+
+    /**
+     * Calculate the next non-colliding serial number sequence for a given product and prefix.
+     */
+    public function getNextSerialSequence(Request $request)
+    {
+        $tenantId = require_tenant_id();
+        $companyId = company_id() ?? current_company_id();
+        $productId = $request->input('product_id');
+        $prefix = (string)$request->input('prefix', '');
+
+        $serials = SerialNumber::where('tenant_id', $tenantId)
+            ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->where('product_id', $productId)
+            ->pluck('serial_number');
+
+        $maxNum = 0;
+        foreach ($serials as $sn) {
+            if (!empty($prefix) && str_starts_with($sn, $prefix)) {
+                $rest = substr($sn, strlen($prefix));
+                if (preg_match('/^([0-9]+)$/', $rest, $m)) {
+                    $val = (int)$m[1];
+                    if ($val > $maxNum) $maxNum = $val;
+                }
+            } else if (preg_match('/(?:^|[^0-9])([0-9]+)$/', $sn, $m)) {
+                $val = (int)$m[1];
+                if ($val > $maxNum) $maxNum = $val;
+            }
+        }
+
+        $nextNumber = $maxNum > 0 ? $maxNum + 1 : 1001;
+
+        return response()->json([
+            'success' => true,
+            'prefix' => $prefix,
+            'next_number' => $nextNumber,
+            'existing_count' => $serials->count(),
+            'existing_serials' => $serials->values()->toArray(),
+        ]);
+    }
+
+    /**
+     * Validate a list of serial numbers against internal list duplicates and database duplicates.
+     */
+    public function validateSerials(Request $request)
+    {
+        $tenantId = require_tenant_id();
+        $companyId = company_id() ?? current_company_id();
+        $productId = $request->input('product_id');
+        $serials = $request->input('serials', []);
+
+        if (is_string($serials)) {
+            $serials = array_filter(array_map('trim', preg_split('/[\r\n,;]+/', $serials)));
+        }
+
+        $serials = array_values(array_filter((array)$serials));
+
+        // Check internal duplicates within input
+        $counts = array_count_values($serials);
+        $internalDuplicates = array_keys(array_filter($counts, fn($c) => $c > 1));
+
+        // Check against database for this tenant & company
+        $dbDuplicates = SerialNumber::where('tenant_id', $tenantId)
+            ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->where('product_id', $productId)
+            ->whereIn('serial_number', $serials)
+            ->pluck('serial_number')
+            ->toArray();
+
+        $allDuplicates = array_values(array_unique(array_merge($internalDuplicates, $dbDuplicates)));
+
+        return response()->json([
+            'valid' => empty($allDuplicates),
+            'internal_duplicates' => $internalDuplicates,
+            'db_duplicates' => $dbDuplicates,
+            'all_duplicates' => $allDuplicates,
+            'message' => empty($allDuplicates) ? 'All serial numbers are valid and unique.' : 'Duplicate serial numbers detected: ' . implode(', ', $allDuplicates),
         ]);
     }
 

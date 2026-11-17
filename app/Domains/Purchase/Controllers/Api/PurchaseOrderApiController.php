@@ -35,6 +35,7 @@ class PurchaseOrderApiController extends Controller
      */
     public function meta(): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $vendors    = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'company_name', 'email', 'phone', 'gstin']);
@@ -61,6 +62,7 @@ class PurchaseOrderApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = PurchaseOrder::query()
@@ -124,6 +126,8 @@ class PurchaseOrderApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', PurchaseOrder::class);
+
         $validator = Validator::make($request->all(), [
             'vendor_id'                  => ['required', 'integer'],
             'date'                       => ['required', 'date'],
@@ -262,6 +266,8 @@ class PurchaseOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $order);
+
         $orderData = $order->toArray();
         $orderData['remaining_advance_limit'] = $order->getRemainingAdvanceLimit();
         $orderData['unbilled_advance']        = $order->getUnappliedAdvanceAmount();
@@ -286,6 +292,12 @@ class PurchaseOrderApiController extends Controller
                 'success' => false,
                 'message' => 'Purchase Order not found',
             ], 404);
+        }
+
+        if ($request->input('status') === 'Approved') {
+            $this->authorize('approve', $order);
+        } else {
+            $this->authorize('update', $order);
         }
 
         $validator = Validator::make($request->all(), [
@@ -330,6 +342,9 @@ class PurchaseOrderApiController extends Controller
                 'message' => 'Purchase Order not found',
             ], 404);
         }
+
+        $this->authorize('view', $order);
+        $this->authorize('create', GoodsReceiptNote::class);
 
         $grnNo = 'GRN-' . strtoupper(bin2hex(random_bytes(4)));
 
@@ -407,6 +422,9 @@ class PurchaseOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $order);
+        $this->authorize('create', VendorBill::class);
+
         $billNo = 'BILL-' . strtoupper(bin2hex(random_bytes(4)));
 
         $bill = DB::transaction(function () use ($order, $billNo, $tenantId, $companyId, $branchId, $request) {
@@ -472,6 +490,8 @@ class PurchaseOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $order);
+
         $order->delete();
 
         return response()->json([
@@ -494,6 +514,8 @@ class PurchaseOrderApiController extends Controller
                 'message' => 'Purchase Order not found in trash',
             ], 404);
         }
+
+        $this->authorize('delete', $order);
 
         $order->restore();
 
@@ -518,6 +540,8 @@ class PurchaseOrderApiController extends Controller
                 'message' => 'Purchase Order not found',
             ], 404);
         }
+
+        $this->authorize('approve', $order);
 
         if ($order->status !== 'Draft') {
             return response()->json([
@@ -553,6 +577,8 @@ class PurchaseOrderApiController extends Controller
                 'message' => 'Purchase Order not found',
             ], 404);
         }
+
+        $this->authorize('approve', $order);
 
         if ($order->status !== 'Draft') {
             return response()->json([
@@ -596,6 +622,8 @@ class PurchaseOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $order);
+
         if ($order->status !== 'Draft') {
             return response()->json([
                 'success' => false,
@@ -626,6 +654,7 @@ class PurchaseOrderApiController extends Controller
      */
     public function poApprovals(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = PurchaseOrder::where('tenant_id', $tenantId)
@@ -652,6 +681,7 @@ class PurchaseOrderApiController extends Controller
      */
     public function getRequisitionItems(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseOrder::class);
         [$tenantId]    = $this->resolveTenantContext();
         $requisitionId = (int)$request->query('requisition_id');
         $requisition   = \App\Domains\Purchase\Models\PurchaseRequisition::where('tenant_id', $tenantId)
@@ -684,6 +714,7 @@ class PurchaseOrderApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', PurchaseOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         return \Maatwebsite\Excel\Facades\Excel::download(
@@ -703,6 +734,8 @@ class PurchaseOrderApiController extends Controller
         if (!$order) {
             return response()->json(['success' => false, 'message' => 'Purchase Order not found'], 404);
         }
+
+        $this->authorize('view', $order);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.purchase.orders.pdf', compact('order'));
         return $pdf->download("PurchaseOrder_{$order->purchase_order_number}.pdf");

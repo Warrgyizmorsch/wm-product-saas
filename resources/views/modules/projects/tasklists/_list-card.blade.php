@@ -121,7 +121,7 @@
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="confirmAction(@js(__('projects.confirm_remove_tasklist')), function () { document.getElementById('taskListDeleteForm{{ $taskList->id }}').submit(); })">
+                        <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="if (confirm(@js(__('projects.confirm_remove_tasklist')))) { document.getElementById('taskListDeleteForm{{ $taskList->id }}').submit(); }">
                             <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
                         </a>
                     </li>

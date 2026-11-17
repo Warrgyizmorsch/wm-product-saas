@@ -12,6 +12,7 @@
         'startDate' => optional($task->start_date)->format('Y-m-d'),
         'dueDate' => optional($task->due_date)->format('Y-m-d'),
         'estimatedHours' => $task->estimated_hours,
+        'billingAmount' => (float) ($task->billing_amount ?? 0),
     ];
 @endphp
 
@@ -39,12 +40,14 @@
                         <i class="feather-copy me-2"></i>{{ __('projects.clone') }}
                     </a>
                 </li>
-                <li>
-                    <a class="dropdown-item text-danger" href="javascript:void(0);"
-                       onclick="confirmAction(@js(__('projects.confirm_remove_task')), function () { document.getElementById('taskWorkspaceDeleteForm').submit(); })">
-                        <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
-                    </a>
-                </li>
+                @if (!$task->is_invoiced)
+                    <li>
+                        <a class="dropdown-item text-danger" href="javascript:void(0);"
+                           onclick="if (confirm(@js(__('projects.confirm_remove_task')))) { document.getElementById('taskWorkspaceDeleteForm').submit(); }">
+                            <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
+                        </a>
+                    </li>
+                @endif
             </x-ui.action-dropdown>
             <form id="taskWorkspaceDeleteForm" method="POST" action="{{ route('projects.tasks.destroy', [$project, $task]) }}" class="d-none">
                 @csrf

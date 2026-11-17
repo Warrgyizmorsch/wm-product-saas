@@ -186,6 +186,125 @@ class PurchaseOrderController extends Controller
             ->orderBy('code')
             ->get();
 
+        // RFQ Prefill Handling
+        $selectedRfqId = $request->input('rfq_id');
+        $selectedVendorId = $request->input('vendor_id');
+        $prefilledReference = null;
+        $prefilledSupplierQuoteNo = null;
+        $prefilledNotes = null;
+
+        if ($selectedRfqId) {
+            $rfq = \App\Domains\Purchase\Models\PurchaseRfq::where('tenant_id', $tenantId)
+                ->with(['items.product', 'rfqVendors.rates'])
+                ->find($selectedRfqId);
+
+            if ($rfq) {
+                if (!$selectedRequisitionId && $rfq->purchase_requisition_id) {
+                    $selectedRequisitionId = $rfq->purchase_requisition_id;
+                }
+
+                $prefilledReference = $rfq->rfq_number;
+
+                $rfqVendor = null;
+                if ($selectedVendorId) {
+                    $rfqVendor = $rfq->rfqVendors->firstWhere('vendor_id', (int) $selectedVendorId);
+                } elseif ($rfq->rfqVendors->isNotEmpty()) {
+                    $rfqVendor = $rfq->rfqVendors->first();
+                    $selectedVendorId = $rfqVendor->vendor_id;
+                }
+
+                if ($rfqVendor) {
+                    $prefilledSupplierQuoteNo = $rfqVendor->quotation_number;
+                    $prefilledNotes = $rfqVendor->terms_conditions;
+                    if (!$prefilledExpectedDate && $rfqVendor->delivery_date) {
+                        $prefilledExpectedDate = $rfqVendor->delivery_date->format('Y-m-d');
+                    } elseif (!$prefilledExpectedDate && $rfqVendor->rates->whereNotNull('delivery_date')->first()) {
+                        $prefilledExpectedDate = \Carbon\Carbon::parse($rfqVendor->rates->whereNotNull('delivery_date')->first()->delivery_date)->format('Y-m-d');
+                    }
+                }
+
+                // If items were passed from request (e.g. checked items from matrix)
+                $requestItems = (array) $request->input('items', []);
+                if (!empty($requestItems)) {
+                    $prefilledItems = [];
+                    foreach ($requestItems as $reqItem) {
+                        $pId = (int) ($reqItem['product_id'] ?? 0);
+                        if (!$pId) continue;
+                        $product = $products->firstWhere('id', $pId);
+                        $qty = (float) ($reqItem['quantity'] ?? 1);
+                        $rate = (float) ($reqItem['rate'] ?? 0);
+                        if ($rate <= 0 && $rfqVendor) {
+                            $vRate = $rfqVendor->rates->firstWhere('product_id', $pId);
+                            if ($vRate && $vRate->rate > 0) {
+                                $rate = convert_from_base((float) $vRate->rate);
+                            }
+                        }
+                        if ($rate <= 0 && $product) {
+                            $rate = convert_from_base((float) ($product->cost_price ?: ($product->unit_cost ?: 0)));
+                        }
+
+                        $prefilledItems[] = [
+                            'product_id' => $pId,
+                            'product_name' => $product?->name ?? 'Product #' . $pId,
+                            'quantity' => $qty,
+                            'rate' => $rate,
+                            'warehouse_id' => $rfq->items->firstWhere('product_id', $pId)?->warehouse_id ?? null,
+                            'line_type' => 'stock',
+                        ];
+                    }
+                } else {
+                    $prefilledItems = [];
+                    $linkedPos = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+                        ->where('source_type', 'rfq')
+                        ->where(function ($q) use ($rfq) {
+                            $q->where('reference', $rfq->rfq_number)
+                              ->orWhere('reference', 'RFQ: ' . $rfq->rfq_number);
+                        })
+                        ->where('status', '!=', 'Cancelled')
+                        ->with('items')
+                        ->get();
+
+                    foreach ($rfq->items as $rfqItem) {
+                        $pId = $rfqItem->product_id;
+                        $alreadyOrderedQty = 0;
+                        foreach ($linkedPos as $lpo) {
+                            foreach ($lpo->items as $lpoItem) {
+                                if ($lpoItem->product_id == $pId) {
+                                    $alreadyOrderedQty += (float) $lpoItem->quantity;
+                                }
+                            }
+                        }
+
+                        $pendingQty = max(0.0, (float) $rfqItem->quantity - $alreadyOrderedQty);
+                        if ($pendingQty <= 0) {
+                            continue;
+                        }
+
+                        $product = $rfqItem->product;
+                        $rate = 0;
+                        if ($rfqVendor) {
+                            $vRate = $rfqVendor->rates->firstWhere('product_id', $pId);
+                            if ($vRate && $vRate->rate > 0) {
+                                $rate = convert_from_base((float) $vRate->rate);
+                            }
+                        }
+                        if ($rate <= 0 && $product) {
+                            $rate = convert_from_base((float) ($product->cost_price ?: ($product->unit_cost ?: 0)));
+                        }
+
+                        $prefilledItems[] = [
+                            'product_id' => $pId,
+                            'product_name' => $product?->name ?? 'Product #' . $pId,
+                            'quantity' => $pendingQty,
+                            'rate' => $rate,
+                            'warehouse_id' => $rfqItem->warehouse_id,
+                            'line_type' => 'stock',
+                        ];
+                    }
+                }
+            }
+        }
+
         return view('modules.purchase.orders.create', compact(
             'vendors',
             'products',
@@ -196,7 +315,12 @@ class PurchaseOrderController extends Controller
             'prefilledItems',
             'prefilledExpectedDate',
             'assetCategories',
-            'expenseAccounts'
+            'expenseAccounts',
+            'selectedRfqId',
+            'selectedVendorId',
+            'prefilledReference',
+            'prefilledSupplierQuoteNo',
+            'prefilledNotes'
         ));
     }
 
@@ -216,6 +340,7 @@ class PurchaseOrderController extends Controller
             'reference' => 'nullable|string',
             'supplier_quotation_number' => 'nullable|string',
             'purchase_requisition_id' => 'nullable|integer',
+            'rfq_id' => 'nullable|integer',
             'payment_terms' => 'nullable|string|max:255',
             'discount_type' => 'nullable|string',
             'tax_type' => 'nullable|string',
@@ -274,6 +399,51 @@ class PurchaseOrderController extends Controller
         }
 
         $po = $this->orderService->storeOrder($validated, $tenantId);
+
+        if ($request->filled('rfq_id')) {
+            $rfq = \App\Domains\Purchase\Models\PurchaseRfq::where('tenant_id', $tenantId)->find($request->input('rfq_id'));
+            if ($rfq) {
+                $poUpdates = ['source_type' => 'rfq'];
+                if (empty($po->reference)) {
+                    $poUpdates['reference'] = $rfq->rfq_number;
+                }
+                if (empty($po->purchase_requisition_id) && $rfq->purchase_requisition_id) {
+                    $poUpdates['purchase_requisition_id'] = $rfq->purchase_requisition_id;
+                }
+                $po->update($poUpdates);
+
+                // Check whether all RFQ items are now ordered across all linked POs
+                $rfq->load('items');
+                $linkedOrders = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+                    ->where('source_type', 'rfq')
+                    ->where(function ($q) use ($rfq) {
+                        $q->where('reference', $rfq->rfq_number)
+                          ->orWhere('reference', 'RFQ: ' . $rfq->rfq_number);
+                    })
+                    ->where('status', '!=', 'Cancelled')
+                    ->with('items')
+                    ->get();
+
+                $allFullyOrdered = $rfq->items->isNotEmpty();
+                foreach ($rfq->items as $rfqItem) {
+                    $itemOrderedQty = 0;
+                    foreach ($linkedOrders as $lo) {
+                        foreach ($lo->items as $loItem) {
+                            if ($loItem->product_id == $rfqItem->product_id) {
+                                $itemOrderedQty += (float) $loItem->quantity;
+                            }
+                        }
+                    }
+                    if ($itemOrderedQty < (float) $rfqItem->quantity) {
+                        $allFullyOrdered = false;
+                        break;
+                    }
+                }
+
+                $newRfqStatus = $allFullyOrdered ? 'Confirmed' : 'Partially Ordered';
+                $rfq->update(['status' => $newRfqStatus]);
+            }
+        }
 
         \App\Domains\Purchase\Services\PurchaseNotificationService::notifyOrderCreated($po);
 

@@ -152,8 +152,10 @@ class CrmDealController extends Controller
             ];
         }
 
-        $allDeals = CrmDeal::with(['account', 'contact', 'quotations', 'lead'])
-            ->where('tenant_id', $tenantId)
+        $dealsQuery = CrmDeal::with(['account', 'contact', 'quotations', 'lead'])
+            ->where('tenant_id', $tenantId);
+
+        $allDeals = $dealsQuery
             ->orderBy('updated_at', 'desc')
             ->get();
 
@@ -312,18 +314,13 @@ class CrmDealController extends Controller
             $activeQuotation = $deal->quotations->first();
         }
 
-        // Fetch linked lead for complete activity roll-up & document history
+        // Fetch linked lead for complete activity roll-up & document history (only if this deal was converted from a lead)
         $linkedLead = null;
         if (!empty($deal->lead_id)) {
             $linkedLead = \App\Domains\CRM\Models\Lead::with(['histories.user', 'leadDocuments', 'owner'])->find($deal->lead_id);
         }
         if (!$linkedLead) {
             $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
-                ->orWhere(function($q) use ($deal) {
-                    if ($deal->crm_account_id) {
-                        $q->where('crm_account_id', $deal->crm_account_id);
-                    }
-                })
                 ->with(['histories.user', 'leadDocuments', 'owner'])
                 ->first();
         }
@@ -590,13 +587,7 @@ class CrmDealController extends Controller
             'documents.*' => 'file|max:10240'
         ]);
 
-        $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
-            ->orWhere(function($q) use ($deal) {
-                if ($deal->crm_account_id) {
-                    $q->where('crm_account_id', $deal->crm_account_id);
-                }
-            })
-            ->first();
+        $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)->first();
 
         if (!$linkedLead) {
             $tenantId = tenant_id() ?? 1;

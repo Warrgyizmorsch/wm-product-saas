@@ -131,6 +131,7 @@
                                                 onclick="openMilestoneDetailsDrawer({
                                                     id: {{ $milestone->id }},
                                                     showUrl: @js(route('projects.milestones.show', [$milestone->project, $milestone])),
+                                                    storeUrl: @js(route('projects.milestones.store', $milestone->project)),
                                                     updateUrl: @js(route('projects.milestones.update', [$milestone->project, $milestone])),
                                                     deleteUrl: @js(route('projects.milestones.destroy', [$milestone->project, $milestone])),
                                                     name: @js($milestone->name),
@@ -165,11 +166,14 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        <x-ui.pagination
-            :currentPage="$milestones->currentPage()"
-            :totalPages="$milestones->lastPage()"
-            :totalResults="$milestones->total()"
-            :perPage="$milestones->perPage()" />
+        <div class="mt-3">
+            <x-ui.pagination
+                :paginator="$milestones"
+                :currentPage="$milestones->currentPage()"
+                :totalPages="$milestones->lastPage()"
+                :totalResults="$milestones->total()"
+                :perPage="$milestones->perPage()" />
+        </div>
     </div>
 
     @include('modules.projects.milestones._modal')

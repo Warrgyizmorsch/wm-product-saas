@@ -27,6 +27,8 @@ class DealStatusApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', DealStatus::class);
+
         $tenantId = $this->resolveTenantId();
 
         $query = DealStatus::query()
@@ -68,6 +70,8 @@ class DealStatusApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', DealStatus::class);
+
         $tenantId = $this->resolveTenantId();
 
         $validator = Validator::make($request->all(), [
@@ -127,6 +131,8 @@ class DealStatusApiController extends Controller
      */
     public function show(DealStatus $dealStatus): JsonResponse
     {
+        $this->authorize('view', $dealStatus);
+
         return response()->json([
             'success' => true,
             'data'    => [
@@ -147,6 +153,8 @@ class DealStatusApiController extends Controller
      */
     public function update(Request $request, DealStatus $dealStatus): JsonResponse
     {
+        $this->authorize('update', $dealStatus);
+
         $tenantId = $this->resolveTenantId();
 
         $validator = Validator::make($request->all(), [
@@ -206,6 +214,8 @@ class DealStatusApiController extends Controller
      */
     public function destroy(DealStatus $dealStatus): JsonResponse
     {
+        $this->authorize('delete', $dealStatus);
+
         $res = $this->service->deleteStatus($dealStatus);
 
         if (!$res['success']) {
@@ -227,6 +237,8 @@ class DealStatusApiController extends Controller
      */
     public function reorder(Request $request): JsonResponse
     {
+        $this->authorize('update', DealStatus::class);
+
         $validated = $request->validate([
             'order'   => 'required|array',
             'order.*' => 'integer',

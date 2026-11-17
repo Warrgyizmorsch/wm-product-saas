@@ -20,6 +20,11 @@ class CustomerExport implements FromCollection, WithHeadings, WithMapping, Shoul
         $query = Customer::where('tenant_id', $this->tenantId)
             ->withCount(['salesOrders', 'invoices']);
 
+        $authUser = auth()->user();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'crm.customers.view', ['tenant_id' => $this->tenantId])) {
+            $query->whereHas('crmAccount', fn($q) => $q->where('owner_id', $authUser->id));
+        }
+
         // 1. Status filter
         if (!empty($this->filters['status'])) {
             $query->where('status', $this->filters['status']);

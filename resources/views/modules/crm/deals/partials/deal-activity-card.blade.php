@@ -66,7 +66,15 @@
     }
 
     // Assigned / Tagged user string
-    $assignedNames = $item->taggedUsers->pluck('name')->join(', ') ?: ($deal->owner?->name ?: 'Unassigned');
+    $currentAuthId = auth()->id();
+    $currentUser = auth()->user();
+    $assigneeUser = $item->assignedTo ?: ($deal->owner ?: ($item->taggedUser ?: ($item->taggedUsers ? $item->taggedUsers->first() : null)));
+    $taggedAttendeesList = $item->tagged_users ?: collect();
+    $isAdminUser = $currentUser && in_array(strtolower(str_replace([' ', '_', '-'], '', (string) ($currentUser->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
+    $canManageActivity = ($assigneeUser && $assigneeUser->id == $currentAuthId)
+        || ($deal->owner_id == $currentAuthId)
+        || $isAdminUser;
+    $assignedNames = $taggedAttendeesList->pluck('name')->join(', ') ?: ($assigneeUser?->name ?: ($deal->owner?->name ?: 'Unassigned'));
 
     // Phone to call
     $phoneToCall = $deal->contact?->phone ?: ($deal->account?->phone ?: ($linkedLead?->phone ?: ''));
@@ -369,6 +377,7 @@
 
             <!-- Direct Action Options (Connected, Not Connected, Reschedule, Cancel, Call) -->
             @if($isPending)
+                @if($canManageActivity)
                 <div class="d-flex align-items-center flex-wrap pt-1.5 fs-12" style="column-gap: 16px; row-gap: 6px;">
                     <!-- Connected -->
                     <a href="javascript:void(0)"
@@ -410,6 +419,23 @@
                         </a>
                     @endif
                 </div>
+                @else
+                <div class="d-flex align-items-center flex-wrap pt-1.5 fs-12">
+                    <span class="badge bg-light text-muted border px-2 py-1 fs-11"
+                        title="Only the primary host can update meeting status">
+                        <i class="feather-eye me-1"></i>View Only
+                    </span>
+                    @if($phoneToCall)
+                        <!-- Call Now Button -->
+                        <a href="javascript:void(0)"
+                            class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 fs-10 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1 hover-opacity btn-crm-deal-click-to-call ms-auto"
+                            data-deal-id="{{ $deal->id }}" data-deal-title="{{ addslashes($deal->title) }}"
+                            data-deal-phone="{{ $phoneToCall }}" title="Click to call softphone">
+                            <i class="feather-phone-call fs-10"></i> <span>{{ __('crm.call') }} {{ $phoneToCall }}</span>
+                        </a>
+                    @endif
+                </div>
+                @endif
 
                 @php
                     $currentTaggedIds = $item->taggedUsers->pluck('id')->toArray();

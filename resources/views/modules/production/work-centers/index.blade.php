@@ -70,13 +70,13 @@
                             <span>Name (Z&ndash;A)</span>
                         </a>
                         <div class="dropdown-divider"></div>
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'cost_per_hour', 'sort_order' => 'asc']) }}"
-                            class="dropdown-item {{ $sortBy === 'cost_per_hour' && $sortOrder === 'asc' ? 'active' : '' }}">
-                            <span>Cost/Hr (Low to High)</span>
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'labor_cost_per_hour', 'sort_order' => 'asc']) }}"
+                            class="dropdown-item {{ $sortBy === 'labor_cost_per_hour' && $sortOrder === 'asc' ? 'active' : '' }}">
+                            <span>Labor Cost/Hr (Low to High)</span>
                         </a>
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'cost_per_hour', 'sort_order' => 'desc']) }}"
-                            class="dropdown-item {{ $sortBy === 'cost_per_hour' && $sortOrder === 'desc' ? 'active' : '' }}">
-                            <span>Cost/Hr (High to Low)</span>
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'labor_cost_per_hour', 'sort_order' => 'desc']) }}"
+                            class="dropdown-item {{ $sortBy === 'labor_cost_per_hour' && $sortOrder === 'desc' ? 'active' : '' }}">
+                            <span>Labor Cost/Hr (High to Low)</span>
                         </a>
                     </x-ui.sort-dropdown>
 
@@ -138,333 +138,137 @@
             </div>
         </div>
 
-        @php
-            $hasFilters = !empty(request('search')) || !empty(request('work_center_type')) || !empty(request('status'));
-        @endphp
-
-        @if(!$hasFilters)
-            @php
-                $allWorkCenters = \App\Domains\Production\Models\WorkCenter::withCount('machines')->get();
-                $orderedWorkCenters = collect();
-                $visitedIds = [];
-
-                $departments = $allWorkCenters->where('type', 'department')->sortBy('name');
-
-                foreach ($departments as $dept) {
-                    $orderedWorkCenters->push([
-                        'node' => $dept,
-                        'level' => 0,
-                        'icon' => 'feather-grid text-primary',
-                    ]);
-                    $visitedIds[] = $dept->id;
-
-                    $sections = $allWorkCenters->where('parent_id', $dept->id)->where('type', 'section')->sortBy('name');
-                    foreach ($sections as $sec) {
-                        $orderedWorkCenters->push([
-                            'node' => $sec,
-                            'level' => 1,
-                            'icon' => 'feather-folder text-warning',
-                        ]);
-                        $visitedIds[] = $sec->id;
-
-                        $wcs = $allWorkCenters->where('parent_id', $sec->id)->sortBy('name');
-                        foreach ($wcs as $wc) {
-                            $orderedWorkCenters->push([
-                                'node' => $wc,
-                                'level' => 2,
-                                'icon' => 'feather-sliders text-secondary',
-                            ]);
-                            $visitedIds[] = $wc->id;
-                        }
-                    }
-
-                    $directWcs = $allWorkCenters->where('parent_id', $dept->id)->where('type', '!=', 'section')->sortBy('name');
-                    foreach ($directWcs as $wc) {
-                        if (!in_array($wc->id, $visitedIds)) {
-                            $orderedWorkCenters->push([
-                                'node' => $wc,
-                                'level' => 1,
-                                'icon' => 'feather-sliders text-secondary',
-                            ]);
-                            $visitedIds[] = $wc->id;
-                        }
-                    }
-                }
-
-                $standalone = $allWorkCenters->reject(function ($wc) use ($visitedIds) {
-                    return in_array($wc->id, $visitedIds);
-                })->sortBy('name');
-
-                foreach ($standalone as $wc) {
-                    $level = 0;
-                    $icon = 'feather-sliders text-secondary';
-                    if ($wc->type === 'section') {
-                        $icon = 'feather-folder text-warning';
-                    } elseif ($wc->type === 'department') {
-                        $icon = 'feather-grid text-primary';
-                    }
-                    $orderedWorkCenters->push([
-                        'node' => $wc,
-                        'level' => $level,
-                        'icon' => $icon,
-                    ]);
-                }
-            @endphp
-
-            <div class="table-responsive">
-                <x-ui.odoo-form-ui type="table">
-                    <thead>
+        <div class="table-responsive">
+            <x-ui.odoo-form-ui type="table">
+                <thead>
+                    <tr>
+                        <th style="width: 3%" class="text-center">
+                            <input type="checkbox" class="form-check-input check-all-work-centers">
+                        </th>
+                        <th style="width: 12%">{{ __('production.work_center_code') }}</th>
+                        <th style="width: 18%">{{ __('production.work_center_name') }}</th>
+                        <th style="width: 10%">{{ __('production.work_center_type') }}</th>
+                        <th style="width: 10%">{{ __('production.physical_location') }}</th>
+                        <th style="width: 11%" class="text-end">{{ __('production.capacity_hr') }}</th>
+                        <th style="width: 13%" class="text-end">{{ __('production.operating_cost_per_hour') }}</th>
+                        <th style="width: 13%" class="text-end">{{ __('production.wc_labor_cost_per_hour') }}</th>
+                        <th style="width: 5%" class="text-center">{{ __('production.machines') }}</th>
+                        <th style="width: 5%">{{ __('production.status') }}</th>
+                        <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($workCenters as $wc)
+                        @php
+                            $snapshot = $wc->latestCalculation;
+                        @endphp
                         <tr>
-                            <th style="width: 3%" class="text-center">
-                                <input type="checkbox" class="form-check-input check-all-work-centers">
-                            </th>
-                            <th style="width: 12%">{{ __('production.work_center_code') }}</th>
-                            <th style="width: 25%">{{ __('production.name_hierarchy') }}</th>
-                            <th style="width: 10%">{{ __('production.work_center_type') }}</th>
-                            <th style="width: 10%">{{ __('production.department_name') }}</th>
-                            <th style="width: 10%">{{ __('production.physical_location') }}</th>
-                            <th style="width: 8%" class="text-end">{{ __('production.capacity_hr') }}</th>
-                            <th style="width: 7%" class="text-end">{{ __('production.efficiency') }}</th>
-                            <th style="width: 7%" class="text-end">{{ __('production.cost_per_hour') }}</th>
-                            <th style="width: 3%" class="text-center">{{ __('production.machines') }}</th>
-                            <th style="width: 5%">{{ __('production.status') }}</th>
-                            <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($orderedWorkCenters as $item)
-                            @php
-                                $wc = $item['node'];
-                                $level = $item['level'];
-                                $icon = $item['icon'];
-                                $padding = $level * 24;
-
-                                $rowClass = '';
-                                $spanClass = '';
-                                if ($wc->type === 'department') {
-                                    $rowClass = 'bg-light-soft fw-bold';
-                                    $spanClass = 'fw-bold text-dark';
-                                } elseif ($wc->type === 'section') {
-                                    $rowClass = 'bg-white';
-                                    $spanClass = 'fw-semibold text-dark';
-                                } else {
-                                    $rowClass = 'table-light-soft text-muted';
-                                    $spanClass = 'fw-normal text-dark';
-                                }
-                            @endphp
-                            <tr class="{{ $rowClass }}">
-                                <td class="text-center">
-                                    <input type="checkbox" class="form-check-input work-center-checkbox" value="{{ $wc->id }}" data-can-delete="{{ auth()->user()->can('delete', $wc) ? 'true' : 'false' }}">
-                                </td>
-                                <td>
-                                    <a href="{{ route('production.work-centers.show', $wc->id) }}"
-                                        class="fw-bold text-primary hover-primary">
-                                        {{ $wc->code }}
-                                    </a>
-                                </td>
-                                <td>
-                                    <div style="padding-left: {{ $padding }}px;" class="d-flex align-items-center">
-                                        @if($level > 0)
-                                            <i class="feather-corner-down-right text-muted me-2" style="font-size: 11px;"></i>
-                                        @endif
-                                        <i class="{{ $icon }} me-2 fs-13"></i>
-                                        <span class="{{ $spanClass }}">{{ $wc->name }}</span>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-soft-primary text-primary text-uppercase fs-9 rounded-pill px-2 py-0.5">
-                                        {{ $workCenterTypes[$wc->work_center_type] ?? $wc->work_center_type ?? 'N/A' }}
-                                    </span>
-                                </td>
-                                <td class="text-muted">{{ $wc->department_name ?? '—' }}</td>
-                                <td class="text-muted">{{ $wc->location ?? '—' }}</td>
-                                <td class="text-end fw-semibold">
-                                    {{ $wc->capacity_per_hour !== null ? number_format($wc->capacity_per_hour, 2) : __('production.unlimited') }}
-                                </td>
-                                <td class="text-end text-muted">{{ number_format($wc->efficiency_percentage, 0) }}%</td>
-                                <td class="text-end fw-semibold text-dark">{{ format_currency($wc->cost_per_hour) }}</td>
-                                <td class="text-center">
-                                    @if($wc->machines_count > 0)
-                                        <a href="{{ route('production.machines.index', ['work_center_id' => $wc->id]) }}"
-                                            class="badge bg-soft-info text-info rounded-pill px-2 py-1 fw-bold">
-                                            {{ $wc->machines_count }}
-                                        </a>
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    @if ($wc->isActive())
-                                        <span class="erp-badge-active">{{ __('production.active') }}</span>
-                                    @else
-                                        <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-0.5 fs-10">{{ __('production.inactive') }}</span>
-                                    @endif
+                            <td class="text-center">
+                                <input type="checkbox" class="form-check-input work-center-checkbox" value="{{ $wc->id }}" data-can-delete="{{ auth()->user()->can('delete', $wc) ? 'true' : 'false' }}">
+                            </td>
+                            <td>
+                                <a href="{{ route('production.work-centers.show', $wc->id) }}"
+                                    class="fw-bold text-primary hover-primary">
+                                    {{ $wc->code }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="fw-semibold text-dark">{{ $wc->name }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-soft-primary text-primary text-uppercase fs-10 rounded-pill px-2 py-1">
+                                    {{ $workCenterTypes[$wc->work_center_type] ?? $wc->work_center_type ?? 'N/A' }}
+                                </span>
+                            </td>
+                            <td class="text-muted">{{ $wc->location ?? '—' }}</td>
+                            @if($snapshot)
+                                <td class="text-end">
+                                    <span class="fw-semibold font-monospace text-dark">{{ number_format((float) ($snapshot->capacity_per_hour ?? 0), 1) }}</span>
+                                    <small class="text-muted fs-10">u/h</small>
                                 </td>
                                 <td class="text-end">
-                                    <x-ui.action-dropdown :viewUrl="route('production.work-centers.show', $wc->id)">
-                                        @can('update', $wc)
-                                            <li>
-                                                <a href="{{ route('production.work-centers.edit', $wc->id) }}" class="dropdown-item">
-                                                    <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('production.edit_work_center') }}
-                                                </a>
-                                            </li>
-                                        @endcan
-                                        @can('delete', $wc)
-                                            <li>
-                                                <hr class="dropdown-divider">
-                                            </li>
-                                            <li>
-                                                <form action="{{ route('production.work-centers.destroy', $wc->id) }}" method="POST"
-                                                    onsubmit="return confirm('{{ __('production.confirm_delete_selected_routings') }}');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete') }}
-                                                    </button>
-                                                </form>
-                                            </li>
-                                        @endcan
-                                    </x-ui.action-dropdown>
+                                    <span class="fw-semibold font-monospace text-dark">{{ format_currency((float) ($snapshot->total_cost_per_hour ?? 0)) }}</span>
+                                    <small class="text-muted fs-10">/hr</small>
                                 </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="12" class="text-center py-4 text-muted">
-                                    <i class="feather-info me-2 fs-16"></i>{{ __('production.no_work_centers_configured') }}
+                                <td class="text-end">
+                                    <span class="fw-semibold font-monospace text-dark">{{ format_currency((float) ($snapshot->labor_cost_per_hour ?? 0)) }}</span>
+                                    <small class="text-muted fs-10">/hr</small>
                                 </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </x-ui.odoo-form-ui>
-            </div>
-        @else
-            {{-- Flat Table Search/Filters Fallback View --}}
-            <div class="table-responsive">
-                <x-ui.odoo-form-ui type="table">
-                    <thead>
-                        <tr>
-                            <th style="width: 3%" class="text-center">
-                                <input type="checkbox" class="form-check-input check-all-work-centers">
-                            </th>
-                            <th style="width: 9%">{{ __('production.work_center_code') }}</th>
-                            <th style="width: 14%">{{ __('production.work_center_name') }}</th>
-                            <th style="width: 16%">{{ __('production.hierarchy_path') }}</th>
-                            <th style="width: 9%">{{ __('production.work_center_type') }}</th>
-                            <th style="width: 11%">{{ __('production.department_name') }}</th>
-                            <th style="width: 9%">{{ __('production.physical_location') }}</th>
-                            <th style="width: 7%" class="text-end">{{ __('production.capacity_hr') }}</th>
-                            <th style="width: 6%" class="text-end">{{ __('production.efficiency') }}</th>
-                            <th style="width: 6%" class="text-end">{{ __('production.cost_per_hour') }}</th>
-                            <th style="width: 5%" class="text-center">{{ __('production.machines') }}</th>
-                            <th style="width: 5%">{{ __('production.status') }}</th>
-                            <th style="width: 6%" class="text-end">{{ __('production.actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($workCenters as $wc)
-                            @php
-                                $rowClass = '';
-                                $spanClass = '';
-                                if ($wc->type === 'department') {
-                                    $rowClass = 'bg-light-soft fw-bold';
-                                    $spanClass = 'fw-bold text-dark';
-                                } elseif ($wc->type === 'section') {
-                                    $rowClass = 'bg-white';
-                                    $spanClass = 'fw-semibold text-dark';
-                                } else {
-                                    $rowClass = 'table-light-soft text-muted';
-                                    $spanClass = 'fw-normal text-dark';
-                                }
-                            @endphp
-                            <tr class="{{ $rowClass }}">
-                                <td class="text-center">
-                                    <input type="checkbox" class="form-check-input work-center-checkbox" value="{{ $wc->id }}" data-can-delete="{{ auth()->user()->can('delete', $wc) ? 'true' : 'false' }}">
-                                </td>
-                                <td>
-                                    <a href="{{ route('production.work-centers.show', $wc->id) }}"
-                                        class="fw-bold text-primary hover-primary">
-                                        {{ $wc->code }}
-                                    </a>
-                                </td>
-                                <td>
-                                    <span class="{{ $spanClass }}">{{ $wc->name }}</span>
-                                </td>
-                                <td class="fs-11 text-muted">
-                                    @if($wc->parent)
-                                        <span>
-                                            {{ $wc->parent->parent ? $wc->parent->parent->name . ' › ' : '' }}{{ $wc->parent->name }}
-                                        </span>
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    <span class="badge bg-soft-primary text-primary text-uppercase fs-10 rounded-pill px-2 py-1">
-                                        {{ $workCenterTypes[$wc->work_center_type] ?? $wc->work_center_type ?? 'N/A' }}
+                            @else
+                                <td class="text-end">
+                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill font-monospace fs-10 px-2 py-0.5" data-bs-toggle="tooltip" data-bs-placement="top" title="Calculation snapshot has not been created yet.">
+                                        <i class="feather-alert-circle me-1"></i>Snapshot not created
                                     </span>
                                 </td>
-                                <td class="text-muted">{{ $wc->department_name ?? '—' }}</td>
-                                <td class="text-muted">{{ $wc->location ?? '—' }}</td>
-                                <td class="text-end fw-semibold">
-                                    {{ $wc->capacity_per_hour !== null ? number_format($wc->capacity_per_hour, 2) : __('production.unlimited') }}
+                                <td class="text-end">
+                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill font-monospace fs-10 px-2 py-0.5" data-bs-toggle="tooltip" data-bs-placement="top" title="Calculation snapshot has not been created yet.">
+                                        <i class="feather-alert-circle me-1"></i>Snapshot not created
+                                    </span>
                                 </td>
-                                <td class="text-end text-muted">{{ number_format($wc->efficiency_percentage, 0) }}%</td>
-                                <td class="text-end fw-semibold text-dark">{{ format_currency($wc->cost_per_hour) }}</td>
-                                <td class="text-center">
+                                <td class="text-end">
+                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill font-monospace fs-10 px-2 py-0.5" data-bs-toggle="tooltip" data-bs-placement="top" title="Calculation snapshot has not been created yet.">
+                                        <i class="feather-alert-circle me-1"></i>Snapshot not created
+                                    </span>
+                                </td>
+                            @endif
+                            <td class="text-center">
+                                @if($wc->machines_count > 0)
                                     <a href="{{ route('production.machines.index', ['work_center_id' => $wc->id]) }}"
                                         class="badge bg-soft-info text-info rounded-pill px-2 py-1 fw-bold">
                                         {{ $wc->machines_count }}
                                     </a>
-                                </td>
-                                <td>
-                                    @if ($wc->isActive())
-                                        <span class="erp-badge-active">{{ __('production.active') }}</span>
-                                    @else
-                                        <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">{{ __('production.inactive') }}</span>
-                                    @endif
-                                </td>
-                                <td class="text-end">
-                                    <x-ui.action-dropdown :viewUrl="route('production.work-centers.show', $wc->id)">
-                                        @can('update', $wc)
-                                            <li>
-                                                <a href="{{ route('production.work-centers.edit', $wc->id) }}" class="dropdown-item">
-                                                    <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('production.edit_work_center') }}
-                                                </a>
-                                            </li>
-                                        @endcan
-                                        @can('delete', $wc)
-                                            <li>
-                                                <hr class="dropdown-divider">
-                                            </li>
-                                            <li>
-                                                <form action="{{ route('production.work-centers.destroy', $wc->id) }}" method="POST"
-                                                    onsubmit="return confirm('{{ __('production.confirm_delete_selected_routings') }}');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete') }}
-                                                    </button>
-                                                </form>
-                                            </li>
-                                        @endcan
-                                    </x-ui.action-dropdown>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="13" class="text-center py-4 text-muted">
-                                    <i class="feather-info me-2 fs-16"></i>{{ __('production.no_work_centers_matching') }}
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </x-ui.odoo-form-ui>
-            </div>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if ($wc->isActive())
+                                    <span class="erp-badge-active">{{ __('production.active') }}</span>
+                                @else
+                                    <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">{{ __('production.inactive') }}</span>
+                                @endif
+                            </td>
+                            <td class="text-end">
+                                <x-ui.action-dropdown :viewUrl="route('production.work-centers.show', $wc->id)">
+                                    @can('update', $wc)
+                                        <li>
+                                            <a href="{{ route('production.work-centers.edit', $wc->id) }}" class="dropdown-item">
+                                                <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('production.edit_work_center') }}
+                                            </a>
+                                        </li>
+                                    @endcan
+                                    @can('delete', $wc)
+                                        <li>
+                                            <hr class="dropdown-divider">
+                                        </li>
+                                        <li>
+                                            <form action="{{ route('production.work-centers.destroy', $wc->id) }}" method="POST"
+                                                onsubmit="return confirm('{{ __('production.confirm_delete_selected_routings') }}');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete') }}
+                                                </button>
+                                            </form>
+                                        </li>
+                                    @endcan
+                                </x-ui.action-dropdown>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="11" class="text-center py-4 text-muted">
+                                <i class="feather-info me-2 fs-16"></i>{{ __('production.no_work_centers_configured') }}
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </x-ui.odoo-form-ui>
+        </div>
 
-            <div class="mt-4">
-                {{ $workCenters->links() }}
-            </div>
-        @endif
+        <div class="mt-4">
+            {{ $workCenters->links() }}
+        </div>
     </div>
 
     {{-- Import Work Centers Modal --}}

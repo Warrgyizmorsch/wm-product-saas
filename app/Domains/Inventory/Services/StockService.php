@@ -37,9 +37,10 @@ class StockService
         string $referenceType,
         int $referenceId,
         ?int $referenceItemId = null,
-        ?string $expiresAt = null
+        ?string $expiresAt = null,
+        array $selectedSerials = []
     ): StockReservation {
-        return DB::transaction(function () use ($tenantId, $productId, $warehouseId, $qty, $referenceType, $referenceId, $referenceItemId, $expiresAt) {
+        return DB::transaction(function () use ($tenantId, $productId, $warehouseId, $qty, $referenceType, $referenceId, $referenceItemId, $expiresAt, $selectedSerials) {
             // 0. Calculate actually available stock to reserve (only for physical serial/batch constraints)
             $stock = ProductWarehouseStock::query()
                 ->where('tenant_id', $tenantId)
@@ -107,16 +108,25 @@ class StockService
             $product = Product::find($productId);
             $qtyToReservePhysical = min($qty, $availableToReserve);
             if ($product && $product->track_serial_number && $qtyToReservePhysical > 0) {
-                $serials = SerialNumber::query()
+                $query = SerialNumber::query()
                     ->where('tenant_id', $tenantId)
                     ->where('product_id', $productId)
                     ->where('warehouse_id', $warehouseId)
-                    ->where('status', 'Available')
-                    ->limit((int)$qtyToReservePhysical)
-                    ->get();
+                    ->where('status', 'Available');
+
+                if (!empty($selectedSerials)) {
+                    $query->whereIn('serial_number', $selectedSerials);
+                } else {
+                    $query->limit((int)$qtyToReservePhysical);
+                }
+
+                $serials = $query->get();
 
                 foreach ($serials as $serial) {
-                    $serial->update(['status' => 'Reserved']);
+                    $serial->update([
+                        'status' => 'Reserved',
+                        'material_requirement_item_id' => ($referenceType === 'DeliveryOrder' || $referenceType === 'MaterialRequirement') ? $referenceItemId : $serial->material_requirement_item_id,
+                    ]);
                 }
             }
 
@@ -207,16 +217,23 @@ class StockService
             // Restore serial statuses if tracked
             $product = Product::find($productId);
             if ($product && $product->track_serial_number) {
-                $serials = SerialNumber::query()
+                $query = SerialNumber::query()
                     ->where('tenant_id', $tenantId)
                     ->where('product_id', $productId)
                     ->where('warehouse_id', $warehouseId)
-                    ->where('status', 'Reserved')
-                    ->limit((int)$releaseQty)
-                    ->get();
+                    ->where('status', 'Reserved');
+
+                if ($referenceItemId && ($referenceType === 'DeliveryOrder' || $referenceType === 'MaterialRequirement')) {
+                    $query->where('material_requirement_item_id', $referenceItemId);
+                }
+
+                $serials = $query->limit((int)$releaseQty)->get();
 
                 foreach ($serials as $serial) {
-                    $serial->update(['status' => 'Available']);
+                    $serial->update([
+                        'status' => 'Available',
+                        'material_requirement_item_id' => null,
+                    ]);
                 }
             }
 

@@ -71,31 +71,53 @@ class IssuePolicy
 
     private function authorizeOnProject(User $user, Project $project, string $permission): bool
     {
+        $isMemberOrLead = (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id
+            || ($project->relationLoaded('members')
+                ? $project->members->where('user_id', $user->id)->where('is_active', true)->isNotEmpty()
+                : $project->members()->where('user_id', $user->id)->where('is_active', true)->exists());
+
         return $this->access->allows($user, $permission, [
             'tenant_id' => $project->tenant_id,
-            'owner_id' => $project->owner_id,
+            'owner_id'  => $isMemberOrLead ? $user->id : $project->owner_id,
         ]);
     }
 
     private function authorizeOnIssue(User $user, Issue $issue, string $permission): bool
     {
-        if ($this->access->allows($user, $permission, [
-            'tenant_id' => $issue->tenant_id,
-            'owner_id' => $issue->assignee_id,
-        ])) {
-            return true;
+        $isDirectParty = (int) $user->id === (int) $issue->assignee_id
+            || (int) $user->id === (int) $issue->reporter_id;
+
+        if ($isDirectParty) {
+            if ($this->access->allows($user, $permission, [
+                'tenant_id' => $issue->tenant_id,
+                'owner_id'  => $user->id,
+            ])) {
+                return true;
+            }
         }
 
-        if ($this->access->allows($user, $permission, [
-            'tenant_id' => $issue->tenant_id,
-            'owner_id' => $issue->reporter_id,
-        ])) {
-            return true;
-        }
+        $project = $issue->project;
+        $isMemberOrLead = $project && (
+            (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id
+            || ($project->relationLoaded('members')
+                ? $project->members->where('user_id', $user->id)->where('is_active', true)->isNotEmpty()
+                : $project->members()->where('user_id', $user->id)->where('is_active', true)->exists())
+        );
+
+        $isLead = $project && (
+            (int) $user->id === (int) $project->owner_id
+            || (int) $user->id === (int) $project->manager_id
+        );
+
+        $effectiveOwnerId = ($permission === 'projects.issues.view' ? $isMemberOrLead : $isLead)
+            ? $user->id
+            : $project?->owner_id;
 
         return $this->access->allows($user, $permission, [
             'tenant_id' => $issue->tenant_id,
-            'owner_id' => $issue->project?->owner_id,
+            'owner_id'  => $effectiveOwnerId,
         ]);
     }
 }

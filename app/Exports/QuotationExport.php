@@ -21,6 +21,16 @@ class QuotationExport implements FromCollection, WithHeadings, WithMapping, Shou
         $query = Quotation::where('tenant_id', $this->tenantId)
             ->with(['lead', 'salesPerson', 'crmAccount', 'crmDeal.account', 'crmDeal.contact']);
 
+        $currentUser = auth()->user();
+        if ($currentUser && !app(\App\Services\Access\AccessService::class)->allows($currentUser, 'crm.quotations.view', ['tenant_id' => $this->tenantId])) {
+            $query->where(function ($q) use ($currentUser) {
+                $q->where('sales_person_id', $currentUser->id)
+                  ->orWhereHas('crmDeal', fn($dq) => $dq->where('owner_id', $currentUser->id)->orWhereHas('account', fn($aq) => $aq->where('owner_id', $currentUser->id)))
+                  ->orWhereHas('crmAccount', fn($aq) => $aq->where('owner_id', $currentUser->id))
+                  ->orWhereHas('lead', fn($lq) => $lq->where('lead_owner_id', $currentUser->id));
+            });
+        }
+
         // 1. Revision / current filter (default to current if not specified)
         if (!isset($this->filters['all_revisions']) || !$this->filters['all_revisions']) {
             $query->where('is_current', true);

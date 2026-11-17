@@ -62,7 +62,8 @@ Give each partner their own connection and token, so you can cut off one without
 | Result | Likely cause |
 |---|---|
 | `[Blocked]` in the Postman Console | The kit stopped the request. The message says which setting to change |
-| `401` on Log in, with the right password | `tenant_slug` is wrong, or the user isn't in that tenant |
+| `404` on Log in | `tenant_slug` doesn't match an active tenant |
+| `401` on Log in, with the right password | The user isn't in that tenant |
 | `401` on other calls | Token missing, revoked or invalid |
 | `402` | The tenant's subscription has lapsed |
 | `403` | The user lacks the permission, or the token is for another connection |

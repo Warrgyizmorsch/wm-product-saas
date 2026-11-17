@@ -15,6 +15,7 @@ use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\RoutingOperationAlternateMachine;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Services\MesExecutionService;
 use App\Domains\Production\Services\SchedulingService;
 use App\Models\Tenant;
@@ -141,7 +142,14 @@ class EnterpriseSchedulingTest extends TestCase
             'active'           => true,
         ]);
 
-        $wc->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenant->id]);
+        $sec = WorkCenterSection::create([
+            'tenant_id' => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name' => 'Default Section',
+            'code' => 'SEC-' . $wc->code,
+            'status' => 'active',
+        ]);
+        $sec->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenant->id, 'target_headcount' => 1, 'active' => true]);
 
         $date = Carbon::parse('2026-07-06'); // Monday
         $capacity = $this->schedulingService->calculateCapacity($wc->id, $date);
@@ -340,6 +348,33 @@ class EnterpriseSchedulingTest extends TestCase
      */
     private function createMockOrder(string $number, WorkCenter $wc, Machine $machine, float $durationMinutes): ProductionOrder
     {
+        if ($wc->sections()->count() === 0) {
+            $shift = ProductionShift::firstOrCreate([
+                'tenant_id' => $this->tenant->id,
+                'code'      => 'SH_STD',
+            ], [
+                'name'             => 'Standard Shift',
+                'start_time'       => '08:00:00',
+                'end_time'         => '16:00:00',
+                'break_minutes'    => 0,
+                'overtime_allowed' => false,
+                'active'           => true,
+            ]);
+            $sec = WorkCenterSection::create([
+                'tenant_id'      => $this->tenant->id,
+                'work_center_id' => $wc->id,
+                'name'           => 'Section ' . $wc->code,
+                'code'           => 'SEC-' . $wc->code,
+                'status'         => 'active',
+            ]);
+            $sec->shifts()->attach($shift->id, [
+                'tenant_id'        => $this->tenant->id,
+                'target_headcount' => 1,
+                'active'           => true,
+            ]);
+            $wc->unsetRelation('sections');
+        }
+
         $routing = Routing::create([
             'tenant_id'  => $this->tenant->id,
             'product_id' => $this->product->id,
@@ -427,7 +462,14 @@ class EnterpriseSchedulingTest extends TestCase
             'overtime_allowed' => false,
             'active'           => true,
         ]);
-        $wc->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenant->id]);
+        $sec = WorkCenterSection::create([
+            'tenant_id' => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name' => 'Default Section',
+            'code' => 'SEC-' . $wc->code,
+            'status' => 'active',
+        ]);
+        $sec->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenant->id, 'target_headcount' => 1, 'active' => true]);
 
         // Create 2 identical orders with 1 operation of 120 mins duration
         $order1 = $this->createMockOrder('ORD-BACK-101', $wc, $machine, 120);
@@ -511,7 +553,14 @@ class EnterpriseSchedulingTest extends TestCase
             'overtime_allowed' => false,
             'active'           => true,
         ]);
-        $wc->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenant->id]);
+        $sec = WorkCenterSection::create([
+            'tenant_id' => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name' => 'Default Section',
+            'code' => 'SEC-' . $wc->code,
+            'status' => 'active',
+        ]);
+        $sec->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenant->id, 'target_headcount' => 1, 'active' => true]);
 
         // Start Friday 2026-07-03 at 15:30:00. Runs for 120 mins.
         // It skips Saturday 2026-07-04 and Sunday 2026-07-05.
@@ -580,7 +629,14 @@ class EnterpriseSchedulingTest extends TestCase
             'break_minutes'    => 0,
             'active'           => true,
         ]);
-        $wc->shifts()->attach($shift->id, ['tenant_id' => $this->tenant->id]);
+        $sec = WorkCenterSection::create([
+            'tenant_id' => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name' => 'Default Section',
+            'code' => 'SEC-' . $wc->code,
+            'status' => 'active',
+        ]);
+        $sec->shifts()->attach($shift->id, ['tenant_id' => $this->tenant->id, 'target_headcount' => 1, 'active' => true]);
 
         // Start Saturday 2026-07-04. Both machines skip Sat & Sun.
         $order = $this->createMockOrder('ORD-WARN-MULT', $wc, $machine1, 60);
@@ -643,7 +699,14 @@ class EnterpriseSchedulingTest extends TestCase
             'break_minutes'    => 0,
             'active'           => true,
         ]);
-        $wc->shifts()->attach($shift->id, ['tenant_id' => $this->tenant->id]);
+        $sec = WorkCenterSection::create([
+            'tenant_id' => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name' => 'Default Section',
+            'code' => 'SEC-' . $wc->code,
+            'status' => 'active',
+        ]);
+        $sec->shifts()->attach($shift->id, ['tenant_id' => $this->tenant->id, 'target_headcount' => 1, 'active' => true]);
 
         $order = $this->createMockOrder('ORD-RECALC', $wc, $machine, 60);
         $start = Carbon::parse('2026-07-04 08:00:00'); // Saturday (skips Sat & Sun)

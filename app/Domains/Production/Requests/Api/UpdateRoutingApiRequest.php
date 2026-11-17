@@ -2,10 +2,17 @@
 
 namespace App\Domains\Production\Requests\Api;
 
-use App\Domains\Production\Models\RoutingOperation;
+use App\Domains\Production\Requests\Concerns\ValidatesRoutingOperations;
 
+/**
+ * RT-IMPL-07: the API uses the SAME operation rules and checks as the web form
+ * (section, manual batch, alternatives, machine XOR batch, tenant-scoped exists).
+ * RT-IMPL-01: routings have no product any more — product_id is no longer required.
+ */
 class UpdateRoutingApiRequest extends ApiFormRequest
 {
+    use ValidatesRoutingOperations;
+
     protected function prepareForValidation(): void
     {
         if ($this->has('operations') && is_array($this->operations)) {
@@ -35,39 +42,32 @@ class UpdateRoutingApiRequest extends ApiFormRequest
 
     public function rules(): array
     {
-        $operationTypes = implode(',', RoutingOperation::TYPES);
-
-        return [
-            'name'                                => 'sometimes|required|string|max:255',
-            'version'                             => 'nullable|string|max:50',
-            'is_default'                          => 'nullable|boolean',
-            'effective_from'                      => 'nullable|date',
-            'effective_to'                        => 'nullable|date|after_or_equal:effective_from',
-            'description'                         => 'nullable|string',
-            'operations'                          => 'nullable|array|min:1',
-            'operations.*.sequence'               => 'required_with:operations|integer|min:1',
-            'operations.*.operation_sequence'     => 'nullable|integer|min:1',
-            'operations.*.operation_number'       => 'nullable|string|max:50',
-            'operations.*.name'                   => 'required_with:operations|string|max:255',
-            'operations.*.operation_name'         => 'nullable|string|max:255',
-            'operations.*.operation_type'         => "required_with:operations|in:{$operationTypes}",
-            'operations.*.work_center_id'         => 'nullable|exists:production_work_centers,id',
-            'operations.*.machine_id'             => 'nullable|exists:production_machines,id',
-            'operations.*.setup_time_minutes'     => 'nullable|numeric|min:0',
-            'operations.*.processing_time_minutes'=> 'nullable|numeric|min:0',
+        return array_merge([
+            'name'            => 'sometimes|required|string|max:255',
+            'version'         => 'nullable|string|max:50',
+            'is_default'      => 'nullable|boolean',
+            'effective_from'  => 'nullable|date',
+            'effective_to'    => 'nullable|date|after_or_equal:effective_from',
+            'description'     => 'nullable|string',
+            // API-only aliases (normalised in prepareForValidation)
+            'operations.*.operation_sequence'        => 'nullable|integer|min:1',
+            'operations.*.operation_name'            => 'nullable|string|max:255',
             'operations.*.run_time_per_unit_minutes' => 'nullable|numeric|min:0',
-            'operations.*.run_time_minutes'       => 'nullable|numeric|min:0',
-            'operations.*.wait_time_minutes'      => 'nullable|numeric|min:0',
-            'operations.*.expected_yield_percentage' => 'nullable|numeric|min:0|max:100',
-            'operations.*.labor_cost_rate'        => 'nullable|numeric|min:0',
-            'operations.*.machine_cost_rate'      => 'nullable|numeric|min:0',
-            'operations.*.description'            => 'nullable|string',
-            'operations.*.instructions'           => 'nullable|string',
-            'operations.*.quality_required'       => 'nullable|boolean',
-            'operations.*.is_external'            => 'nullable|boolean',
-            'operations.*.vendor_id'              => 'nullable|exists:vendors,id',
-            'operations.*.transfer_batch_quantity'=> 'nullable|numeric|min:0',
-            'operations.*.transfer_lag_minutes'   => 'nullable|integer|min:0',
-        ];
+            'operations.*.run_time_minutes'          => 'nullable|numeric|min:0',
+        ], $this->routingOperationRules(false));
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            if (is_array($this->input('operations'))) {
+                $this->validateRoutingOperations($validator, $this->input('operations'));
+            }
+        });
+    }
+
+    public function messages(): array
+    {
+        return $this->routingOperationMessages();
     }
 }

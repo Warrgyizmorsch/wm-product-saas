@@ -600,6 +600,8 @@ class OrgApiController extends Controller
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
             'postal_code'         => 'nullable|max:20',
+            'timezone'            => 'nullable|string|max:64',
+            'time_zone'           => 'nullable|string|max:64',
             'status'              => 'required|in:0,1',
         ]);
 
@@ -626,6 +628,7 @@ class OrgApiController extends Controller
             'state'               => $validated['state'] ?? null,
             'country'             => $validated['country'] ?? null,
             'postal_code'         => $validated['postal_code'] ?? null,
+            'timezone'            => $validated['timezone'] ?? $validated['time_zone'] ?? null,
             'status'              => $status,
         ]);
 
@@ -660,6 +663,8 @@ class OrgApiController extends Controller
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
             'postal_code'         => 'nullable|max:20',
+            'timezone'            => 'nullable|string|max:64',
+            'time_zone'           => 'nullable|string|max:64',
             'status'              => 'required|in:0,1',
         ]);
 
@@ -686,6 +691,7 @@ class OrgApiController extends Controller
             'state'               => $validated['state'] ?? null,
             'country'             => $validated['country'] ?? null,
             'postal_code'         => $validated['postal_code'] ?? null,
+            'timezone'            => array_key_exists('timezone', $validated) ? $validated['timezone'] : ($validated['time_zone'] ?? $branch->timezone),
             'status'              => $status,
         ]);
 

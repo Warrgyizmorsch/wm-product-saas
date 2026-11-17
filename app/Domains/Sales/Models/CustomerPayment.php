@@ -8,10 +8,22 @@ use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Domains\CRM\Models\Customer;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 class CustomerPayment extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch;
+
+    protected ?string $rbacPermission = 'sales.payments.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->where(function (Builder $sub) use ($user) {
+            $sub->whereHas('customer.crmAccount', fn($caq) => $caq->where('crm_accounts.owner_id', $user->id))
+                ->orWhereHas('allocations.salesOrder', fn($soq) => $soq->where('sales_orders.sales_person_id', $user->id));
+        });
+    }
 
     protected $fillable = [
         'tenant_id',

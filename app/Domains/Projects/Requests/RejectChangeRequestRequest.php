@@ -14,6 +14,7 @@ class RejectChangeRequestRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'cr_id'             => ['nullable', 'integer'],
             'rejection_remarks' => ['required', 'string', 'max:2000'],
         ];
     }

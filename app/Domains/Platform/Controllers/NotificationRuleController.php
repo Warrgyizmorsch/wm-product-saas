@@ -232,6 +232,16 @@ class NotificationRuleController extends Controller
             'letter_type' => 'Promotion & Increment Letter',
             'ref_no' => 'INC-' . date('Y') . '-084',
             'exit_date' => now()->addDays(30)->format('d M Y'),
+            'project' => 'Website Redesign',
+            'code' => 'PRJ-2026-001',
+            'task_code' => 'PRJ-T-042',
+            'issue_number' => 'ISSUE-019',
+            'cr_number' => 'CR-007',
+            'actor' => auth()->user()?->name ?? 'Project Lead',
+            'count' => '3',
+            'severity' => 'Major',
+            'old_status' => 'In Progress',
+            'new_status' => 'Review',
         ];
 
         $resolvedUrl = '#';

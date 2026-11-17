@@ -22,6 +22,9 @@
             align-items: center;
             padding: 0 14px;
         }
+        #activityLogDrawer .offcanvas-body {
+            padding-top: 0 !important;
+        }
     </style>
 @endpush
 
@@ -77,6 +80,11 @@
                 'Cancelled' => 'danger',
                 default => 'secondary',
             };
+            $isOwnerOrAdmin = $canUpdateProject && (
+                (int) $project->owner_id === (int) auth()->id()
+                || auth()->user()?->hasRole('admin', 'super_admin', 'tenant_owner')
+                || (bool) auth()->user()?->is_admin
+            );
         @endphp
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 pb-3 border-bottom">
             <h4 class="fw-bold text-dark mb-0 d-flex flex-wrap align-items-center gap-2">
@@ -139,7 +147,7 @@
                     </div>
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
-                            @if ($canUpdateProject)
+                            @if ($canUpdateProject && !$project->isContractLocked())
                                 @php
                                     $clientOptions = $customers->pluck('name', 'id')
                                         ->prepend(__('projects.none_option'), '');
@@ -148,6 +156,23 @@
                                     :url="route('projects.field', $project)" type="select2" :options="$clientOptions" :label="__('projects.client')" />
                             @else
                                 {{ $project->customer?->name ?: '—' }}
+                                @if ($project->isContractLocked())
+                                    @if ($isOwnerOrAdmin)
+                                        <button type="button"
+                                                class="btn btn-sm btn-link p-0 ms-1.5 text-decoration-none text-muted contract-amend-btn"
+                                                data-field="customer_id"
+                                                data-label="{{ __('projects.client') }}"
+                                                data-current-value="{{ $project->customer_id }}"
+                                                data-current-label="{{ $project->customer?->name ?: __('projects.none_option') }}"
+                                                data-bs-toggle="tooltip"
+                                                title="{{ __('projects.amend_contract_setting_tooltip') }}">
+                                            <i class="feather-lock text-warning fs-11"></i>
+                                            <span class="fs-11 text-primary fw-semibold ms-0.5">{{ __('projects.amend') }}</span>
+                                        </button>
+                                    @else
+                                        <i class="feather-lock text-muted fs-11 ms-1" data-bs-toggle="tooltip" title="{{ $project->contractLockReason() }}"></i>
+                                    @endif
+                                @endif
                             @endif
                         </span>
                     </div>
@@ -215,7 +240,7 @@
                     </div>
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
-                            @if ($canUpdateProject)
+                            @if ($canUpdateProject && !$project->isClosed())
                                 @php
                                     $statusOptions = collect($statusTransitions)
                                         ->mapWithKeys(fn($status) => [$status => __('projects.statuses.' . $status)]);
@@ -258,16 +283,33 @@
                             class="fw-semibold text-muted fs-13">{{ __('projects.billing_method') }}:</span></div>
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
-                            @if ($canUpdateProject)
+                            @if ($canUpdateProject && !$project->isContractLocked())
                                 @php
                                     $billingMethodOptions = collect(\App\Domains\Projects\Models\Project::BILLING_METHODS)
                                         ->mapWithKeys(fn($method) => [$method => __('projects.billing_methods.' . $method)])
                                         ->prepend(__('projects.none_option'), '');
                                 @endphp
                                 <x-ui.inline-edit field="billing_method" :value="$project->billing_method"
-                                    :url="route('projects.field', $project)" type="select2" :options="$billingMethodOptions" :label="__('projects.billing_method')" />
+                                    :url="route('projects.field', $project)" type="select2" :options="$billingMethodOptions" :label="__('projects.billing_method')" :reload="true" />
                             @else
                                 {{ $project->billing_method ? __('projects.billing_methods.' . $project->billing_method) : '—' }}
+                                @if ($project->isContractLocked())
+                                    @if ($isOwnerOrAdmin)
+                                        <button type="button"
+                                                class="btn btn-sm btn-link p-0 ms-1.5 text-decoration-none text-muted contract-amend-btn"
+                                                data-field="billing_method"
+                                                data-label="{{ __('projects.billing_method') }}"
+                                                data-current-value="{{ $project->billing_method }}"
+                                                data-current-label="{{ $project->billing_method ? __('projects.billing_methods.' . $project->billing_method) : __('projects.none_option') }}"
+                                                data-bs-toggle="tooltip"
+                                                title="{{ __('projects.amend_contract_setting_tooltip') }}">
+                                            <i class="feather-lock text-warning fs-11"></i>
+                                            <span class="fs-11 text-primary fw-semibold ms-0.5">{{ __('projects.amend') }}</span>
+                                        </button>
+                                    @else
+                                        <i class="feather-lock text-muted fs-11 ms-1" data-bs-toggle="tooltip" title="{{ $project->contractLockReason() }}"></i>
+                                    @endif
+                                @endif
                             @endif
                         </span>
                     </div>
@@ -277,16 +319,33 @@
                             class="fw-semibold text-muted fs-13">{{ __('projects.budget_type') }}:</span></div>
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
-                            @if ($canUpdateProject)
+                            @if ($canUpdateProject && !$project->isContractLocked())
                                 @php
                                     $budgetTypeOptions = collect(\App\Domains\Projects\Models\Project::BUDGET_TYPES)
                                         ->mapWithKeys(fn($type) => [$type => __('projects.budget_types.' . $type)])
                                         ->prepend(__('projects.none_option'), '');
                                 @endphp
                                 <x-ui.inline-edit field="budget_type" :value="$project->budget_type"
-                                    :url="route('projects.field', $project)" type="select2" :options="$budgetTypeOptions" :label="__('projects.budget_type')" />
+                                    :url="route('projects.field', $project)" type="select2" :options="$budgetTypeOptions" :label="__('projects.budget_type')" :reload="true" />
                             @else
                                 {{ $project->budget_type ? __('projects.budget_types.' . $project->budget_type) : '—' }}
+                                @if ($project->isContractLocked())
+                                    @if ($isOwnerOrAdmin)
+                                        <button type="button"
+                                                class="btn btn-sm btn-link p-0 ms-1.5 text-decoration-none text-muted contract-amend-btn"
+                                                data-field="budget_type"
+                                                data-label="{{ __('projects.budget_type') }}"
+                                                data-current-value="{{ $project->budget_type }}"
+                                                data-current-label="{{ $project->budget_type ? __('projects.budget_types.' . $project->budget_type) : __('projects.none_option') }}"
+                                                data-bs-toggle="tooltip"
+                                                title="{{ __('projects.amend_contract_setting_tooltip') }}">
+                                            <i class="feather-lock text-warning fs-11"></i>
+                                            <span class="fs-11 text-primary fw-semibold ms-0.5">{{ __('projects.amend') }}</span>
+                                        </button>
+                                    @else
+                                        <i class="feather-lock text-muted fs-11 ms-1" data-bs-toggle="tooltip" title="{{ $project->contractLockReason() }}"></i>
+                                    @endif
+                                @endif
                             @endif
                         </span>
                     </div>
@@ -298,7 +357,7 @@
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
                                 <x-ui.inline-edit field="budget_amount" :value="$project->budget_amount"
-                                    :url="route('projects.field', $project)" type="number" :label="__('projects.budget_amount') . ' (' . active_currency_symbol() . ')'" />
+                                    :url="route('projects.field', $project)" type="number" :label="__('projects.budget_amount') . ' (' . active_currency_symbol() . ')'" :reload="true" />
                             @else
                                 {{ $project->budget_amount !== null ? format_currency($project->budget_amount) : '—' }}
                             @endif
@@ -389,7 +448,9 @@
                         ? 'issues'
                         : (old('_document_form')
                             ? 'documents'
-                            : (old('_review_form') || old('_cr_form') ? 'reviews' : 'summary'))));
+                            : (old('_review_form') || old('_cr_form')
+                                ? 'reviews'
+                                : (old('_billing_form') ? 'billing' : 'summary')))));
 
             $projectDetailTabs = [
                 ['id' => 'tab-summary', 'label' => __('projects.summary'), 'icon' => 'feather-grid', 'active' => $activeProjectTab === 'summary'],
@@ -500,11 +561,26 @@
     @if (!$project->isClosed() && $canCloseProject)
         @include('modules.projects._close_project_modal')
     @endif
+    @if ($isOwnerOrAdmin)
+        <div id="contractAmendOptions" class="d-none"
+             data-amend-url="{{ route('projects.amend-contract', $project) }}"
+             data-billing-methods='@json(collect(\App\Domains\Projects\Models\Project::BILLING_METHODS)->mapWithKeys(fn($m) => [$m => __('projects.billing_methods.' . $m)]))'
+             data-budget-types='@json(collect(\App\Domains\Projects\Models\Project::BUDGET_TYPES)->mapWithKeys(fn($t) => [$t => __('projects.budget_types.' . $t)]))'
+             data-clients='@json($customers->pluck('name', 'id'))'
+             data-none-option="{{ __('projects.none_option') }}"
+             data-notice-general="{{ __('projects.amend_notice_general') }}"
+             data-notice-billing-method="{{ __('projects.amend_notice_billing_method') }}"
+             data-notice-budget-type="{{ __('projects.amend_notice_budget_type') }}"
+             data-notice-customer="{{ __('projects.amend_notice_customer') }}">
+        </div>
+        @include('modules.projects._amend_contract_modal')
+    @endif
 
     @push('scripts')
         <script type="module" src="{{ asset('assets/js/inline-edit/index.js') }}"></script>
         <script src="{{ asset('assets/js/milestones/inline-create.js') }}"></script>
         <script src="{{ asset('assets/js/projects/collaborators.js') }}"></script>
+        <script src="{{ asset('assets/js/projects/contract-amend.js') }}"></script>
         <script>
             function openActivityDrawer(url) {
                 var drawerEl = document.getElementById('activityLogDrawer');

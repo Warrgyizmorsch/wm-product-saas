@@ -105,6 +105,13 @@
 @php
     $activeEmployeesCount = $employees->getCollection()->where('status', true)->count();
     $inactiveEmployeesCount = $employees->getCollection()->where('status', false)->count();
+    $companiesJson = $companies->map(function ($company) {
+        return [
+            'id' => $company->id,
+            'name' => $company->company_name,
+            'timezone' => $company->timezone,
+        ];
+    })->values();
     $businessUnitsJson = $businessUnits->map(function ($unit) {
         return [
             'id' => $unit->id,
@@ -118,6 +125,7 @@
             'company_id' => $branch->company_id,
             'business_unit_id' => $branch->business_unit_id,
             'name' => $branch->name,
+            'timezone' => $branch->timezone,
         ];
     })->values();
     $departmentsJson = $departments->map(function ($department) {
@@ -668,6 +676,7 @@
                                                         'blood_group'               => $employee->blood_group,
                                                         'diet_preference'           => $employee->diet_preference,
                                                         'office'                    => $employee->office ?: 'office',
+                                                        'timezone'                  => $employee->timezone,
                                                         'wfh_latitude'              => $employee->wfh_latitude,
                                                         'wfh_longitude'             => $employee->wfh_longitude,
                                                         'personal_mobile_number'    => $employee->personal_mobile_number,
@@ -874,6 +883,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const companies = @json($companiesJson);
             const businessUnits = @json($businessUnitsJson);
             const branches = @json($branchesJson);
             const departments = @json($departmentsJson);
@@ -939,7 +949,8 @@
 
                 items.forEach(function (item) {
                     const selected = String(item.id) === currentValue ? 'selected' : '';
-                    options += `<option value="${item.id}" ${selected}>${item.name}</option>`;
+                    const tzAttr = item.timezone ? ` data-timezone="${item.timezone}"` : '';
+                    options += `<option value="${item.id}" ${selected}${tzAttr}>${item.name}</option>`;
                 });
 
                 select.innerHTML = options;
@@ -1060,6 +1071,41 @@
                     shiftSelect.dataset.selectedValue = shiftSelect.value;
                 }
 
+                // Auto-sync Timezone according to parent (Branch override -> Company fallback)
+                const timezoneSelect = document.getElementById(prefix + '_timezone');
+                if (timezoneSelect && !selectedValues.preserveTimezone) {
+                    let parentTz = '';
+
+                    // 1. Check if Branch is selected
+                    if (resolvedBranchId) {
+                        const matchedBranch = branches.find(b => String(b.id) === String(resolvedBranchId));
+                        if (matchedBranch && matchedBranch.timezone) {
+                            parentTz = matchedBranch.timezone;
+                        } else if (branchSelect.selectedOptions && branchSelect.selectedOptions[0]) {
+                            parentTz = branchSelect.selectedOptions[0].dataset.timezone || '';
+                        }
+                    }
+
+                    // 2. If no Branch or Branch has no timezone, check Company
+                    if (!parentTz && companyId) {
+                        const matchedCompany = companies.find(c => String(c.id) === String(companyId));
+                        if (matchedCompany && matchedCompany.timezone) {
+                            parentTz = matchedCompany.timezone;
+                        } else if (companySelect.selectedOptions && companySelect.selectedOptions[0]) {
+                            parentTz = companySelect.selectedOptions[0].dataset.timezone || '';
+                        }
+                    }
+
+                    // 3. Auto-populate for create mode or when user explicitly triggers change
+                    if (parentTz && (prefix === 'create' || selectedValues.updateTimezone)) {
+                        timezoneSelect.dataset.initialValue = parentTz;
+                        if (!$(timezoneSelect).find(`option[value="${parentTz}"]`).length) {
+                            $(timezoneSelect).append(new Option(parentTz, parentTz, true, true));
+                        }
+                        $(timezoneSelect).val(parentTz).trigger('change').trigger('change.select2');
+                    }
+                }
+
                 $(businessUnitSelect).trigger('change.select2');
                 $(branchSelect).trigger('change.select2');
                 $(departmentSelect).trigger('change.select2');
@@ -1083,22 +1129,29 @@
                 const payGroupSelect = document.getElementById(prefix + '_pay_group_id');
 
                 if (companySelect) {
-                    $(companySelect).on('change', function () {
-                        syncHierarchy(prefix, {});
+                    $(companySelect).on('change select2:select', function (e) {
+                        const tzInput = document.getElementById(prefix + '_timezone');
+                        const isUserAction = (e.type === 'select2:select') || Boolean(e.originalEvent && e.originalEvent.isTrusted);
+                        const shouldUpdateTz = (prefix === 'create') || (isUserAction && (!tzInput || !tzInput.value));
+                        syncHierarchy(prefix, { updateTimezone: shouldUpdateTz });
                     });
                 }
 
                 if (businessUnitSelect) {
-                    $(businessUnitSelect).on('change', function () {
+                    $(businessUnitSelect).on('change select2:select', function () {
                         syncHierarchy(prefix, { businessUnitId: businessUnitSelect.value });
                     });
                 }
 
                 if (branchSelect) {
-                    $(branchSelect).on('change', function () {
+                    $(branchSelect).on('change select2:select', function (e) {
+                        const tzInput = document.getElementById(prefix + '_timezone');
+                        const isUserAction = (e.type === 'select2:select') || Boolean(e.originalEvent && e.originalEvent.isTrusted);
+                        const shouldUpdateTz = (prefix === 'create') || (isUserAction && (!tzInput || !tzInput.value));
                         syncHierarchy(prefix, {
                             businessUnitId: businessUnitSelect ? businessUnitSelect.value : '',
-                            branchId: branchSelect.value
+                            branchId: branchSelect.value,
+                            updateTimezone: shouldUpdateTz
                         });
                     });
                 }
@@ -1108,7 +1161,8 @@
                         syncHierarchy(prefix, {
                             businessUnitId: businessUnitSelect ? businessUnitSelect.value : '',
                             branchId: branchSelect ? branchSelect.value : '',
-                            departmentId: departmentSelect.value
+                            departmentId: departmentSelect.value,
+                            preserveTimezone: true
                         });
                     });
                 }
@@ -1119,7 +1173,8 @@
                             businessUnitId: businessUnitSelect ? businessUnitSelect.value : '',
                             branchId: branchSelect ? branchSelect.value : '',
                             departmentId: departmentSelect ? departmentSelect.value : '',
-                            payGroupId: payGroupSelect.value
+                            payGroupId: payGroupSelect.value,
+                            preserveTimezone: true
                         });
                     });
                 }
@@ -1219,6 +1274,7 @@
                     edit_blood_group: employee.blood_group || '',
                     edit_diet_preference: employee.diet_preference || '',
                     edit_office: employee.office || 'office',
+                    edit_timezone: employee.timezone || '',
                     edit_status: (employee.status == 1 || employee.status === true || employee.status === '1') ? '1' : '0',
                     edit_pay_group_id: employee.pay_group_id || '',
                     edit_leave_plan_id: employee.leave_plan_id || '',
@@ -1241,6 +1297,7 @@
                     payGroupId: employee.pay_group_id || '',
                     leavePlanId: employee.leave_plan_id || '',
                     shiftId: employee.shift_id || '',
+                    preserveTimezone: true,
                 });
 
                 setPreview('edit', employee.photo, employee.full_name);
@@ -1284,6 +1341,17 @@
                     payGroupId: document.getElementById('edit_pay_group_id')?.value || '',
                     leavePlanId: document.getElementById('edit_leave_plan_id')?.value || '',
                     shiftId: document.getElementById('edit_shift_id')?.value || '',
+                    preserveTimezone: true,
+            });
+
+            $('#addEmployeeModal').on('shown.bs.modal', function () {
+                if (document.getElementById('create_company_id')?.value || document.getElementById('create_branch_id')?.value) {
+                    syncHierarchy('create', {
+                        businessUnitId: document.getElementById('create_business_unit_id')?.value || '',
+                        branchId: document.getElementById('create_branch_id')?.value || '',
+                        updateTimezone: true
+                    });
+                }
             });
 
             $(document).on('click', '.employee-edit-trigger', function () {

@@ -8,7 +8,6 @@ use App\Domains\Production\Models\ProductionMachineDowntime;
 use App\Domains\Production\Models\ProductionOrderReservation;
 use App\Domains\Production\Models\ProductionSchedule;
 use App\Domains\Production\Models\ProductionScheduleOperation;
-use App\Domains\Production\Models\RoutingOperationAlternateMachine;
 use App\Domains\Production\Models\WorkCenter;
 use Illuminate\Support\Carbon;
 
@@ -37,7 +36,7 @@ class SchedulePreReleaseValidationService
         $operations = ProductionScheduleOperation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('production_schedule_id', $schedule->id)
-            ->with(['workCenter', 'machine', 'orderOperation.routingOperation', 'orderOperation.predecessorDependencies'])
+            ->with(['workCenter', 'section', 'machine.section', 'manualProduction', 'orderOperation.routingOperation', 'orderOperation.predecessorDependencies'])
             ->orderBy('sequence')
             ->get();
 
@@ -71,21 +70,67 @@ class SchedulePreReleaseValidationService
                 ];
             }
 
-            // Check if Machine assignment is required for this WorkCenter (only for internal operations)
-            if (!$isExternal && $op->work_center_id && !$op->machine_id) {
-                $machinesCount = Machine::withoutGlobalScopes()
-                    ->where('tenant_id', $tenantId)
-                    ->where('work_center_id', $op->work_center_id)
-                    ->where('status', 'active')
-                    ->count();
+            // Section architecture: an internal operation runs on a Machine OR a Manual Batch inside a Section.
+            if (!$isExternal && $op->work_center_id) {
+                $opLabel = "Operation sequence {$op->sequence}";
 
-                if ($machinesCount > 0) {
+                if (!$op->machine_id && !$op->section_manual_production_id) {
                     $errors[] = [
-                        'code'         => 'UNASSIGNED_MACHINE',
+                        'code'         => 'NO_RESOURCE_ASSIGNED',
                         'severity'     => 'error',
-                        'message'      => "Operation sequence {$op->sequence} requires a machine assignment at Work Center [" . ($op->workCenter?->name ?? 'N/A') . "].",
+                        'message'      => "{$opLabel} has no machine or manual batch assigned at Work Center [" . ($op->workCenter?->name ?? 'N/A') . "].",
                         'operation_id' => $op->id,
                     ];
+                }
+
+                if ($op->section_id) {
+                    $section = $op->section;
+                    if (!$section || !$section->isActive()) {
+                        $errors[] = [
+                            'code'         => 'INACTIVE_SECTION',
+                            'severity'     => 'error',
+                            'message'      => "{$opLabel} relies on an inactive or missing Section" . ($section ? " [{$section->name}]" : '') . '.',
+                            'operation_id' => $op->id,
+                        ];
+                    } elseif ((int) $section->work_center_id !== (int) $op->work_center_id) {
+                        $errors[] = [
+                            'code'         => 'SECTION_WORK_CENTER_MISMATCH',
+                            'severity'     => 'error',
+                            'message'      => "{$opLabel}: Section [{$section->name}] does not belong to Work Center [" . ($op->workCenter?->name ?? 'N/A') . "].",
+                            'operation_id' => $op->id,
+                        ];
+                    }
+                }
+
+                if ($op->section_manual_production_id) {
+                    $batch = $op->manualProduction;
+                    if (!$batch || !$batch->active) {
+                        $errors[] = [
+                            'code'         => 'MANUAL_BATCH_INACTIVE',
+                            'severity'     => 'error',
+                            'message'      => "{$opLabel} relies on an inactive or missing manual batch" . ($batch ? " [{$batch->batch_name}]" : '') . '.',
+                            'operation_id' => $op->id,
+                        ];
+                    } elseif ($op->section_id && (int) $batch->section_id !== (int) $op->section_id) {
+                        $errors[] = [
+                            'code'         => 'MANUAL_BATCH_SECTION_MISMATCH',
+                            'severity'     => 'error',
+                            'message'      => "{$opLabel}: manual batch [{$batch->batch_name}] does not belong to the operation's Section.",
+                            'operation_id' => $op->id,
+                        ];
+                    }
+                }
+
+                // Slot could not be placed inside shifts (generation fell back to a raw start time)
+                foreach ((array) ($op->warnings ?? []) as $w) {
+                    if (($w['code'] ?? null) === 'NO_SHIFTS_CONFIGURED') {
+                        $errors[] = [
+                            'code'         => 'NO_SHIFTS_CONFIGURED',
+                            'severity'     => 'error',
+                            'message'      => "{$opLabel}: " . ($w['message'] ?? 'no active shifts configured.'),
+                            'operation_id' => $op->id,
+                        ];
+                    }
                 }
             }
         }
@@ -190,7 +235,9 @@ class SchedulePreReleaseValidationService
                     ];
                 }
 
-                if ($m->work_center_id !== $op->work_center_id) {
+                // Machines belong to a Section; the Work Center is derived through it.
+                if ((int) ($m->section?->work_center_id ?? 0) !== (int) $op->work_center_id
+                    || ($op->section_id && (int) $m->section_id !== (int) $op->section_id)) {
                     $errors[] = [
                         'code'         => 'MACHINE_WORK_CENTER_MISMATCH',
                         'severity'     => 'error',
@@ -208,26 +255,18 @@ class SchedulePreReleaseValidationService
                     ];
                 }
 
-                // Machine qualification check (Primary or Approved Alternate)
-                if ($op->orderOperation && $op->orderOperation->routing_operation_id) {
-                    $routingOpId = $op->orderOperation->routing_operation_id;
-                    $routingOp   = \App\Domains\Production\Models\RoutingOperation::find($routingOpId);
+                // Machine qualification: no alternate machines for now — the alternative operation is chosen at
+                // Production Order creation, so the schedule must use the machine planned on the order operation.
+                if ($op->orderOperation) {
+                    $plannedMachineId = $op->orderOperation->machine_id ?: $op->orderOperation->routingOperation?->machine_id;
 
-                    if ($routingOp && $routingOp->machine_id && $routingOp->machine_id !== $m->id) {
-                        $isApprovedAlt = RoutingOperationAlternateMachine::withoutGlobalScopes()
-                            ->where('tenant_id', $tenantId)
-                            ->where('routing_operation_id', $routingOpId)
-                            ->where('machine_id', $m->id)
-                            ->exists();
-
-                        if (!$isApprovedAlt) {
-                            $errors[] = [
-                                'code'         => 'UNQUALIFIED_MACHINE',
-                                'severity'     => 'error',
-                                'message'      => "Machine [{$m->name}] is not an approved primary or alternate machine for operation sequence {$op->sequence}.",
-                                'operation_id' => $op->id,
-                            ];
-                        }
+                    if ($plannedMachineId && (int) $plannedMachineId !== (int) $m->id) {
+                        $errors[] = [
+                            'code'         => 'UNQUALIFIED_MACHINE',
+                            'severity'     => 'error',
+                            'message'      => "Machine [{$m->name}] is not the machine planned for operation sequence {$op->sequence}.",
+                            'operation_id' => $op->id,
+                        ];
                     }
                 }
 

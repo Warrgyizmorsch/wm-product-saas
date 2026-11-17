@@ -163,6 +163,28 @@ class ProductionOrderController extends Controller
         }
     }
 
+    /**
+     * PO-IMPL-05 (PO-01): BOM / Routing resolution, blocking reasons and the Tab 1 / Tab 2 workspace for Create.
+     */
+    public function getEngineeringStatus(Request $request)
+    {
+        Gate::authorize('create', ProductionOrder::class);
+
+        $request->validate([
+            'product_id' => 'required|integer',
+            'branch_id'  => 'nullable|integer',
+            'quantity'   => 'nullable|numeric|min:0',
+        ]);
+        $tenantId = require_tenant_id();
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($request->integer('product_id'));
+        $branchId = $request->filled('branch_id') ? $request->integer('branch_id') : (branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id());
+
+        return response()->json(
+            app(\App\Domains\Production\Services\ProductionOrderEngineeringService::class)
+                ->buildInteractiveWorkspacePayload($product, $tenantId, $branchId, (float) ($request->input('quantity') ?: 1))
+        );
+    }
+
     public function createFromPlan(int $planId)
     {
         Gate::authorize('create', ProductionOrder::class);

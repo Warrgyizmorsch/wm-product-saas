@@ -2,14 +2,17 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Projects\Events\MilestoneCompleted;
 use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Repositories\MilestoneRepositoryInterface;
 use App\Domains\Projects\Repositories\TaskDependencyRepositoryInterface;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class MilestoneService
 {
@@ -38,7 +41,7 @@ class MilestoneService
         return $this->milestones->getForProject($project->id);
     }
 
-    public function paginateAll(array $filters, int $perPage = 15): LengthAwarePaginator
+    public function paginateAll(array $filters, int $perPage = 10): LengthAwarePaginator
     {
         return $this->milestones->paginateAll($filters, $perPage);
     }
@@ -55,6 +58,18 @@ class MilestoneService
             $data['tenant_id'] = $project->tenant_id;
             $data['company_id'] = $data['company_id'] ?? $project->company_id;
             $data['branch_id'] = $data['branch_id'] ?? $project->branch_id;
+            if (isset($data['billing_percentage']) && $data['billing_percentage'] !== '' && (!isset($data['billing_amount']) || (float)$data['billing_amount'] <= 0)) {
+                $budget = (float) ($project->budget_amount ?? 0);
+                $data['billing_amount'] = $budget > 0 ? round(((float)$data['billing_percentage'] / 100) * $budget, 2) : 0;
+            }
+            unset($data['billing_percentage']);
+
+            if (array_key_exists('billing_amount', $data) && ($data['billing_amount'] === '' || $data['billing_amount'] === null)) {
+                $data['billing_amount'] = 0;
+            }
+            if (isset($data['status']) && $data['status'] === Milestone::STATUS_COMPLETED && (!isset($data['completion_percentage']) || (int)$data['completion_percentage'] < 100)) {
+                $data['completion_percentage'] = 100;
+            }
 
             $milestone = $this->milestones->create($data);
 
@@ -81,6 +96,18 @@ class MilestoneService
 
         return DB::transaction(function () use ($milestone, $data, $oldStatus, $newStatus) {
             $project = $milestone->project;
+            if (isset($data['billing_percentage']) && $data['billing_percentage'] !== '' && (!isset($data['billing_amount']) || (float)$data['billing_amount'] <= 0)) {
+                $budget = (float) ($project->budget_amount ?? 0);
+                $data['billing_amount'] = $budget > 0 ? round(((float)$data['billing_percentage'] / 100) * $budget, 2) : 0;
+            }
+            unset($data['billing_percentage']);
+
+            if (array_key_exists('billing_amount', $data) && ($data['billing_amount'] === '' || $data['billing_amount'] === null)) {
+                $data['billing_amount'] = 0;
+            }
+            if ($newStatus === Milestone::STATUS_COMPLETED && (!isset($data['completion_percentage']) || (int)$data['completion_percentage'] < 100)) {
+                $data['completion_percentage'] = 100;
+            }
             $milestone = $this->milestones->update($milestone->id, $data);
 
             if ($milestone->owner_id) {
@@ -96,6 +123,11 @@ class MilestoneService
                     $milestone,
                     ['old_status' => $oldStatus, 'new_status' => $newStatus],
                 );
+
+                $actor = auth()->user() ?? $project?->manager ?? $project?->owner ?? User::first();
+                if ($actor) {
+                    event(new MilestoneCompleted($milestone, $actor));
+                }
             } else {
                 $this->activity->record(
                     $project,
@@ -117,7 +149,9 @@ class MilestoneService
      */
     public function updateField(Milestone $milestone, string $field, mixed $value): mixed
     {
-        return DB::transaction(function () use ($milestone, $field, $value) {
+        $oldStatus = $milestone->status;
+
+        return DB::transaction(function () use ($milestone, $field, $value, $oldStatus) {
             $project = $milestone->project;
             $milestone = $this->milestones->update($milestone->id, [$field => $value]);
 
@@ -125,13 +159,33 @@ class MilestoneService
                 $this->members->ensureCollaborator($project, $milestone->owner_id);
             }
 
-            $this->activity->record(
-                $project,
-                'milestone.updated',
-                "Milestone '{$milestone->name}' updated",
-                null,
-                $milestone,
-            );
+            if ($field === 'status' && $value === Milestone::STATUS_COMPLETED) {
+                $milestone = $this->milestones->update($milestone->id, ['completion_percentage' => 100]);
+            }
+
+            if ($field === 'status' && $value === Milestone::STATUS_COMPLETED && $oldStatus !== Milestone::STATUS_COMPLETED) {
+                $this->activity->record(
+                    $project,
+                    'milestone.completed',
+                    "Milestone '{$milestone->name}' completed",
+                    null,
+                    $milestone,
+                    ['old_status' => $oldStatus, 'new_status' => $value],
+                );
+
+                $actor = auth()->user() ?? $project?->manager ?? $project?->owner ?? User::first();
+                if ($actor) {
+                    event(new MilestoneCompleted($milestone, $actor));
+                }
+            } else {
+                $this->activity->record(
+                    $project,
+                    'milestone.updated',
+                    "Milestone '{$milestone->name}' updated",
+                    null,
+                    $milestone,
+                );
+            }
 
             return $milestone->{$field};
         });
@@ -139,6 +193,12 @@ class MilestoneService
 
     public function delete(Milestone $milestone, string $taskAction = 'unlink'): bool
     {
+        if ($milestone->is_invoiced) {
+            throw ValidationException::withMessages([
+                'milestone' => 'Cannot delete a milestone that has already been invoiced.',
+            ]);
+        }
+
         return DB::transaction(function () use ($milestone, $taskAction) {
             $project = $milestone->project;
 
@@ -147,11 +207,13 @@ class MilestoneService
                 foreach ($milestone->tasks as $task) {
                     $taskService->delete($task);
                 }
+                foreach ($milestone->taskLists as $taskList) {
+                    $taskList->delete();
+                }
             } else {
                 $milestone->tasks()->update(['milestone_id' => null]);
+                $milestone->taskLists()->update(['milestone_id' => null]);
             }
-
-            $milestone->taskLists()->update(['milestone_id' => null]);
 
             $this->activity->record(
                 $project,
@@ -294,7 +356,20 @@ class MilestoneService
 
         $percentage = $totalEligible > 0 ? (int) round(($completedCount / $totalEligible) * 100) : 0;
 
-        if ($model->completion_percentage !== $percentage) {
+        if ($percentage === 100 && $totalEligible > 0 && $model->status !== Milestone::STATUS_COMPLETED) {
+            $this->milestones->update($model->id, [
+                'completion_percentage' => 100,
+                'status'                => Milestone::STATUS_COMPLETED,
+            ]);
+            $model->completion_percentage = 100;
+            $model->status = Milestone::STATUS_COMPLETED;
+
+            $project = $model->project ?? Project::find($model->project_id);
+            $actor = auth()->user() ?? $project?->manager ?? $project?->owner ?? User::first();
+            if ($actor) {
+                event(new MilestoneCompleted($model, $actor));
+            }
+        } elseif ($model->completion_percentage !== $percentage) {
             $this->milestones->update($model->id, [
                 'completion_percentage' => $percentage,
             ]);

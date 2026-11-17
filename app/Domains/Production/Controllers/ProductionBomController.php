@@ -15,6 +15,7 @@ use App\Domains\Production\Services\BomExplosionService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 class ProductionBomController extends Controller
@@ -36,7 +37,9 @@ class ProductionBomController extends Controller
         $filters = $request->only(['product_id', 'status', 'search', 'sort_by', 'sort_order']);
         $boms = $this->bomRepository->paginateAll($filters, 10)->withQueryString();
 
-        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])
+            ->whereIn('supplier_method', ['manufacture', 'both'])
+            ->get();
 
         return view('modules.production.bom.index', compact('boms', 'products'));
     }
@@ -46,28 +49,46 @@ class ProductionBomController extends Controller
         $tenantId = require_tenant_id();
 
         $boms = $this->bomRepository->getBomsByProductUnscoped($productId, $tenantId);
+        $today = Carbon::today()->toDateString();
 
-        $versions = $boms->map(function ($bom) {
+        // Only approved BOMs that are currently active or scheduled (exclude cancelled, draft, inactive, expired)
+        $validBoms = $boms->filter(function ($bom) use ($today) {
+            if (!in_array($bom->status, ['approved', 'active', 'scheduled'], true)) {
+                return false;
+            }
+            if ($bom->expiry_date && Carbon::parse($bom->expiry_date)->toDateString() < $today) {
+                return false;
+            }
+            return true;
+        })->values();
+
+        $versions = $validBoms->map(function ($bom) use ($today) {
+            $effectiveDate = $bom->effective_date ? Carbon::parse($bom->effective_date)->toDateString() : null;
+            $isScheduled = ($bom->status === 'scheduled') || ($effectiveDate && $effectiveDate > $today);
+            $displayStatus = $isScheduled ? 'scheduled' : 'active';
+
             return [
                 'id' => $bom->id,
                 'bom_number' => $bom->bom_number,
                 'version' => $bom->version,
                 'bom_name' => $bom->bom_name,
-                'status' => $bom->status,
-                'effective_date' => $bom->effective_date ? $bom->effective_date->toDateString() : null,
-                'expiry_date' => $bom->expiry_date ? $bom->expiry_date->toDateString() : null,
+                'status' => $displayStatus,
+                'effective_date' => $effectiveDate,
+                'expiry_date' => $bom->expiry_date ? Carbon::parse($bom->expiry_date)->toDateString() : null,
             ];
         });
 
-        $approved = $boms->firstWhere('status', 'approved');
-        $draft = $boms->firstWhere('status', 'draft') ?? $boms->firstWhere('status', 'under_revision') ?? $boms->firstWhere('status', 'pending_approval');
+        $activeBom = $validBoms->first(function ($bom) use ($today) {
+            $effectiveDate = $bom->effective_date ? Carbon::parse($bom->effective_date)->toDateString() : null;
+            return !$effectiveDate || $effectiveDate <= $today;
+        }) ?? $validBoms->first();
 
         return response()->json([
-            'status' => $approved ? 'approved' : ($draft ? 'draft' : 'none'),
-            'bom_id' => $approved ? $approved->id : ($draft ? $draft->id : null),
-            'bom_number' => $approved ? $approved->bom_number : ($draft ? $draft->bom_number : null),
-            'version' => $approved ? $approved->version : ($draft ? $draft->version : null),
-            'bom_name' => $approved ? $approved->bom_name : ($draft ? $draft->bom_name : null),
+            'status' => $activeBom ? 'approved' : 'none',
+            'bom_id' => $activeBom?->id,
+            'bom_number' => $activeBom?->bom_number,
+            'version' => $activeBom?->version,
+            'bom_name' => $activeBom?->bom_name,
             'versions' => $versions,
         ]);
     }
@@ -96,20 +117,23 @@ class ProductionBomController extends Controller
             };
         }
 
-        try {
-            $newBom = $this->bomService->duplicateVersion($id, $newVersion, auth()->id() ?: 1);
-            return redirect()
-                ->route('production.boms.edit', $newBom->id)
-                ->with('success', "New BOM version {$newBom->version} created as draft. Review and save components.");
-        } catch (\Exception $e) {
-            return redirect()
-                ->back()
-                ->with('error', $e->getMessage());
-        }
+        // BM-IMPL-03: Copy-without-saving — redirect to pre-filled create form
+        return redirect()
+            ->route('production.boms.create', [
+                'copy_from' => $bom->id,
+                'mode'      => 'revision',
+                'version'   => $newVersion,
+            ])
+            ->with('info', __('production.bom_copy_notice', [
+                'number'  => $bom->bom_number,
+                'version' => $bom->version,
+                'mode'    => __('production.bom_mode_revision'),
+            ]));
     }
 
     public function show(int $id, Request $request): View
     {
+        // BM-IMPL-15 #6: master rows + allocations with their operations (incl. removed ones)
         $bom = $this->bomRepository->getBomWithComponents($id);
         abort_if(!$bom, 404, 'BOM not found.');
 
@@ -117,27 +141,37 @@ class ProductionBomController extends Controller
 
         // Requirements multi-level explosion
         $calcQty = $request->input('calc_qty') ? (float) $request->input('calc_qty') : $bom->base_quantity;
-        $explosion = $this->explosionService->explode($bom->product_id, $calcQty, $bom->tenant_id);
+        $explosion = $this->explosionService->explodeBom($bom->id, $calcQty, $bom->tenant_id) /* BM-IMPL-16: the version being viewed */;
 
-        // BOM Cost Preview
+        // BOM Cost Preview (reads operationMaterials; legacy fallback to items only if empty)
         $costDetails = [];
         $totalCost = 0.0;
-        foreach ($bom->items as $item) {
-            $qty = $item->quantity;
-            $grossQty = $qty * (1 + ($item->material_scrap_percentage / 100));
-            $unitCost = $item->material?->unit_cost ?? 0.0;
+        $costSourceRows = $bom->operationMaterials->isNotEmpty() ? $bom->operationMaterials : $bom->items;
+        foreach ($costSourceRows as $item) {
+            $qty = (float) $item->quantity;
+            $scrapPct = (float) ($item->material_scrap_percentage ?? 0.0);
+            $grossQty = isset($item->gross_quantity) && $item->gross_quantity !== null
+                ? (float) $item->gross_quantity
+                : \App\Domains\Production\Models\RoutingOperationMaterial::calculateGrossQuantity($qty, $scrapPct);
+            $unitCost = (float) ($item->material?->unit_cost ?? 0.0);
             $itemCost = $grossQty * $unitCost;
-            $totalCost += $itemCost;
+            $isAlt = (bool) ($item->is_alternative ?? false);
+            if (!$isAlt) {
+                $totalCost += $itemCost;
+            }
 
             $costDetails[] = [
                 'material_name' => $item->material?->name ?? 'Unknown Material',
                 'material_sku' => $item->material?->sku ?? '—',
                 'quantity' => $qty,
-                'scrap_percentage' => $item->material_scrap_percentage,
+                'scrap_percentage' => $scrapPct,
                 'gross_quantity' => $grossQty,
                 'uom_code' => $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS',
                 'unit_cost' => $unitCost,
                 'total_cost' => $itemCost,
+                'is_alternative' => $isAlt,
+                'replaces_item_id' => $item->replaces_routing_material_id ?? $item->replaces_item_id ?? null,
+                'priority' => $item->priority,
             ];
         }
         $costPerUnit = $bom->base_quantity > 0 ? ($totalCost / $bom->base_quantity) : 0.0;
@@ -149,7 +183,7 @@ class ProductionBomController extends Controller
             'cost_per_unit' => $costPerUnit,
         ], $costCalculations);
 
-        $componentProductIds = $bom->items->pluck('material_id')->unique();
+        $componentProductIds = $costSourceRows->pluck('material_id')->unique();
         $componentBoms = ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $bom->tenant_id)
             ->whereIn('product_id', $componentProductIds)
@@ -170,7 +204,7 @@ class ProductionBomController extends Controller
                 $parentBom = ProductionBom::withoutGlobalScopes()
                     ->where('tenant_id', $bom->tenant_id)
                     ->where('product_id', $parentProduct->id)
-                    ->orderByRaw("case when status = 'approved' then 1 when status = 'draft' then 2 else 3 end")
+                    ->orderByRaw("case when status in ('approved', 'active') then 1 when status = 'draft' then 2 else 3 end")
                     ->first();
             }
         }
@@ -186,13 +220,85 @@ class ProductionBomController extends Controller
     {
         $this->authorize('create', ProductionBom::class);
 
-        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
-        $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get(); // support multi-level
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])
+            ->whereIn('supplier_method', ['manufacture', 'both'])
+            ->get();
+        $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
         $uoms = Uom::all();
-        $routings = Routing::all();
+        $routings = Routing::with(['operations.workCenter', 'operations.section'])
+            ->whereIn('status', [Routing::STATUS_ACTIVE, Routing::STATUS_SCHEDULED, 'approved'])
+            ->get();
         $selectedProductId = $request->query('product_id');
 
-        return view('modules.production.bom.create', compact('products', 'materials', 'uoms', 'routings', 'selectedProductId'));
+        // BM-IMPL-03: copy_from prefill without saving to DB
+        $copyFromBom = null;
+        $copyMode = null;
+        $suggestedVersion = null;
+        $copyItems = null;
+        $selectedRoutingId = '';
+
+        if ($request->filled('copy_from')) {
+            $sourceBom = $this->bomRepository->getBomWithComponents((int) $request->query('copy_from'));
+            if ($sourceBom && $sourceBom->tenant_id === require_tenant_id()) {
+                $this->authorize('view', $sourceBom);
+                $copyFromBom = $sourceBom;
+                $copyMode = $request->query('mode') === 'revision' ? 'revision' : 'duplicate';
+                $selectedProductId = $selectedProductId ?: $sourceBom->product_id;
+
+                $reqVersion = trim((string) $request->query('version', ''));
+                if ($reqVersion !== '' && !$this->bomRepository->versionExistsUnscoped($sourceBom->product_id, $reqVersion, $sourceBom->tenant_id)) {
+                    $suggestedVersion = $reqVersion;
+                } else {
+                    $candidate = $this->versionService->incrementPatch($sourceBom->version ?: '1.0.0');
+                    while ($this->bomRepository->versionExistsUnscoped($sourceBom->product_id, $candidate, $sourceBom->tenant_id)) {
+                        $candidate = $this->versionService->incrementPatch($candidate);
+                    }
+                    $suggestedVersion = $candidate;
+                }
+
+                // Include source routing in list if non-historical/non-cancelled so operations render cleanly
+                if ($sourceBom->routing_id) {
+                    $existingRouting = $routings->firstWhere('id', $sourceBom->routing_id);
+                    if (!$existingRouting) {
+                        $sourceRouting = Routing::with(['operations.workCenter', 'operations.section'])->find($sourceBom->routing_id);
+                        if ($sourceRouting && !in_array($sourceRouting->status, [Routing::STATUS_HISTORICAL, Routing::STATUS_CANCELLED], true)) {
+                            $routings->push($sourceRouting);
+                            $existingRouting = $sourceRouting;
+                        }
+                    }
+                    if ($existingRouting) {
+                        $selectedRoutingId = (string) $existingRouting->id;
+                    }
+                }
+
+                $this->attachDeletedOperationsForBom($sourceBom->id, $routings);
+
+                $copyItems = $sourceBom->operationMaterials->isNotEmpty()
+                    ? $sourceBom->operationMaterials->map(fn ($om) => [
+                        'uid'                       => 'copy_' . $om->id,
+                        'routing_operation_id'      => $om->routing_operation_id,
+                        'material_id'               => $om->material_id,
+                        'quantity'                  => (float) $om->quantity,
+                        'uom_id'                    => $om->uom_id,
+                        'material_scrap_percentage' => (float) ($om->material_scrap_percentage ?? 0),
+                        'is_alternative'            => (bool) $om->is_alternative,
+                        'priority'                  => $om->priority ?: 1,
+                        'replaces_row_uid'          => $om->replaces_routing_material_id ? 'copy_' . $om->replaces_routing_material_id : '',
+                        'child_bom_id'              => $om->child_bom_id,
+                        'notes'                     => $om->notes,
+                        'sequence'                  => $om->sequence,
+                    ])->values()->all()
+                    : [];
+            }
+        }
+
+        $routingAdvisoriesMap = $this->buildRoutingAdvisoriesMap($routings);
+
+        return view('modules.production.bom.create', compact(
+            'products', 'materials', 'uoms', 'routings', 'selectedProductId',
+            'copyFromBom', 'copyMode', 'suggestedVersion', 'copyItems',
+            'selectedRoutingId', 'routingAdvisoriesMap'
+        ));
     }
 
     public function store(StoreProductionBomRequest $request): RedirectResponse
@@ -201,7 +307,7 @@ class ProductionBomController extends Controller
 
         try {
             $dto = ProductionBomDTO::fromArray($request->validated());
-            $bom = $this->bomService->create($dto, auth()->id() ?: 1);
+            $bom = $this->bomService->create($dto, auth()->id());
 
             $routeParams = ['bom' => $bom->id];
             if ($request->filled('parent_product_id')) {
@@ -227,12 +333,24 @@ class ProductionBomController extends Controller
 
         $this->authorize('update', $bom);
 
-        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])
+            ->whereIn('supplier_method', ['manufacture', 'both'])
+            ->get();
         $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get(); // support multi-level
         $uoms = Uom::all();
-        $routings = Routing::all();
+        $routings = Routing::with(['operations.workCenter', 'operations.section'])
+            ->where(function ($q) use ($bom) {
+                $q->whereIn('status', [Routing::STATUS_ACTIVE, Routing::STATUS_SCHEDULED, 'approved']);
+                if ($bom->routing_id) {
+                    $q->orWhere('id', $bom->routing_id);
+                }
+            })
+            ->get();
 
-        return view('modules.production.bom.edit', compact('bom', 'products', 'materials', 'uoms', 'routings'));
+        $this->attachDeletedOperationsForBom($bom->id, $routings);
+        $routingAdvisoriesMap = $this->buildRoutingAdvisoriesMap($routings);
+
+        return view('modules.production.bom.edit', compact('bom', 'products', 'materials', 'uoms', 'routings', 'routingAdvisoriesMap'));
     }
 
     public function update(int $id, UpdateProductionBomRequest $request): RedirectResponse
@@ -328,7 +446,7 @@ class ProductionBomController extends Controller
                 foreach ($boms as $bom) {
                     if ($bom->isPendingApproval() && auth()->user()->can('approve', $bom)) {
                         try {
-                            $this->bomService->approve($bom->id, auth()->id() ?: 1);
+                            $this->bomService->approve($bom->id, auth()->id());
                             $successCount++;
                         } catch (\Exception $e) {
                             $failedCount++;
@@ -344,7 +462,7 @@ class ProductionBomController extends Controller
                 foreach ($boms as $bom) {
                     if (auth()->user()->can('cancel', $bom)) {
                         try {
-                            $this->bomService->cancel($bom->id, auth()->id() ?: 1, 'Bulk cancelled.');
+                            $this->bomService->cancel($bom->id, auth()->id(), 'Bulk cancelled.');
                             $successCount++;
                         } catch (\Exception $e) {
                             $failedCount++;
@@ -405,7 +523,7 @@ class ProductionBomController extends Controller
         $this->authorize('approve', $bom);
 
         try {
-            $this->bomService->approve($id, auth()->id() ?: 1);
+            $this->bomService->approve($id, auth()->id());
             return redirect()
                 ->back()
                 ->with('success', 'BOM approved successfully. Any older approved version has been set to inactive.');
@@ -425,7 +543,7 @@ class ProductionBomController extends Controller
 
         $request->validate(['comments' => 'nullable|string|max:1000']);
         try {
-            $this->bomService->reject($id, auth()->id() ?: 1, $request->input('comments'));
+            $this->bomService->reject($id, auth()->id(), $request->input('comments'));
             return redirect()
                 ->back()
                 ->with('success', 'BOM rejected successfully.');
@@ -445,7 +563,7 @@ class ProductionBomController extends Controller
 
         $request->validate(['comments' => 'nullable|string|max:1000']);
         try {
-            $this->bomService->cancel($id, auth()->id() ?: 1, $request->input('comments'));
+            $this->bomService->cancel($id, auth()->id(), $request->input('comments'));
             return redirect()
                 ->back()
                 ->with('success', 'BOM cancelled successfully.');
@@ -468,14 +586,70 @@ class ProductionBomController extends Controller
         ]);
 
         try {
-            $newBom = $this->bomService->duplicateVersion($id, $request->input('new_version'), auth()->id() ?: 1);
+            $newVersion = $request->input('new_version');
+            $this->bomService->checkBomConflicts($bom->product_id, $newVersion, null, $bom->tenant_id);
+
+            // BM-IMPL-03: Copy-without-saving — redirect to pre-filled create form
             return redirect()
-                ->route('production.boms.edit', $newBom->id)
-                ->with('success', "New BOM version {$newBom->version} created as draft. Review and save components.");
+                ->route('production.boms.create', [
+                    'copy_from' => $bom->id,
+                    'mode'      => 'duplicate',
+                    'version'   => $newVersion,
+                ])
+                ->with('info', __('production.bom_copy_notice', [
+                    'number'  => $bom->bom_number,
+                    'version' => $bom->version,
+                    'mode'    => __('production.bom_mode_duplicate'),
+                ]));
         } catch (\Exception $e) {
             return redirect()
                 ->back()
                 ->with('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Attach soft-deleted routing operations that still carry this BOM's materials so they render as Deleted cards.
+     */
+    private function attachDeletedOperationsForBom(int $bomId, $routings): void
+    {
+        $removedOpIds = \App\Domains\Production\Models\RoutingOperationMaterial::where('bom_id', $bomId)
+            ->pluck('routing_operation_id')
+            ->unique()
+            ->filter();
+        if ($removedOpIds->isEmpty()) {
+            return;
+        }
+
+        $removedOps = \App\Domains\Production\Models\RoutingOperation::onlyTrashed()
+            ->whereIn('id', $removedOpIds)
+            ->with(['workCenter', 'section'])
+            ->get();
+
+        foreach ($removedOps->groupBy('routing_id') as $routingId => $ops) {
+            $routingModel = $routings->firstWhere('id', $routingId);
+            if (!$routingModel) {
+                continue;
+            }
+            $ops->each(function ($op) {
+                $op->setAttribute('is_deleted', true);
+                $op->setAttribute('sequence', 99000 + $op->id);
+            });
+            $routingModel->setRelation('operations', $routingModel->operations->concat($ops)->values());
+        }
+    }
+
+    /**
+     * Precompute structured live routing advisories for the BOM form routing dropdown.
+     *
+     * @return array<int, array<int, array{code: string, message: string, blocks_approval: bool}>>
+     */
+    private function buildRoutingAdvisoriesMap($routings): array
+    {
+        $map = [];
+        foreach ($routings as $r) {
+            $map[$r->id] = ProductionBom::buildRoutingAdvisories($r);
+        }
+        return $map;
     }
 }

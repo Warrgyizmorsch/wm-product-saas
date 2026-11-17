@@ -9,19 +9,21 @@ class ProductionBomDTO
      */
     public function __construct(
         public readonly string $bom_number,
-        public readonly ?string $bom_name,
-        public readonly string $bom_type,
-        public readonly int $product_id,
-        public readonly float $base_quantity,
-        public readonly ?int $base_uom_id = null,
-        public readonly string $version,
-        public readonly ?string $revision_reason = null,
+        public readonly ?string $bom_name = null,
+        public readonly string $bom_type = 'manufacturing',
+        public readonly int $product_id = 0,
         public readonly ?int $routing_id = null,
-        public readonly string $effective_date,
+        public readonly float $base_quantity = 1.00,
+        public readonly ?int $base_uom_id = null,
+        public readonly string $version = '1.0.0',
+        public readonly ?string $revision_reason = null,
+        public readonly ?string $effective_date = null,
         public readonly ?string $expiry_date = null,
         public readonly ?string $notes = null,
         public readonly array $items = [],
         public readonly ?string $usage_context = 'manufacturing',
+        // BM-IMPL-03: set when saving a Duplicate / Revise copy (not a column)
+        public readonly ?int $source_bom_id = null,
     ) {
     }
 
@@ -39,16 +41,17 @@ class ProductionBomDTO
             bom_name: $data['bom_name'] ?? null,
             bom_type: $data['bom_type'] ?? 'manufacturing',
             product_id: (int) ($data['product_id'] ?? 0),
+            routing_id: !empty($data['routing_id']) ? (int) $data['routing_id'] : null,
             base_quantity: isset($data['base_quantity']) ? (float) $data['base_quantity'] : 1.00,
             base_uom_id: !empty($data['base_uom_id']) ? (int) $data['base_uom_id'] : null,
             version: $data['version'] ?? '1.0.0',
             revision_reason: $data['revision_reason'] ?? null,
-            routing_id: !empty($data['routing_id']) ? (int) $data['routing_id'] : null,
             effective_date: $data['effective_date'] ?? now()->toDateString(),
             expiry_date: $data['expiry_date'] ?? null,
             notes: $data['notes'] ?? null,
             items: $items,
             usage_context: $data['usage_context'] ?? 'manufacturing',
+            source_bom_id: !empty($data['source_bom_id']) ? (int) $data['source_bom_id'] : null,
         );
     }
 
@@ -59,11 +62,11 @@ class ProductionBomDTO
             'bom_name' => $this->bom_name,
             'bom_type' => $this->bom_type,
             'product_id' => $this->product_id,
+            'routing_id' => $this->routing_id,
             'base_quantity' => $this->base_quantity,
             'base_uom_id' => $this->base_uom_id,
             'version' => $this->version,
             'revision_reason' => $this->revision_reason,
-            'routing_id' => $this->routing_id,
             'effective_date' => $this->effective_date,
             'expiry_date' => $this->expiry_date,
             'notes' => $this->notes,

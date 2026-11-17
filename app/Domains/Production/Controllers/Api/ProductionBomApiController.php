@@ -78,6 +78,23 @@ class ProductionBomApiController extends ApiBaseController
     }
 
     /**
+     * Eager load relations needed by ProductionBomDetailResource.
+     */
+    private function detailRelations(): array
+    {
+        return [
+            'product.uom',
+            'baseUom',
+            'routing.operations',
+            'operationMaterials.material.uom',
+            'operationMaterials.uom',
+            'operationMaterials.routingOperation' => fn ($q) => $q->withTrashed(),
+            'items.material.uom',
+            'items.product',
+        ];
+    }
+
+    /**
      * GET /api/v1/production/boms/{id}
      * Get detailed BOM including component lines.
      */
@@ -86,7 +103,7 @@ class ProductionBomApiController extends ApiBaseController
         $tenantId = $this->getTenantId();
 
         $bom = ProductionBom::where('tenant_id', $tenantId)
-            ->with(['product.uom', 'baseUom', 'routing', 'items.material.uom', 'items.product'])
+            ->with($this->detailRelations())
             ->findOrFail($id);
 
         Gate::authorize('view', $bom);
@@ -107,10 +124,10 @@ class ProductionBomApiController extends ApiBaseController
 
         try {
             $dto = ProductionBomDTO::fromArray($request->validated());
-            $bom = $this->bomService->create($dto, auth()->id() ?: 1);
+            $bom = $this->bomService->create($dto, auth()->id());
 
             return $this->createdResponse(
-                new ProductionBomDetailResource($bom->load(['product', 'routing', 'items.material.uom', 'items.product'])),
+                new ProductionBomDetailResource($bom->load($this->detailRelations())),
                 'BOM created successfully in draft mode.'
             );
         } catch (\Throwable $e) {
@@ -125,7 +142,9 @@ class ProductionBomApiController extends ApiBaseController
     public function update(UpdateBomApiRequest $request, int $id): JsonResponse
     {
         $tenantId = $this->getTenantId();
-        $bom = ProductionBom::where('tenant_id', $tenantId)->findOrFail($id);
+        $bom = ProductionBom::where('tenant_id', $tenantId)
+            ->with(['operationMaterials', 'items'])
+            ->findOrFail($id);
 
         Gate::authorize('update', $bom);
 
@@ -134,22 +153,17 @@ class ProductionBomApiController extends ApiBaseController
         }
 
         try {
-            $existingItems = [];
+            // BM-IMPL-19 #2: no `items` → header-only update; allocations and master rows are never touched
             if (!$request->has('items')) {
-                $existingItems = $bom->items->map(function ($item) {
-                    return [
-                        'material_id' => $item->material_id,
-                        'quantity' => $item->quantity,
-                        'uom_id' => $item->uom_id,
-                        'scrap_percentage' => $item->scrap_percentage,
-                        'sequence' => $item->sequence,
-                        'is_critical' => $item->is_critical,
-                        'child_bom_id' => $item->child_bom_id,
-                        'notes' => $item->notes,
-                    ];
-                })->all();
+                $this->bomService->updateHeader($id, $request->validated());
+
+                return $this->successResponse(
+                    new ProductionBomDetailResource($bom->fresh($this->detailRelations())),
+                    'BOM updated successfully.'
+                );
             }
 
+            $existingItems = [];
             $mergedData = array_merge([
                 'bom_number'     => $bom->bom_number,
                 'product_id'     => $bom->product_id,
@@ -168,7 +182,7 @@ class ProductionBomApiController extends ApiBaseController
             $this->bomService->update($id, $dto);
 
             return $this->successResponse(
-                new ProductionBomDetailResource($bom->fresh(['product', 'items.product'])),
+                new ProductionBomDetailResource($bom->fresh($this->detailRelations())),
                 'BOM updated successfully.'
             );
         } catch (\Throwable $e) {
@@ -191,7 +205,7 @@ class ProductionBomApiController extends ApiBaseController
             $this->bomService->submitApproval($id);
 
             return $this->successResponse(
-                new ProductionBomDetailResource($bom->fresh(['product'])),
+                new ProductionBomDetailResource($bom->fresh($this->detailRelations())),
                 'BOM submitted for approval.'
             );
         } catch (\Throwable $e) {
@@ -211,10 +225,10 @@ class ProductionBomApiController extends ApiBaseController
         Gate::authorize('approve', $bom);
 
         try {
-            $this->bomService->approve($id, auth()->id() ?: 1);
+            $this->bomService->approve($id, auth()->id());
 
             return $this->successResponse(
-                new ProductionBomDetailResource($bom->fresh(['product'])),
+                new ProductionBomDetailResource($bom->fresh($this->detailRelations())),
                 'BOM approved successfully.'
             );
         } catch (\Throwable $e) {
@@ -224,7 +238,7 @@ class ProductionBomApiController extends ApiBaseController
 
     /**
      * POST /api/v1/production/boms/{id}/duplicate
-     * Duplicate a BOM to create a new revision.
+     * Copy data for a new version (Duplicate with `version`, Revise with `version_type`) — nothing saved.
      */
     public function duplicate(Request $request, int $id): JsonResponse
     {
@@ -233,14 +247,16 @@ class ProductionBomApiController extends ApiBaseController
         $tenantId = $this->getTenantId();
         $bom = ProductionBom::where('tenant_id', $tenantId)->findOrFail($id);
 
+        // An explicit version (Duplicate) wins over a bump (Revise)
+        $explicitVersion = trim((string) $request->input('version', ''));
         $bumpType = $request->input('version_type', $request->input('bump_type', 'patch'));
-        $newVersion = match ($bumpType) {
+        $newVersion = $explicitVersion !== '' ? $explicitVersion : match ($bumpType) {
             'major' => $this->versionService->incrementMajor($bom->version),
             'minor' => $this->versionService->incrementMinor($bom->version),
             default => $this->versionService->incrementPatch($bom->version),
         };
 
-        while ($this->bomRepository->versionExistsUnscoped($bom->product_id, $newVersion, $tenantId)) {
+        while ($explicitVersion === '' && $this->bomRepository->versionExistsUnscoped($bom->product_id, $newVersion, $tenantId)) {
             $newVersion = match ($bumpType) {
                 'major' => $this->versionService->incrementMajor($newVersion),
                 'minor' => $this->versionService->incrementMinor($newVersion),
@@ -249,11 +265,11 @@ class ProductionBomApiController extends ApiBaseController
         }
 
         try {
-            $newBom = $this->bomService->duplicateVersion($id, $newVersion, auth()->id() ?: 1);
-
-            return $this->createdResponse(
-                new ProductionBomDetailResource($newBom->load(['product', 'items.product'])),
-                "New BOM version {$newBom->version} created as draft."
+            // BM-IMPL-03 #7 / BM-IMPL-19 #5: nothing is saved — the copy data comes back; the client sends it
+            // (with source_bom_id) to the normal create endpoint to save the new version
+            return $this->successResponse(
+                $this->bomService->buildCopyPayload($id, $newVersion),
+                'Copy data for the new version — not saved. Send it to the create endpoint to save.'
             );
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
@@ -283,10 +299,10 @@ class ProductionBomApiController extends ApiBaseController
         $request->validate(['comments' => 'nullable|string|max:1000']);
 
         try {
-            $this->bomService->reject($id, auth()->id() ?: 1, $request->input('comments'));
+            $this->bomService->reject($id, auth()->id(), $request->input('comments'));
 
             return $this->successResponse(
-                new ProductionBomDetailResource($bom->fresh(['product'])),
+                new ProductionBomDetailResource($bom->fresh($this->detailRelations())),
                 'BOM rejected successfully.'
             );
         } catch (\Throwable $e) {
@@ -308,10 +324,10 @@ class ProductionBomApiController extends ApiBaseController
         $request->validate(['comments' => 'nullable|string|max:1000']);
 
         try {
-            $this->bomService->cancel($id, auth()->id() ?: 1, $request->input('comments'));
+            $this->bomService->cancel($id, auth()->id(), $request->input('comments'));
 
             return $this->successResponse(
-                new ProductionBomDetailResource($bom->fresh(['product'])),
+                new ProductionBomDetailResource($bom->fresh($this->detailRelations())),
                 'BOM cancelled successfully.'
             );
         } catch (\Throwable $e) {

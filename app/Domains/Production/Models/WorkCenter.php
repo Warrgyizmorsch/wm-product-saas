@@ -8,13 +8,16 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WorkCenter extends BaseModel
 {
     use HasFactory, SoftDeletes, Loggable;
 
-    public const TYPES = ['department', 'section', 'work_center', 'machine_group'];
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_INACTIVE = 'inactive';
 
     protected $table = 'production_work_centers';
 
@@ -24,41 +27,74 @@ class WorkCenter extends BaseModel
         'code',
         'work_center_type',  // A4: future FK when master table arrives
         'description',
-        'department_name',   // Q2: plain string, no FK
         'location',
-        'capacity_per_hour',
-        'efficiency_percentage',
-        'cost_per_hour',
-        'overhead_rate',
+        'overhead_cost',
+        'calculation_countdown_minutes',
+        'calculation_countdown_end_at',
+        'pending_calculation_section_ids',
+        'is_calculation_running',
         'status',
-        'parent_id',
-        'type',
         'production_calendar_id',
     ];
 
     protected $casts = [
-        'capacity_per_hour'      => 'float',
-        'efficiency_percentage'  => 'float',
-        'cost_per_hour'          => 'float',
-        'overhead_rate'          => 'float',
-        'parent_id'              => 'integer',
+        'overhead_cost'                   => 'decimal:4',
+        'calculation_countdown_minutes'   => 'integer',
+        'calculation_countdown_end_at'    => 'datetime',
+        'pending_calculation_section_ids' => 'array',
+        'is_calculation_running'          => 'boolean',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
-    public function parent(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function calculations(): HasMany
     {
-        return $this->belongsTo(self::class, 'parent_id');
+        return $this->hasMany(WorkCenterCalculation::class, 'work_center_id');
     }
 
-    public function children(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function latestCalculation(): HasOne
     {
-        return $this->hasMany(self::class, 'parent_id');
+        return $this->hasOne(WorkCenterCalculation::class, 'work_center_id')->latestOfMany();
     }
 
-    public function machines(): HasMany
+    public function activityLogs(): HasMany
     {
-        return $this->hasMany(Machine::class, 'work_center_id');
+        return $this->hasMany(WorkCenterActivityLog::class, 'work_center_id')->orderByDesc('id');
+    }
+
+    public function sections(): HasMany
+    {
+        return $this->hasMany(WorkCenterSection::class, 'work_center_id');
+    }
+
+    /**
+     * Machines assigned to Sections belonging to this Work Center.
+     */
+    public function machines(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            Machine::class,
+            WorkCenterSection::class,
+            'work_center_id', // Foreign key on WorkCenterSection table
+            'section_id',     // Foreign key on Machine table
+            'id',             // Local key on WorkCenter table
+            'id'              // Local key on WorkCenterSection table
+        );
+    }
+
+    /**
+     * External worker allocations for Sections belonging to this Work Center.
+     */
+    public function externalWorkerAllocations(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            ExternalWorkerAllocation::class,
+            WorkCenterSection::class,
+            'work_center_id', // Foreign key on WorkCenterSection table
+            'section_id',     // Foreign key on ExternalWorkerAllocation table
+            'id',             // Local key on WorkCenter table
+            'id'              // Local key on WorkCenterSection table
+        );
     }
 
     public function calendar(): BelongsTo
@@ -66,25 +102,85 @@ class WorkCenter extends BaseModel
         return $this->belongsTo(ProductionCalendar::class, 'production_calendar_id');
     }
 
-    public function shifts(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    /**
+     * Get the effective shifts for this Work Center derived from its Sections.
+     *
+     * A Work Center's effective shifts are the unique union of shifts assigned to its Sections.
+     *
+     * @param bool $onlyActive When true, only active sections, active section-shift assignments, and active shifts are returned.
+     * @return \Illuminate\Support\Collection<int, ProductionShift>
+     */
+    public function getEffectiveShifts(bool $onlyActive = true): \Illuminate\Support\Collection
     {
-        return $this->belongsToMany(
-            ProductionShift::class,
-            'production_work_center_shifts',
-            'work_center_id',
-            'shift_id'
-        )->distinct();
+        $sections = $this->relationLoaded('sections')
+            ? $this->sections
+            : $this->sections()->get();
+
+        if ($onlyActive) {
+            $sections = $sections->filter(fn($sec) => $sec->isActive());
+        }
+
+        $shifts = collect();
+        foreach ($sections as $section) {
+            $secShifts = $section->shifts;
+
+            if ($onlyActive) {
+                $secShifts = $secShifts->filter(function ($shift) {
+                    $shiftActive = (bool) ($shift->active ?? true);
+                    $pivotActive = (bool) ($shift->pivot->active ?? true);
+                    return $shiftActive && $pivotActive;
+                });
+            }
+
+            $shifts = $shifts->merge($secShifts);
+        }
+
+        return $shifts->unique('id')->values();
     }
 
-    public function activeMachines(): HasMany
+    /**
+     * Accessor for effective shifts collection.
+     */
+    public function getEffectiveShiftsAttribute(): \Illuminate\Support\Collection
     {
-        return $this->hasMany(Machine::class, 'work_center_id')
-            ->where('status', 'active');
+        return $this->getEffectiveShifts(true);
+    }
+
+    public function activeMachines(): HasManyThrough
+    {
+        return $this->machines()
+            ->where('production_machines.status', Machine::STATUS_ACTIVE);
     }
 
     public function operations(): HasMany
     {
         return $this->hasMany(RoutingOperation::class, 'work_center_id');
+    }
+
+    public function employeeAssignments(): HasMany
+    {
+        return $this->hasMany(WorkCenterEmployeeAssignment::class, 'work_center_id')
+            ->whereNull('production_work_center_employees.section_id');
+    }
+
+    public function allEmployeeAssignments(): HasMany
+    {
+        return $this->hasMany(WorkCenterEmployeeAssignment::class, 'work_center_id');
+    }
+
+    public function activeEmployeeAssignments(): HasMany
+    {
+        return $this->employeeAssignments()->where('production_work_center_employees.active', true);
+    }
+
+    public function employees(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(
+            \App\Domains\HRMS\Models\Employee::class,
+            'production_work_center_employees',
+            'work_center_id',
+            'employee_id'
+        )->wherePivotNull('section_id')->withPivot('id', 'active', 'tenant_id')->withTimestamps();
     }
 
     // ─── Status Helpers ───────────────────────────────────────────────────────
@@ -114,30 +210,78 @@ class WorkCenter extends BaseModel
     // ─── Computed Helpers ─────────────────────────────────────────────────────
 
     /**
+     * Determine whether the Work Center has a valid derived efficiency.
+     *
+     * In the redesigned architecture, efficiency is derived from Sections,
+     * employee assignments, and relevant calculation logic rather than entered manually.
+     * A newly created Work Center with no relevant Section or assignment data
+     * cannot have its efficiency determined.
+     */
+    public function hasDeterminedEfficiency(): bool
+    {
+        return false;
+    }
+
+    /**
      * Effective capacity considering efficiency percentage.
      * Future: used by SchedulingEngine to calculate available slots.
      */
     public function effectiveCapacityPerHour(): float
     {
-        return ($this->capacity_per_hour ?? 0) * ($this->efficiency_percentage / 100);
+        return 0.0;
     }
 
     /**
-     * Get the breadcrumb path of the work center hierarchy.
-     * e.g. "Fabrication > Cutting > Laser Cutting"
+     * Short Full Review Point 2 — fallback rates for legacy cost readers.
+     * The old `cost_per_hour` / `overhead_rate` columns were dropped; the real figures live on the
+     * latest Work Center calculation snapshot and `overhead_cost` (flat amount per day). All values are DB base currency.
      */
-    public function getHierarchyPath(string $separator = ' > '): string
+    public function calculatedLaborCostPerHour(): float
     {
-        $path = [$this->name];
-        $current = $this;
-        $depth = 0;
+        return (float) ($this->latestCalculation?->labor_cost_per_hour ?? 0.0);
+    }
 
-        while ($current->parent_id && $current->parent && $depth < 10) {
-            $current = $current->parent;
-            array_unshift($path, $current->name);
-            $depth++;
-        }
+    /** Overhead per operating hour = daily overhead ÷ unique operating hours of the latest calculation (0 when not calculated). */
+    public function calculatedOverheadCostPerHour(): float
+    {
+        $hours = (float) ($this->latestCalculation?->unique_operating_hours ?? 0.0);
 
-        return implode($separator, $path);
+        $daily = (float) ($this->latestCalculation?->overhead_cost ?? $this->overhead_cost ?? 0.0);
+
+        return $hours > 0 ? $daily / $hours : 0.0;
+    }
+
+    public function getCalculationDetails(): array
+    {
+        return [
+            'capacity' => [
+                'capacity_per_hour'          => 0.0,
+                'total_theoretical_capacity' => 0.0,
+                'unique_operating_hours'     => 0.0,
+                'capacity_unit'              => 'units/hr',
+                'sections'                   => [],
+                'windows'                    => [],
+                'timeline_windows'           => [],
+                'gaps'                       => [],
+            ],
+            'labor_cost' => [
+                'labor_cost_per_hour'         => 0.0,
+                'total_scheduled_labor_cost'  => 0.0,
+                'unique_operating_hours'      => 0.0,
+                'cost_unit'                   => 'currency/hr',
+                'has_missing_rates'           => false,
+                'has_overlapping_assignments' => false,
+                'assignments'                 => [],
+                'sections'                    => [],
+                'windows'                     => [],
+                'gaps'                        => [],
+            ],
+        ];
+    }
+
+    public function hasOverlappingAssignments(): bool
+    {
+        $details = $this->getCalculationDetails();
+        return (bool) ($details['labor_cost']['has_overlapping_assignments'] ?? false);
     }
 }

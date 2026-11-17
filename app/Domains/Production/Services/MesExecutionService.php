@@ -148,7 +148,14 @@ class MesExecutionService
                         }
 
                         if ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled) {
-                            if (($orderOp && (float) $orderOp->quantity_transferred_in > 0) || ((float) $predOrderOp->quantity_transferred_out > 0) || ($schedOp->status === ProductionScheduleOperation::STATUS_READY)) {
+                            $transferBatch = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
+                            $claimedOrProduced = max((float) ($predOrderOp->quantity_claimed ?? 0), (float) ($predOrderOp->quantity_produced ?? 0));
+                            if (
+                                ($orderOp && (float) $orderOp->quantity_transferred_in > 0)
+                                || ((float) $predOrderOp->quantity_transferred_out > 0)
+                                || ($schedOp->status === ProductionScheduleOperation::STATUS_READY)
+                                || ($transferBatch > 0 && $claimedOrProduced >= $transferBatch)
+                            ) {
                                 return false;
                             }
                         }

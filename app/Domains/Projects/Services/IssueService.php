@@ -2,6 +2,8 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Platform\Services\NotificationRuleService;
+use App\Domains\Projects\Events\IssueAssigned;
 use App\Domains\Projects\Events\IssueLogged;
 use App\Domains\Projects\Events\IssueResolved;
 use App\Domains\Projects\Events\IssueRetested;
@@ -68,6 +70,25 @@ class IssueService
 
             event(new IssueLogged($issue, $reporter));
 
+            try {
+                NotificationRuleService::trigger('projects.issue.logged', [
+                    'tenant_id'        => $project->tenant_id,
+                    'issue_number'     => $issue->issue_number,
+                    'title'            => $issue->title,
+                    'severity'         => $issue->severity,
+                    'project'          => $project->name,
+                    'actor'            => $reporter->name,
+                    'assigned_user_id' => $issue->assignee_id,
+                    'exclude_user_ids' => [$reporter->id],
+                ], $project, $issue);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.issue.logged notification failed: ' . $e->getMessage());
+            }
+
+            if (!empty($issue->assignee_id)) {
+                event(new IssueAssigned($issue, $reporter));
+            }
+
             return $issue;
         });
     }
@@ -94,6 +115,13 @@ class IssueService
 
         return DB::transaction(function () use ($issue, $data, $project, $actor) {
             $originalStatus = $issue->status;
+            $previousAssigneeId = $issue->assignee_id;
+
+            // Auto-update status to Assigned if assigning an Open issue
+            if (array_key_exists('assignee_id', $data) && !empty($data['assignee_id']) && $issue->status === Issue::STATUS_OPEN && !array_key_exists('status', $data)) {
+                $data['status'] = Issue::STATUS_ASSIGNED;
+            }
+
             $updated = $this->issues->update($issue->id, $data);
 
             if ($originalStatus !== $updated->status) {
@@ -112,6 +140,7 @@ class IssueService
                     );
 
                     event(new IssueResolved($updated, $actor));
+                    $this->triggerIssueResolvedNotification($updated, $actor, $issue->project);
                 } else {
                     $this->activityLogs->record(
                         $project,
@@ -131,6 +160,28 @@ class IssueService
                         ]
                     );
                 }
+            }
+
+            if (array_key_exists('assignee_id', $data) && !empty($data['assignee_id']) && (int) $data['assignee_id'] !== (int) $previousAssigneeId) {
+                $updated->loadMissing('assignee');
+                $this->activityLogs->record(
+                    $project,
+                    'project.issue_assigned',
+                    __('projects.issue_assigned_title', [
+                        'number'   => $updated->issue_number,
+                        'user'     => $actor->name,
+                        'assignee' => $updated->assignee?->name ?? 'User',
+                        'default'  => ":user assigned issue :number to :assignee",
+                    ]),
+                    null,
+                    $updated,
+                    [
+                        'previous_assignee_id' => $previousAssigneeId,
+                        'new_assignee_id'      => $updated->assignee_id,
+                    ]
+                );
+
+                event(new IssueAssigned($updated, $actor, $previousAssigneeId));
             }
 
             return $updated;
@@ -168,6 +219,7 @@ class IssueService
             );
 
             event(new IssueResolved($updated, $actor));
+            $this->triggerIssueResolvedNotification($updated, $actor, $issue->project);
 
             return $updated;
         });
@@ -240,6 +292,22 @@ class IssueService
 
             event(new IssueRetested($updated, $tester, $passed));
 
+            try {
+                NotificationRuleService::trigger('projects.issue.retested', [
+                    'tenant_id'          => $issue->project?->tenant_id ?? $issue->tenant_id,
+                    'issue_number'       => $updated->issue_number,
+                    'title'              => $updated->title,
+                    'result'             => $passed ? 'Passed (Closed)' : 'Failed (Reopened)',
+                    'project'            => $issue->project?->name ?? 'Project',
+                    'actor'              => $tester->name,
+                    'assigned_user_id'   => $updated->assignee_id,
+                    'created_by_user_id' => $updated->reporter_id,
+                    'exclude_user_ids'   => [$tester->id],
+                ], $issue->project, $updated);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.issue.retested notification failed: ' . $e->getMessage());
+            }
+
             return $updated;
         });
     }
@@ -268,9 +336,11 @@ class IssueService
         return $deleted;
     }
 
-    public function updateField(Issue $issue, string $field, mixed $value, User $actor): Issue
+    public function updateField(Issue $issue, string $field, mixed $value, User $actor): mixed
     {
-        return $this->update($issue, [$field => $value], $actor);
+        $updated = $this->update($issue, [$field => $value], $actor);
+
+        return $updated->{$field};
     }
 
     private function validateAssigneeIsCollaborator(Project $project, int $userId): void
@@ -287,6 +357,24 @@ class IssueService
                     'default' => 'Issue assignee must be an active collaborator on this project.',
                 ])],
             ]);
+        }
+    }
+
+    private function triggerIssueResolvedNotification(Issue $issue, User $actor, ?Project $project = null): void
+    {
+        try {
+            $proj = $project ?? $issue->project;
+            NotificationRuleService::trigger('projects.issue.resolved', [
+                'tenant_id'          => $proj?->tenant_id ?? $issue->tenant_id,
+                'issue_number'       => $issue->issue_number,
+                'title'              => $issue->title,
+                'project'            => $proj?->name ?? 'Project',
+                'actor'              => $actor->name,
+                'created_by_user_id' => $issue->reporter_id,
+                'exclude_user_ids'   => [$actor->id],
+            ], $proj, $issue);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('projects.issue.resolved notification failed: ' . $e->getMessage());
         }
     }
 }

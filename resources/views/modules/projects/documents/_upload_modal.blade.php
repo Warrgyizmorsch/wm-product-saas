@@ -27,7 +27,7 @@
 
             <div class="col-12">
                 <label class="form-label fw-bold fs-12 text-uppercase text-muted">{{ __('projects.document') }} <span class="text-danger">*</span></label>
-                <input type="file" name="file" class="form-control form-control-sm" required>
+                <input type="file" name="file" class="form-control form-control-sm" accept=".pdf,.docx,.xlsx,.csv,.png,.jpg,.jpeg,.zip,.txt" required>
                 <div class="form-text fs-11 text-muted">{{ __('projects.max_file_size_hint') }}</div>
             </div>
 

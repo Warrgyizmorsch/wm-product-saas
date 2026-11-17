@@ -5,6 +5,7 @@
     $visibleTaskLists = $hasActiveTaskFilters
         ? $taskLists->filter(fn ($taskList) => $tasksByList->get($taskList->id, collect())->isNotEmpty())
         : $taskLists;
+    $tasklistsFilterUrl = isset($milestone) ? route('projects.milestones.show', [$project, $milestone]) : route('projects.show', $project);
 @endphp
 
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
@@ -12,7 +13,7 @@
         <i class="feather-list me-2 text-primary"></i>{{ __('projects.tasklists') }}
     </h5>
     <div class="d-flex align-items-center gap-2">
-        <form method="GET" action="{{ route('projects.show', $project) }}" class="d-inline">
+        <form method="GET" action="{{ $tasklistsFilterUrl }}" class="d-inline">
             <input type="hidden" name="tab" value="tasklists">
             <x-ui.filter :label="__('ui.filter')" offset="0, 5">
                     <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>{{ __('projects.filter_options') }}</h6>
@@ -59,7 +60,7 @@
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('projects.show', ['project' => $project, 'tab' => 'tasklists']) }}" class="btn btn-sm btn-light border">{{ __('projects.reset') }}</a>
+                        <a href="{{ $tasklistsFilterUrl }}?tab=tasklists" class="btn btn-sm btn-light border">{{ __('projects.reset') }}</a>
                         <button type="submit" class="btn btn-sm btn-primary">{{ __('projects.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
@@ -87,7 +88,7 @@
             @php $assigneeChip = $assigneeOptions->firstWhere('user_id', (int) $taskFilters['assignee_id']); @endphp
             <x-ui.badge variant="secondary" soft>{{ __('projects.task_assignee') }}: {{ $assigneeChip->user?->name ?? __('projects.unassigned') }}</x-ui.badge>
         @endif
-        <a href="{{ route('projects.show', ['project' => $project, 'tab' => 'tasklists']) }}" class="fs-11 text-danger fw-semibold">
+        <a href="{{ $tasklistsFilterUrl }}?tab=tasklists" class="fs-11 text-danger fw-semibold">
             <i class="feather-x me-1"></i>{{ __('projects.clear_filters') }}
         </a>
     </div>
@@ -107,7 +108,7 @@
         @if ($hasActiveTaskFilters)
             <h6 class="fw-bold text-dark mb-1">{{ __('projects.no_matching_tasks') }}</h6>
             <p class="fs-12 text-muted mb-3">{{ __('projects.no_matching_tasks_hint') }}</p>
-            <a href="{{ route('projects.show', ['project' => $project, 'tab' => 'tasklists']) }}" class="btn btn-light btn-sm border">
+            <a href="{{ $tasklistsFilterUrl }}?tab=tasklists" class="btn btn-light btn-sm border">
                 {{ __('projects.clear_filters') }}
             </a>
         @else

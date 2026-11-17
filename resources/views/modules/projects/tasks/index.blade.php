@@ -189,14 +189,15 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        <x-ui.pagination
-            :currentPage="$tasks->currentPage()"
-            :lastPage="$tasks->lastPage()"
-            :total="$tasks->total()"
-            :perPage="$tasks->perPage()"
-            :from="$tasks->firstItem()"
-            :to="$tasks->lastItem()"
-        />
+        <div class="mt-3">
+            <x-ui.pagination
+                :paginator="$tasks"
+                :currentPage="$tasks->currentPage()"
+                :totalPages="$tasks->lastPage()"
+                :totalResults="$tasks->total()"
+                :perPage="$tasks->perPage()"
+            />
+        </div>
 
     </div>
 @endsection

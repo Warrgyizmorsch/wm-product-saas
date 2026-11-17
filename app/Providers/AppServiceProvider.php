@@ -121,6 +121,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Repositories\WorkCenterRepository::class
         );
 
+        // ── Production: Work Center Section ───────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\WorkCenterSectionRepositoryInterface::class,
+            \App\Domains\Production\Repositories\WorkCenterSectionRepository::class
+        );
+
         // ── Production: Machine ───────────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Production\Repositories\MachineRepositoryInterface::class,
@@ -655,9 +661,11 @@ class AppServiceProvider extends ServiceProvider
         foreach ([
             \App\Domains\Projects\Events\TaskAssigned::class,
             \App\Domains\Projects\Events\TaskCompleted::class,
+            \App\Domains\Projects\Events\IssueAssigned::class,
             \App\Domains\Projects\Events\IssueLogged::class,
             \App\Domains\Projects\Events\IssueResolved::class,
             \App\Domains\Projects\Events\IssueRetested::class,
+            \App\Domains\Projects\Events\MilestoneCompleted::class,
             \App\Domains\Projects\Events\TimesheetSubmitted::class,
             \App\Domains\Projects\Events\TimesheetApproved::class,
             \App\Domains\Projects\Events\TimesheetRejected::class,
@@ -712,6 +720,21 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\WorkCenter::class,
             \App\Domains\Production\Policies\WorkCenterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\WorkCenterSection::class,
+            \App\Domains\Production\Policies\WorkCenterSectionPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ExternalWorkerPayGrade::class,
+            \App\Domains\Production\Policies\ExternalWorkerPayGradePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ExternalWorkerAllocation::class,
+            \App\Domains\Production\Policies\ExternalWorkerAllocationPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(

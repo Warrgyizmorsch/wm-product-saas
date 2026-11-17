@@ -37,10 +37,14 @@ class MachineApiController extends ApiBaseController
         $tenantId = $this->getTenantId();
 
         $query = Machine::where('tenant_id', $tenantId)
-            ->with(['workCenter:id,name,code']);
+            ->with(['section:id,name,code,work_center_id', 'workCenter:id,name,code']);
+
+        if ($request->filled('section_id')) {
+            $query->where('section_id', (int) $request->query('section_id'));
+        }
 
         if ($request->filled('work_center_id')) {
-            $query->where('work_center_id', (int) $request->query('work_center_id'));
+            $query->whereHas('section', fn ($q) => $q->where('work_center_id', (int) $request->query('work_center_id')));
         }
 
         if ($request->filled('status')) {

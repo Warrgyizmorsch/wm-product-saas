@@ -59,18 +59,23 @@ class ProductionPlanService
             $defaultBom = ProductionBom::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $dto->product_id)
-                ->where('status', 'approved')
+                ->whereIn('status', ['approved', 'active'])
                 ->first();
             $bomId = $defaultBom ? $defaultBom->id : null;
         }
 
+        if ($bomId) {
+            $selectedBom = ProductionBom::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($bomId);
+            if ($selectedBom) {
+                app(ProductionBomService::class)->validateBomTreeForExecution($selectedBom, $tenantId);
+            }
+        }
+
         $routingId = $dto->routing_id;
         if (! $routingId) {
-            $defaultRouting = Routing::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('product_id', $dto->product_id)
-                ->where('status', 'active')
-                ->first();
+            // PO-IMPL-04: the BOM's routing (routings.product_id was dropped)
+            $bomRoutingId = $bomId ? ProductionBom::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereKey($bomId)->value('routing_id') : null;
+            $defaultRouting = $bomRoutingId ? Routing::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($bomRoutingId) : null;
             $routingId = $defaultRouting ? $defaultRouting->id : null;
         }
 

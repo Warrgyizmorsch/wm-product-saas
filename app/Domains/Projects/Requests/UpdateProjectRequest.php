@@ -51,4 +51,24 @@ class UpdateProjectRequest extends FormRequest
             'status.in' => 'A project cannot be set to that status.',
         ];
     }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $project = $this->route('project');
+            if ($project instanceof Project && $project->isContractLocked()) {
+                $reason = $project->contractLockReason();
+
+                if ($this->has('customer_id') && (int) $this->input('customer_id') !== (int) $project->customer_id) {
+                    $validator->errors()->add('customer_id', $reason);
+                }
+                if ($this->has('budget_type') && $this->input('budget_type') !== $project->budget_type) {
+                    $validator->errors()->add('budget_type', $reason);
+                }
+                if ($this->has('billing_method') && $this->input('billing_method') !== $project->billing_method) {
+                    $validator->errors()->add('billing_method', $reason);
+                }
+            }
+        });
+    }
 }

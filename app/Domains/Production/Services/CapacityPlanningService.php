@@ -40,7 +40,8 @@ class CapacityPlanningService
         $wcQuery = WorkCenter::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
-            ->with(['machines' => fn ($q) => $q->where('tenant_id', $tenantId)]);
+            // Machines are reached through sections — qualify the column (both tables carry tenant_id)
+            ->with(['machines' => fn ($q) => $q->where('production_machines.tenant_id', $tenantId)]);
 
         if (!empty($filters['work_center_id'])) {
             $wcQuery->where('id', $filters['work_center_id']);
@@ -59,7 +60,7 @@ class CapacityPlanningService
                     'code'           => $m->code,
                     'name'           => $m->name,
                     'type'           => 'machine',
-                    'work_center_id' => $m->work_center_id,
+                    'work_center_id' => $wc->id,
                     'status'         => $m->status,
                 ])->values()->all(),
             ];
@@ -490,35 +491,22 @@ class CapacityPlanningService
             throw new InvalidArgumentException("Selected machine [{$machine->name}] is inactive.");
         }
 
-        if ($machine->work_center_id !== $schedOp->work_center_id) {
+        if ($machine->section?->work_center_id !== $schedOp->work_center_id) {
             throw new InvalidArgumentException("Selected machine [{$machine->name}] does not belong to Work Center [#{$schedOp->work_center_id}].");
         }
 
         $orderOp = $schedOp->orderOperation;
         if ($orderOp) {
-            $routingOpId      = $orderOp->routing_operation_id;
+            // No alternate machines for now: the alternative operation is chosen at Production Order creation,
+            // so only the machine planned on the order operation qualifies.
             $primaryMachineId = $orderOp->machine_id ?: $orderOp->routingOperation?->machine_id;
 
-            $hasAlternateMachines = false;
-            $isAlternate = false;
-
-            if ($routingOpId) {
-                $hasAlternateMachines = RoutingOperationAlternateMachine::where('tenant_id', $tenantId)
-                    ->where('routing_operation_id', $routingOpId)
-                    ->exists();
-
-                $isAlternate = RoutingOperationAlternateMachine::where('tenant_id', $tenantId)
-                    ->where('routing_operation_id', $routingOpId)
-                    ->where('machine_id', $machineId)
-                    ->exists();
+            if ($primaryMachineId && (int) $primaryMachineId !== (int) $machineId) {
+                throw new InvalidArgumentException("Machine [{$machine->name}] is not the machine planned for operation [{$orderOp->name}].");
             }
 
-            if ($primaryMachineId || $hasAlternateMachines) {
-                $isPrimary = $primaryMachineId && (int) $primaryMachineId === (int) $machineId;
-
-                if (!$isPrimary && !$isAlternate) {
-                    throw new InvalidArgumentException("Machine [{$machine->name}] is not an approved primary or alternate machine for operation [{$orderOp->name}].");
-                }
+            if (!$primaryMachineId && ($orderOp->section_manual_production_id ?: $orderOp->routingOperation?->section_manual_production_id)) {
+                throw new InvalidArgumentException("Operation [{$orderOp->name}] runs on a manual batch; a machine cannot be assigned to it.");
             }
         }
 
@@ -921,7 +909,7 @@ class CapacityPlanningService
         $tenantId = require_tenant_id();
 
         // Get alternate machines in the same work center
-        $machines = Machine::where('work_center_id', $schedOp->work_center_id)
+        $machines = Machine::whereHas('section', fn ($q) => $q->where('work_center_id', $schedOp->work_center_id))
             ->where('status', 'active')
             ->where('id', '!=', $schedOp->machine_id)
             ->get();

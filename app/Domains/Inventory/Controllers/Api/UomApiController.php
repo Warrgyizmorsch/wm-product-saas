@@ -26,6 +26,8 @@ class UomApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Uom::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $query = Uom::query()->where('tenant_id', $tenantId);
@@ -50,6 +52,8 @@ class UomApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Uom::class);
+
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [
@@ -94,6 +98,8 @@ class UomApiController extends Controller
      */
     public function quickCreate(Request $request): JsonResponse
     {
+        $this->authorize('create', Uom::class);
+
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [

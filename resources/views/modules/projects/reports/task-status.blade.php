@@ -144,8 +144,14 @@
         </tbody>
     </x-ui.odoo-form-ui>
 
-    <div class="mt-4">
-        {{ $tasks->links() }}
+    <div class="mt-3">
+        <x-ui.pagination
+            :paginator="$tasks"
+            :currentPage="$tasks->currentPage()"
+            :totalPages="$tasks->lastPage()"
+            :totalResults="$tasks->total()"
+            :perPage="$tasks->perPage()"
+        />
     </div>
 </div>
 @endsection

@@ -221,24 +221,13 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.finished_product') }}</label>
-                                <x-ui.odoo-form-ui type="select" name="product_id">
-                                    <option value="">{{ __('production.all_products') }}</option>
-                                    @foreach($products as $product)
-                                        <option value="{{ $product->id }}" {{ request('product_id') == $product->id ? 'selected' : '' }}>
-                                            {{ $product->name }}
-                                        </option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-
-                            <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.status') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="status">
                                     <option value="">{{ __('production.all_statuses') }}</option>
                                     <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>{{ __('production.draft') }}</option>
                                     <option value="pending_approval" {{ request('status') === 'pending_approval' ? 'selected' : '' }}>{{ __('production.pending_approval') }}</option>
                                     <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>{{ __('production.active') }}</option>
+                                    <option value="scheduled" {{ request('status') === 'scheduled' ? 'selected' : '' }}>{{ __('production.scheduled') }}</option>
                                     <option value="historical" {{ request('status') === 'historical' ? 'selected' : '' }}>{{ __('production.historical') }}</option>
                                     <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>{{ __('production.cancelled') }}</option>
                                 </x-ui.odoo-form-ui>
@@ -281,15 +270,14 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" id="check-all-routings" class="form-check-input">
                         </th>
-                        <th style="width: 12%">{{ __('production.routing_number') }}</th>
-                        <th style="width: 18%">{{ __('production.routing_name') }}</th>
-                        <th style="width: 20%">{{ __('production.product_to_manufacture') }}</th>
-                        <th style="width: 7%">{{ __('production.version') }}</th>
-                        <th style="width: 6%" class="text-center">{{ __('production.operations_count') }}</th>
-                        <th style="width: 8%">{{ __('production.effective_from') }}</th>
-                        <th style="width: 8%">{{ __('production.effective_to') }}</th>
-                        <th style="width: 6%">{{ __('production.routing_type') }}</th>
-                        <th style="width: 7%">{{ __('production.status') }}</th>
+                        <th style="width: 14%">{{ __('production.routing_number') }}</th>
+                        <th style="width: 22%">{{ __('production.routing_name') }}</th>
+                        <th style="width: 8%">{{ __('production.version') }}</th>
+                        <th style="width: 8%" class="text-center">{{ __('production.operations_count') }}</th>
+                        <th style="width: 10%">{{ __('production.effective_from') }}</th>
+                        <th style="width: 10%">{{ __('production.effective_to') }}</th>
+                        <th style="width: 12%">{{ __('production.linked_boms') }}</th>
+                        <th style="width: 8%">{{ __('production.status') }}</th>
                         <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
                     </tr>
                 </thead>
@@ -308,16 +296,6 @@
                                 <span class="fw-semibold text-dark">{{ $routing->name }}</span>
                             </td>
                             <td>
-                                @if ($routing->product)
-                                    <div class="d-flex flex-column">
-                                        <span class="fw-semibold text-dark">{{ $routing->product->name }}</span>
-                                        <small class="text-muted font-monospace fs-10">{{ $routing->product->sku }}</small>
-                                    </div>
-                                @else
-                                    <span class="text-muted">{{ __('production.no_product') ?? 'No Product' }}</span>
-                                @endif
-                            </td>
-                            <td>
                                 <span class="text-dark">{{ $routing->version }}</span>
                                 @if ($routing->revision > 0)
                                     <small class="text-muted d-block fs-10">Rev {{ $routing->revision }}</small>
@@ -328,26 +306,43 @@
                                     {{ $routing->operations_count }}
                                 </span>
                             </td>
-                            <td class="text-muted">{{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : __('production.immediate') }}</td>
+                            <td class="text-muted">{{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : '-' }}</td>
                             <td class="text-muted">{{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : __('production.indefinite') }}</td>
                             <td>
-                                @if ($routing->is_default)
-                                    <span class="badge bg-soft-success text-success px-2 py-1 rounded-pill fs-10">{{ __('production.primary') }}</span>
-                                @else
-                                    <span class="badge bg-soft-warning text-warning px-2 py-1 rounded-pill fs-10">{{ __('production.alternative') }}</span>
-                                @endif
+                                <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-1 fw-semibold">
+                                    <i class="feather-layers me-1 fs-10"></i>{{ $routing->boms_count ?? 0 }} {{ __('production.boms') }}
+                                </span>
                             </td>
                             <td>
+                                @php
+                                    $todayStr = now()->toDateString();
+                                    $effFromStr = $routing->effective_from ? $routing->effective_from->toDateString() : null;
+                                    $effToStr = $routing->effective_to ? $routing->effective_to->toDateString() : null;
+                                @endphp
                                 @if ($routing->isDraft())
                                     <span class="erp-badge-draft">{{ __('production.draft') }}</span>
                                 @elseif ($routing->isPendingApproval())
                                     <span class="erp-badge-pending">{{ __('production.pending') }}</span>
+                                @elseif ($routing->isCancelled())
+                                    <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">{{ __('production.cancelled') }}</span>
+                                @elseif ($routing->status === \App\Domains\Production\Models\Routing::STATUS_SCHEDULED || ($routing->isActive() && $effFromStr && $effFromStr > $todayStr))
+                                    <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1 font-monospace fw-bold">{{ __('production.scheduled') }}</span>
+                                @elseif ($routing->isHistorical() || ($effToStr && $effToStr <= $todayStr && !$routing->isCurrentlyActive()))
+                                    <span class="badge bg-soft-info text-info rounded-pill px-2 py-1">{{ __('production.historical') }}</span>
                                 @elseif ($routing->isActive())
                                     <span class="erp-badge-active">{{ __('production.active') }}</span>
-                                @elseif ($routing->isHistorical())
-                                    <span class="badge bg-soft-info text-info rounded-pill px-2 py-1">{{ __('production.historical') }}</span>
                                 @else
-                                    <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">{{ __('production.cancelled') }}</span>
+                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-2 py-1">{{ ucfirst($routing->status) }}</span>
+                                @endif
+                                @php $rowCostStatus = app(\App\Domains\Production\Services\RoutingCostStatusService::class)->check($routing); @endphp
+                                @if ($rowCostStatus['outdated'])
+                                    <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1 ms-1 routing-costs-outdated-badge" title="{{ collect($rowCostStatus['operations'])->map(fn($o) => $o['operation_number'] . ': ' . implode(' ', $o['messages']))->implode(' | ') }} — {{ $rowCostStatus['action'] }}"><i class="feather-alert-triangle me-0.5"></i>Costs outdated</span>
+                                @elseif ($rowCostStatus['not_calculated'])
+                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-2 py-1 ms-1" title="{{ $rowCostStatus['action'] }}">Costs not calculated</span>
+                                @endif
+                                @if (!empty($rowCostStatus['inactive']))
+                                    {{-- RT-IMPL-18 --}}
+                                    <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1 ms-1 routing-inactive-badge" title="{{ collect($rowCostStatus['inactive'])->pluck('message')->implode(' ') }} {{ $rowCostStatus['inactive_header'] }}"><i class="feather-slash me-0.5"></i>{{ __('production.inactive_resources') }}</span>
                                 @endif
                             </td>
                             <td class="text-end">
@@ -395,7 +390,7 @@
                                     @endif
 
                                     {{-- Cancel --}}
-                                    @if(!$routing->isCancelled() && !$routing->isHistorical())
+                                    @if($routing->isActive() || $routing->isScheduled())
                                         @can('cancel', $routing)
                                             <li>
                                                 <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#cancelModal{{ $routing->id }}">
@@ -406,6 +401,13 @@
                                     @endif
 
                                     {{-- Duplicate --}}
+                                    @can('retire', $routing)
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#retireModal{{ $routing->id }}">
+                                                <i class="feather-archive me-2 text-muted fs-12"></i>{{ __('production.retire_routing') }}
+                                            </button>
+                                        </li>
+                                    @endcan
                                     @can('duplicate', $routing)
                                         <li>
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#duplicateModal{{ $routing->id }}">
@@ -468,10 +470,26 @@
                                 </x-ui.modal>
 
                                 <!-- Cancel Modal -->
+                                @can('retire', $routing)
+                                <x-ui.modal id="retireModal{{ $routing->id }}" title="{{ __('production.retire_routing') }}" class="text-start">
+                                    <form method="POST" action="{{ route('production.routing.retire', $routing->id) }}" id="retireForm{{ $routing->id }}">
+                                        @csrf
+                                        <p class="fs-13 text-muted">{{ __('production.retire_routing_body') }}</p>
+                                        @include('modules.production.routing.partials.bom-impact', ['routing' => $routing])
+                                        <x-ui.input :label="__('production.notes_reasons')" name="comments" placeholder="{{ __('production.retire_reason_placeholder') }}" />
+                                    </form>
+                                    <x-slot name="footer">
+                                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+                                        <x-ui.button type="submit" variant="dark" onclick="document.getElementById('retireForm{{ $routing->id }}').submit();">{{ __('production.retire_routing') }}</x-ui.button>
+                                    </x-slot>
+                                </x-ui.modal>
+                                @endcan
+
                                 <x-ui.modal id="cancelModal{{ $routing->id }}" title="{{ __('production.cancel_routing_version') }}" submit-text="{{ __('production.cancel_version') }}" class="text-start">
                                     <form method="POST" action="{{ route('production.routing.cancel', $routing->id) }}" id="cancelForm{{ $routing->id }}">
                                         @csrf
                                         <p class="fs-13 text-muted">{{ __('production.cancel_routing_modal_body') }}</p>
+                                        @include('modules.production.routing.partials.bom-impact', ['routing' => $routing])
                                         <x-ui.input :label="__('production.cancellation_reason')" name="comments" placeholder="e.g. Process design obsolete" required />
                                     </form>
                                     <x-slot name="footer">

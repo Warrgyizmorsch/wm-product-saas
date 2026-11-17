@@ -792,6 +792,19 @@ class TravelExpenseApiController extends Controller
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
+        // Gracefully resolve string employee_code (e.g. "WRG-001") to integer primary key ID
+        if ($request->filled('employee_id') && !is_numeric($request->employee_id)) {
+            $found = Employee::where('employee_id', $request->employee_id)->first();
+            if ($found) {
+                $request->merge(['employee_id' => $found->id]);
+            }
+        } elseif ($request->filled('employee_code') && !$request->filled('employee_id')) {
+            $found = Employee::where('employee_id', $request->employee_code)->first();
+            if ($found) {
+                $request->merge(['employee_id' => $found->id]);
+            }
+        }
+
         $validated = $request->validate([
             'employee_id'      => 'nullable|integer|exists:employees,id',
             'purpose'          => 'required|string|max:255',
@@ -1010,6 +1023,19 @@ class TravelExpenseApiController extends Controller
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        // Gracefully resolve string employee_code (e.g. "WRG-001") to integer primary key ID
+        if ($request->filled('employee_id') && !is_numeric($request->employee_id)) {
+            $found = Employee::where('employee_id', $request->employee_id)->first();
+            if ($found) {
+                $request->merge(['employee_id' => $found->id]);
+            }
+        } elseif ($request->filled('employee_code') && !$request->filled('employee_id')) {
+            $found = Employee::where('employee_id', $request->employee_code)->first();
+            if ($found) {
+                $request->merge(['employee_id' => $found->id]);
+            }
+        }
 
         $validated = $request->validate([
             'employee_id'       => 'nullable|integer|exists:employees,id',
@@ -1250,6 +1276,19 @@ class TravelExpenseApiController extends Controller
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        // Gracefully resolve string employee_code (e.g. "WRG-001") to integer primary key ID
+        if ($request->filled('employee_id') && !is_numeric($request->employee_id)) {
+            $found = Employee::where('employee_id', $request->employee_id)->first();
+            if ($found) {
+                $request->merge(['employee_id' => $found->id]);
+            }
+        } elseif ($request->filled('employee_code') && !$request->filled('employee_id')) {
+            $found = Employee::where('employee_id', $request->employee_code)->first();
+            if ($found) {
+                $request->merge(['employee_id' => $found->id]);
+            }
+        }
 
         $validated = $request->validate([
             'employee_id'       => 'nullable|integer|exists:employees,id',

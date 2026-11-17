@@ -1,0 +1,555 @@
+<?php
+
+namespace App\Domains\Production\Services;
+
+use App\Domains\HRMS\Models\Employee;
+use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterCalculation;
+use App\Domains\Production\Models\WorkCenterEmployeeAssignment;
+use App\Domains\Production\Models\WorkCenterSection;
+use App\Domains\Production\Models\WorkCenterSectionCalculation;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+class WorkCenterCalculationService
+{
+    public function __construct(
+        private readonly ?SectionCalculationService $sectionCalculationService = null,
+        private readonly ?WorkCenterActivityLogger $activityLogger = null,
+    ) {}
+
+    protected function getSectionCalculationService(): SectionCalculationService
+    {
+        return $this->sectionCalculationService ?? app(SectionCalculationService::class);
+    }
+
+    protected function getActivityLogger(): WorkCenterActivityLogger
+    {
+        return $this->activityLogger ?? app(WorkCenterActivityLogger::class);
+    }
+
+    /**
+     * Compute full calculation payload for a Work Center roll-up.
+     */
+    public function calculate(WorkCenter $workCenter, ?array $sectionCalculationResults = null): array
+    {
+        $tenantId = (int) $workCenter->tenant_id;
+
+        // 1. Resolve Active Sections
+        $sections = $workCenter->relationLoaded('sections')
+            ? $workCenter->sections->where('tenant_id', $tenantId)->filter(fn($sec) => $sec->isActive())
+            : $workCenter->sections()->where('tenant_id', $tenantId)->active()->with(['machines', 'manualProductions'])->get();
+
+        $sectionCalcService = $this->getSectionCalculationService();
+
+        // 2. Obtain Section Calculations
+        $sectionDetails = [];
+        $totalSectionDailyCap    = 0.0;
+        $totalSectionHourlyCap   = 0.0;
+        $totalSectionDailyLabor  = 0.0;
+        $totalSectionDailyMach   = 0.0;
+        $totalSectionHourlyMach  = 0.0;
+
+        $allShiftsAcrossSections = [];
+
+        foreach ($sections as $section) {
+            // Use passed in calculation results or calculate on the fly
+            $secCalc = $sectionCalculationResults[$section->id] ?? $sectionCalcService->calculate($section);
+
+            $totalSectionDailyCap   += (float) ($secCalc['daily_capacity'] ?? 0.0);
+            $totalSectionHourlyCap  += (float) ($secCalc['capacity_per_hour'] ?? 0.0);
+            $totalSectionDailyLabor += (float) ($secCalc['total_daily_labor_cost'] ?? 0.0);
+            $totalSectionDailyMach  += (float) ($secCalc['total_daily_machine_cost'] ?? 0.0);
+            $totalSectionHourlyMach += (float) ($secCalc['machine_cost_per_hour'] ?? 0.0);
+
+            $secShifts = $secCalc['calculation_details']['operating_timeline']['shifts'] 
+                ?? $secCalc['calculation_details']['operating_hours']['shifts'] 
+                ?? [];
+            foreach ($secShifts as $s) {
+                $allShiftsAcrossSections[$s['id']] = $s;
+            }
+
+            $sectionDetails[] = [
+                'section_id'                 => $section->id,
+                'section_code'               => $section->code,
+                'section_name'               => $section->name,
+                // WC-IMPL-15: which section snapshot fed this Work Center snapshot (null in previews)
+                'section_calculation_id'     => isset($secCalc['section_calculation_id']) ? (int) $secCalc['section_calculation_id'] : null,
+                'section_snapshot_number'    => $secCalc['section_snapshot_number'] ?? null,
+                'capacity_per_hour'          => (float) ($secCalc['capacity_per_hour'] ?? 0.0),
+                'daily_capacity'             => (float) ($secCalc['daily_capacity'] ?? 0.0),
+                'labor_cost_per_hour'        => (float) ($secCalc['labor_cost_per_hour'] ?? 0.0),
+                'total_daily_labor_cost'     => (float) ($secCalc['total_daily_labor_cost'] ?? 0.0),
+                'machine_cost_per_hour'      => (float) ($secCalc['machine_cost_per_hour'] ?? 0.0),
+                'total_daily_machine_cost'   => (float) ($secCalc['total_daily_machine_cost'] ?? 0.0),
+                'total_daily_operating_cost' => (float) ($secCalc['total_daily_operating_cost'] ?? 0.0),
+                'unique_operating_hours'     => (float) ($secCalc['unique_operating_hours'] ?? 0.0),
+            ];
+        }
+
+        // 3. Work Center Unique Operating Hours (Union of clock intervals across all sections)
+        $operatingHoursData = $this->calculateUniqueOperatingHours(array_values($allShiftsAcrossSections));
+        $uniqueOperatingHours = (float) ($operatingHoursData['unique_clock_hours'] ?? 0.0);
+
+        // 4. Direct Work Center Staff (section_id IS NULL)
+        $directStaff = $this->calculateDirectStaffLabor($workCenter);
+        $directStaffDailyLabor = (float) ($directStaff['total_daily_cost'] ?? 0.0);
+
+        // 5. Work Center Aggregated Labor
+        $wcDailyLaborCost = round($totalSectionDailyLabor + $directStaffDailyLabor, 4);
+        $wcLaborCostPerHour = $uniqueOperatingHours > 0
+            ? round($wcDailyLaborCost / $uniqueOperatingHours, 4)
+            : 0.0;
+
+        // 6. Work Center Machine Expenses
+        $wcDailyMachineCost = round($totalSectionDailyMach, 4);
+        $wcHourlyMachineCost = $uniqueOperatingHours > 0
+            ? round($wcDailyMachineCost / $uniqueOperatingHours, 4)
+            : 0.0;
+
+        // 7. Overhead & Total Operating Cost
+        $overheadDailyCost = round((float) ($workCenter->overhead_cost ?? 0.0), 4);
+
+        $wcTotalDailyCost = round($wcDailyLaborCost + $wcDailyMachineCost + $overheadDailyCost, 4);
+        $wcTotalCostPerHour = $uniqueOperatingHours > 0
+            ? round($wcTotalDailyCost / $uniqueOperatingHours, 4)
+            : 0.0;
+
+        // Capacity: Total Daily & True Average Hourly (Daily / Unique Operating Hours)
+        $wcDailyCapacity = round($totalSectionDailyCap, 4);
+        $wcHourlyCapacity = $uniqueOperatingHours > 0
+            ? round($wcDailyCapacity / $uniqueOperatingHours, 4)
+            : 0.0;
+
+        // Financial Unit Cost
+        $wcCostPerUnit = cost_per_unit_value($wcTotalDailyCost, $wcDailyCapacity); // null = N/A (WC-23, WC-29)
+
+        // 8. Detailed Calculation JSON
+        $calculationDetails = [
+            'operating_hours' => [
+                'unique_clock_hours'   => $uniqueOperatingHours,
+                'unique_clock_minutes' => $operatingHoursData['unique_clock_minutes'] ?? 0,
+                'operational_window'   => $operatingHoursData['operational_window'] ?? 'None',
+                'shifts_count'         => count($allShiftsAcrossSections),
+            ],
+            'sections_contribution' => $sectionDetails,
+            'sections'              => $sectionDetails, // alias for modal compatibility
+            'direct_work_center_staff' => [
+                'employees'        => $directStaff['employees'],
+                'total_daily_cost' => $directStaffDailyLabor,
+            ],
+            'direct_personnel'      => [ // alias for modal compatibility
+                'employees'        => $directStaff['employees'],
+                'total_daily_cost' => $directStaffDailyLabor,
+            ],
+            'overhead' => [
+                'flat_daily_amount'      => $overheadDailyCost,
+                'note'                   => 'Direct flat daily operating expense entered in Work Center form',
+            ],
+            'timeline_matrix'       => $this->buildTimelineMatrix($sectionDetails, $allShiftsAcrossSections, $sectionCalculationResults ?? []),
+            'totals' => [
+                'total_daily_capacity'         => $wcDailyCapacity,
+                'total_hourly_capacity'        => $wcHourlyCapacity,
+                'section_daily_labor_cost'     => round($totalSectionDailyLabor, 4),
+                'direct_staff_daily_labor_cost'=> $directStaffDailyLabor,
+                'total_daily_labor_cost'       => $wcDailyLaborCost,
+                'average_hourly_labor_cost'    => $wcLaborCostPerHour,
+                'total_daily_machine_cost'     => $wcDailyMachineCost,
+                'total_hourly_machine_cost'    => $wcHourlyMachineCost,
+                'overhead_daily_cost'          => $overheadDailyCost,
+                'total_daily_cost'             => $wcTotalDailyCost,
+                'total_cost_per_hour'          => $wcTotalCostPerHour,
+                'cost_per_unit'                => $wcCostPerUnit,
+                'unique_operating_hours'       => $uniqueOperatingHours,
+            ],
+        ];
+
+        return [
+            'capacity_per_hour'             => $wcHourlyCapacity,
+            'daily_capacity'                => $wcDailyCapacity,
+            'labor_cost_per_hour'           => $wcLaborCostPerHour,
+            'total_daily_labor_cost'        => $wcDailyLaborCost,
+            'direct_staff_daily_labor_cost' => $directStaffDailyLabor,
+            'machine_cost_per_hour'         => $wcHourlyMachineCost,
+            'total_daily_machine_cost'      => $wcDailyMachineCost,
+            'overhead_cost'                 => $overheadDailyCost,
+            'total_daily_cost'              => $wcTotalDailyCost,
+            'total_cost_per_hour'           => $wcTotalCostPerHour,
+            'cost_per_unit'                 => $wcCostPerUnit,
+            'unique_operating_hours'        => $uniqueOperatingHours,
+            'calculation_details'           => $calculationDetails,
+            'calculated_at'                 => now()->toIso8601String(),
+
+            // Legacy backward-compatibility sub-keys
+            'capacity' => [
+                'capacity_per_hour'          => $wcHourlyCapacity,
+                'total_theoretical_capacity' => $wcDailyCapacity,
+                'unique_operating_hours'     => $uniqueOperatingHours,
+                'capacity_unit'              => 'units/hr',
+                'sections'                   => $sectionDetails,
+            ],
+            'labor_cost' => [
+                'labor_cost_per_hour'        => $wcLaborCostPerHour,
+                'total_scheduled_labor_cost' => $wcDailyLaborCost,
+                'unique_operating_hours'     => $uniqueOperatingHours,
+            ],
+        ];
+    }
+
+    /**
+     * Calculate and persist Work Center Rollup Snapshot into production_work_center_calculations.
+     * Recalculates only the impacted sections (WC-IMPL-13): an empty list = Work Center roll-up only —
+     * every section reuses its latest snapshot, and only a section with no snapshot yet is calculated.
+     * Callers that want every section recalculated pass all active section IDs (CountdownCalculationEngine scope 'all').
+     */
+    public function calculateAndSave(
+        WorkCenter $workCenter,
+        string $triggerType = 'manual',
+        ?string $batchId = null,
+        array $impactedSectionIds = []
+    ): WorkCenterCalculation {
+        $batchId = $batchId ?: (string) Str::uuid();
+        $tenantId = (int) $workCenter->tenant_id;
+        $sectionCalcService = $this->getSectionCalculationService();
+
+        // 1. Resolve sections that need calculation
+        $allSections = $workCenter->sections()->where('tenant_id', $tenantId)->active()->get();
+
+        $sectionsToRecalculate = $allSections->whereIn('id', array_map('intval', $impactedSectionIds));
+
+        $sectionCalculationSnapshots = [];
+        $sectionCalculationResults   = [];
+
+        foreach ($allSections as $sec) {
+            $isImpacted = $sectionsToRecalculate->contains('id', $sec->id);
+
+            if ($isImpacted) {
+                // Calculate and save fresh snapshot for this section in the same batch
+                $savedSecCalc = $sectionCalcService->calculateAndSave(
+                    section: $sec,
+                    triggerType: $triggerType,
+                    batchId: $batchId
+                );
+                $sectionCalculationSnapshots[$sec->id] = $savedSecCalc;
+                $sectionCalculationResults[$sec->id]   = [
+                    'section_calculation_id'     => (int) $savedSecCalc->id,
+                    'section_snapshot_number'    => $savedSecCalc->snapshot_number,
+                    'capacity_per_hour'          => $savedSecCalc->capacity_per_hour,
+                    'daily_capacity'             => $savedSecCalc->daily_capacity,
+                    'labor_cost_per_hour'        => $savedSecCalc->labor_cost_per_hour,
+                    'total_daily_labor_cost'     => $savedSecCalc->total_daily_labor_cost,
+                    'machine_cost_per_hour'      => $savedSecCalc->machine_cost_per_hour,
+                    'total_daily_machine_cost'   => $savedSecCalc->total_daily_machine_cost,
+                    'total_daily_operating_cost' => $savedSecCalc->total_daily_operating_cost,
+                    'unique_operating_hours'     => $savedSecCalc->unique_operating_hours,
+                    'calculation_details'        => $savedSecCalc->calculation_details,
+                ];
+            } else {
+                // Fetch latest existing section calculation snapshot
+                $latestSecCalc = WorkCenterSectionCalculation::where('tenant_id', $tenantId)
+                    ->where('section_id', $sec->id)
+                    ->latest('id')
+                    ->first();
+
+                if ($latestSecCalc) {
+                    $sectionCalculationSnapshots[$sec->id] = $latestSecCalc;
+                    $sectionCalculationResults[$sec->id]   = [
+                        'section_calculation_id'     => (int) $latestSecCalc->id,
+                        'section_snapshot_number'    => $latestSecCalc->snapshot_number,
+                        'capacity_per_hour'          => $latestSecCalc->capacity_per_hour,
+                        'daily_capacity'             => $latestSecCalc->daily_capacity,
+                        'labor_cost_per_hour'        => $latestSecCalc->labor_cost_per_hour,
+                        'total_daily_labor_cost'     => $latestSecCalc->total_daily_labor_cost,
+                        'machine_cost_per_hour'      => $latestSecCalc->machine_cost_per_hour,
+                        'total_daily_machine_cost'   => $latestSecCalc->total_daily_machine_cost,
+                        'total_daily_operating_cost' => $latestSecCalc->total_daily_operating_cost,
+                        'unique_operating_hours'     => $latestSecCalc->unique_operating_hours,
+                        'calculation_details'        => $latestSecCalc->calculation_details,
+                    ];
+                } else {
+                    $freshSecCalc = $sectionCalcService->calculateAndSave(
+                        section: $sec,
+                        triggerType: $triggerType,
+                        batchId: $batchId
+                    );
+                    $sectionCalculationSnapshots[$sec->id] = $freshSecCalc;
+                    $sectionCalculationResults[$sec->id]   = $freshSecCalc->toArray() + [
+                        'section_calculation_id'  => (int) $freshSecCalc->id,
+                        'section_snapshot_number' => $freshSecCalc->snapshot_number,
+                    ];
+                }
+            }
+        }
+
+        // 2. Roll up Work Center Metrics
+        $wcCalc = $this->calculate($workCenter, $sectionCalculationResults);
+
+        // 3. Persist Work Center Snapshot (assign sequential snapshot_number scoped per Work Center)
+        $nextSnapshotNumber = ((int) WorkCenterCalculation::where('work_center_id', $workCenter->id)->max('snapshot_number')) + 1;
+
+        $record = WorkCenterCalculation::create([
+            'tenant_id'                     => $tenantId,
+            'work_center_id'                => (int) $workCenter->id,
+            'snapshot_number'               => $nextSnapshotNumber,
+            'batch_id'                      => $batchId,
+            'trigger_type'                  => $triggerType,
+            'impacted_section_ids'          => empty($impactedSectionIds) ? $allSections->pluck('id')->all() : array_values($impactedSectionIds),
+            'capacity_per_hour'             => $wcCalc['capacity_per_hour'],
+            'daily_capacity'                => $wcCalc['daily_capacity'],
+            'labor_cost_per_hour'           => $wcCalc['labor_cost_per_hour'],
+            'total_daily_labor_cost'        => $wcCalc['total_daily_labor_cost'],
+            'direct_staff_daily_labor_cost' => $wcCalc['direct_staff_daily_labor_cost'],
+            'machine_cost_per_hour'         => $wcCalc['machine_cost_per_hour'],
+            'total_daily_machine_cost'      => $wcCalc['total_daily_machine_cost'],
+            'overhead_cost'                 => $wcCalc['overhead_cost'],
+            'total_daily_cost'              => $wcCalc['total_daily_cost'],
+            'total_cost_per_hour'           => $wcCalc['total_cost_per_hour'],
+            'cost_per_unit'                 => $wcCalc['cost_per_unit'],
+            'unique_operating_hours'        => $wcCalc['unique_operating_hours'],
+            'calculation_details'           => $wcCalc['calculation_details'],
+        ]);
+
+        // 4. Link section calculation snapshots to this parent WC calculation record
+        foreach ($sectionCalculationSnapshots as $secSnapshot) {
+            if ($secSnapshot->batch_id === $batchId) {
+                $secSnapshot->update(['work_center_calculation_id' => $record->id]);
+            }
+        }
+
+        // 5. Record activity log
+        $this->getActivityLogger()->logWorkCenterCalculationCompleted($record);
+
+        return $record;
+    }
+
+    /**
+     * Calculate direct Work Center employees (work_center_id set, section_id IS NULL).
+     * e.g., floating supervisors, maintenance crew, department heads.
+     * Incorporates multi-Work Center split allocation and shift-based hourly rates.
+     */
+    public function calculateDirectStaffLabor(WorkCenter $workCenter): array
+    {
+        $tenantId = (int) $workCenter->tenant_id;
+
+        $assignments = WorkCenterEmployeeAssignment::where('tenant_id', $tenantId)
+            ->where('work_center_id', $workCenter->id)
+            ->whereNull('section_id')
+            ->where('active', true)
+            ->with(['employee.shift', 'employee.defaultShift'])
+            ->get();
+
+        $employees = [];
+        $totalDailyCost = 0.0;
+
+        foreach ($assignments as $assignment) {
+            $emp = $assignment->employee;
+            if (!$emp || !(bool) ($emp->status ?? true)) {
+                continue;
+            }
+
+            // 1. Count active direct Work Center assignments for this employee
+            $activeWcCount = WorkCenterEmployeeAssignment::where('tenant_id', $tenantId)
+                ->where('employee_id', $emp->id)
+                ->whereNull('section_id')
+                ->where('active', true)
+                ->distinct('work_center_id')
+                ->count('work_center_id');
+            $activeWcCount = max(1, (int) $activeWcCount);
+
+            // 2. Base Daily Salary & Allocated Daily Cost for this Work Center
+            $monthlySalary        = $emp->monthlyCtc(); // HRMS payroll monthly CTC (current_salary is annual) — WC-17
+            $baseDailySalary      = round($monthlySalary / 30, 4);
+            $allocatedDailySalary = round($baseDailySalary / $activeWcCount, 4);
+
+            // 3. Resolve Assigned Shift & Hourly Rate
+            $empShift = $emp->defaultShift ?? $emp->shift ?? (method_exists($emp, 'resolveShiftForDate') ? $emp->resolveShiftForDate(now()) : null);
+            // Shift CLOCK hours, breaks included — same rule as section personnel (WC-18, WC-27).
+            // 8-hour fallback for a missing / zero shift stays until the Shift module review (WC-ISSUE-07).
+            $shiftDurationHours = $empShift ? (float) ($empShift->clock_hours ?? 8.0) : 8.0;
+            if ($shiftDurationHours <= 0) {
+                $shiftDurationHours = 8.0;
+            }
+
+            $hourlyRate = round($allocatedDailySalary / $shiftDurationHours, 4);
+            $shiftName  = $empShift?->name ?? 'Standard Shift';
+
+
+            $employees[] = [
+                'assignment_id'           => $assignment->id,
+                'employee_id'             => $emp->id,
+                'employee_code'           => $emp->employee_id ?? "EMP-{$emp->id}",
+                'name'                    => $emp->full_name,
+                'role'                    => $emp->job_title ?: 'Work Center Staff',
+                'annual_ctc'              => (float) ($emp->current_salary ?? 0.0), // WC-IMPL-04: formula text built at display
+                'monthly_salary'          => $monthlySalary, // WC-IMPL-19: one key (was also hrms_net_monthly_salary / monthly_ctc)
+                'base_daily_salary'       => $baseDailySalary,
+                'active_wc_count'          => $activeWcCount,
+                'allocation_percentage'    => $activeWcCount > 0 ? round(100 / $activeWcCount, 2) : 100.0,
+                'daily_cost'              => $allocatedDailySalary,
+                'shift_name'              => $shiftName,
+                'shift_duration_hours'    => $shiftDurationHours,
+                'hourly_rate'             => $hourlyRate,
+            ];
+
+            $totalDailyCost += $allocatedDailySalary;
+        }
+
+        return [
+            'employees'        => $employees,
+            'total_daily_cost' => round($totalDailyCost, 4),
+        ];
+    }
+
+    /**
+     * Calculate union of unique clock hours across an array of shift configurations.
+     */
+    protected function calculateUniqueOperatingHours(array $shiftsData): array
+    {
+        if (empty($shiftsData)) {
+            return [
+                'unique_clock_hours'   => 0.0,
+                'unique_clock_minutes' => 0,
+                'operational_window'   => 'None',
+            ];
+        }
+
+        $covered = array_fill(0, 1440, false);
+
+        foreach ($shiftsData as $s) {
+            $sMin   = (int) ($s['start_minute'] ?? 0);
+            $eMin   = (int) ($s['end_minute'] ?? 0);
+            $isOver = (bool) ($s['is_overnight'] ?? false);
+
+            for ($m = 0; $m < 1440; $m++) {
+                $isActive = $isOver ? ($m >= $sMin || $m < $eMin) : ($m >= $sMin && $m < $eMin);
+                if ($isActive) {
+                    $covered[$m] = true;
+                }
+            }
+        }
+
+        $totalCoveredMinutes = count(array_filter($covered));
+        $uniqueHours = round($totalCoveredMinutes / 60, 4);
+
+        if ($totalCoveredMinutes >= 1440 || $uniqueHours >= 24) {
+            $dayShifts = array_filter($shiftsData, fn($s) => ((int) ($s['start_minute'] ?? 0) >= 300) && ((int) ($s['start_minute'] ?? 0) < 720));
+            $earliestDayStart = !empty($dayShifts) ? min(array_column($dayShifts, 'start_time')) : '06:00';
+            $wStart = substr($earliestDayStart, 0, 5);
+            $window = "{$wStart} – {$wStart}";
+            $windowStart = $wStart;
+            $windowEnd   = $wStart;
+        } else {
+            $earliestAct = null;
+            $latestAct = null;
+            for ($m = 0; $m < 1440; $m++) {
+                if ($covered[$m]) {
+                    if ($earliestAct === null) $earliestAct = $m;
+                    $latestAct = $m;
+                }
+            }
+            if ($earliestAct !== null) {
+                $windowStart = sprintf('%02d:%02d', floor($earliestAct / 60), $earliestAct % 60);
+                $windowEnd   = sprintf('%02d:%02d', floor(($latestAct + 1) / 60), ($latestAct + 1) % 60);
+                $window = "{$windowStart} – {$windowEnd}";
+            } else {
+                $window = 'None';
+                $windowStart = 'None';
+                $windowEnd   = 'None';
+            }
+        }
+
+        return [
+            'unique_clock_hours'   => $uniqueHours,
+            'unique_clock_minutes' => $totalCoveredMinutes,
+            'operational_window'   => $window,
+            'window_start'         => $windowStart,
+            'window_end'           => $windowEnd,
+        ];
+    }
+
+    /**
+     * Build 2D Shift x Section timeline matrix for executive overview.
+     */
+    protected function buildTimelineMatrix(array $sectionDetails, array $allShiftsAcrossSections, ?array $sectionCalculationResults = []): array
+    {
+        $shifts = array_values($allShiftsAcrossSections);
+        usort($shifts, fn($a, $b) => ($a['start_minute'] ?? 0) <=> ($b['start_minute'] ?? 0));
+
+        $matrix = [];
+        foreach ($shifts as $sh) {
+            $shId = $sh['id'];
+            $durHrs = (float) ($sh['duration_hours'] ?? 0.0);
+            $shiftCombinedOutput = 0.0;
+            $shiftCombinedCost   = 0.0;
+            $activeSectionsCount = 0;
+
+            $sectionCells = [];
+            foreach ($sectionDetails as $sec) {
+                $secId = $sec['section_id'];
+                $secCalc = $sectionCalculationResults[$secId] ?? [];
+                $secShifts = $secCalc['calculation_details']['operating_timeline']['shifts']
+                    ?? $secCalc['calculation_details']['operating_hours']['shifts']
+                    ?? [];
+                $hasShift = collect($secShifts)->contains('id', $shId);
+
+                if ($hasShift) {
+                    $hourlyCap = (float) ($sec['capacity_per_hour'] ?? 0.0);
+                    $uniqHours = max(0.1, (float) ($sec['unique_operating_hours'] ?? 0.0));
+                    $hourlyCost = (float) (($sec['total_daily_operating_cost'] ?? 0.0) / $uniqHours);
+                    $shiftOutput = round($hourlyCap * $durHrs, 2);
+                    $shiftCost = round($hourlyCost * $durHrs, 2);
+                    $unitCost = $shiftOutput > 0 ? round($shiftCost / $shiftOutput, 2) : 0.0;
+
+                    $sectionCells[$secId] = [
+                        'is_active'       => true,
+                        'hourly_capacity' => $hourlyCap,
+                        'hourly_cost'     => $hourlyCost,
+                        'shift_output'    => $shiftOutput,
+                        'shift_cost'      => $shiftCost,
+                        'unit_cost'       => $unitCost,
+                    ];
+
+                    $shiftCombinedOutput += $shiftOutput;
+                    $shiftCombinedCost   += $shiftCost;
+                    $activeSectionsCount++;
+                } else {
+                    $sectionCells[$secId] = [
+                        'is_active' => false,
+                    ];
+                }
+            }
+
+            $matrix[] = [
+                'shift'                 => $sh,
+                'sections'              => $sectionCells,
+                'combined_output'       => round($shiftCombinedOutput, 2),
+                'combined_cost'         => round($shiftCombinedCost, 2),
+                'active_sections_count' => $activeSectionsCount,
+            ];
+        }
+
+        return [
+            'shifts' => $shifts,
+            'matrix' => $matrix,
+        ];
+    }
+
+    /**
+     * Legacy helper to calculate capacity alone.
+     */
+    public function calculateCapacity(WorkCenter $workCenter): array
+    {
+        $calc = $this->calculate($workCenter);
+        return $calc['capacity'];
+    }
+
+    /**
+     * Legacy helper to calculate labor cost alone.
+     */
+    public function calculateLaborCost(WorkCenter $workCenter): array
+    {
+        $calc = $this->calculate($workCenter);
+        return $calc['labor_cost'];
+    }
+}

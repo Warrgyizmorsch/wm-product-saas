@@ -15,8 +15,32 @@ use Carbon\Carbon;
 
 class InventoryReportController extends Controller
 {
+    private function authorizeReport(): void
+    {
+        $user = auth()->user();
+        if (! $user) {
+            abort(403);
+        }
+
+        $context = [
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
+        ];
+
+        $access = app(\App\Services\Access\AccessService::class);
+        if (! $access->allows($user, 'inventory.reports.view', $context)
+            && ! $access->allows($user, 'inventory.warehouses.manage', $context)) {
+            abort(403, 'Unauthorized');
+        }
+    }
+
     public function lowStockReport(Request $request)
     {
+        $this->authorizeReport();
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         $query = Product::query()
@@ -67,6 +91,8 @@ class InventoryReportController extends Controller
 
     public function valuationReport(Request $request)
     {
+        $this->authorizeReport();
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         $baseQuery = ProductWarehouseStock::query()
@@ -173,6 +199,8 @@ class InventoryReportController extends Controller
 
     public function exportValuationReport(Request $request)
     {
+        $this->authorizeReport();
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         $query = ProductWarehouseStock::query()

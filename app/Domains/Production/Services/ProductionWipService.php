@@ -309,10 +309,10 @@ class ProductionWipService
 
             // Resolve cost rates from routing snapshots (with Work Center fallback)
             $routingLaborRate = (float) ($orderOp->routingOperation?->labor_cost_rate ?? 0.0);
-            $wcLaborRate = $orderOp->workCenter ? ((float) $orderOp->workCenter->cost_per_hour / 60.0) : 0.0;
+            $wcLaborRate = $orderOp->workCenter ? ($orderOp->workCenter->calculatedLaborCostPerHour() / 60.0) : 0.0;
             $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
             $machineRate = $orderOp->routingOperation?->machine_cost_rate ?? 0.0;
-            $overheadRate = $orderOp->workCenter?->overhead_rate ?? 0.0;
+            $overheadRate = ($orderOp->workCenter?->calculatedOverheadCostPerHour() ?? 0.0);
 
             $activeMinutes = $setupMins + $runMins;
             $laborCost = $activeMinutes * $laborRate;
@@ -710,6 +710,13 @@ class ProductionWipService
                     ->orderBy('production_order_operations.sequence', 'asc')
                     ->lockForUpdate()
                     ->first();
+
+                if (!$nextOp) {
+                    $nextOp = $sourceOp->successorDependencies()
+                        ->orderBy('production_order_operations.sequence', 'asc')
+                        ->lockForUpdate()
+                        ->first();
+                }
             }
 
             if (!$nextOp) {
@@ -964,10 +971,17 @@ class ProductionWipService
                     }
 
                     ProductionScheduleOperation::where('tenant_id', $tenantId)
-                        ->where('production_order_id', $sourceOp->production_order_id)
                         ->where('production_order_operation_id', $nextOp->id)
                         ->where('status', ProductionScheduleOperation::STATUS_WAITING)
                         ->update(['status' => ProductionScheduleOperation::STATUS_READY]);
+
+                    if ($nextOp->production_order_id) {
+                        try {
+                            app(ProductionOrderService::class)->reconcileOperationReadiness($nextOp->production_order_id);
+                        } catch (\Throwable $e) {
+                            // Non-fatal readiness reconciliation
+                        }
+                    }
 
                     if ($destWip && $destWip->id !== $sourceWip?->id) {
                         $destWip->current_routing_operation_id = $nextRoutingOpId;

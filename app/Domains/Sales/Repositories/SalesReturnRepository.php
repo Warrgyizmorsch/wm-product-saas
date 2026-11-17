@@ -9,7 +9,11 @@ class SalesReturnRepository
 {
     public function getPaginated(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = SalesReturn::query()->with(['customer', 'salesOrder']);
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $query = SalesReturn::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['customer.crmAccount', 'salesOrder']);
 
         if (!empty($filters['search'])) {
             $search = trim($filters['search']);
@@ -26,7 +30,7 @@ class SalesReturnRepository
 
     public function find(int $id): ?SalesReturn
     {
-        return SalesReturn::with(['customer', 'salesOrder', 'items.product', 'items.warehouse'])->find($id);
+        return SalesReturn::withoutGlobalScope('rbac_scope')->with(['customer', 'salesOrder', 'items.product', 'items.warehouse'])->find($id);
     }
 
     public function create(array $data): SalesReturn

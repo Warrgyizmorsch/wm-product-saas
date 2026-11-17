@@ -27,12 +27,20 @@ class UpdateTaskListRequest extends FormRequest
                 $members->activeCollaboratorRule($project),
             ],
             'milestone_id' => [
-                'nullable',
+                'sometimes',
+                'required',
                 'integer',
                 Rule::exists('project_milestones', 'id')
                     ->where('tenant_id', $tenantId)
                     ->where('project_id', $project?->id),
             ],
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'milestone_id' => __('projects.milestone'),
         ];
     }
 }

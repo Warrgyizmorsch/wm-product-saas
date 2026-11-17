@@ -751,7 +751,7 @@
                 confirmButtonText: '{{ __('hrms.biometric.yes_delete') }}',
                 cancelButtonText: '{{ __('hrms.biometric.cancel') }}'
             }).then((result) => {
-                if (result.isConfirmed) {
+                if (result && (result.isConfirmed || result.value)) {
                     button.closest('form').submit();
                 }
             });

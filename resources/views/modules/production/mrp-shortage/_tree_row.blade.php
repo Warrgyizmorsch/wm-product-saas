@@ -2,7 +2,7 @@
     $level = (int) ($node['level'] ?? 1);
     $padding = max(0, ($level - 1) * 24);
     $hasShortage = (float)($node['net_shortage_qty'] ?? 0) > 0;
-    $isManufactured = !empty($node['has_bom']) || ($node['planning_type'] ?? '') === 'manufacture';
+    $isManufactured = !empty($node['has_bom']) || in_array($node['supplier_method'] ?? '', ['manufacture', 'both'], true);
     $type = $node['type'] ?? 'goods';
     
     $rowClass = $hasShortage ? 'bg-soft-danger-subtle' : ($level > 1 ? 'table-light-soft' : '');

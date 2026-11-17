@@ -134,7 +134,7 @@ Route::middleware(['tenant'])->group(function (): void {
         });
     });
 
-    Route::middleware(['auth:sanctum', 'company', 'branch', 'billing.active'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'company', 'branch', 'billing.active', 'module.access'])->group(function (): void {
         foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/api.php'))) as $moduleApiRoutes) {
             if (str_contains($moduleApiRoutes, 'Production')) {
                 continue;

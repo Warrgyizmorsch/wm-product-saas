@@ -35,6 +35,7 @@ class SalesOrderApiController extends Controller
      */
     public function meta(): JsonResponse
     {
+        $this->authorize('viewAny', SalesOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $customers  = Customer::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'company_name', 'email', 'phone', 'gstin']);
@@ -64,6 +65,7 @@ class SalesOrderApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', SalesOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = SalesOrder::query()
@@ -145,6 +147,8 @@ class SalesOrderApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', SalesOrder::class);
+
         $input = $request->all();
 
         // Support aliases
@@ -330,6 +334,8 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $order);
+
         $invoices   = Invoice::where('tenant_id', $tenantId)->where('sales_order_id', $id)->get();
         $dispatches = DispatchOrder::where('tenant_id', $tenantId)->where('sales_order_id', $id)->get();
 
@@ -356,6 +362,8 @@ class SalesOrderApiController extends Controller
                 'message' => 'Sales Order not found',
             ], 404);
         }
+
+        $this->authorize('update', $order);
 
         $input = $request->all();
 
@@ -498,6 +506,14 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        if ($request->input('status') === 'Confirmed') {
+            $this->authorize('confirm', $order);
+        } elseif (in_array($request->input('status'), ['Cancelled', 'Closed'])) {
+            $this->authorize('cancel', $order);
+        } else {
+            $this->authorize('update', $order);
+        }
+
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Confirmed,Processing,Closed,Cancelled'],
             'notes'  => ['nullable', 'string'],
@@ -538,6 +554,9 @@ class SalesOrderApiController extends Controller
                 'message' => 'Sales Order not found',
             ], 404);
         }
+
+        $this->authorize('view', $order);
+        $this->authorize('create', Invoice::class);
 
         $invoiceNumber = 'INV-' . strtoupper(bin2hex(random_bytes(4)));
 
@@ -628,6 +647,9 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $order);
+        $this->authorize('create', DispatchOrder::class);
+
         if ($order->hasOnlyServices()) {
             return response()->json([
                 'success' => false,
@@ -704,6 +726,8 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $order);
+
         $order->delete();
 
         return response()->json([
@@ -726,6 +750,8 @@ class SalesOrderApiController extends Controller
                 'message' => 'Sales Order not found in trash',
             ], 404);
         }
+
+        $this->authorize('delete', $order);
 
         $order->restore();
 
@@ -793,6 +819,18 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        $authUser = auth()->user();
+        $ownerId = $order->sales_person_id
+            ?? $order->quotation?->sales_person_id
+            ?? $order->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.orders.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this sales order.'], 403);
+        }
+
         $this->authorize('cancel', $order);
 
         $reason = $request->input('reason', 'Cancelled via API');
@@ -827,6 +865,18 @@ class SalesOrderApiController extends Controller
                 'success' => false,
                 'message' => 'Sales Order not found',
             ], 404);
+        }
+
+        $authUser = auth()->user();
+        $ownerId = $order->sales_person_id
+            ?? $order->quotation?->sales_person_id
+            ?? $order->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.orders.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this sales order.'], 403);
         }
 
         $this->authorize('shortClose', $order);

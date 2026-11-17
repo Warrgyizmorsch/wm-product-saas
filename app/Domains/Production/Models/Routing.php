@@ -23,6 +23,7 @@ class Routing extends BaseModel
     public const STATUS_DRAFT            = 'draft';
     public const STATUS_PENDING_APPROVAL = 'pending_approval';
     public const STATUS_ACTIVE           = 'active';
+    public const STATUS_SCHEDULED        = 'scheduled';
     public const STATUS_HISTORICAL       = 'historical';
     public const STATUS_CANCELLED        = 'cancelled';
 
@@ -30,15 +31,28 @@ class Routing extends BaseModel
         self::STATUS_DRAFT,
         self::STATUS_PENDING_APPROVAL,
         self::STATUS_ACTIVE,
+        self::STATUS_SCHEDULED,
         self::STATUS_HISTORICAL,
         self::STATUS_CANCELLED,
     ];
 
+    // [INVERSION-DECOUPLE-TRACK-03] Material quantity entry modes on routing commented out
+    // public const MODE_PER_UNIT              = 'per_unit';
+    // public const MODE_PER_BOM_BASE_QUANTITY = 'per_bom_base_quantity';
+
+    // public const MATERIAL_QUANTITY_MODES = [
+    //     self::MODE_PER_UNIT,
+    //     self::MODE_PER_BOM_BASE_QUANTITY,
+    // ];
+
     protected $fillable = [
+        'cost_snapshot',
         'tenant_id',
         'routing_number',
         'name',
-        'product_id',
+        // [DECOUPLE-PRODUCT-INDEPENDENT] 'product_id',
+        // [INVERSION-DECOUPLE-TRACK-03] 'bom_id',
+        // [INVERSION-DECOUPLE-TRACK-03] 'material_quantity_mode',
         'version',
         'revision',
         'is_default',       // A3: routing alternatives flag
@@ -52,18 +66,46 @@ class Routing extends BaseModel
     ];
 
     protected $casts = [
-        'effective_from' => 'date',
-        'effective_to'   => 'date',
-        'approved_at'    => 'datetime',
-        'revision'       => 'integer',
-        'is_default'     => 'boolean',
+        'cost_snapshot' => 'array', // RT-IMPL-14: costs recorded at approval
+        'effective_from'         => 'date',
+        'effective_to'           => 'date',
+        'approved_at'            => 'datetime',
+        'revision'               => 'integer',
+        'is_default'             => 'boolean',
+        // [INVERSION-DECOUPLE-TRACK-03] 'material_quantity_mode' => 'string',
     ];
+
+    // [INVERSION-DECOUPLE-TRACK-03] Mode helpers commented out
+    // public function isPerUnit(): bool
+    // {
+    //     return ($this->material_quantity_mode ?? self::MODE_PER_UNIT) === self::MODE_PER_UNIT;
+    // }
+
+    // public function isPerBomBaseQuantity(): bool
+    // {
+    //     return ($this->material_quantity_mode ?? self::MODE_PER_UNIT) === self::MODE_PER_BOM_BASE_QUANTITY;
+    // }
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
-    public function product(): BelongsTo
+    // [DECOUPLE-PRODUCT-INDEPENDENT] Routing is independent of products
+    // public function product(): BelongsTo
+    // {
+    //     return $this->belongsTo(Product::class, 'product_id');
+    // }
+
+    // [INVERSION-DECOUPLE-TRACK-03] Inverted: Routing no longer belongs to a single BOM via bom_id
+    // public function bom(): BelongsTo
+    // {
+    //     return $this->belongsTo(ProductionBom::class, 'bom_id');
+    // }
+
+    /**
+     * Inverted relationship: A Routing has many BOMs that reference it.
+     */
+    public function boms(): HasMany
     {
-        return $this->belongsTo(Product::class, 'product_id');
+        return $this->hasMany(ProductionBom::class, 'routing_id');
     }
 
     public function operations(): HasMany
@@ -76,11 +118,6 @@ class Routing extends BaseModel
     {
         return $this->hasMany(RoutingApproval::class, 'routing_id')
             ->orderBy('created_at', 'desc');
-    }
-
-    public function boms(): HasMany
-    {
-        return $this->hasMany(ProductionBom::class, 'routing_id');
     }
 
     public function creator(): BelongsTo
@@ -110,9 +147,42 @@ class Routing extends BaseModel
         return $this->status === self::STATUS_ACTIVE;
     }
 
+    public function isScheduled(): bool
+    {
+        return $this->status === self::STATUS_SCHEDULED
+            || ($this->status === self::STATUS_ACTIVE && $this->effective_from && $this->effective_from->toDateString() > Carbon::today()->toDateString());
+    }
+
+    public function isCurrentlyActive(): bool
+    {
+        if ($this->status !== self::STATUS_ACTIVE && $this->status !== self::STATUS_SCHEDULED) {
+            return false;
+        }
+
+        $today = Carbon::today()->toDateString();
+        $startDate = $this->effective_from ? $this->effective_from->toDateString() : null;
+        $endDate = $this->effective_to ? $this->effective_to->toDateString() : null;
+
+        if ($startDate && $startDate > $today) {
+            return false;
+        }
+
+        if ($endDate && $endDate < $today) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function isHistorical(): bool
     {
         return $this->status === self::STATUS_HISTORICAL;
+    }
+
+    /** RT-IMPL-02: only active or scheduled routings can be retired (→ historical). */
+    public function canBeRetired(): bool
+    {
+        return in_array($this->status, [self::STATUS_ACTIVE, self::STATUS_SCHEDULED], true);
     }
 
     public function isCancelled(): bool
@@ -129,6 +199,7 @@ class Routing extends BaseModel
     {
         return in_array($this->status, [
             self::STATUS_ACTIVE,
+            self::STATUS_SCHEDULED,
             self::STATUS_HISTORICAL,
             self::STATUS_CANCELLED,
         ], true);
@@ -137,17 +208,20 @@ class Routing extends BaseModel
     // ─── Scopes ───────────────────────────────────────────────────────────────
 
     /**
-     * Active routing: status=active and current date falls within effective range.
+     * Active routing: status in active/scheduled and current date falls within effective range.
      */
     public function scopeActive(Builder $query): void
     {
         $today = Carbon::today()->toDateString();
-        $query->where('status', self::STATUS_ACTIVE)
-            ->where('effective_from', '<=', $today)
+        // PO-IMPL-02: a NULL start date means "active now" (same as isCurrentlyActive())
+        $query->whereIn('status', [self::STATUS_ACTIVE, self::STATUS_SCHEDULED])
+            ->where(fn (Builder $q) => $q->whereNull('effective_from')->orWhereDate('effective_from', '<=', $today))
             ->where(function (Builder $q) use ($today): void {
                 $q->whereNull('effective_to')
-                  ->orWhere('effective_to', '>=', $today);
-            });
+                  ->orWhereDate('effective_to', '>=', $today);
+            })
+            ->orderBy('effective_from', 'desc')
+            ->orderBy('id', 'desc');
     }
 
     public function scopePrimary(Builder $query): void
@@ -155,10 +229,6 @@ class Routing extends BaseModel
         $query->where('is_default', true);
     }
 
-    public function scopeForProduct(Builder $query, int $productId): void
-    {
-        $query->where('product_id', $productId);
-    }
 
     // ─── Computed Helpers ─────────────────────────────────────────────────────
 
@@ -168,8 +238,8 @@ class Routing extends BaseModel
      */
     public function totalCycleTimeMinutes(): float
     {
-        return $this->operations->sum(function (RoutingOperation $op): float {
-            return $op->setup_time_minutes + $op->processing_time_minutes + $op->wait_time_minutes;
+        return $this->operations->where('is_alternative', false)->sum(function (RoutingOperation $op): float {
+            return $op->totalCycleTimeMinutes();
         });
     }
 

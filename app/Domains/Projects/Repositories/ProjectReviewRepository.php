@@ -9,7 +9,7 @@ class ProjectReviewRepository implements ProjectReviewRepositoryInterface
 {
     public function getForProject(int $projectId, array $filters = []): Collection
     {
-        $query = ProjectReview::with(['reviewer', 'creator', 'documents'])
+        $query = ProjectReview::with(['reviewer', 'creator', 'documents', 'project'])
             ->where('project_id', $projectId);
 
         if (!empty($filters['status'])) {

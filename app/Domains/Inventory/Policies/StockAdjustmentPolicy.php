@@ -14,43 +14,68 @@ class StockAdjustmentPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->access->allows($user, 'inventory.products.view', [
-            'tenant_id' => $user->tenant_id,
-        ]);
+        $context = [
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
+        ];
+
+        return $this->access->allows($user, 'inventory.adjustments.view', $context)
+            || $this->access->allows($user, 'inventory.warehouses.manage', $context);
     }
 
     public function view(User $user, StockAdjustment $adjustment): bool
     {
-        return $this->access->allows($user, 'inventory.products.view', [
-            'tenant_id' => $adjustment->tenant_id,
-        ]);
+        $context = [
+            'tenant_id'     => $adjustment->tenant_id,
+            'owner_id'      => $adjustment->created_by ?? $user->id,
+            'branch_id'     => $adjustment->branch_id ?? $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $adjustment->company_id ?? $user->company_id,
+        ];
+
+        return $this->access->allows($user, 'inventory.adjustments.view', $context)
+            || $this->access->allows($user, 'inventory.warehouses.manage', $context);
     }
 
     public function create(User $user): bool
     {
-        return $this->access->allows($user, 'inventory.products.update', [
-            'tenant_id' => $user->tenant_id,
-        ]);
+        $context = [
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
+        ];
+
+        return $this->access->allows($user, 'inventory.adjustments.create', $context)
+            || $this->access->allows($user, 'inventory.adjustments.manage', $context)
+            || $this->access->allows($user, 'inventory.warehouses.manage', $context);
     }
 
     public function update(User $user, StockAdjustment $adjustment): bool
     {
-        return $this->access->allows($user, 'inventory.products.update', [
-            'tenant_id' => $adjustment->tenant_id,
-        ]);
+        $context = [
+            'tenant_id'     => $adjustment->tenant_id,
+            'owner_id'      => $adjustment->created_by ?? $user->id,
+            'branch_id'     => $adjustment->branch_id ?? $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $adjustment->company_id ?? $user->company_id,
+        ];
+
+        return $this->access->allows($user, 'inventory.adjustments.manage', $context)
+            || $this->access->allows($user, 'inventory.warehouses.manage', $context);
     }
 
     public function approve(User $user, StockAdjustment $adjustment): bool
     {
-        return $this->access->allows($user, 'inventory.products.update', [
-            'tenant_id' => $adjustment->tenant_id,
-        ]);
+        return $this->update($user, $adjustment);
     }
 
     public function delete(User $user, StockAdjustment $adjustment): bool
     {
-        return $this->access->allows($user, 'inventory.products.delete', [
-            'tenant_id' => $adjustment->tenant_id,
-        ]);
+        return $this->update($user, $adjustment);
     }
 }

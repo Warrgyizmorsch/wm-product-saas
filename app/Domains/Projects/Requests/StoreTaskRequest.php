@@ -48,6 +48,14 @@ class StoreTaskRequest extends FormRequest
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'estimated_hours' => ['nullable', 'numeric', 'min:0'],
+            'billing_amount' => ['nullable', 'numeric', 'min:0'],
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'task_list_id' => __('projects.task_list'),
         ];
     }
 }

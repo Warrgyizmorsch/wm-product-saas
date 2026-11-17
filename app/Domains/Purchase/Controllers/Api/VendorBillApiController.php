@@ -33,6 +33,7 @@ class VendorBillApiController extends Controller
      */
     public function meta(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', VendorBill::class);
         [$tenantId] = $this->resolveTenantContext();
         $vendors    = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'company_name', 'email', 'phone', 'gstin']);
 
@@ -73,6 +74,7 @@ class VendorBillApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', VendorBill::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = VendorBill::query()
@@ -120,6 +122,8 @@ class VendorBillApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', VendorBill::class);
+
         $validator = Validator::make($request->all(), [
             'vendor_id'             => ['required', 'integer'],
             'purchase_order_id'     => ['nullable', 'integer'],
@@ -262,6 +266,8 @@ class VendorBillApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $bill);
+
         $billData = $bill->toArray();
         $billData['returns_total'] = $bill->returnsTotal();
         $billData['net_payable']   = $bill->netPayable();
@@ -287,6 +293,8 @@ class VendorBillApiController extends Controller
                 'message' => 'Vendor Bill not found',
             ], 404);
         }
+
+        $this->authorize('update', $bill);
 
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Approved,Paid,Partial,Cancelled'],
@@ -341,6 +349,8 @@ class VendorBillApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('update', $bill);
+
         if ($bill->amount_paid > 0) {
             return response()->json([
                 'success' => false,
@@ -362,6 +372,7 @@ class VendorBillApiController extends Controller
      */
     public function pendingGrns(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', VendorBill::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = \App\Domains\Purchase\Models\GoodsReceiptNote::where('tenant_id', $tenantId)
@@ -389,6 +400,7 @@ class VendorBillApiController extends Controller
      */
     public function pendingFreight(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', VendorBill::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = \App\Domains\Purchase\Models\GoodsReceiptNote::where('tenant_id', $tenantId)
@@ -416,6 +428,8 @@ class VendorBillApiController extends Controller
      */
     public function storeService(Request $request): JsonResponse
     {
+        $this->authorize('create', VendorBill::class);
+
         $validator = Validator::make($request->all(), [
             'vendor_id'         => ['required', 'integer'],
             'bill_date'         => ['required', 'date'],
@@ -514,6 +528,8 @@ class VendorBillApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('update', $bill);
+
         if ($bill->isOnHold()) {
             return response()->json([
                 'success' => false,
@@ -555,6 +571,7 @@ class VendorBillApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', VendorBill::class);
         [$tenantId] = $this->resolveTenantContext();
 
         return \Maatwebsite\Excel\Facades\Excel::download(
@@ -576,6 +593,8 @@ class VendorBillApiController extends Controller
         if (!$bill) {
             return response()->json(['success' => false, 'message' => 'Vendor Bill not found'], 404);
         }
+
+        $this->authorize('view', $bill);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.purchase.bills.pdf', compact('bill'));
         return $pdf->download("Bill_{$bill->bill_number}.pdf");

@@ -545,6 +545,15 @@
             $status = $item['status'] ?? 'Pending';
             $isPending = ($status === 'Pending');
             $isGeoRequired = !empty($item['is_geo_verification_required']);
+
+            $currentUserId = auth()->id();
+            $hostObj = $item['assigned_to'] ?? ($item['meeting_owner'] ?? ($lead['lead_owner'] ?? ($deal['deal_owner'] ?? null)));
+            $hostId = $item['assigned_to_id'] ?? ($hostObj['id'] ?? null);
+            $isHost = !empty($item['is_host']) || ($hostId == $currentUserId) || (empty($hostId) && (($lead['lead_owner']['id'] ?? ($deal['deal_owner']['id'] ?? null)) == $currentUserId));
+            $hostName = $hostObj['name'] ?? ($lead['lead_owner']['name'] ?? ($deal['deal_owner']['name'] ?? 'Lead Owner'));
+            $currentUser = auth()->user();
+            $isAdminUser = $currentUser && in_array(strtolower(str_replace([' ', '_', '-'], '', (string) ($currentUser->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
+            $canManageMeeting = $isHost || ($lead && ($lead['lead_owner']['id'] ?? null) == $currentUserId) || ($deal && ($deal['deal_owner']['id'] ?? null) == $currentUserId) || $isAdminUser;
         @endphp
 
         {{-- Offcanvas Drawer: Quick View Lead / Deal Details --}}
@@ -838,17 +847,24 @@
                     {{ __('crm.close') ?? 'Close' }}
                 </button>
                 @if($isPending)
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-info text-white" data-bs-dismiss="offcanvas"
-                            data-bs-toggle="modal" data-bs-target="#meetingRescheduleModal_{{ $item['id'] }}">
-                            <i class="feather-calendar me-1"></i> {{ __('crm.meetings_reschedule') }}
-                        </button>
-                        <button type="button" class="btn btn-sm btn-success" data-bs-dismiss="offcanvas" data-bs-toggle="modal"
-                            data-bs-target="#meetingModal_{{ $item['id'] }}_Connected"
-                            onclick="crmInitVisitModal('{{ $item['id'] }}', 'Connected')">
-                            <i class="feather-check me-1"></i> {{ __('crm.meetings_mark_connected') }}
-                        </button>
-                    </div>
+                    @if($canManageMeeting)
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-info text-white" data-bs-dismiss="offcanvas"
+                                data-bs-toggle="modal" data-bs-target="#meetingRescheduleModal_{{ $item['id'] }}">
+                                <i class="feather-calendar me-1"></i> {{ __('crm.meetings_reschedule') }}
+                            </button>
+                            <button type="button" class="btn btn-sm btn-success" data-bs-dismiss="offcanvas" data-bs-toggle="modal"
+                                data-bs-target="#meetingModal_{{ $item['id'] }}_Connected"
+                                onclick="crmInitVisitModal('{{ $item['id'] }}', 'Connected')">
+                                <i class="feather-check me-1"></i> {{ __('crm.meetings_mark_connected') }}
+                            </button>
+                        </div>
+                    @else
+                        <span class="badge bg-light text-muted border px-2.5 py-1.5 fs-11 d-inline-flex align-items-center gap-1"
+                            title="Only the primary host ({{ $hostName }}) can update meeting status">
+                            <i class="feather-eye me-1"></i>View Only
+                        </span>
+                    @endif
                 @endif
             </div>
         </div>

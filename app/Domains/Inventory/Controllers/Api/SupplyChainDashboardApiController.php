@@ -35,6 +35,8 @@ class SupplyChainDashboardApiController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Product::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $preset   = $request->get('preset', 'this_month');

@@ -159,27 +159,59 @@ class CrmNotificationService
     public static function notifyDealCreated(CrmDeal $deal): void
     {
         try {
+            $deal->loadMissing([
+                'account' => fn($q) => $q->withoutGlobalScope('rbac_scope')->with('owner'),
+                'owner',
+            ]);
             $accountName = $deal->account?->name ?: 'General Account';
             $amountFormatted = number_format((float) ($deal->estimated_value ?? 0), 2);
             $createdBy = auth()->user()?->name ?: 'System';
             $actionUrl = route('crm.deals.show', $deal->id);
 
+            $accountOwnerId = $deal->account?->owner_id;
+            $dealOwnerId = $deal->owner_id;
+            $currentUserId = auth()->id();
+
             // 1. Direct notification to assigned Deal Owner if assigned to someone else
-            if (!empty($deal->owner_id) && $deal->owner_id !== auth()->id()) {
-                self::notifyDealAssigned($deal, $deal->owner_id, auth()->id());
+            if (!empty($dealOwnerId) && $dealOwnerId !== $currentUserId) {
+                self::notifyDealAssigned($deal, $dealOwnerId, $currentUserId);
             }
 
-            // 2. Notification Master trigger for Managers / Executives
+            // 2. Direct notification to Account Manager if account manager is not the creator and not already notified as deal owner
+            if (!empty($accountOwnerId) && $accountOwnerId !== $currentUserId && $accountOwnerId !== $dealOwnerId) {
+                $dealTitle = $deal->title ?: ('Deal #' . ($deal->deal_number ?? $deal->id));
+                NotificationService::send(
+                    user: $accountOwnerId,
+                    title: "New Deal Created: {$dealTitle}",
+                    message: "A new deal '{$dealTitle}' ({$accountName}, ₹{$amountFormatted}) was created for your managed account by {$createdBy}.",
+                    actionUrl: $actionUrl,
+                    module: 'crm',
+                    type: 'deal_created',
+                    iconClass: 'feather-briefcase',
+                    extraData: ['deal_id' => $deal->id, 'tenant_id' => $deal->tenant_id, 'account_id' => $deal->crm_account_id]
+                );
+            }
+
+            // 3. Notification Master trigger for Managers / Executives
+            $excludeUserIds = [];
+            if (!empty($dealOwnerId) && $dealOwnerId !== $currentUserId) {
+                $excludeUserIds[] = $dealOwnerId;
+            }
+            if (!empty($accountOwnerId) && $accountOwnerId !== $currentUserId) {
+                $excludeUserIds[] = $accountOwnerId;
+            }
+
             NotificationRuleService::trigger(
                 eventKey: 'crm.deal.created',
                 data: [
-                    'deal_title'   => $deal->title,
-                    'account_name' => $accountName,
-                    'amount'       => $amountFormatted,
-                    'created_by'   => $createdBy,
-                    'deal_number'  => $deal->deal_number ?? '',
-                    'assigned_user_id' => $deal->owner_id,
-                    'exclude_user_ids' => (!empty($deal->owner_id) && $deal->owner_id !== auth()->id()) ? [$deal->owner_id] : [],
+                    'deal_title'         => $deal->title,
+                    'account_name'       => $accountName,
+                    'amount'             => $amountFormatted,
+                    'created_by'         => $createdBy,
+                    'deal_number'        => $deal->deal_number ?? '',
+                    'assigned_user_id'   => $deal->owner_id,
+                    'account_manager_id' => $accountOwnerId,
+                    'exclude_user_ids'   => $excludeUserIds,
                 ],
                 actionUrl: $actionUrl,
                 subjectModel: $deal
@@ -199,6 +231,9 @@ class CrmNotificationService
         }
 
         try {
+            $deal->loadMissing([
+                'account' => fn($q) => $q->withoutGlobalScope('rbac_scope')->with('owner'),
+            ]);
             $assignedByUser = $assignedByUserId ? User::find($assignedByUserId) : auth()->user();
             $assignedByName = $assignedByUser?->name ?: 'System Admin';
             $accountName = $deal->account?->name ?: 'General Account';
@@ -218,17 +253,40 @@ class CrmNotificationService
                 extraData: ['deal_id' => $deal->id, 'tenant_id' => $deal->tenant_id]
             );
 
+            // Notify Account Manager if deal is assigned to another executive
+            $accountOwnerId = $deal->account?->owner_id;
+            if (!empty($accountOwnerId) && $accountOwnerId !== $assignedToUserId && $accountOwnerId !== $assignedByUserId) {
+                $assignedToUser = User::find($assignedToUserId);
+                $assignedToName = $assignedToUser?->name ?: 'Executive';
+                NotificationService::send(
+                    user: $accountOwnerId,
+                    title: "Deal Assigned: {$dealTitle}",
+                    message: "Deal '{$dealTitle}' in your managed account '{$accountName}' has been assigned to {$assignedToName} by {$assignedByName}.",
+                    actionUrl: $actionUrl,
+                    module: 'crm',
+                    type: 'deal_assigned',
+                    iconClass: 'feather-briefcase',
+                    extraData: ['deal_id' => $deal->id, 'tenant_id' => $deal->tenant_id]
+                );
+            }
+
+            $excludeIds = [$assignedToUserId];
+            if (!empty($accountOwnerId)) {
+                $excludeIds[] = $accountOwnerId;
+            }
+
             NotificationRuleService::trigger(
                 eventKey: 'crm.deal.assigned',
                 data: [
-                    'deal_title'   => $dealTitle,
-                    'account_name' => $accountName,
-                    'amount'       => $amountFormatted,
-                    'assigned_to'  => User::find($assignedToUserId)?->name ?: 'Executive',
-                    'assigned_by'  => $assignedByName,
-                    'deal_number'  => $deal->deal_number ?? '',
-                    'assigned_user_id' => $assignedToUserId,
-                    'exclude_user_ids' => [$assignedToUserId],
+                    'deal_title'         => $dealTitle,
+                    'account_name'       => $accountName,
+                    'amount'             => $amountFormatted,
+                    'assigned_to'        => User::find($assignedToUserId)?->name ?: 'Executive',
+                    'assigned_by'        => $assignedByName,
+                    'deal_number'        => $deal->deal_number ?? '',
+                    'assigned_user_id'   => $assignedToUserId,
+                    'account_manager_id' => $accountOwnerId,
+                    'exclude_user_ids'   => $excludeIds,
                 ],
                 actionUrl: $actionUrl,
                 subjectModel: $deal
@@ -244,6 +302,9 @@ class CrmNotificationService
     public static function notifyDealStageUpdated(CrmDeal $deal, string $oldStage, string $newStage): void
     {
         try {
+            $deal->loadMissing([
+                'account' => fn($q) => $q->withoutGlobalScope('rbac_scope')->with('owner'),
+            ]);
             $accountName = $deal->account?->name ?: 'General Account';
             $updatedBy = auth()->user()?->name ?: 'System';
             $actionUrl = route('crm.deals.show', $deal->id);
@@ -258,10 +319,14 @@ class CrmNotificationService
                 return;
             }
 
+            $currentUserId = auth()->id();
+            $dealOwnerId = $deal->owner_id;
+            $accountOwnerId = $deal->account?->owner_id;
+
             // Direct in-app + Pusher alert to deal owner
-            if (!empty($deal->owner_id) && $deal->owner_id !== auth()->id()) {
+            if (!empty($dealOwnerId) && $dealOwnerId !== $currentUserId) {
                 NotificationService::send(
-                    user: $deal->owner_id,
+                    user: $dealOwnerId,
                     title: "Deal Stage: {$newStage} ({$deal->title})",
                     message: "Deal '{$deal->title}' moved from {$oldStage} to {$newStage} by {$updatedBy}.",
                     actionUrl: $actionUrl,
@@ -271,17 +336,39 @@ class CrmNotificationService
                 );
             }
 
+            // Direct in-app + Pusher alert to account manager (if not already notified as deal owner)
+            if (!empty($accountOwnerId) && $accountOwnerId !== $currentUserId && $accountOwnerId !== $dealOwnerId) {
+                NotificationService::send(
+                    user: $accountOwnerId,
+                    title: "Deal Stage: {$newStage} ({$deal->title})",
+                    message: "Deal '{$deal->title}' in your managed account '{$accountName}' moved from {$oldStage} to {$newStage} by {$updatedBy}.",
+                    actionUrl: $actionUrl,
+                    module: 'crm',
+                    type: 'deal_stage_updated',
+                    iconClass: 'feather-trending-up'
+                );
+            }
+
+            $excludeUserIds = [];
+            if (!empty($dealOwnerId) && $dealOwnerId !== $currentUserId) {
+                $excludeUserIds[] = $dealOwnerId;
+            }
+            if (!empty($accountOwnerId) && $accountOwnerId !== $currentUserId) {
+                $excludeUserIds[] = $accountOwnerId;
+            }
+
             NotificationRuleService::trigger(
                 eventKey: 'crm.deal.stage_updated',
                 data: [
-                    'deal_title'   => $deal->title,
-                    'account_name' => $accountName,
-                    'old_stage'    => $oldStage,
-                    'new_stage'    => $newStage,
-                    'updated_by'   => $updatedBy,
-                    'deal_number'  => $deal->deal_number ?? '',
-                    'assigned_user_id' => $deal->owner_id,
-                    'exclude_user_ids' => (!empty($deal->owner_id) && $deal->owner_id !== auth()->id()) ? [$deal->owner_id] : [],
+                    'deal_title'         => $deal->title,
+                    'account_name'       => $accountName,
+                    'old_stage'          => $oldStage,
+                    'new_stage'          => $newStage,
+                    'updated_by'         => $updatedBy,
+                    'deal_number'        => $deal->deal_number ?? '',
+                    'assigned_user_id'   => $deal->owner_id,
+                    'account_manager_id' => $accountOwnerId,
+                    'exclude_user_ids'   => $excludeUserIds,
                 ],
                 actionUrl: $actionUrl,
                 subjectModel: $deal
@@ -297,15 +384,21 @@ class CrmNotificationService
     public static function notifyDealWon(CrmDeal $deal): void
     {
         try {
+            $deal->loadMissing([
+                'account' => fn($q) => $q->withoutGlobalScope('rbac_scope')->with('owner'),
+            ]);
             $accountName = $deal->account?->name ?: 'Customer';
             $amountFormatted = number_format((float) ($deal->estimated_value ?? 0), 2);
             $wonBy = auth()->user()?->name ?: 'User';
             $actionUrl = route('crm.deals.show', $deal->id);
 
+            $dealOwnerId = $deal->owner_id;
+            $accountOwnerId = $deal->account?->owner_id;
+
             // Direct celebration alert to deal owner
-            if (!empty($deal->owner_id)) {
+            if (!empty($dealOwnerId)) {
                 NotificationService::send(
-                    user: $deal->owner_id,
+                    user: $dealOwnerId,
                     title: "🎉 Deal WON: {$deal->title}",
                     message: "Congratulations! Deal '{$deal->title}' for {$accountName} (₹{$amountFormatted}) has been successfully marked as WON!",
                     actionUrl: $actionUrl,
@@ -315,16 +408,38 @@ class CrmNotificationService
                 );
             }
 
+            // Direct celebration alert to account manager (if not already notified as deal owner)
+            if (!empty($accountOwnerId) && $accountOwnerId !== $dealOwnerId) {
+                NotificationService::send(
+                    user: $accountOwnerId,
+                    title: "🎉 Deal WON: {$deal->title}",
+                    message: "Congratulations! Deal '{$deal->title}' in your managed account '{$accountName}' (₹{$amountFormatted}) has been successfully marked as WON by {$wonBy}!",
+                    actionUrl: $actionUrl,
+                    module: 'crm',
+                    type: 'deal_won',
+                    iconClass: 'feather-award'
+                );
+            }
+
+            $excludeUserIds = [];
+            if (!empty($dealOwnerId)) {
+                $excludeUserIds[] = $dealOwnerId;
+            }
+            if (!empty($accountOwnerId)) {
+                $excludeUserIds[] = $accountOwnerId;
+            }
+
             NotificationRuleService::trigger(
                 eventKey: 'crm.deal.won',
                 data: [
-                    'deal_title'    => $deal->title,
-                    'customer_name' => $accountName,
-                    'amount'        => $amountFormatted,
-                    'won_by'        => $wonBy,
-                    'deal_number'   => $deal->deal_number ?? '',
-                    'assigned_user_id' => $deal->owner_id,
-                    'exclude_user_ids' => !empty($deal->owner_id) ? [$deal->owner_id] : [],
+                    'deal_title'         => $deal->title,
+                    'customer_name'      => $accountName,
+                    'amount'             => $amountFormatted,
+                    'won_by'             => $wonBy,
+                    'deal_number'        => $deal->deal_number ?? '',
+                    'assigned_user_id'   => $deal->owner_id,
+                    'account_manager_id' => $accountOwnerId,
+                    'exclude_user_ids'   => $excludeUserIds,
                 ],
                 actionUrl: $actionUrl,
                 subjectModel: $deal
@@ -340,21 +455,62 @@ class CrmNotificationService
     public static function notifyDealLost(CrmDeal $deal, ?string $reason = null): void
     {
         try {
+            $deal->loadMissing([
+                'account' => fn($q) => $q->withoutGlobalScope('rbac_scope')->with('owner'),
+            ]);
             $accountName = $deal->account?->name ?: 'Customer';
             $amountFormatted = number_format((float) ($deal->estimated_value ?? 0), 2);
             $closedBy = auth()->user()?->name ?: 'User';
             $actionUrl = route('crm.deals.show', $deal->id);
 
+            $dealOwnerId = $deal->owner_id;
+            $accountOwnerId = $deal->account?->owner_id;
+            $currentUserId = auth()->id();
+
+            if (!empty($dealOwnerId) && $dealOwnerId !== $currentUserId) {
+                NotificationService::send(
+                    user: $dealOwnerId,
+                    title: "Deal Marked as Lost: {$deal->title}",
+                    message: "Deal '{$deal->title}' for {$accountName} was marked as Lost by {$closedBy}. Reason: " . ($reason ?: 'Not specified'),
+                    actionUrl: $actionUrl,
+                    module: 'crm',
+                    type: 'deal_lost',
+                    iconClass: 'feather-alert-triangle'
+                );
+            }
+
+            if (!empty($accountOwnerId) && $accountOwnerId !== $currentUserId && $accountOwnerId !== $dealOwnerId) {
+                NotificationService::send(
+                    user: $accountOwnerId,
+                    title: "Deal Marked as Lost: {$deal->title}",
+                    message: "Deal '{$deal->title}' in your managed account '{$accountName}' was marked as Lost by {$closedBy}. Reason: " . ($reason ?: 'Not specified'),
+                    actionUrl: $actionUrl,
+                    module: 'crm',
+                    type: 'deal_lost',
+                    iconClass: 'feather-alert-triangle'
+                );
+            }
+
+            $excludeUserIds = [];
+            if (!empty($dealOwnerId) && $dealOwnerId !== $currentUserId) {
+                $excludeUserIds[] = $dealOwnerId;
+            }
+            if (!empty($accountOwnerId) && $accountOwnerId !== $currentUserId) {
+                $excludeUserIds[] = $accountOwnerId;
+            }
+
             NotificationRuleService::trigger(
                 eventKey: 'crm.deal.lost',
                 data: [
-                    'deal_title'    => $deal->title,
-                    'customer_name' => $accountName,
-                    'amount'        => $amountFormatted,
-                    'closed_by'     => $closedBy,
-                    'reason'        => $reason ?: ($deal->close_reason ?: 'Not specified'),
-                    'deal_number'   => $deal->deal_number ?? '',
-                    'assigned_user_id' => $deal->owner_id,
+                    'deal_title'         => $deal->title,
+                    'customer_name'      => $accountName,
+                    'amount'             => $amountFormatted,
+                    'closed_by'          => $closedBy,
+                    'reason'             => $reason ?: ($deal->close_reason ?: 'Not specified'),
+                    'deal_number'        => $deal->deal_number ?? '',
+                    'assigned_user_id'   => $deal->owner_id,
+                    'account_manager_id' => $accountOwnerId,
+                    'exclude_user_ids'   => $excludeUserIds,
                 ],
                 actionUrl: $actionUrl,
                 subjectModel: $deal

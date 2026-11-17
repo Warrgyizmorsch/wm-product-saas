@@ -1,0 +1,3 @@
+# Browser profile (holds the logged-in session cookies) and local login details — never commit
+.chrome-profile/
+login.local.json

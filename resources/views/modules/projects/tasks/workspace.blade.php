@@ -4,6 +4,8 @@
 @section('page-title', $task->title)
 @section('breadcrumb', __('projects.title') . ' / ' . ($task->milestone?->name ?? $task->taskList?->name) . ' / ' . $task->task_code)
 
+@include('modules.projects._panel-styles')
+
 @section('content')
     <div class="erp-single-panel bg-white p-4 rounded-3 border">
         @if ($errors->any())
@@ -43,4 +45,8 @@
     @if ($canManageTask)
         @include('modules.projects.tasks._modal')
     @endif
+
+    @push('scripts')
+        <script type="module" src="{{ asset('assets/js/inline-edit/index.js') }}"></script>
+    @endpush
 @endsection

@@ -4,6 +4,8 @@ namespace App\Services\Approval;
 
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\HRMS\Models\AssetRequest;
+use App\Domains\Projects\Models\ChangeRequest;
+use App\Domains\Projects\Models\TimeLog;
 use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\CashAdvance;
 use App\Domains\HRMS\Models\Document;
@@ -78,8 +80,9 @@ class ApprovalCenterService
         $isSalesEnabled = $this->isSalesModuleEnabled();
         $isPurchaseEnabled = $this->isPurchaseModuleEnabled();
         $isInventoryEnabled = $this->isInventoryModuleEnabled();
+        $isProjectsEnabled = $this->isProjectsModuleEnabled();
 
-        if (! $isProdEnabled && ! $isHrmsEnabled && ! $isCrmEnabled && ! $isSalesEnabled && ! $isPurchaseEnabled && ! $isInventoryEnabled) {
+        if (! $isProdEnabled && ! $isHrmsEnabled && ! $isCrmEnabled && ! $isSalesEnabled && ! $isPurchaseEnabled && ! $isInventoryEnabled && ! $isProjectsEnabled) {
             return [
                 'count' => 0,
                 'items' => [],
@@ -1068,6 +1071,91 @@ class ApprovalCenterService
             }
         }
 
+        // ==========================================
+        // 7. Project Module Approvals (Time Logs & Change Requests)
+        // ==========================================
+        if ($isProjectsEnabled) {
+            $canApproveTime = $this->hasPermission($user, 'projects.timetracking.approve');
+            $canApproveCr = $this->hasPermission($user, 'projects.changerequests.approve');
+
+            // Pending Time Logs
+            if ($canApproveTime && class_exists(TimeLog::class)) {
+                $canSelfApproveTime = $this->accessService->holdsPlatformAdminRole($user)
+                    || $this->accessService->hasRole($user, 'tenant_owner', $user->tenant_id)
+                    || $this->accessService->hasRole($user, 'company_admin', $user->tenant_id)
+                    || $this->accessService->hasExplicitScope($user, 'projects.timetracking.approve', \App\Models\Access\RolePermission::SCOPE_OWN, $user->tenant_id);
+
+                $timeQuery = TimeLog::query()
+                    ->where('approval_status', TimeLog::STATUS_PENDING)
+                    ->when(! $canSelfApproveTime, fn ($q) => $q->where('user_id', '!=', $user->id));
+
+                $timeCount = (clone $timeQuery)->count();
+                $totalActionableCount += $timeCount;
+
+                if ($timeCount > 0) {
+                    $timeLogs = $timeQuery->with(['user', 'project'])
+                        ->orderBy('created_at', 'asc')
+                        ->take(self::MAX_HEADER_ITEMS)
+                        ->get();
+
+                    foreach ($timeLogs as $log) {
+                        $author = $log->user?->name ?: 'Member';
+                        $prjName = $log->project?->name ?: 'Project';
+                        $hours = number_format((float) ($log->hours ?? 0), 2);
+
+                        $candidateItems[] = [
+                            'module' => 'Projects',
+                            'type' => 'Time Log',
+                            'title' => "Time Log #{$log->id}",
+                            'subtitle' => "{$author} • {$hours} hrs on {$prjName}",
+                            'url' => Route::has('projects.show') && $log->project_id ? route('projects.show', $log->project_id) : url('/projects'),
+                            'icon' => 'feather-clock',
+                            'time' => $log->created_at?->diffForHumans(),
+                            'created_at' => $log->created_at?->toIso8601String(),
+                        ];
+                    }
+                }
+            }
+
+            // Pending Change Requests
+            if ($canApproveCr && class_exists(ChangeRequest::class)) {
+                $canSelfApproveCr = $this->accessService->holdsPlatformAdminRole($user)
+                    || $this->accessService->hasRole($user, 'tenant_owner', $user->tenant_id)
+                    || $this->accessService->hasRole($user, 'company_admin', $user->tenant_id)
+                    || $this->accessService->hasExplicitScope($user, 'projects.changerequests.approve', \App\Models\Access\RolePermission::SCOPE_OWN, $user->tenant_id);
+
+                $crQuery = ChangeRequest::query()
+                    ->where('status', ChangeRequest::STATUS_PENDING)
+                    ->when(! $canSelfApproveCr, fn ($q) => $q->where('requested_by', '!=', $user->id)->where('created_by', '!=', $user->id));
+
+                $crCount = (clone $crQuery)->count();
+                $totalActionableCount += $crCount;
+
+                if ($crCount > 0) {
+                    $crs = $crQuery->with(['requester', 'project'])
+                        ->orderBy('created_at', 'asc')
+                        ->take(self::MAX_HEADER_ITEMS)
+                        ->get();
+
+                    foreach ($crs as $cr) {
+                        $reqName = $cr->requester?->name ?: 'Member';
+                        $prjName = $cr->project?->name ?: 'Project';
+
+                        $candidateItems[] = [
+                            'module' => 'Projects',
+                            'type' => 'Change Request',
+                            'title' => (string) ($cr->cr_number ?: "CR #{$cr->id}"),
+                            'subtitle' => "{$reqName} • {$cr->title} ({$prjName})",
+                            'url' => Route::has('projects.show') && $cr->project_id ? route('projects.show', $cr->project_id) : url('/projects'),
+                            'icon' => 'feather-git-pull-request',
+                            'time' => $cr->created_at?->diffForHumans(),
+                            'created_at' => $cr->created_at?->toIso8601String(),
+                        ];
+                    }
+                }
+            }
+        }
+
         // Bounded Results Sorting: oldest pending first for workflow queue priority
         usort($candidateItems, function (array $a, array $b): int {
             $timeA = $a['created_at'] ?? '';
@@ -1210,6 +1298,20 @@ class ApprovalCenterService
             || $this->hasPermission($user, 'hrms.performance.manage')
             || $this->hasPermission($user, 'hrms.goals.manage')
             || $this->hasPermission($user, 'hrms.feedback_360.manage');
+    }
+
+    /**
+     * Verify if the Projects module is active in tenant's subscription plan.
+     */
+    private function isProjectsModuleEnabled(): bool
+    {
+        $planModules = tenant_allowed_modules();
+
+        if ($planModules === null || in_array('*', $planModules, true)) {
+            return true;
+        }
+
+        return in_array('projects', $planModules, true);
     }
 
     /**

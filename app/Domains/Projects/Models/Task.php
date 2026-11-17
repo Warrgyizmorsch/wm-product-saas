@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,6 +17,24 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Task extends BaseModel
 {
     use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+
+    protected ?string $rbacPermission = 'projects.tasks.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $table = $this->getTable();
+        $builder->where(function (Builder $sub) use ($user, $table) {
+            $sub->where($table . '.assignee_id', $user->id)
+                ->orWhere($table . '.assigned_to', $user->id)
+                ->orWhereHas('project', fn (Builder $pq) => 
+                    $pq->where('owner_id', $user->id)
+                       ->orWhere('manager_id', $user->id)
+                       ->orWhereHas('members', fn (Builder $mq) =>
+                           $mq->where('user_id', $user->id)->where('is_active', true)
+                       )
+                );
+        });
+    }
 
     protected $table = 'project_tasks';
 
@@ -39,6 +58,8 @@ class Task extends BaseModel
 
     protected $attributes = [
         'status' => self::STATUS_OPEN,
+        'billing_amount' => 0.00,
+        'is_invoiced' => false,
     ];
 
     protected $fillable = [
@@ -61,6 +82,9 @@ class Task extends BaseModel
         'actual_hours',
         'position',
         'completed_at',
+        'billing_amount',
+        'is_invoiced',
+        'invoice_id',
     ];
 
     protected $casts = [
@@ -70,6 +94,8 @@ class Task extends BaseModel
         'actual_hours'     => 'decimal:2',
         'position'         => 'integer',
         'completed_at'     => 'datetime',
+        'billing_amount'   => 'decimal:2',
+        'is_invoiced'      => 'boolean',
     ];
 
     public function project(): BelongsTo
@@ -105,6 +131,16 @@ class Task extends BaseModel
     public function setAssignedToAttribute($value): void
     {
         $this->attributes['assignee_id'] = $value;
+    }
+
+    public function setBillingAmountAttribute($value): void
+    {
+        $this->attributes['billing_amount'] = (is_numeric($value) && (float) $value >= 0) ? (float) $value : 0.00;
+    }
+
+    public function getTaskNumberAttribute(): ?string
+    {
+        return $this->task_code;
     }
 
     public function reviewer(): BelongsTo
@@ -150,6 +186,11 @@ class Task extends BaseModel
     public function purchaseRequisitionItems(): HasMany
     {
         return $this->hasMany(\App\Domains\Purchase\Models\PurchaseRequisitionItem::class, 'project_task_id');
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Sales\Models\Invoice::class, 'invoice_id');
     }
 }
 

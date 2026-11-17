@@ -52,6 +52,9 @@
             <div class="card border-0 shadow-sm p-4 p-md-5 bg-white">
                 <form action="{{ route('purchase.orders.store') }}" method="POST" id="createPoForm" class="odoo-sheet">
                     @csrf
+                    <input type="hidden" name="rfq_id" value="{{ $selectedRfqId ?? old('rfq_id', request('rfq_id')) }}">
+                    <input type="hidden" name="reference" value="{{ $prefilledReference ?? old('reference', request('reference')) }}">
+                    <input type="hidden" name="supplier_quotation_number" value="{{ $prefilledSupplierQuoteNo ?? old('supplier_quotation_number', request('supplier_quotation_number')) }}">
                     @foreach($requisitionItemIds ?? [] as $itemId)
                         <input type="hidden" name="requisition_item_ids[]" value="{{ $itemId }}">
                     @endforeach
@@ -63,6 +66,24 @@
                             <small class="text-muted fs-12">{{ __('purchase.create_po_help') }}</small>
                         </div>
                     </div>
+
+                    @if(!empty($selectedRfqId) && !empty($prefilledReference))
+                        <div class="alert alert-info py-2 px-3 mb-4 d-flex align-items-center justify-content-between rounded border-0 shadow-2xs" style="background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe !important;">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="feather-link fs-16 text-primary"></i>
+                                <div>
+                                    <span class="fw-bold">{{ __('purchase.converted_from_rfq') }}:</span>
+                                    <span class="badge bg-primary text-white ms-1">{{ $prefilledReference }}</span>
+                                    @if(!empty($prefilledSupplierQuoteNo))
+                                        <span class="ms-2 text-muted">&bull; <strong>{{ __('purchase.supplier_quotation_no') }}:</strong> {{ $prefilledSupplierQuoteNo }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                            <a href="{{ route('purchase.rfqs.show', $selectedRfqId) }}" class="btn btn-xs btn-outline-primary bg-white" target="_blank">
+                                <i class="feather-external-link me-1"></i>{{ __('purchase.view_rfq') }}
+                            </a>
+                        </div>
+                    @endif
 
                     <div class="row g-4 fs-13 text-dark">
                         <!-- Left Panel: Supplier & Location details -->
@@ -115,7 +136,7 @@
                                         data-address="{{ $v->address }}"
                                         data-gst-prefix="{{ $vendorGstPrefix }}"
                                         data-gst-type="{{ $computedGstType }}"
-                                        @selected(old('vendor_id', request('vendor_id')) == $v->id)>
+                                        @selected(old('vendor_id', $selectedVendorId ?? request('vendor_id')) == $v->id)>
                                         {{ $v->name }} {{ $v->code ? '('.$v->code.')' : '' }}
                                     </option>
                                 @endforeach
@@ -447,7 +468,7 @@
                         <!-- Left side: Rich text editor notes -->
                         <div class="col-md-7">
                             <x-ui.odoo-form-ui type="editor" label="{{ __('purchase.terms_notes') }}" name="notes" placeholder="{{ __('purchase.notes_placeholder') }}">
-                                {!! old('notes') !!}
+                                {!! old('notes', $prefilledNotes ?? '') !!}
                             </x-ui.odoo-form-ui>
                         </div>
                         

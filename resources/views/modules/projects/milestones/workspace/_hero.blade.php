@@ -11,9 +11,9 @@
     // hero's percentage never drifts from the "X of Y tasks completed" caption
     // next to it. $milestone->completion_percentage is only a manually-set value
     // (see the edit modal) and isn't kept in sync with actual task completion.
-    $heroTaskProgress = $totalTasks > 0
+    $heroTaskProgress = $milestoneProgress ?? ($totalTasks > 0
         ? (int) round(($completedTasks / $totalTasks) * 100)
-        : (int) ($milestone->completion_percentage ?? 0);
+        : (int) ($milestone->completion_percentage ?? 0));
 
     // This bar tracks task completion, not milestone health, so it always reads
     // as green progress regardless of health_state (health has its own metadata tile).
@@ -31,6 +31,8 @@
         'dueDate' => $milestone->due_date?->format('Y-m-d'),
         'status' => $milestone->status,
         'completionPercentage' => $milestone->completion_percentage,
+        'billingAmount' => (float) ($milestone->billing_amount ?? 0),
+        'billingPercentage' => $milestone->billing_percentage,
     ];
 
     $heroCloneJsData = array_merge($heroJsData, [
@@ -89,12 +91,14 @@
                             <i class="feather-copy me-2"></i>{{ __('projects.clone') }}
                         </a>
                     </li>
-                    <li>
-                        <a class="dropdown-item text-danger" href="javascript:void(0);"
-                           onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone]) }}', @js($milestone->name), {{ $milestone->tasks()->count() }})">
-                            <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
-                        </a>
-                    </li>
+                    @if (!$milestone->is_invoiced)
+                        <li>
+                            <a class="dropdown-item text-danger" href="javascript:void(0);"
+                               onclick="openDeleteMilestoneModal('{{ route('projects.milestones.destroy', [$project, $milestone]) }}', @js($milestone->name), {{ $milestone->tasks()->count() }})">
+                                <i class="feather-trash-2 me-2"></i>{{ __('projects.remove') }}
+                            </a>
+                        </li>
+                    @endif
                 </x-ui.action-dropdown>
                 <form id="milestoneWorkspaceDeleteForm" method="POST" action="{{ route('projects.milestones.destroy', [$project, $milestone]) }}" class="d-none">
                     @csrf
@@ -182,6 +186,54 @@
                 <span class="fs-11 text-muted">{{ __('projects.health') }}</span>
             </div>
         </div>
+
+        @if ($project->budget_type !== 'Time & Material' && ($project->billing_method === 'Project Based' || $project->billing_method === 'Milestone Based' || (float)$milestone->billing_amount > 0))
+        <div class="d-flex align-items-start gap-2 ps-3 metadata-divider metadata-item">
+            <i class="{{ $project->billing_method === 'Project Based' ? 'feather-pie-chart' : 'feather-dollar-sign' }} text-muted fs-14 metadata-icon"></i>
+            <div class="d-flex flex-column">
+                <span class="fs-13 fw-semibold text-dark">
+                    @if ($project->billing_method === 'Project Based' && (float)$project->budget_amount > 0)
+                        @if ($canManageMilestones && !$milestone->is_invoiced)
+                            <x-ui.inline-edit field="billing_percentage" :value="$milestone->billing_percentage"
+                                :url="route('projects.milestones.field', [$project, $milestone])" type="number" :label="__('projects.installment_percentage')" />%
+                        @else
+                            {{ $milestone->billing_percentage ?? 0 }}%
+                        @endif
+                        <span class="fs-11 fw-normal text-muted ms-1">({{ format_currency($milestone->billing_amount ?? 0) }})</span>
+                    @else
+                        @if ($canManageMilestones && !$milestone->is_invoiced)
+                            <x-ui.inline-edit field="billing_amount" :value="$milestone->billing_amount"
+                                :url="route('projects.milestones.field', [$project, $milestone])" type="number" :label="$project->billing_method === 'Milestone Based' ? __('projects.deliverable_price') : __('projects.billing_amount')" />
+                        @else
+                            {{ format_currency($milestone->billing_amount ?? 0) }}
+                        @endif
+                    @endif
+                </span>
+                <span class="fs-11 text-muted">
+                    {{ $project->billing_method === 'Project Based' ? __('projects.installment_percentage') : ($project->billing_method === 'Milestone Based' ? __('projects.deliverable_price') : __('projects.billing_amount')) }}
+                    @if ($milestone->is_invoiced)
+                        @if ($milestone->invoice_id)
+                            · <a href="{{ route('sales.invoices.show', $milestone->invoice_id) }}" class="text-success fw-bold text-decoration-none" title="{{ __('projects.view_invoice') }}">
+                                <i class="feather-check-circle me-1"></i>{{ __('projects.invoiced') }}
+                            </a>
+                        @else
+                            · <span class="text-success fw-bold">{{ __('projects.invoiced') }}</span>
+                        @endif
+                    @endif
+                </span>
+            </div>
+        </div>
+        @elseif ($project->budget_type === 'Time & Material')
+        <div class="d-flex align-items-start gap-2 ps-3 metadata-divider metadata-item">
+            <i class="feather-clock text-muted fs-14 metadata-icon"></i>
+            <div class="d-flex flex-column">
+                <span class="fs-13 fw-semibold text-dark">
+                    <span class="badge bg-light text-muted border fs-11 text-uppercase">{{ __('projects.billed_via_timesheets') }}</span>
+                </span>
+                <span class="fs-11 text-muted">{{ __('projects.billing_method') }}</span>
+            </div>
+        </div>
+        @endif
 
         <div class="ms-auto">
             <div class="d-flex align-items-center gap-2">

@@ -143,8 +143,9 @@
     </style>
 @endonce
 
-@if($totalPages > 1)
+@if($totalPages > 1 || $totalResults > 0)
 <div class="erp-pagination-container" {{ $attributes }}>
+    @if($totalPages > 1)
     <ul class="erp-pagination">
         <!-- Previous Page Link -->
         <li class="page-item {{ $currentPage <= 1 ? 'disabled' : '' }}">
@@ -191,6 +192,7 @@
             </a>
         </li>
     </ul>
+    @endif
 
     <div class="erp-pagination-info">
         Showing {{ $from }} to {{ $to }} of {{ $totalResults }} entries

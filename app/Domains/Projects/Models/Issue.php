@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -15,6 +16,24 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Issue extends BaseModel
 {
     use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+
+    protected ?string $rbacPermission = 'projects.issues.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $table = $this->getTable();
+        $builder->where(function (Builder $sub) use ($user, $table) {
+            $sub->where($table . '.assignee_id', $user->id)
+                ->orWhere($table . '.reporter_id', $user->id)
+                ->orWhereHas('project', fn (Builder $pq) => 
+                    $pq->where('owner_id', $user->id)
+                       ->orWhere('manager_id', $user->id)
+                       ->orWhereHas('members', fn (Builder $mq) =>
+                           $mq->where('user_id', $user->id)->where('is_active', true)
+                       )
+                );
+        });
+    }
 
     protected $table = 'project_issues';
 

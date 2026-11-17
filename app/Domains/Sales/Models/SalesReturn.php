@@ -5,12 +5,24 @@ namespace App\Domains\Sales\Models;
 use App\Core\Database\BaseModel;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SalesReturn extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch;
+
+    protected ?string $rbacPermission = 'sales.returns.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->where(function (Builder $sub) use ($user) {
+            $sub->whereHas('salesOrder', fn($soq) => $soq->where('sales_orders.sales_person_id', $user->id))
+                ->orWhereHas('customer.crmAccount', fn($caq) => $caq->where('crm_accounts.owner_id', $user->id));
+        });
+    }
 
     protected $fillable = [
         'tenant_id',

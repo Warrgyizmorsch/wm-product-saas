@@ -11,14 +11,27 @@ use App\Domains\CRM\Models\Quotation;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\Concerns\HasRbacScope;
 use App\Models\User;
 use App\Domains\Inventory\Models\Product;
 use App\Models\Concerns\NormalizesTaxIdentity;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 
 class Lead extends Model
 {
-    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes, NormalizesTaxIdentity;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes, NormalizesTaxIdentity, HasRbacScope;
+
+    protected ?string $rbacPermission = 'crm.leads.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->where(function (Builder $sub) use ($user) {
+            $sub->where('leads.lead_owner_id', $user->id)
+                ->orWhereHas('crmAccount', fn($aq) => $aq->where('owner_id', $user->id))
+                ->orWhereHas('crmDeal.account', fn($aq) => $aq->where('owner_id', $user->id));
+        });
+    }
 
     protected static function boot()
     {

@@ -21,6 +21,21 @@ Schedule::command('billing:reconcile-subscriptions')
     ->hourly()
     ->withoutOverlapping();
 
+// RT-IMPL-04: routing status by dates — scheduled → active on start date, expired → historical (with BOM handling).
+Schedule::command('production:process-routing-dates')
+    ->dailyAt('00:05')
+    ->withoutOverlapping();
+
+// BM-IMPL-02: BOM status by dates — scheduled → approved on start date, expired → inactive.
+Schedule::command('production:process-bom-dates')
+    ->dailyAt('00:10')
+    ->withoutOverlapping();
+
+// Process expired Work Center calculation debounce countdowns.
+Schedule::command('production:process-calculation-countdowns')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 // Tenant storage usage: drop deleted files, record untracked ones.
 Schedule::command('tenant:storage-sync')
     ->dailyAt('02:30')
@@ -35,6 +50,7 @@ Schedule::command('attendance:prune-location-logs')
 Schedule::command('hrms:check-document-expiry')
     ->dailyAt('06:00')
     ->withoutOverlapping();
+
 // CRM Lead and Deal Follow-up / Meeting Due Reminders (every minute)
 Schedule::command('crm:send-followup-reminders')
     ->everyMinute()

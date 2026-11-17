@@ -15,22 +15,37 @@ class SalesOrderPolicy
     public function viewAny(User $user): bool
     {
         return $this->access->allows($user, 'sales.orders.view', [
-            'tenant_id' => $user->tenant_id,
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
         ]);
     }
 
     public function view(User $user, SalesOrder $order): bool
     {
+        $ownerId = $order->sales_person_id
+            ?? $order->quotation?->sales_person_id
+            ?? $order->customer?->crmAccount?->owner_id;
+
         return $this->access->allows($user, 'sales.orders.view', [
-            'tenant_id' => $order->tenant_id,
-            'owner_id' => $order->sales_person_id,
+            'tenant_id'     => $order->tenant_id,
+            'owner_id'      => $ownerId,
+            'branch_id'     => $order->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $order->company_id,
         ]);
     }
 
     public function create(User $user): bool
     {
         return $this->access->allows($user, 'sales.orders.create', [
-            'tenant_id' => $user->tenant_id,
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
         ]);
     }
 
@@ -40,33 +55,61 @@ class SalesOrderPolicy
             return false;
         }
 
+        $ownerId = $order->sales_person_id
+            ?? $order->quotation?->sales_person_id
+            ?? $order->customer?->crmAccount?->owner_id;
+
         return $this->access->allows($user, 'sales.orders.update', [
-            'tenant_id' => $order->tenant_id,
-            'owner_id' => $order->sales_person_id,
+            'tenant_id'     => $order->tenant_id,
+            'owner_id'      => $ownerId,
+            'branch_id'     => $order->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $order->company_id,
         ]);
     }
 
     public function delete(User $user, SalesOrder $order): bool
     {
+        $ownerId = $order->sales_person_id
+            ?? $order->quotation?->sales_person_id
+            ?? $order->customer?->crmAccount?->owner_id;
+
         return $this->access->allows($user, 'sales.orders.delete', [
-            'tenant_id' => $order->tenant_id,
-            'owner_id' => $order->sales_person_id,
+            'tenant_id'     => $order->tenant_id,
+            'owner_id'      => $ownerId,
+            'branch_id'     => $order->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $order->company_id,
         ]);
     }
 
     public function confirm(User $user, SalesOrder $order): bool
     {
+        $ownerId = $order->sales_person_id
+            ?? $order->quotation?->sales_person_id
+            ?? $order->customer?->crmAccount?->owner_id;
+
         return $this->access->allows($user, 'sales.orders.confirm', [
-            'tenant_id' => $order->tenant_id,
-            'owner_id' => $order->sales_person_id,
+            'tenant_id'     => $order->tenant_id,
+            'owner_id'      => $ownerId,
+            'branch_id'     => $order->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $order->company_id,
         ]);
     }
 
     public function cancel(User $user, SalesOrder $order): bool
     {
+        $ownerId = $order->sales_person_id
+            ?? $order->quotation?->sales_person_id
+            ?? $order->customer?->crmAccount?->owner_id;
+
         return $this->access->allows($user, 'sales.orders.cancel', [
-            'tenant_id' => $order->tenant_id,
-            'owner_id' => $order->sales_person_id,
+            'tenant_id'     => $order->tenant_id,
+            'owner_id'      => $ownerId,
+            'branch_id'     => $order->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $order->company_id,
         ]);
     }
 

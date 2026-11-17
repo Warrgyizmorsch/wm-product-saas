@@ -86,12 +86,12 @@
             @forelse ($paginatedDocs as $doc)
                 @php
                     $catBadgeClass = match($doc->category) {
-                        'sow' => 'badge bg-primary-subtle text-primary border border-primary-subtle',
-                        'architecture' => 'badge bg-info-subtle text-info border border-info-subtle',
-                        'qa' => 'badge bg-warning-subtle text-warning border border-warning-subtle',
-                        'meeting_notes' => 'badge bg-success-subtle text-success border border-success-subtle',
-                        'attachment' => 'badge bg-secondary-subtle text-secondary border',
-                        default => 'badge bg-secondary-subtle text-secondary',
+                        'Requirement', 'sow' => 'badge bg-primary-subtle text-primary border border-primary-subtle',
+                        'Design', 'architecture' => 'badge bg-info-subtle text-info border border-info-subtle',
+                        'API' => 'badge bg-purple-subtle text-purple border border-purple-subtle',
+                        'Test Case', 'qa' => 'badge bg-warning-subtle text-warning border border-warning-subtle',
+                        'Meeting Minutes', 'meeting_notes' => 'badge bg-success-subtle text-success border border-success-subtle',
+                        default => 'badge bg-secondary-subtle text-secondary border',
                     };
                 @endphp
                 <tr>
@@ -123,7 +123,7 @@
                                 <span class="fs-12 text-muted">{{ class_basename($doc->attachable_type) }}</span>
                             @endif
                         @else
-                            <span class="badge bg-light text-muted border fs-11">{{ __('projects.title') }}</span>
+                            <span class="badge bg-light text-muted border fs-11">{{ __('projects.project') }}</span>
                         @endif
                     </td>
                     <td>

@@ -16,6 +16,7 @@ class SignOffProjectReviewRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'review_id'     => ['nullable', 'integer'],
             'outcome' => [
                 'required',
                 Rule::in([ProjectReview::STATUS_APPROVED, ProjectReview::STATUS_REWORK_REQUIRED]),

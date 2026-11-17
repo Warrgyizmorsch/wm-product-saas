@@ -10,10 +10,19 @@ use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
 use App\Models\Concerns\NormalizesTaxIdentity;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 class Customer extends BaseModel
 {
     use HasFactory, BelongsToCompany, BelongsToBranch, NormalizesTaxIdentity;
+
+    protected ?string $rbacPermission = 'crm.customers.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->whereHas('crmAccount', fn($aq) => $aq->where('owner_id', $user->id));
+    }
 
     /**
      * Set to TRUE before Customer::create() inside deal conversion

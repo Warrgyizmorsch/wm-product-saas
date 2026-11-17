@@ -3,7 +3,7 @@
 > **Domain Location:** `app/Domains/Production`  
 > **Documentation Root:** `app/Domains/Production/docs/BOM_GUIDE.md`  
 > **Primary Models:** `ProductionBom`, `ProductionBomItem`, `ProductionBomApproval`  
-> **Primary Services:** `ProductionBomService`, `BomExplosionService`, `BomFormulaEvaluatorService`, `BomWhereUsedService`
+> **Primary Services:** `ProductionBomService`, `BomExplosionService`, `BomWhereUsedService`
 
 ---
 
@@ -54,10 +54,7 @@ When an order or plan is exploded:
 
 For custom manufacturing (e.g. custom furniture, cut-to-size metal sheets), material consumption depends dynamically on customer-specified dimensions rather than fixed static ratios.
 
-### Formula Engine (`BomFormulaEvaluatorService`)
-- **Field:** `production_bom_items.formula` (e.g. `(length * width * thickness * density) / 1000000`).
-- **Input Parameters:** Passed during Production Order creation in `production_orders.parameters` JSON (e.g. `{"length": 2400, "width": 1000, "thickness": 35, "density": 0.75}`).
-- **Formula Preview Route:** `POST /production/boms/preview-formula` via `BomFormulaController::preview()`. Planners can test formulas with sample inputs before committing.
+> **Removed (BM-09, 2026-11-12):** formula quantities (`formula`, `quantity_type`, order `parameters`, the evaluator and the preview route) were dropped. BOM quantities are fixed per allocation.
 
 ---
 

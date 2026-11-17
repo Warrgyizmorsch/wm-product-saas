@@ -30,8 +30,9 @@ class ProductionBomPolicy
 
     public function delete(User $user, ProductionBom $bom): bool
     {
-        return $bom->status === 'draft'
-            && $user->hasProductionPermission('production.bom.update', $bom->tenant_id);
+        return in_array($bom->status, ['draft', 'under_revision'])
+            && ($user->hasProductionPermission('production.bom.update', $bom->tenant_id)
+                || ($user->role === 'admin' && $user->tenant_id === $bom->tenant_id));
     }
 
     public function approve(User $user, ProductionBom $bom): bool

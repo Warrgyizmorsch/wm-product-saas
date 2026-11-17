@@ -54,6 +54,7 @@
                         'production' => ['label' => 'Production', 'icon' => 'feather-layers'],
                         'sales' => ['label' => 'Sales', 'icon' => 'feather-trending-up'],
                         'crm' => ['label' => 'CRM', 'icon' => 'feather-target'],
+                        'projects' => ['label' => 'Projects', 'icon' => 'feather-briefcase'],
                         'inventory' => ['label' => 'Inventory', 'icon' => 'feather-package'],
                         'accounting' => ['label' => 'Accounting', 'icon' => 'feather-dollar-sign'],
                         'system' => ['label' => 'System', 'icon' => 'feather-sliders'],

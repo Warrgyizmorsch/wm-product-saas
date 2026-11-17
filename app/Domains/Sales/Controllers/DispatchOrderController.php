@@ -107,6 +107,7 @@ class DispatchOrderController extends Controller
             'salesOrder.customer',
             'items.product',
             'items.warehouse',
+            'items.serialNumbers',
         ])
         ->whereHas('salesOrder', function ($q) {
             $q->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered']);
@@ -158,18 +159,41 @@ class DispatchOrderController extends Controller
 
     public function getAvailableSerials(Request $request): JsonResponse
     {
-        $productId = $request->input('product_id');
-        $warehouseId = $request->input('warehouse_id');
+        $productId = (int) $request->input('product_id');
+        $warehouseId = (int) $request->input('warehouse_id');
+        $mrItemId = (int) $request->input('material_requirement_item_id');
         $status = $request->input('status', 'Available');
         $tenantId = require_tenant_id();
+        $companyId = company_id() ?? current_company_id();
 
-        $serials = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
-            ->where('product_id', $productId)
-            ->when($warehouseId, function ($q) use ($warehouseId) {
-                return $q->where('warehouse_id', $warehouseId);
-            })
-            ->where('status', $status)
-            ->pluck('serial_number');
+        $query = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
+            ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->where('product_id', $productId);
+
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
+        }
+
+        $query->where(function ($q) use ($mrItemId) {
+            $q->where('status', 'Available')
+              ->orWhere(function ($sub) use ($mrItemId) {
+                  $sub->where('status', 'Reserved')
+                      ->where(function ($mrQ) use ($mrItemId) {
+                          if ($mrItemId) {
+                              $mrQ->where('material_requirement_item_id', $mrItemId)
+                                  ->orWhereNull('material_requirement_item_id');
+                          } else {
+                              $mrQ->whereNull('material_requirement_item_id');
+                          }
+                      });
+              });
+        });
+
+        if ($mrItemId) {
+            $query->orderByRaw("CASE WHEN material_requirement_item_id = {$mrItemId} THEN 0 ELSE 1 END");
+        }
+
+        $serials = $query->orderBy('serial_number')->pluck('serial_number');
 
         return response()->json(['success' => true, 'serials' => $serials]);
     }
@@ -257,13 +281,25 @@ class DispatchOrderController extends Controller
             'items.*.product_id'      => ['required', 'exists:products,id'],
             'items.*.warehouse_id'    => ['required', 'exists:warehouses,id'],
             'items.*.quantity'        => ['required', 'numeric', 'min:0.0001'],
-            'items.*.serial_numbers'  => ['nullable', 'string'],
+            'items.*.serial_numbers'  => ['nullable'],
             'items.*.batch_number'    => ['nullable', 'string'],
         ], [
             'items.*.quantity.min'      => 'Dispatch quantity must be greater than 0.',
             'items.*.quantity.required' => 'Dispatch quantity is required.',
             'items.*.quantity.numeric'  => 'Dispatch quantity must be a valid number.',
         ]);
+
+        foreach ($validated['items'] as $idx => $itemData) {
+            $product = Product::find($itemData['product_id']);
+            if ($product && $product->track_serial_number) {
+                $rawSn = $itemData['serial_numbers'] ?? '';
+                $serials = is_array($rawSn) ? $rawSn : array_values(array_filter(array_map('trim', preg_split('/[\r\n,;]+/', (string)$rawSn))));
+                $qty = (float) $itemData['quantity'];
+                if (count($serials) < $qty) {
+                    return redirect()->back()->withInput()->with('error', "Product '{$product->name}' is serial-tracked. Please enter all " . (int)$qty . " serial number(s) (currently entered: " . count($serials) . ").");
+                }
+            }
+        }
 
         try {
             $dispatch = $this->dispatchService->createDispatchOrder($validated, Auth::id() ?? 1);

@@ -25,7 +25,7 @@ return [
         'section' => 'supply_chain', 'order' => 40, 'module' => 'purchase', 'permission' => 'grns.view',
         'label' => 'purchase.goods_receipts', 'default' => 'GRN (Goods Receipts)', 'icon' => 'feather-package',
         'children' => [
-            ['label' => 'purchase.pending_grns', 'default' => 'Pending GRNs', 'route' => 'grns.pending'],
+            ['label' => 'purchase.pending_grns', 'default' => 'Pending GRNs', 'route' => 'grns.pending', 'permission' => 'grns.view'],
             ['label' => 'purchase.all_goods_receipts', 'default' => 'All Goods Receipts', 'route' => 'grns.index', 'permission' => 'grns.view'],
             ['label' => 'purchase.new_goods_receipt', 'default' => 'New Goods Receipt', 'route' => 'grns.create', 'permission' => 'grns.create'],
         ],
@@ -34,8 +34,8 @@ return [
         'section' => 'supply_chain', 'order' => 50,
         'label' => 'purchase.purchase_approvals', 'default' => 'Purchase Approvals', 'icon' => 'feather-check-circle',
         'children' => [
-            ['label' => 'purchase.pr_approvals', 'default' => 'PR Approvals', 'route' => 'purchase.pr-approvals.index', 'permission' => 'purchase.requisitions.view'],
-            ['label' => 'purchase.po_approvals', 'default' => 'PO Approvals', 'route' => 'purchase.po-approvals.index', 'permission' => 'purchase.orders.view'],
+            ['label' => 'purchase.pr_approvals', 'default' => 'PR Approvals', 'route' => 'purchase.pr-approvals.index', 'permission' => 'purchase.requisitions.approve'],
+            ['label' => 'purchase.po_approvals', 'default' => 'PO Approvals', 'route' => 'purchase.po-approvals.index', 'permission' => 'purchase.orders.approve'],
         ],
     ],
 ];

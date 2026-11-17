@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Platform\Services\NotificationRuleService;
 use App\Domains\Projects\Events\TimesheetApproved;
 use App\Domains\Projects\Events\TimesheetRejected;
 use App\Domains\Projects\Events\TimesheetSubmitted;
@@ -40,7 +41,7 @@ class TimeLogService
             ]);
         }
 
-        // 2. Derive hourly rate from project_members if not explicitly supplied
+        // 2. Derive hourly rate & billability based on project billing method
         $hourlyRate = $data['hourly_rate'] ?? null;
         if ($hourlyRate === null) {
             $member = ProjectMember::query()
@@ -50,7 +51,14 @@ class TimeLogService
             $hourlyRate = $member?->rate_per_hour;
         }
 
-        return DB::transaction(function () use ($project, $task, $user, $data, $hourlyRate) {
+        $defaultBillable = match ($project->budget_type) {
+            Project::BUDGET_TYPE_TIME_AND_MATERIAL => true,
+            Project::BUDGET_TYPE_FIXED => ($project->billing_method === Project::BILLING_METHOD_USER_BASED),
+            default => ($project->billing_method === Project::BILLING_METHOD_USER_BASED),
+        };
+        $isBillable = array_key_exists('is_billable', $data) ? (bool)$data['is_billable'] : $defaultBillable;
+
+        return DB::transaction(function () use ($project, $task, $user, $data, $hourlyRate, $isBillable) {
             $log = $this->timeLogs->create([
                 'tenant_id'       => $project->tenant_id,
                 'company_id'      => $project->company_id,
@@ -62,7 +70,7 @@ class TimeLogService
                 'start_time'      => $data['start_time'] ?? null,
                 'end_time'        => $data['end_time'] ?? null,
                 'hours'           => $data['hours'],
-                'is_billable'     => $data['is_billable'] ?? true,
+                'is_billable'     => $isBillable,
                 'hourly_rate'     => $hourlyRate,
                 'description'     => $data['description'] ?? null,
                 'approval_status' => TimeLog::STATUS_PENDING,
@@ -88,6 +96,19 @@ class TimeLogService
             );
 
             event(new TimesheetSubmitted($log, $user, $project));
+
+            try {
+                NotificationRuleService::trigger('projects.timesheet.submitted', [
+                    'tenant_id'        => $project->tenant_id,
+                    'project'          => $project->name,
+                    'actor'            => $user->name,
+                    'count'            => 1,
+                    'hours'            => (string) $log->hours,
+                    'exclude_user_ids' => [$user->id],
+                ], $project, $log);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.timesheet.submitted notification failed: ' . $e->getMessage());
+            }
 
             return $log;
         });
@@ -136,8 +157,13 @@ class TimeLogService
 
     public function approve(TimeLog $timeLog, User $approver): TimeLog
     {
-        // Separation of duty: cannot approve own timesheet
-        if ((int) $timeLog->user_id === (int) $approver->id) {
+        // Separation of duty: regular team members cannot self-approve, but Project Owner,
+        // Project Manager, and Tenant Owner/Admins have supreme authority to approve.
+        $isOwnerOrManager = (int) $timeLog->project?->owner_id === (int) $approver->id
+            || (int) $timeLog->project?->manager_id === (int) $approver->id
+            || $approver->hasAnyRole('owner', 'tenant_owner', 'admin', 'super_admin');
+
+        if ((int) $timeLog->user_id === (int) $approver->id && !$isOwnerOrManager) {
             throw ValidationException::withMessages([
                 'approved_by' => [__('projects.cannot_approve_own_timelog', [
                     'default' => 'A team member cannot approve their own timesheet entry.',
@@ -178,13 +204,31 @@ class TimeLogService
 
             event(new TimesheetApproved($approved, $approver));
 
+            try {
+                NotificationRuleService::trigger('projects.timesheet.approved', [
+                    'tenant_id'        => $approved->tenant_id,
+                    'project'          => $project?->name ?? 'Project',
+                    'actor'            => $approver->name,
+                    'count'            => 1,
+                    'hours'            => (string) $approved->hours,
+                    'assigned_user_id' => $approved->user_id,
+                    'exclude_user_ids' => [$approver->id],
+                ], $project, $approved);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.timesheet.approved notification failed: ' . $e->getMessage());
+            }
+
             return $approved;
         });
     }
 
     public function reject(TimeLog $timeLog, User $approver, ?string $remarks = null): TimeLog
     {
-        if ((int) $timeLog->user_id === (int) $approver->id) {
+        $isOwnerOrManager = (int) $timeLog->project?->owner_id === (int) $approver->id
+            || (int) $timeLog->project?->manager_id === (int) $approver->id
+            || $approver->hasAnyRole('owner', 'tenant_owner', 'admin', 'super_admin');
+
+        if ((int) $timeLog->user_id === (int) $approver->id && !$isOwnerOrManager) {
             throw ValidationException::withMessages([
                 'approved_by' => [__('projects.cannot_reject_own_timelog', [
                     'default' => 'A team member cannot reject their own timesheet entry.',
@@ -224,6 +268,21 @@ class TimeLogService
             }
 
             event(new TimesheetRejected($rejected, $approver, $remarks));
+
+            try {
+                NotificationRuleService::trigger('projects.timesheet.rejected', [
+                    'tenant_id'        => $rejected->tenant_id,
+                    'project'          => $project?->name ?? 'Project',
+                    'actor'            => $approver->name,
+                    'count'            => 1,
+                    'hours'            => (string) $rejected->hours,
+                    'reason'           => $remarks ?? 'Not specified',
+                    'assigned_user_id' => $rejected->user_id,
+                    'exclude_user_ids' => [$approver->id],
+                ], $project, $rejected);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.timesheet.rejected notification failed: ' . $e->getMessage());
+            }
 
             return $rejected;
         });

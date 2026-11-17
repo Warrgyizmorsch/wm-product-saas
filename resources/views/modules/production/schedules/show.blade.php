@@ -310,9 +310,21 @@
                                             <br><small class="text-warning font-monospace fs-11">Lead: {{ $op->orderOperation->subcontract_lead_time_days ?? 0 }}d | Buffer: {{ $op->orderOperation->dispatch_buffer_days ?? 0 }}d / {{ $op->orderOperation->return_buffer_days ?? 0 }}d</small>
                                         @endif
                                     </td>
-                                    <td class="align-middle">{{ $op->workCenter->name ?? '—' }}</td>
+                                    <td class="align-middle">
+                                        {{ $op->workCenter->name ?? '—' }}
+                                        @if($op->section)
+                                            <br><small class="text-muted">{{ $op->section->name }}</small>
+                                        @endif
+                                    </td>
                                     <td class="align-middle text-muted">
-                                        {{ $op->machine->name ?? '—' }}
+                                        @if($op->machine)
+                                            {{ $op->machine->name }}
+                                        @elseif($op->manualProduction)
+                                            {{ $op->manualProduction->batch_name }}
+                                            <span class="badge bg-soft-secondary text-secondary d-block mt-1 text-center" style="width: max-content">Manual Batch</span>
+                                        @else
+                                            —
+                                        @endif
                                         @if(($op->priority ?? 1) > 1)
                                             <span class="badge bg-soft-warning text-warning d-block mt-1 text-center" style="width: max-content">Alt Priority {{ $op->priority }}</span>
                                         @endif

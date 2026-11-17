@@ -79,15 +79,31 @@ class MrpEngineService
         int $level,
         ?int $sourceItemId
     ): void {
-        $bom = ProductionBom::withoutGlobalScopes()->with('items.material')->find($bomId);
+        $bom = ProductionBom::withoutGlobalScopes()
+            ->with(['operationMaterials.material', 'items.material'])
+            ->find($bomId);
         if (! $bom) {
             return;
         }
 
-        foreach ($bom->items as $item) {
-            // Required quantity including scrap loss
-            $scrapFactor = 1.0 + ($item->material_scrap_percentage / 100);
-            $requiredQty = $parentQty * $item->quantity * $scrapFactor;
+        $sourceRows = $bom->operationMaterials->isNotEmpty()
+            ? $bom->operationMaterials
+            : $bom->items;
+
+        foreach ($sourceRows as $item) {
+            // Alternatives must not be treated as separate simultaneously required materials
+            if ($item->is_alternative) {
+                continue;
+            }
+
+            // Required quantity including scrap loss (gross_quantity when available)
+            $grossUnitQty = method_exists($item, 'calculateGrossQuantity')
+                ? (float) ($item->gross_quantity ?? $item->calculateGrossQuantity())
+                : ((float) $item->quantity * (1.0 + (((float) ($item->material_scrap_percentage ?? 0)) / 100)));
+            $requiredQty = $parentQty * $grossUnitQty;
+            $bomItemId = $item instanceof \App\Domains\Production\Models\RoutingOperationMaterial
+                ? $item->bom_item_id
+                : $item->id;
 
             $requiredDate = $plan->start_date ?? $plan->end_date;
 
@@ -108,7 +124,7 @@ class MrpEngineService
             ProductionPlanRequirement::create([
                 'tenant_id' => $plan->tenant_id,
                 'production_plan_id' => $plan->id,
-                'bom_item_id' => $item->id,
+                'bom_item_id' => $bomItemId,
                 'product_id' => $item->material_id,
                 'bom_level' => $level,
                 'required_quantity' => $requiredQty,
@@ -121,18 +137,9 @@ class MrpEngineService
             ]);
 
             // If component is semi-finished or finished, check for child BOM
-            if ($item->material->type === 'semi_finished' || $item->material->type === 'finished_good') {
+            if ($item->material && ($item->material->type === 'semi_finished' || $item->material->type === 'finished_good')) {
+                // BM-IMPL-08 #7: only the sub-BOM chosen on the BOM (allocation) is followed — no own guess
                 $childBomId = $item->child_bom_id;
-
-                // Fallback to default approved BOM if no specific child BOM link is set
-                if (! $childBomId) {
-                    $defaultChildBom = ProductionBom::withoutGlobalScopes()
-                        ->where('tenant_id', $plan->tenant_id)
-                        ->where('product_id', $item->material_id)
-                        ->where('status', 'approved')
-                        ->first();
-                    $childBomId = $defaultChildBom ? $defaultChildBom->id : null;
-                }
 
                 if ($childBomId && $shortage > 0) {
                     $this->explodeBom(
@@ -209,7 +216,7 @@ class MrpEngineService
             // Overhead costs
             $wc = $op->workCenter;
             if ($wc) {
-                $overheadCost = $op->total_time_minutes * ((float) $wc->overhead_rate / 60.0);
+                $overheadCost = $op->total_time_minutes * ($wc->calculatedOverheadCostPerHour() / 60.0);
                 $estimatedManufacturingCost += $overheadCost;
 
                 if ($wc->capacity_per_hour !== null && $wc->capacity_per_hour > 0) {

@@ -711,8 +711,8 @@
                     errorEl.remove();
                 }
 
-                // Hide server-side validation error too if visible
-                let serverErrorEl = errorContainer.querySelector('.invalid-feedback');
+                // Hide server-side validation error too if visible (preserve Alpine dynamic reactive errors with x-text)
+                let serverErrorEl = errorContainer.querySelector('.invalid-feedback:not([x-text])');
                 if (serverErrorEl) {
                     serverErrorEl.classList.remove('d-block');
                     serverErrorEl.classList.add('d-none');

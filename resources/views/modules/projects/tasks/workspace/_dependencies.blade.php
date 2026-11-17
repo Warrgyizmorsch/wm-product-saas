@@ -124,7 +124,7 @@
                     remove.className = 'btn btn-link text-danger btn-sm p-0 flex-shrink-0';
                     remove.innerHTML = '<i class="feather-x"></i>';
                     remove.onclick = function () {
-                        confirmAction(@js(__('projects.confirm_remove_dependency')), function () {
+                        (window.confirmAction || function (msg, cb) { if (confirm(msg)) cb(); })(@js(__('projects.confirm_remove_dependency')), function () {
                             remove.disabled = true;
                             wsRequest(dependency.deleteUrl, 'DELETE')
                                 .then(function (result) { apply(result); })

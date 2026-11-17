@@ -416,7 +416,7 @@
                 </x-ui.odoo-form-ui>
 
                 <x-ui.odoo-form-ui type="input" label="{{ __('projects.project_name') }}" name="name"
-                    id="modal_project_name"
+                    id="modal_project_name" maxlength="255"
                     :value="$isCreateReopen ? old('name') : null" :required="true"
                     :errorText="$isCreateReopen ? $errors->first('name') : null" />
 

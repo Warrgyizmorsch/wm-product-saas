@@ -38,6 +38,11 @@ use App\Domains\Production\Controllers\SerialNumberController;
 use App\Domains\Production\Controllers\ShiftController;
 use App\Domains\Production\Controllers\WipController;
 use App\Domains\Production\Controllers\WorkCenterController;
+use App\Domains\Production\Controllers\WorkCenterSectionController;
+use App\Domains\Production\Controllers\ExternalWorkerPayGradeController;
+use App\Domains\Production\Controllers\ExternalWorkerAllocationController;
+use App\Domains\Production\Controllers\WorkCenterEmployeeController;
+use App\Domains\Production\Controllers\SectionManualProductionController;
 use App\Domains\Production\Controllers\WorkCenterDashboardController;
 use App\Domains\Production\Controllers\ProductionDashboardController;
 use App\Domains\Production\Controllers\ProductionImportExportController;
@@ -92,8 +97,7 @@ Route::prefix('production')
             return view('modules.production.track-status');
         })->name('track-status');
 
-        // ── BOM (Frozen) ──────────────────────────────────────────────────────
-        Route::post('boms/preview-formula', [\App\Domains\Production\Controllers\BomFormulaController::class, 'preview'])->name('boms.preview-formula');
+        // ── BOM ───────────────────────────────────────────────────────────────
         Route::get('boms/check-child/{productId}', [ProductionBomController::class, 'checkChildBom'])->name('boms.check-child');
         Route::post('boms/{bom}/create-revision', [ProductionBomController::class, 'createRevision'])->name('boms.create-revision');
         Route::post('boms/{bom}/submit', [ProductionBomController::class, 'submitApproval'])->name('boms.submit');
@@ -106,7 +110,41 @@ Route::prefix('production')
 
         // ── Work Centers ──────────────────────────────────────────────────────
         Route::post('work-centers/bulk-action', [WorkCenterController::class, 'bulkAction'])->name('work-centers.bulk-action');
+        Route::post('work-centers/{work_center}/recalculate-now', [WorkCenterController::class, 'recalculateNow'])->name('work-centers.recalculate-now');
+        Route::post('work-centers/{work_center}/countdown-duration', [WorkCenterController::class, 'updateCountdownDuration'])->name('work-centers.countdown-duration');
+        Route::get('work-centers/{work_center}/calculation-details', [WorkCenterController::class, 'calculationDetails'])->name('work-centers.calculation-details');
+        // WC-IMPL-20: read-only rendered modal for one exact snapshot (never calculates)
+        Route::get('work-centers/{work_center}/snapshots/{snapshot}/modal', [WorkCenterController::class, 'workCenterSnapshotModal'])
+            ->whereNumber(['work_center', 'snapshot'])->name('work-centers.snapshots.modal');
+        Route::get('work-centers/{work_center}/sections/{section}/snapshots/{snapshot}/modal', [WorkCenterController::class, 'sectionSnapshotModal'])
+            ->whereNumber(['work_center', 'section', 'snapshot'])->name('work-centers.sections.snapshots.modal');
         Route::resource('work-centers', WorkCenterController::class);
+
+        // ── Work Center Sections ──────────────────────────────────────────────
+        Route::get('sections/by-work-center/{workCenter}', [WorkCenterSectionController::class, 'byWorkCenter'])->name('work-center-sections.by-work-center');
+        Route::get('sections/{section}/resources', [WorkCenterSectionController::class, 'resources'])->name('sections.resources');
+        Route::patch('work-center-sections/{section}/manual-production', [WorkCenterSectionController::class, 'updateManualProduction'])->name('work-center-sections.update-manual-production');
+        Route::post('work-center-sections/{section}/manual-productions', [SectionManualProductionController::class, 'store'])->name('work-center-sections.manual-productions.store');
+        Route::put('manual-productions/{batch}', [SectionManualProductionController::class, 'update'])->name('manual-productions.update');
+        Route::patch('manual-productions/{batch}/toggle-status', [SectionManualProductionController::class, 'toggleStatus'])->name('manual-productions.toggle-status');
+        Route::delete('manual-productions/{batch}', [SectionManualProductionController::class, 'destroy'])->name('manual-productions.destroy');
+        Route::resource('work-center-sections', WorkCenterSectionController::class);
+
+        // ── External Worker Pay Grades ────────────────────────────────────────
+        Route::patch('pay-grades/{payGrade}/toggle-status', [ExternalWorkerPayGradeController::class, 'toggleStatus'])->name('pay-grades.toggle-status');
+        Route::resource('pay-grades', ExternalWorkerPayGradeController::class);
+
+        // ── External Worker Allocations ───────────────────────────────────────
+        Route::post('external-worker-allocations', [ExternalWorkerAllocationController::class, 'store'])->name('external-worker-allocations.store');
+        Route::patch('external-worker-allocations/{allocation}/quantity', [ExternalWorkerAllocationController::class, 'updateQuantity'])->name('external-worker-allocations.quantity');
+        Route::patch('external-worker-allocations/{allocation}/toggle-status', [ExternalWorkerAllocationController::class, 'toggleStatus'])->name('external-worker-allocations.toggle-status');
+        Route::delete('external-worker-allocations/{allocation}', [ExternalWorkerAllocationController::class, 'destroy'])->name('external-worker-allocations.destroy');
+
+
+        // ── Work Center Internal Employee Assignments ────────────────────────
+        Route::post('work-center-employees', [WorkCenterEmployeeController::class, 'store'])->name('work-center-employees.store');
+        Route::patch('work-center-employees/{assignment}/toggle-status', [WorkCenterEmployeeController::class, 'toggleStatus'])->name('work-center-employees.toggle-status');
+        Route::delete('work-center-employees/{assignment}', [WorkCenterEmployeeController::class, 'destroy'])->name('work-center-employees.destroy');
 
         // ── Machines (AJAX endpoint must be before resource to avoid routing conflict) ──
         Route::get('machines/by-work-center/{workCenter}', [MachineController::class, 'byWorkCenter'])
@@ -145,6 +183,7 @@ Route::prefix('production')
         Route::post('routing/{routing}/approve', [RoutingController::class, 'approve'])->name('routing.approve');
         Route::post('routing/{routing}/reject', [RoutingController::class, 'reject'])->name('routing.reject');
         Route::post('routing/{routing}/cancel', [RoutingController::class, 'cancel'])->name('routing.cancel');
+        Route::post('routing/{routing}/retire', [RoutingController::class, 'retire'])->name('routing.retire'); // RT-IMPL-02
         Route::post('routing/{routing}/duplicate', [RoutingController::class, 'duplicateVersion'])->name('routing.duplicate');
         Route::get('routing/{routing}/operations', [RoutingController::class, 'getOperationsForAjax'])->name('routing.operations');
         Route::post('routing/bulk-action', [RoutingController::class, 'bulkAction'])->name('routing.bulk-action');
@@ -165,6 +204,7 @@ Route::prefix('production')
 
         // ── Production Orders ─────────────────────────────────────────────────
         Route::post('plans/{plan}/create-order', [ProductionOrderController::class, 'createFromPlan'])->name('plans.create-order');
+        Route::get('orders/ajax-engineering-status', [ProductionOrderController::class, 'getEngineeringStatus'])->name('orders.engineering-status'); // PO-IMPL-05
         Route::post('orders/bulk-action', [ProductionOrderController::class, 'bulkAction'])->name('orders.bulk-action');
         Route::post('orders/{order}/release', [ProductionOrderController::class, 'release'])->name('orders.release');
         Route::post('orders/{order}/issue', [ProductionOrderController::class, 'issueMaterial'])->name('orders.issue');
@@ -361,11 +401,14 @@ Route::prefix('production')
         Route::post('ecos/{id}/cancel', [\App\Domains\Production\Controllers\ProductionEcoController::class, 'cancel'])->name('ecos.cancel');
         Route::resource('ecos', \App\Domains\Production\Controllers\ProductionEcoController::class);
 
-        // ── Parameterized BOM Formulas ────────────────────────────────────────
-        Route::post('boms/preview-formula', [\App\Domains\Production\Controllers\BomFormulaController::class, 'preview'])->name('boms.preview-formula');
-
         // ── Planning Exceptions & At-Risk Orders ────────────────────────────────
         Route::get('planning-exceptions', [\App\Domains\Production\Controllers\PlanningExceptionController::class, 'index'])->name('planning-exceptions.index');
         Route::get('planning-exceptions/{order}', [\App\Domains\Production\Controllers\PlanningExceptionController::class, 'show'])->name('planning-exceptions.show');
         Route::get('orders/{order}/risk-analysis', [\App\Domains\Production\Controllers\PlanningExceptionController::class, 'show'])->name('orders.risk-analysis');
     });
+
+// Fallback / legacy alias routes without 'production/' prefix to protect against any cached clients
+Route::put('manual-productions/{batch}', [SectionManualProductionController::class, 'update']);
+Route::patch('manual-productions/{batch}/toggle-status', [SectionManualProductionController::class, 'toggleStatus']);
+Route::delete('manual-productions/{batch}', [SectionManualProductionController::class, 'destroy']);
+

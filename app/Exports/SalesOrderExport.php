@@ -20,6 +20,15 @@ class SalesOrderExport implements FromCollection, WithHeadings, WithMapping, Sho
         $query = SalesOrder::where('tenant_id', $this->tenantId)
             ->with(['customer', 'salesPerson', 'quotation', 'invoices', 'dispatches']);
 
+        $currentUser = auth()->user();
+        if ($currentUser && !app(\App\Services\Access\AccessService::class)->allows($currentUser, 'sales.orders.view', ['tenant_id' => $this->tenantId])) {
+            $query->where(function ($q) use ($currentUser) {
+                $q->where('sales_person_id', $currentUser->id)
+                  ->orWhereHas('customer.crmAccount', fn($caq) => $caq->where('owner_id', $currentUser->id))
+                  ->orWhereHas('quotation', fn($qq) => $qq->where('sales_person_id', $currentUser->id));
+            });
+        }
+
         // 1. Status Filter
         if (!empty($this->filters['status']) && $this->filters['status'] !== 'all') {
             $query->where('status', $this->filters['status']);

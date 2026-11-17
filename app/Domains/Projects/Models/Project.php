@@ -4,10 +4,12 @@ namespace App\Domains\Projects\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\CRM\Models\Customer;
+use App\Domains\Projects\Models\TimeLog;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +19,20 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Project extends BaseModel
 {
     use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+
+    protected ?string $rbacPermission = 'projects.projects.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $table = $this->getTable();
+        $builder->where(function (Builder $sub) use ($user, $table) {
+            $sub->where($table . '.owner_id', $user->id)
+                ->orWhere($table . '.manager_id', $user->id)
+                ->orWhereHas('members', fn (Builder $mq) => 
+                    $mq->where('user_id', $user->id)->where('is_active', true)
+                );
+        });
+    }
 
     public function getRouteKeyName(): string
     {
@@ -28,7 +44,7 @@ class Project extends BaseModel
         $field = $field ?? $this->getRouteKeyName();
 
         if ($field === 'project_code' && is_numeric($value)) {
-            $match = $this->where('id', (int) $value)->first();
+            $match = $this->withoutGlobalScope('rbac_scope')->where('id', (int) $value)->first();
             if ($match) {
                 return $match;
             }
@@ -37,7 +53,7 @@ class Project extends BaseModel
         $branchId = branch_id() ?? (request()->hasSession() ? request()->session()->get('branch_id') : null);
 
         if ($branchId !== null && in_array($field, ['project_code', 'code'])) {
-            $branchMatch = $this->where($field, $value)->where('branch_id', $branchId)->first();
+            $branchMatch = $this->withoutGlobalScope('rbac_scope')->where($field, $value)->where('branch_id', $branchId)->first();
             if ($branchMatch) {
                 return $branchMatch;
             }
@@ -80,9 +96,25 @@ class Project extends BaseModel
         self::PRIORITY_CRITICAL,
     ];
 
-    public const BUDGET_TYPES = ['Fixed', 'Time & Material'];
+    public const BUDGET_TYPE_FIXED = 'Fixed';
+    public const BUDGET_TYPE_TIME_AND_MATERIAL = 'Time & Material';
 
-    public const BILLING_METHODS = ['Project Based', 'Milestone Based', 'Task Based', 'User Based'];
+    public const BUDGET_TYPES = [
+        self::BUDGET_TYPE_FIXED,
+        self::BUDGET_TYPE_TIME_AND_MATERIAL,
+    ];
+
+    public const BILLING_METHOD_PROJECT_BASED   = 'Project Based';
+    public const BILLING_METHOD_MILESTONE_BASED = 'Milestone Based';
+    public const BILLING_METHOD_TASK_BASED      = 'Task Based';
+    public const BILLING_METHOD_USER_BASED      = 'User Based';
+
+    public const BILLING_METHODS = [
+        self::BILLING_METHOD_PROJECT_BASED,
+        self::BILLING_METHOD_MILESTONE_BASED,
+        self::BILLING_METHOD_TASK_BASED,
+        self::BILLING_METHOD_USER_BASED,
+    ];
 
     public const CLOSURE_STATUS_COMPLETED   = 'Completed';
     public const CLOSURE_STATUS_TERMINATED  = 'Terminated';
@@ -136,9 +168,108 @@ class Project extends BaseModel
         return $this->status === self::STATUS_CLOSED;
     }
 
+    /**
+     * The statuses a project may transition to next from its current status,
+     * excluding formal closure which must occur exclusively via #modalCloseProject.
+     *
+     * @return list<string>
+     */
+    public function getAvailableTransitions(): array
+    {
+        return app(\App\Domains\Projects\Services\ProjectService::class)->availableStatusTransitions($this);
+    }
+
     public function closedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'closed_by');
+    }
+
+    /**
+     * Whether mandatory setup fields (Customer, Budget Type, Billing Method)
+     * are configured so team collaborators may be recruited.
+     */
+    public function isSetupComplete(): bool
+    {
+        return !empty($this->customer_id)
+            && !empty($this->budget_type)
+            && !empty($this->billing_method);
+    }
+
+    /**
+     * Missing setup fields required before collaborators can be added.
+     *
+     * @return list<string>
+     */
+    public function missingSetupFields(): array
+    {
+        $missing = [];
+        if (empty($this->customer_id)) {
+            $missing[] = __('projects.client');
+        }
+        if (empty($this->budget_type)) {
+            $missing[] = __('projects.budget_type');
+        }
+        if (empty($this->billing_method)) {
+            $missing[] = __('projects.billing_method');
+        }
+
+        return $missing;
+    }
+
+    /**
+     * Count of active team collaborators beyond the Project Owner and Manager.
+     */
+    public function activeTeamCollaboratorsCount(): int
+    {
+        return $this->members()
+            ->where('is_active', true)
+            ->where('user_id', '!=', $this->owner_id)
+            ->when($this->manager_id, fn($q) => $q->where('user_id', '!=', $this->manager_id))
+            ->count();
+    }
+
+    /**
+     * Whether contractual fields (billing_method, budget_type, customer_id, sales_order_id)
+     * are locked from inline changes.
+     */
+    public function isContractLocked(): bool
+    {
+        // 1. Financial invoices have been issued
+        if ($this->invoices()->exists()) {
+            return true;
+        }
+
+        // 2. Approved timesheets exist
+        if ($this->timeLogs()->where('approval_status', TimeLog::STATUS_APPROVED)->exists()) {
+            return true;
+        }
+
+        // 3. Team collaborators are recruited beyond owner/manager
+        if ($this->activeTeamCollaboratorsCount() > 0) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Explanation of why contractual fields are locked.
+     */
+    public function contractLockReason(): ?string
+    {
+        if ($this->invoices()->exists()) {
+            return __('projects.contract_locked_invoices');
+        }
+
+        if ($this->timeLogs()->where('approval_status', TimeLog::STATUS_APPROVED)->exists()) {
+            return __('projects.contract_locked_timesheets');
+        }
+
+        if ($this->activeTeamCollaboratorsCount() > 0) {
+            return __('projects.contract_locked_collaborators');
+        }
+
+        return null;
     }
 
     /**

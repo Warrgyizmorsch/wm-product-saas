@@ -31,6 +31,7 @@ class GoodsReceiptNoteApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', GoodsReceiptNote::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = GoodsReceiptNote::query()
@@ -71,6 +72,8 @@ class GoodsReceiptNoteApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', GoodsReceiptNote::class);
+
         $validator = Validator::make($request->all(), [
             'vendor_id'             => ['required', 'integer'],
             'warehouse_id'          => ['nullable', 'integer'],
@@ -164,6 +167,8 @@ class GoodsReceiptNoteApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $grn);
+
         return response()->json([
             'success' => true,
             'data'    => $grn,
@@ -184,6 +189,8 @@ class GoodsReceiptNoteApiController extends Controller
                 'message' => 'Goods Receipt Note not found',
             ], 404);
         }
+
+        $this->authorize('update', $grn);
 
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Received,Inspected,Rejected'],
@@ -221,6 +228,8 @@ class GoodsReceiptNoteApiController extends Controller
                 'message' => 'Goods Receipt Note not found',
             ], 404);
         }
+
+        $this->authorize('approve', $grn);
 
         if ($grn->status === 'Approved') {
             return response()->json([
@@ -287,6 +296,7 @@ class GoodsReceiptNoteApiController extends Controller
      */
     public function indexPending(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', GoodsReceiptNote::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = PurchaseOrder::where('tenant_id', $tenantId)
@@ -313,6 +323,7 @@ class GoodsReceiptNoteApiController extends Controller
      */
     public function getPurchaseOrderItems(int $poId): JsonResponse
     {
+        $this->authorize('viewAny', GoodsReceiptNote::class);
         [$tenantId] = $this->resolveTenantContext();
         $po         = PurchaseOrder::where('tenant_id', $tenantId)->with('items.product')->find($poId);
 
@@ -361,6 +372,7 @@ class GoodsReceiptNoteApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', GoodsReceiptNote::class);
         [$tenantId] = $this->resolveTenantContext();
 
         return \Maatwebsite\Excel\Facades\Excel::download(
@@ -382,6 +394,8 @@ class GoodsReceiptNoteApiController extends Controller
         if (!$grn) {
             return response()->json(['success' => false, 'message' => 'Goods Receipt Note not found'], 404);
         }
+
+        $this->authorize('view', $grn);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.purchase.grns.pdf', compact('grn'));
         return $pdf->download("GRN_{$grn->grn_number}.pdf");

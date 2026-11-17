@@ -28,9 +28,11 @@ class CustomerController extends Controller
 
         $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? 1;
 
-        $totalCount = Customer::where('tenant_id', $tenantId)->count();
-        $activeCount = Customer::where('tenant_id', $tenantId)->whereIn('status', ['active', 'Active'])->count();
-        $inactiveCount = Customer::where('tenant_id', $tenantId)->whereIn('status', ['inactive', 'Inactive'])->count();
+        $countsQuery = Customer::where('tenant_id', $tenantId);
+
+        $totalCount = (clone $countsQuery)->count();
+        $activeCount = (clone $countsQuery)->whereIn('status', ['active', 'Active'])->count();
+        $inactiveCount = (clone $countsQuery)->whereIn('status', ['inactive', 'Inactive'])->count();
 
         $query = Customer::query()->where('tenant_id', $tenantId)->with('crmAccount');
 

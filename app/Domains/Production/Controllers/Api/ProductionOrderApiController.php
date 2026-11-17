@@ -110,6 +110,30 @@ class ProductionOrderApiController extends ApiBaseController
     }
 
     /**
+     * GET /api/v1/production/orders/engineering-status?product_id=&branch_id=&quantity=
+     * PO-IMPL-05: BOM / Routing resolution, blocking reasons, stages with defaults, child BOMs and branch stock.
+     */
+    public function engineeringStatus(\Illuminate\Http\Request $request): JsonResponse
+    {
+        Gate::authorize('create', ProductionOrder::class);
+
+        $request->validate([
+            'product_id' => 'required|integer',
+            'branch_id'  => 'nullable|integer',
+            'quantity'   => 'nullable|numeric|min:0',
+        ]);
+        $tenantId = $this->getTenantId();
+        $product = \App\Domains\Inventory\Models\Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($request->integer('product_id'));
+        $branchId = $request->filled('branch_id') ? $request->integer('branch_id') : (function_exists('branch_id') ? branch_id() : null);
+
+        return $this->successResponse(
+            app(\App\Domains\Production\Services\ProductionOrderEngineeringService::class)
+                ->buildInteractiveWorkspacePayload($product, $tenantId, $branchId, (float) ($request->input('quantity') ?: 1)),
+            'Engineering status retrieved successfully.'
+        );
+    }
+
+    /**
      * POST /api/v1/production/orders
      * Create a new draft production order.
      */

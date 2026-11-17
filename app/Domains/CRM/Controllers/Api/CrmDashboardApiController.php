@@ -30,6 +30,8 @@ class CrmDashboardApiController extends Controller
      */
     public function metrics(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $totalLeads = Lead::where('tenant_id', $tenantId)->count();

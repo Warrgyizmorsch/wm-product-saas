@@ -114,6 +114,27 @@ class GoodsReceiptNoteService
                 }
                 $serialNumbers = array_values(array_filter(array_map('trim', $serialNumbers)));
 
+                // Validate that serial numbers are not duplicated internally or already present in inventory
+                if ($product && $product->track_serial_number && count($serialNumbers) > 0) {
+                    $counts = array_count_values($serialNumbers);
+                    $internalDups = array_keys(array_filter($counts, fn($c) => $c > 1));
+                    if (!empty($internalDups)) {
+                        throw new \Exception("Duplicate serial numbers entered for product '{$product->name}': " . implode(', ', $internalDups));
+                    }
+
+                    $companyId = company_id() ?? current_company_id();
+                    $existingDuplicates = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
+                        ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+                        ->where('product_id', $productId)
+                        ->whereIn('serial_number', $serialNumbers)
+                        ->pluck('serial_number')
+                        ->toArray();
+
+                    if (!empty($existingDuplicates)) {
+                        throw new \Exception("The following serial numbers already exist in inventory for product '{$product->name}': " . implode(', ', $existingDuplicates) . ". Serial numbers must be globally unique per product.");
+                    }
+                }
+
                 $lineType = $poItem?->line_type ?? ($product && strtolower((string)($product->item_type ?? '')) === 'asset' ? PurchaseOrderItem::LINE_TYPE_ASSET : PurchaseOrderItem::LINE_TYPE_STOCK);
 
                 $grnItem = GoodsReceiptNoteItem::create([

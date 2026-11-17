@@ -45,8 +45,12 @@ class TaskListController extends Controller
             ]);
         }
 
+        $defaultUrl = $taskList->milestone_id
+            ? route('projects.milestones.show', [$project, $taskList->milestone_id]) . '?tab=tasklists'
+            : route('projects.show', $project);
+
         return redirect()
-            ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'tasklists']))
+            ->to($this->backUrlWithQuery($defaultUrl, ['tab' => 'tasklists']))
             ->with('success', __('projects.tasklist_added'));
     }
 
@@ -81,8 +85,12 @@ class TaskListController extends Controller
 
         $this->taskLists->update($taskList, $request->validated());
 
+        $defaultUrl = $taskList->milestone_id
+            ? route('projects.milestones.show', [$project, $taskList->milestone_id]) . '?tab=tasklists'
+            : route('projects.show', $project);
+
         return redirect()
-            ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'tasklists']))
+            ->to($this->backUrlWithQuery($defaultUrl, ['tab' => 'tasklists']))
             ->with('success', __('projects.tasklist_updated'));
     }
 
@@ -90,10 +98,14 @@ class TaskListController extends Controller
     {
         $this->authorize('delete', $taskList);
 
+        $defaultUrl = $taskList->milestone_id
+            ? route('projects.milestones.show', [$project, $taskList->milestone_id]) . '?tab=tasklists'
+            : route('projects.show', $project);
+
         $this->taskLists->delete($taskList);
 
         return redirect()
-            ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'tasklists']))
+            ->to($this->backUrlWithQuery($defaultUrl, ['tab' => 'tasklists']))
             ->with('success', __('projects.tasklist_removed'));
     }
 
@@ -103,8 +115,12 @@ class TaskListController extends Controller
 
         $this->taskLists->moveUp($taskList);
 
+        $defaultUrl = $taskList->milestone_id
+            ? route('projects.milestones.show', [$project, $taskList->milestone_id]) . '?tab=tasklists'
+            : route('projects.show', $project);
+
         return redirect()
-            ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'tasklists']));
+            ->to($this->backUrlWithQuery($defaultUrl, ['tab' => 'tasklists']));
     }
 
     public function moveDown(Project $project, TaskList $taskList): RedirectResponse
@@ -113,7 +129,11 @@ class TaskListController extends Controller
 
         $this->taskLists->moveDown($taskList);
 
+        $defaultUrl = $taskList->milestone_id
+            ? route('projects.milestones.show', [$project, $taskList->milestone_id]) . '?tab=tasklists'
+            : route('projects.show', $project);
+
         return redirect()
-            ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'tasklists']));
+            ->to($this->backUrlWithQuery($defaultUrl, ['tab' => 'tasklists']));
     }
 }

@@ -20,6 +20,14 @@ class SalesReturnExport implements FromCollection, WithHeadings, WithMapping, Sh
         $query = SalesReturn::where('tenant_id', $this->tenantId)
             ->with(['customer', 'salesOrder', 'invoice']);
 
+        $currentUser = auth()->user();
+        if ($currentUser && !app(\App\Services\Access\AccessService::class)->allows($currentUser, 'sales.returns.view', ['tenant_id' => $this->tenantId])) {
+            $query->where(function ($q) use ($currentUser) {
+                $q->whereHas('salesOrder', fn($soq) => $soq->where('sales_person_id', $currentUser->id))
+                  ->orWhereHas('customer.crmAccount', fn($caq) => $caq->where('owner_id', $currentUser->id));
+            });
+        }
+
         // 1. Status Filter
         if (!empty($this->filters['status']) && $this->filters['status'] !== 'all') {
             $query->where('status', $this->filters['status']);

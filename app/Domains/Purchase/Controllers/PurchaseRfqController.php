@@ -234,7 +234,72 @@ class PurchaseRfqController extends Controller
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $paymentTerms = PaymentTerm::where('is_active', true)->orderBy('due_days')->get();
 
-        return view('modules.purchase.rfqs.show', compact('rfq', 'warehouses', 'paymentTerms'));
+        // Load all Purchase Orders generated from this RFQ
+        $linkedOrders = PurchaseOrder::where('tenant_id', $tenantId)
+            ->where('source_type', 'rfq')
+            ->where(function ($q) use ($rfq) {
+                $q->where('reference', $rfq->rfq_number)
+                  ->orWhere('reference', 'RFQ: ' . $rfq->rfq_number);
+            })
+            ->where('status', '!=', 'Cancelled')
+            ->with(['items.product', 'vendor'])
+            ->get();
+
+        $orderedItemsMap = [];
+        $allFullyOrdered = $rfq->items->isNotEmpty();
+        $anyOrdered = false;
+
+        foreach ($rfq->items as $rfqItem) {
+            $pId = $rfqItem->product_id;
+            $orderedQty = 0;
+            $itemPos = [];
+
+            foreach ($linkedOrders as $lo) {
+                foreach ($lo->items as $loItem) {
+                    if ($loItem->product_id == $pId) {
+                        $orderedQty += (float) $loItem->quantity;
+                        $itemPos[] = [
+                            'id' => $lo->id,
+                            'po_number' => $lo->purchase_order_number,
+                            'vendor_name' => $lo->vendor?->name ?? 'Vendor',
+                            'quantity' => (float) $loItem->quantity,
+                        ];
+                    }
+                }
+            }
+
+            $isFullyOrdered = $orderedQty >= (float) $rfqItem->quantity;
+            if (!$isFullyOrdered) {
+                $allFullyOrdered = false;
+            }
+            if ($orderedQty > 0) {
+                $anyOrdered = true;
+            }
+
+            $orderedItemsMap[$pId] = [
+                'ordered_qty' => $orderedQty,
+                'is_fully_ordered' => $isFullyOrdered,
+                'pending_qty' => max(0.0, (float) $rfqItem->quantity - $orderedQty),
+                'orders' => $itemPos,
+            ];
+        }
+
+        // Auto-synchronize RFQ status if needed
+        if ($rfq->status !== 'Cancelled') {
+            if ($allFullyOrdered && $rfq->items->isNotEmpty()) {
+                if ($rfq->status !== 'Confirmed') {
+                    $rfq->update(['status' => 'Confirmed']);
+                    $rfq->status = 'Confirmed';
+                }
+            } elseif ($anyOrdered) {
+                if ($rfq->status !== 'Partially Ordered') {
+                    $rfq->update(['status' => 'Partially Ordered']);
+                    $rfq->status = 'Partially Ordered';
+                }
+            }
+        }
+
+        return view('modules.purchase.rfqs.show', compact('rfq', 'warehouses', 'paymentTerms', 'linkedOrders', 'orderedItemsMap'));
     }
 
     public function edit(int $id)

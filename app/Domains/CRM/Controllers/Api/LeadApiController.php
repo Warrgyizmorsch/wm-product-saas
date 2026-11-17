@@ -55,6 +55,8 @@ class LeadApiController extends Controller
      */
     public function meta(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $statuses = LeadStatus::where(function ($q) use ($tenantId) {
@@ -85,6 +87,8 @@ class LeadApiController extends Controller
      */
     public function checkDuplicate(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $email = trim((string)$request->input('email'));
@@ -128,6 +132,8 @@ class LeadApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $query = Lead::query()
@@ -160,7 +166,7 @@ class LeadApiController extends Controller
             $query->where('priority', $priority);
         }
 
-        // Owner Filter
+        // Owner Filter / Scope
         if ($ownerId = $request->input('owner_id')) {
             $query->where('lead_owner_id', $ownerId);
         }
@@ -813,6 +819,8 @@ class LeadApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $lead);
+
         return response()->json([
             'success' => true,
             'data'    => $lead,
@@ -833,6 +841,8 @@ class LeadApiController extends Controller
                 'message' => "Lead with ID {$id} not found.",
             ], 404);
         }
+
+        $this->authorize('update', $lead);
 
         $validator = Validator::make($request->all(), [
             'name'            => ['sometimes', 'required', 'string', 'max:255'],
@@ -897,6 +907,8 @@ class LeadApiController extends Controller
         if (!$lead) {
             return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
         }
+
+        $this->authorize('update', $lead);
 
         $validator = Validator::make($request->all(), [
             'status_id' => ['nullable', 'integer'],
@@ -970,6 +982,8 @@ class LeadApiController extends Controller
             return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
         }
 
+        $this->authorize('update', $lead);
+
         $validator = Validator::make($request->all(), [
             'priority' => ['required', 'string', 'in:low,medium,high,urgent,Low,Medium,High,Urgent'],
         ]);
@@ -1006,6 +1020,8 @@ class LeadApiController extends Controller
                 'message' => 'Lead not found',
             ], 404);
         }
+
+        $this->authorize('update', $lead);
 
         $validator = Validator::make($request->all(), [
             'deal_title'          => ['nullable', 'string', 'max:255'],
@@ -1138,6 +1154,8 @@ class LeadApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $lead);
+
         $lead->delete();
 
         return response()->json([
@@ -1156,6 +1174,8 @@ class LeadApiController extends Controller
         if (!$lead) {
             return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
         }
+
+        $this->authorize('update', $lead);
 
         $validator = Validator::make($request->all(), [
             'lead_owner_id' => 'nullable|integer|exists:users,id',
@@ -1207,6 +1227,8 @@ class LeadApiController extends Controller
      */
     public function bulkAssign(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [
@@ -1275,6 +1297,8 @@ class LeadApiController extends Controller
             return response()->json(['success' => false, 'message' => "Lead with ID {$id} not found."], 404);
         }
 
+        $this->authorize('update', $lead);
+
         $lead->requirement = $request->input('requirement');
         $lead->save();
 
@@ -1290,6 +1314,8 @@ class LeadApiController extends Controller
      */
     public function kanban(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Lead::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $statuses = LeadStatus::where(function ($q) use ($tenantId) {
@@ -1327,6 +1353,8 @@ class LeadApiController extends Controller
         if (!$lead) {
             return response()->json(['success' => false, 'message' => "Deleted Lead with ID {$id} not found."], 404);
         }
+
+        $this->authorize('delete', $lead);
 
         $lead->restore();
 

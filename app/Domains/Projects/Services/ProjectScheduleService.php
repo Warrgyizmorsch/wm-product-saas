@@ -480,11 +480,12 @@ class ProjectScheduleService
                 );
 
                 return [
-                    'success'        => true,
-                    'shift_mode'     => self::SHIFT_MODE_ISOLATED,
-                    'shifted_tasks'  => [$lockedTask->task_code],
-                    'affected_count' => 1,
-                    'schedule'       => $this->calculateSchedule($project),
+                    'success'                 => true,
+                    'shift_mode'              => self::SHIFT_MODE_ISOLATED,
+                    'shifted_tasks'           => [$lockedTask->task_code],
+                    'skipped_completed_tasks' => [],
+                    'affected_count'          => 1,
+                    'schedule'                => $this->calculateSchedule($project),
                 ];
             }
 
@@ -495,6 +496,7 @@ class ProjectScheduleService
             ]);
 
             $shiftedCodes = [$lockedTask->task_code];
+            $skippedCompletedCodes = [];
             $visited = [$lockedTask->id => true];
 
             // Queue for BFS traversal
@@ -521,13 +523,6 @@ class ProjectScheduleService
                         continue;
                     }
 
-                    // Safeguard: Completed tasks cannot be auto-shifted
-                    if ($succ->status === Task::STATUS_COMPLETED) {
-                        throw ValidationException::withMessages([
-                            'shift_mode' => "Cannot ripple schedule: Downstream task '{$succ->task_code}' ({$succ->title}) is already Completed and cannot be automatically rescheduled.",
-                        ]);
-                    }
-
                     $sStart = $succ->start_date ? Carbon::parse($succ->start_date)->startOfDay() : Carbon::today()->startOfDay();
                     $sDue = $succ->due_date ? Carbon::parse($succ->due_date)->startOfDay() : $sStart->copy();
                     $sDuration = max(1, (int) $sStart->diffInDays($sDue) + 1);
@@ -543,6 +538,14 @@ class ProjectScheduleService
                     };
 
                     if ($requiredStart->gt($sStart)) {
+                        // Completed tasks cannot be auto-shifted: preserve historical dates and skip them
+                        if ($succ->status === Task::STATUS_COMPLETED) {
+                            if (! in_array($succ->task_code, $skippedCompletedCodes, true)) {
+                                $skippedCompletedCodes[] = $succ->task_code;
+                            }
+                            continue;
+                        }
+
                         $newSuccStart = $requiredStart->copy();
                         $newSuccDue = $newSuccStart->copy()->addDays($sDuration - 1);
 
@@ -563,25 +566,32 @@ class ProjectScheduleService
                 }
             }
 
+            $desc = 'Cascaded date adjustments to ' . count($shiftedCodes) . ' task(s): ' . implode(', ', $shiftedCodes);
+            if (! empty($skippedCompletedCodes)) {
+                $desc .= '. Skipped ' . count($skippedCompletedCodes) . ' completed task(s): ' . implode(', ', $skippedCompletedCodes);
+            }
+
             $this->activity->record(
                 $project,
                 'project.schedule_shifted',
                 "Project schedule ripple shifted from '{$lockedTask->task_code}'",
-                'Cascaded date adjustments to ' . count($shiftedCodes) . ' task(s): ' . implode(', ', $shiftedCodes),
+                $desc,
                 $lockedTask,
                 [
-                    'task_id'       => $lockedTask->id,
-                    'shift_mode'    => self::SHIFT_MODE_RIPPLE,
-                    'shifted_tasks' => $shiftedCodes,
+                    'task_id'                 => $lockedTask->id,
+                    'shift_mode'              => self::SHIFT_MODE_RIPPLE,
+                    'shifted_tasks'           => $shiftedCodes,
+                    'skipped_completed_tasks' => $skippedCompletedCodes,
                 ]
             );
 
             return [
-                'success'        => true,
-                'shift_mode'     => self::SHIFT_MODE_RIPPLE,
-                'shifted_tasks'  => $shiftedCodes,
-                'affected_count' => count($shiftedCodes),
-                'schedule'       => $this->calculateSchedule($project),
+                'success'                 => true,
+                'shift_mode'              => self::SHIFT_MODE_RIPPLE,
+                'shifted_tasks'           => $shiftedCodes,
+                'skipped_completed_tasks' => $skippedCompletedCodes,
+                'affected_count'          => count($shiftedCodes),
+                'schedule'                => $this->calculateSchedule($project),
             ];
         });
     }

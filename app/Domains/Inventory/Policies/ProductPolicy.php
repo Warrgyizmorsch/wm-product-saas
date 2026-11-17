@@ -15,35 +15,55 @@ class ProductPolicy
     public function viewAny(User $user): bool
     {
         return $this->access->allows($user, 'inventory.products.view', [
-            'tenant_id' => $user->tenant_id,
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
         ]);
     }
 
     public function view(User $user, Product $product): bool
     {
         return $this->access->allows($user, 'inventory.products.view', [
-            'tenant_id' => $product->tenant_id,
+            'tenant_id'     => $product->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $product->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $product->company_id,
         ]);
     }
 
     public function create(User $user): bool
     {
         return $this->access->allows($user, 'inventory.products.create', [
-            'tenant_id' => $user->tenant_id,
+            'tenant_id'     => $user->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $user->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $user->company_id,
         ]);
     }
 
     public function update(User $user, Product $product): bool
     {
         return $this->access->allows($user, 'inventory.products.update', [
-            'tenant_id' => $product->tenant_id,
+            'tenant_id'     => $product->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $product->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $product->company_id,
         ]);
     }
 
     public function delete(User $user, Product $product): bool
     {
         return $this->access->allows($user, 'inventory.products.delete', [
-            'tenant_id' => $product->tenant_id,
+            'tenant_id'     => $product->tenant_id,
+            'owner_id'      => $user->id,
+            'branch_id'     => $product->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $product->company_id,
         ]);
     }
 }

@@ -20,6 +20,14 @@ class DealExport implements FromCollection, WithHeadings, WithMapping, ShouldAut
         $query = CrmDeal::where('tenant_id', $this->tenantId)
             ->with(['account', 'contact', 'owner']);
 
+        $currentUser = auth()->user();
+        if ($currentUser && !app(\App\Services\Access\AccessService::class)->allows($currentUser, 'crm.deals.view', ['tenant_id' => $this->tenantId])) {
+            $query->where(function ($q) use ($currentUser) {
+                $q->where('owner_id', $currentUser->id)
+                  ->orWhereHas('account', fn($aq) => $aq->where('owner_id', $currentUser->id));
+            });
+        }
+
         // 1. Stage / Status filter
         if (!empty($this->filters['stage'])) {
             $stage = $this->filters['stage'];

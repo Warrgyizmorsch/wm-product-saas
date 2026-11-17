@@ -75,6 +75,12 @@ class Milestone extends BaseModel
         $this->attributes['completion_percentage'] = $value !== null ? (int) $value : null;
     }
 
+    public function getBillingPercentageAttribute(): ?float
+    {
+        $budget = (float) ($this->project?->budget_amount ?? 0);
+        return $budget > 0 ? round(((float)$this->billing_amount / $budget) * 100, 1) : null;
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

@@ -138,7 +138,14 @@ class EmployeeProfileRequestApiController extends Controller
         }
 
         if ($request->filled('employee_id')) {
-            $query->where('employee_id', $request->employee_id);
+            $empId = $request->employee_id;
+            if (!is_numeric($empId)) {
+                $empId = Employee::where('employee_id', $empId)->value('id') ?? 0;
+            }
+            $query->where('employee_id', $empId);
+        } elseif ($request->filled('employee_code')) {
+            $empId = Employee::where('employee_id', $request->employee_code)->value('id') ?? 0;
+            $query->where('employee_id', $empId);
         }
 
         if ($request->filled('search')) {

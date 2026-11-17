@@ -281,21 +281,24 @@ class ProjectController extends Controller
             : collect();
 
         $reviews = $canViewReviews
-            ? $project->reviews()->with(['reviewer', 'creator', 'documents'])->latest('review_date')->latest('id')->get()
+            ? $project->reviews()->with(['reviewer', 'creator', 'documents', 'project'])->latest('review_date')->latest('id')->get()
             : collect();
 
         $changeRequests = $canViewCRs
-            ? $project->changeRequests()->with(['requester', 'approver', 'creator', 'review'])->latest('id')->get()
+            ? $project->changeRequests()->with(['requester', 'approver', 'creator', 'review', 'project'])->latest('id')->get()
             : collect();
 
         $billingService = app(\App\Domains\Projects\Services\ProjectBillingService::class);
         $billingSummary = $canViewBilling ? $billingService->getBillingSummary($project) : [];
         $unbilledTimeLogs = ($canViewBilling && $canGenerateInvoice) ? $billingService->getUnbilledTimeLogs($project) : collect();
         $unbilledMilestones = ($canViewBilling && $canGenerateInvoice) ? $billingService->getUnbilledMilestones($project) : collect();
+        $unbilledTasks = ($canViewBilling && $canGenerateInvoice) ? $billingService->getUnbilledTasks($project) : collect();
         $serviceProducts = ($canViewBilling && $canGenerateInvoice)
             ? \App\Domains\Inventory\Models\Product::where('tenant_id', $project->tenant_id)
                 ->where('item_type', 'Service')
-                ->where('status', 'active')
+                ->where(function ($q) {
+                    $q->whereNull('status')->orWhereIn('status', ['active', 'Active']);
+                })
                 ->orderBy('name')
                 ->get()
             : collect();
@@ -361,9 +364,9 @@ class ProjectController extends Controller
         $timesheetCost = (float) $project->timeLogs()->sum(DB::raw('hours * COALESCE(hourly_rate, 0)'));
         $totalCostConsumed = $timesheetCost + $mfgCost;
 
-        $baseBudgetAmount = (float) ($project->budget_amount ?? 0);
-        $approvedCrBudget = (float) $changeRequests->where('status', 'Approved')->sum('impact_budget');
-        $revisedBudget = $baseBudgetAmount + $approvedCrBudget;
+        $revisedBudget = (float) ($project->budget_amount ?? 0);
+        $approvedCrBudget = (float) $changeRequests->where('status', 'Approved')->sum('impact_budget_amount');
+        $baseBudgetAmount = max(0.0, $revisedBudget - $approvedCrBudget);
 
         $costPercent = $revisedBudget > 0 ? round(($totalCostConsumed / $revisedBudget) * 100, 1) : null;
         $isOverBudget = $revisedBudget > 0 && $totalCostConsumed > $revisedBudget;
@@ -372,6 +375,8 @@ class ProjectController extends Controller
             'total_consumed' => $totalCostConsumed,
             'mfg_cost' => $mfgCost,
             'timesheet_cost' => $timesheetCost,
+            'base_budget' => $baseBudgetAmount,
+            'cr_budget' => $approvedCrBudget,
             'revised_budget' => $revisedBudget,
             'percent' => $costPercent,
             'is_over_budget' => $isOverBudget,
@@ -398,6 +403,7 @@ class ProjectController extends Controller
             'billingSummary' => $billingSummary,
             'unbilledTimeLogs' => $unbilledTimeLogs,
             'unbilledMilestones' => $unbilledMilestones,
+            'unbilledTasks' => $unbilledTasks,
             'serviceProducts' => $serviceProducts,
             'statusTransitions' => $canUpdateProject ? $this->projects->availableStatusTransitions($project) : [],
             'customers' => $canUpdateProject ? Customer::query()->orderBy('name')->get() : collect(),
@@ -451,17 +457,13 @@ class ProjectController extends Controller
 
     public function bulkAction(Request $request): RedirectResponse
     {
-        $action = $request->input('action');
-        $ids = $request->input('ids');
+        $validated = $request->validate([
+            'action' => ['required', 'string', 'in:delete'],
+            'ids'    => ['required', 'array', 'min:1'],
+            'ids.*'  => ['required', 'integer'],
+        ]);
 
-        if (empty($ids) || !is_array($ids)) {
-            return redirect()->route('projects.index')->with('error', 'No projects selected.');
-        }
-
-        if ($action !== 'delete') {
-            return redirect()->route('projects.index')->with('error', 'Invalid action.');
-        }
-
+        $ids = $validated['ids'];
         $tenantId = require_tenant_id();
         $projects = Project::whereIn('id', $ids)->where('tenant_id', $tenantId)->get();
 
@@ -497,6 +499,115 @@ class ProjectController extends Controller
     public function updateField(Request $request, Project $project): JsonResponse
     {
         return $this->handleInlineFieldUpdate($request, $project);
+    }
+
+    /**
+     * Option 1: Owner Direct Override with Impact Confirmation.
+     * Allows the Project Owner or Administrator to amend locked contractual settings
+     * (billing_method, budget_type, customer_id) mid-project with mandatory audit reason logging.
+     */
+    public function amendContract(Request $request, Project $project): JsonResponse
+    {
+        $this->authorize('update', $project);
+
+        $isOwnerOrAdmin = (int) $project->owner_id === (int) auth()->id()
+            || auth()->user()?->hasRole('admin', 'super_admin', 'tenant_owner')
+            || (bool) auth()->user()?->is_admin;
+
+        if (!$isOwnerOrAdmin) {
+            return response()->json([
+                'message' => __('projects.only_owner_can_amend_contract'),
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'field' => ['required', 'string', Rule::in(['billing_method', 'budget_type', 'customer_id'])],
+            'value' => ['nullable'],
+            'reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $field = $validated['field'];
+        $value = $validated['value'];
+        $reason = trim($validated['reason']);
+
+        $value = ($value === '' || $value === null) ? null : $value;
+
+        if ($field === 'billing_method' && $value !== null) {
+            if (!in_array($value, Project::BILLING_METHODS, true)) {
+                return response()->json(['message' => 'Invalid billing method selected.'], 422);
+            }
+        } elseif ($field === 'budget_type' && $value !== null) {
+            if (!in_array($value, Project::BUDGET_TYPES, true)) {
+                return response()->json(['message' => 'Invalid budget type selected.'], 422);
+            }
+        } elseif ($field === 'customer_id' && $value !== null) {
+            $value = (int) $value;
+            $customerExists = Customer::where('id', $value)
+                ->where('tenant_id', $project->tenant_id)
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'active'))
+                ->exists();
+            if (!$customerExists) {
+                return response()->json(['message' => 'Invalid customer selected.'], 422);
+            }
+        }
+
+        $oldValue = $project->{$field};
+        if ((string) $oldValue === (string) $value) {
+            return response()->json([
+                'message' => __('projects.amend_value_same_as_current'),
+            ], 422);
+        }
+
+        $fieldLabel = match ($field) {
+            'billing_method' => __('projects.billing_method'),
+            'budget_type' => __('projects.budget_type'),
+            'customer_id' => __('projects.client'),
+            default => $field,
+        };
+
+        $formatValueLabel = function ($f, $val) use ($project) {
+            if (empty($val)) return __('projects.none_option');
+            if ($f === 'billing_method') return __('projects.billing_methods.' . $val);
+            if ($f === 'budget_type') return __('projects.budget_types.' . $val);
+            if ($f === 'customer_id') return Customer::find($val)?->name ?? (string) $val;
+            return (string) $val;
+        };
+
+        $oldLabel = $formatValueLabel($field, $oldValue);
+        $newLabel = $formatValueLabel($field, $value);
+
+        DB::transaction(function () use ($project, $field, $value, $fieldLabel, $oldLabel, $newLabel, $reason, $oldValue) {
+            $this->projects->updateField($project, $field, $value);
+
+            $this->activity->record(
+                $project,
+                'project.contract_amended',
+                __('projects.contract_amended_title', [
+                    'field' => $fieldLabel,
+                    'from' => $oldLabel,
+                    'to' => $newLabel,
+                ]),
+                $reason,
+                $project,
+                [
+                    'field' => $field,
+                    'old_value' => $oldValue,
+                    'new_value' => $value,
+                    'old_label' => $oldLabel,
+                    'new_label' => $newLabel,
+                    'reason' => $reason,
+                    'amended_by' => auth()->user()?->name ?? 'System',
+                ]
+            );
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => __('projects.contract_amended_success', ['field' => $fieldLabel]),
+            'field' => $field,
+            'value' => $value,
+            'should_reload' => true,
+        ]);
     }
 
     protected function inlineFieldSchema(): array
@@ -554,7 +665,15 @@ class ProjectController extends Controller
             ],
             'customer_id' => [
                 'rules' => ['nullable', 'integer', Rule::exists('customers', 'id')->where('tenant_id', require_tenant_id())],
-                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'customer_id', $value),
+                'handler' => function (Project $project, $value) {
+                    if ($project->isContractLocked() && (int) $value !== (int) $project->customer_id) {
+                        throw ValidationException::withMessages([
+                            'value' => $project->contractLockReason(),
+                        ]);
+                    }
+
+                    return $this->projects->updateField($project, 'customer_id', $value);
+                },
             ],
             'owner_id' => [
                 'rules' => ['required', 'integer', $this->members->activeCollaboratorRule($project)],
@@ -576,11 +695,27 @@ class ProjectController extends Controller
             ],
             'budget_type' => [
                 'rules' => ['nullable', Rule::in(Project::BUDGET_TYPES)],
-                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'budget_type', $value),
+                'handler' => function (Project $project, $value) {
+                    if ($project->isContractLocked() && $value !== $project->budget_type) {
+                        throw ValidationException::withMessages([
+                            'value' => $project->contractLockReason(),
+                        ]);
+                    }
+
+                    return $this->projects->updateField($project, 'budget_type', $value);
+                },
             ],
             'billing_method' => [
                 'rules' => ['nullable', Rule::in(Project::BILLING_METHODS)],
-                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'billing_method', $value),
+                'handler' => function (Project $project, $value) {
+                    if ($project->isContractLocked() && $value !== $project->billing_method) {
+                        throw ValidationException::withMessages([
+                            'value' => $project->contractLockReason(),
+                        ]);
+                    }
+
+                    return $this->projects->updateField($project, 'billing_method', $value);
+                },
             ],
         ];
     }

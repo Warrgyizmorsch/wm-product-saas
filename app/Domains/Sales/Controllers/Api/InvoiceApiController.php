@@ -37,6 +37,7 @@ class InvoiceApiController extends Controller
      */
     public function meta(): JsonResponse
     {
+        $this->authorize('viewAny', Invoice::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $customers = Customer::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'company_name', 'email', 'phone', 'gstin']);
@@ -61,6 +62,7 @@ class InvoiceApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Invoice::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = Invoice::query()
@@ -125,6 +127,8 @@ class InvoiceApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Invoice::class);
+
         $validator = Validator::make($request->all(), [
             'customer_id'       => ['required', 'integer'],
             'sales_order_id'    => ['nullable', 'integer'],
@@ -279,6 +283,17 @@ class InvoiceApiController extends Controller
                 'success' => false,
                 'message' => 'Invoice not found',
             ], 404);
+        }
+
+        $authUser = auth()->user();
+        $ownerId = $invoice->salesOrder?->sales_person_id
+            ?? $invoice->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.invoices.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this invoice.'], 403);
         }
 
         // 1. Unallocated advances tied to this Sales Order
@@ -445,6 +460,17 @@ class InvoiceApiController extends Controller
             ], 404);
         }
 
+        $authUser = auth()->user();
+        $ownerId = $invoice->salesOrder?->sales_person_id
+            ?? $invoice->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.invoices.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this invoice.'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'string', 'in:Draft,Sent,Partial,Paid,Overdue,Void'],
         ]);
@@ -486,6 +512,17 @@ class InvoiceApiController extends Controller
             ], 404);
         }
 
+        $authUser = auth()->user();
+        $ownerId = $invoice->salesOrder?->sales_person_id
+            ?? $invoice->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.invoices.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this invoice.'], 403);
+        }
+
         if ($invoice->amount_paid > 0) {
             return response()->json([
                 'success' => false,
@@ -518,6 +555,17 @@ class InvoiceApiController extends Controller
             ], 404);
         }
 
+        $authUser = auth()->user();
+        $ownerId = $invoice->salesOrder?->sales_person_id
+            ?? $invoice->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.invoices.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this invoice.'], 403);
+        }
+
         $this->authorize('update', $invoice);
 
         $invoice->status = 'Posted';
@@ -546,6 +594,17 @@ class InvoiceApiController extends Controller
                 'success' => false,
                 'message' => 'Invoice not found',
             ], 404);
+        }
+
+        $authUser = auth()->user();
+        $ownerId = $invoice->salesOrder?->sales_person_id
+            ?? $invoice->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.invoices.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this invoice.'], 403);
         }
 
         $this->authorize('update', $invoice);
@@ -658,6 +717,17 @@ class InvoiceApiController extends Controller
             ], 404);
         }
 
+        $authUser = auth()->user();
+        $ownerId = $invoice->salesOrder?->sales_person_id
+            ?? $invoice->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.invoices.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this invoice.'], 403);
+        }
+
         $this->authorize('view', $invoice);
 
         $validator = Validator::make($request->all(), [
@@ -706,6 +776,17 @@ class InvoiceApiController extends Controller
                 'success' => false,
                 'message' => 'Invoice not found',
             ], 404);
+        }
+
+        $authUser = auth()->user();
+        $ownerId = $invoice->salesOrder?->sales_person_id
+            ?? $invoice->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.invoices.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this invoice.'], 403);
         }
 
         $this->authorize('view', $invoice);
@@ -770,6 +851,17 @@ class InvoiceApiController extends Controller
                 'success' => false,
                 'message' => 'Invoice not found',
             ], 404);
+        }
+
+        $authUser = auth()->user();
+        $ownerId = $invoice->salesOrder?->sales_person_id
+            ?? $invoice->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.invoices.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this invoice.'], 403);
         }
 
         $this->authorize('view', $invoice);

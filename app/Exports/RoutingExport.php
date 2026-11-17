@@ -7,6 +7,11 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 
+/**
+ * Routing export — one row per operation (RT-IMPL-01).
+ * Routings have no product and no materials any more (materials belong to the BOM — RT-01 / RT-27),
+ * so the old product column and per-material rows are gone.
+ */
 class RoutingExport implements FromCollection, WithHeadings, WithMapping
 {
     public function __construct(
@@ -17,11 +22,7 @@ class RoutingExport implements FromCollection, WithHeadings, WithMapping
     public function collection()
     {
         $query = Routing::where('tenant_id', $this->tenantId)
-            ->with(['product', 'operations.workCenter', 'operations.machine', 'operations.materials.material', 'operations.materials.uom']);
-
-        if (!empty($this->filters['product_id'])) {
-            $query->where('product_id', $this->filters['product_id']);
-        }
+            ->with(['operations.workCenter', 'operations.section', 'operations.machine', 'operations.manualProduction']);
 
         if (!empty($this->filters['status'])) {
             $query->where('status', $this->filters['status']);
@@ -29,64 +30,27 @@ class RoutingExport implements FromCollection, WithHeadings, WithMapping
 
         if (!empty($this->filters['search'])) {
             $search = $this->filters['search'];
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('routing_number', 'like', "%{$search}%")
-                  ->orWhere('name', 'like', "%{$search}%")
-                  ->orWhereHas('product', function ($pq) use ($search) {
-                      $pq->where('name', 'like', "%{$search}%")
-                        ->orWhere('sku', 'like', "%{$search}%");
-                  });
+                  ->orWhere('name', 'like', "%{$search}%");
             });
         }
 
         $sortBy = $this->filters['sort_by'] ?? 'routing_number';
         $sortOrder = strtolower($this->filters['sort_order'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
         $allowedSorts = ['routing_number', 'name', 'version'];
-        if (in_array($sortBy, $allowedSorts, true)) {
-            $query->orderBy($sortBy, $sortOrder);
-        } else {
-            $query->orderBy('routing_number', 'asc');
-        }
-
-        $routings = $query->get();
+        $query->orderBy(in_array($sortBy, $allowedSorts, true) ? $sortBy : 'routing_number', $sortOrder);
 
         $rows = [];
-        foreach ($routings as $routing) {
+        foreach ($query->get() as $routing) {
             if ($routing->operations->isEmpty()) {
-                $rows[] = (object)[
-                    'routing' => $routing,
-                    'operation' => null,
-                    'material' => null,
-                    'is_routing_first' => true,
-                    'is_operation_first' => true
-                ];
-            } else {
-                $isRoutingFirst = true;
-                foreach ($routing->operations as $op) {
-                    if ($op->materials->isEmpty()) {
-                        $rows[] = (object)[
-                            'routing' => $routing,
-                            'operation' => $op,
-                            'material' => null,
-                            'is_routing_first' => $isRoutingFirst,
-                            'is_operation_first' => true
-                        ];
-                        $isRoutingFirst = false;
-                    } else {
-                        $isOpFirst = true;
-                        foreach ($op->materials as $mat) {
-                            $rows[] = (object)[
-                                'routing' => $routing,
-                                'operation' => $op,
-                                'material' => $mat,
-                                'is_routing_first' => $isRoutingFirst,
-                                'is_operation_first' => $isOpFirst
-                            ];
-                            $isRoutingFirst = false;
-                            $isOpFirst = false;
-                        }
-                    }
-                }
+                $rows[] = (object) ['routing' => $routing, 'operation' => null, 'is_routing_first' => true];
+                continue;
+            }
+            $first = true;
+            foreach ($routing->operations->sortBy('sequence') as $op) {
+                $rows[] = (object) ['routing' => $routing, 'operation' => $op, 'is_routing_first' => $first];
+                $first = false;
             }
         }
 
@@ -96,22 +60,24 @@ class RoutingExport implements FromCollection, WithHeadings, WithMapping
     public static function availableColumns(): array
     {
         return [
-            'routing_code' => 'Routing Code',
-            'routing_name' => 'Routing Name',
-            'product_code' => 'Product Code',
-            'version' => 'Version',
+            'routing_code'       => 'Routing Code',
+            'routing_name'       => 'Routing Name',
+            'version'            => 'Version',
+            'status'             => 'Status',
             'operation_sequence' => 'Operation Sequence',
-            'operation_name' => 'Operation Name',
-            'operation_code' => 'Operation Code',
-            'operation_type' => 'Operation Type',
-            'work_center_code' => 'Work Center Code',
-            'machine_code' => 'Machine Code',
-            'setup_time' => 'Setup Time Minutes',
-            'processing_time' => 'Processing Time Minutes',
-            'yield_percentage' => 'Yield Percentage',
-            'is_external' => 'Is External',
-            'material_code' => 'Material Code',
-            'material_quantity' => 'Material Quantity',
+            'operation_name'     => 'Operation Name',
+            'operation_code'     => 'Operation Code',
+            'operation_type'     => 'Operation Type',
+            'work_center_code'   => 'Work Center Code',
+            'section_code'       => 'Section Code',
+            'machine_code'       => 'Machine Code',
+            'manual_batch'       => 'Manual Batch',
+            'setup_time'         => 'Setup Per Run Minutes',
+            'setup_time_per_piece' => 'Setup Per Piece Minutes',
+            'processing_time'    => 'Processing Time Minutes',
+            'yield_percentage'   => 'Yield Percentage',
+            'is_external'        => 'Is External',
+            'cost_per_unit'      => 'Cost Per Unit',
         ];
     }
 
@@ -130,43 +96,36 @@ class RoutingExport implements FromCollection, WithHeadings, WithMapping
     public function headings(): array
     {
         $all = static::availableColumns();
-        $headers = [];
-        foreach ($this->getActiveColumns() as $key) {
-            $headers[] = $all[$key] ?? $key;
-        }
-        return $headers;
+        return array_map(fn($key) => $all[$key] ?? $key, $this->getActiveColumns());
     }
 
     public function map($row): array
     {
         $routing = $row->routing;
         $op = $row->operation;
-        $mat = $row->material;
+        $head = $row->is_routing_first;
 
         $values = [
-            'routing_code' => $row->is_routing_first ? ($routing->routing_number ?? '') : '',
-            'routing_name' => $row->is_routing_first ? ($routing->name ?? '') : '',
-            'product_code' => $row->is_routing_first ? ($routing->product?->sku ?? '') : '',
-            'version' => $row->is_routing_first ? ($routing->version ?? '') : '',
-            'operation_sequence' => ($op && $row->is_operation_first) ? $op->sequence : '',
-            'operation_name' => ($op && $row->is_operation_first) ? $op->name : '',
-            'operation_code' => ($op && $row->is_operation_first) ? $op->operation_number : '',
-            'operation_type' => ($op && $row->is_operation_first) ? $op->operation_type : '',
-            'work_center_code' => ($op && $row->is_operation_first) ? ($op->workCenter?->code ?? '') : '',
-            'machine_code' => ($op && $row->is_operation_first) ? ($op->machine?->code ?? '') : '',
-            'setup_time' => ($op && $row->is_operation_first) ? $op->setup_time_minutes : '',
-            'processing_time' => ($op && $row->is_operation_first) ? $op->processing_time_minutes : '',
-            'yield_percentage' => ($op && $row->is_operation_first) ? $op->expected_yield_percentage : '',
-            'is_external' => ($op && $row->is_operation_first) ? ($op->is_external ? 'Yes' : 'No') : '',
-            'material_code' => $mat ? ($mat->material?->sku ?? '') : '',
-            'material_quantity' => $mat ? $mat->quantity : '',
+            'routing_code'       => $head ? ($routing->routing_number ?? '') : '',
+            'routing_name'       => $head ? ($routing->name ?? '') : '',
+            'version'            => $head ? ($routing->version ?? '') : '',
+            'status'             => $head ? ($routing->status ?? '') : '',
+            'operation_sequence' => $op?->sequence ?? '',
+            'operation_name'     => $op?->name ?? '',
+            'operation_code'     => $op?->operation_number ?? '',
+            'operation_type'     => $op?->operation_type ?? '',
+            'work_center_code'   => $op?->workCenter?->code ?? '',
+            'section_code'       => $op?->section?->code ?? '',
+            'machine_code'       => $op?->machine?->code ?? '',
+            'manual_batch'       => $op?->manualProduction?->batch_name ?? '',
+            'setup_time'         => $op?->setup_time_minutes ?? '',
+            'setup_time_per_piece' => $op?->setup_time_per_piece_minutes ?? '',
+            'processing_time'    => $op?->processing_time_minutes ?? '',
+            'yield_percentage'   => $op?->expected_yield_percentage ?? '',
+            'is_external'        => $op ? ($op->is_external ? 'Yes' : 'No') : '',
+            'cost_per_unit'      => $op?->cost_per_unit ?? '',
         ];
 
-        $output = [];
-        foreach ($this->getActiveColumns() as $col) {
-            $output[] = $values[$col] ?? '';
-        }
-
-        return $output;
+        return array_map(fn($col) => $values[$col] ?? '', $this->getActiveColumns());
     }
 }

@@ -31,7 +31,7 @@ class ProjectScheduleController extends Controller
             return response()->json($schedule);
         }
 
-        $milestones = $project->milestones()->orderBy('milestone_order')->get();
+        $milestones = $project->milestones()->orderBy('start_date')->orderBy('id')->get();
 
         return view('modules.projects.timeline', [
             'project'    => $project,
@@ -69,14 +69,24 @@ class ProjectScheduleController extends Controller
                 $validated['shift_mode']
             );
 
+            $message = __('projects.task_rescheduled', ['defaultValue' => 'Task rescheduled successfully.']);
+            if (! empty($result['skipped_completed_tasks'])) {
+                $countSkipped = count($result['skipped_completed_tasks']);
+                $skippedList = implode(', ', $result['skipped_completed_tasks']);
+                $notice = $countSkipped === 1
+                    ? __('projects.completed_task_skipped', ['task' => $skippedList, 'defaultValue' => "Completed task {$skippedList} was skipped and kept unchanged."])
+                    : __('projects.completed_tasks_skipped', ['tasks' => $skippedList, 'defaultValue' => "Completed tasks [{$skippedList}] were skipped and kept unchanged."]);
+                $message .= ' (' . $notice . ')';
+            }
+
             if ($request->wantsJson()) {
                 return response()->json([
-                    'message' => __('projects.task_rescheduled', ['defaultValue' => 'Task rescheduled successfully.']),
+                    'message' => $message,
                     'result'  => $result,
                 ]);
             }
 
-            return redirect()->back()->with('success', __('projects.task_rescheduled', ['defaultValue' => 'Task rescheduled successfully.']));
+            return redirect()->back()->with('success', $message);
         } catch (ValidationException $e) {
             if ($request->wantsJson()) {
                 return response()->json([

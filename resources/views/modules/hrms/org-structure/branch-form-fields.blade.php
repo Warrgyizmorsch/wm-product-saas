@@ -15,16 +15,23 @@
     <div class="col-md-6">
         <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_company') }}" name="company_id" id="{{ $prefix }}_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
             <option value="">{{ __('hrms.org.select_company_required') }}</option>
-            @foreach($companies as $company)
-                <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+            @foreach(($companiesList ?? $companies) as $company)
+                <option value="{{ $company->id }}" data-timezone="{{ $company->timezone }}">{{ $company->company_name }}</option>
             @endforeach
         </x-ui.odoo-form-ui>
     </div>
     <div class="col-md-6">
         <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_business_unit') }}" name="business_unit_id" id="{{ $buId }}" select2-selector="default" :errorText="$errors->first('business_unit_id')">
             <option value="">{{ __('hrms.org.select_business_unit') }}</option>
-            @foreach($businessUnits as $buUnit)
-                <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
+            @foreach(($businessUnitsList ?? $businessUnits) as $buUnit)
+                @php
+                    $buCompanyTz = $buUnit->company?->timezone ?? '';
+                    if (empty($buCompanyTz) && !empty($buUnit->company_id)) {
+                        $compObj = ($companiesList ?? $companies)->firstWhere('id', $buUnit->company_id);
+                        $buCompanyTz = $compObj?->timezone ?? '';
+                    }
+                @endphp
+                <option value="{{ $buUnit->id }}" data-company-id="{{ $buUnit->company_id }}" data-timezone="{{ $buCompanyTz }}">{{ $buUnit->name }}</option>
             @endforeach
         </x-ui.odoo-form-ui>
     </div>
@@ -65,6 +72,11 @@
     </div>
     <div class="col-md-6">
         <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.postal_code') }}" name="postal_code" id="{{ $prefix }}_postal_code" placeholder="{{ __('hrms.org.postal_code') }}" :errorText="$errors->first('postal_code')" />
+    </div>
+    <div class="col-md-6">
+        <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.timezone') ?? 'Timezone' }}" name="timezone" id="{{ $prefix }}_timezone" select2-selector="tzone" class="geo-timezone" :errorText="$errors->first('timezone')" data-initial-value="{{ $isEdit ? '' : old('timezone') }}">
+            <option value="">{{ __('hrms.org.select_timezone') }} (Inherit Company Timezone)</option>
+        </x-ui.odoo-form-ui>
     </div>
     <div class="col-12">
         <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.org.address') }}" name="address" id="{{ $prefix }}_address" rows="3" placeholder="{{ __('hrms.org.address') }}" :errorText="$errors->first('address')" />

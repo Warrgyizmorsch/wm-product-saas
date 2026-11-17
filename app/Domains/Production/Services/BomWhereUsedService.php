@@ -4,13 +4,14 @@ namespace App\Domains\Production\Services;
 
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Production\Models\ProductionBomItem;
+use App\Domains\Production\Models\RoutingOperationMaterial;
 use Illuminate\Support\Collection;
 
 class BomWhereUsedService
 {
     /**
      * Finds parent products consuming the product as a subassembly or component.
-     * Checks approved/active parent BOMs.
+     * Checks approved/active parent BOMs across operation allocations and legacy items.
      */
     public function findParents(?Product $product): Collection
     {
@@ -20,17 +21,27 @@ class BomWhereUsedService
 
         $tenantId = $product->tenant_id;
 
-        $items = ProductionBomItem::where('material_id', $product->id)
+        $allocParents = RoutingOperationMaterial::where('material_id', $product->id)
             ->whereHas('bom', function ($query) use ($tenantId) {
                 $query->where('tenant_id', $tenantId)
-                      ->where('status', 'approved');
+                      ->whereIn('status', ['approved', 'active']);
             })
             ->with(['bom.product'])
-            ->get();
+            ->get()
+            ->map(fn ($om) => $om->bom?->product)
+            ->filter();
 
-        return $items->map(function ($item) {
-            return $item->bom->product;
-        })->unique('id')->values();
+        $legacyParents = ProductionBomItem::where('material_id', $product->id)
+            ->whereHas('bom', function ($query) use ($tenantId) {
+                $query->where('tenant_id', $tenantId)
+                      ->whereIn('status', ['approved', 'active']);
+            })
+            ->with(['bom.product'])
+            ->get()
+            ->map(fn ($item) => $item->bom?->product)
+            ->filter();
+
+        return $allocParents->concat($legacyParents)->unique('id')->values();
     }
 
     /**
@@ -45,15 +56,20 @@ class BomWhereUsedService
 
         $tenantId = $product->tenant_id;
 
-        $items = ProductionBomItem::where('material_id', $product->id)
-            ->whereHas('bom', function ($query) use ($tenantId) {
-                $query->where('tenant_id', $tenantId);
-            })
+        $allocBoms = RoutingOperationMaterial::where('material_id', $product->id)
+            ->whereHas('bom', fn ($query) => $query->where('tenant_id', $tenantId))
             ->with(['bom.product'])
-            ->get();
+            ->get()
+            ->map(fn ($om) => $om->bom)
+            ->filter();
 
-        return $items->map(function ($item) {
-            return $item->bom;
-        })->unique('id')->values();
+        $legacyBoms = ProductionBomItem::where('material_id', $product->id)
+            ->whereHas('bom', fn ($query) => $query->where('tenant_id', $tenantId))
+            ->with(['bom.product'])
+            ->get()
+            ->map(fn ($item) => $item->bom)
+            ->filter();
+
+        return $allocBoms->concat($legacyBoms)->unique('id')->values();
     }
 }

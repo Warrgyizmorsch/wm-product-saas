@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Platform\Services\NotificationRuleService;
 use App\Domains\Projects\Events\ChangeRequestCreated;
 use App\Domains\Projects\Models\ChangeRequest;
 use App\Domains\Projects\Models\Project;
@@ -78,7 +79,7 @@ class ChangeRequestService
                 'cr_number'            => $crNumber,
                 'title'                => $data['title'],
                 'description'          => $data['description'],
-                'requested_by'         => $requester->id,
+                'requested_by'         => !empty($data['requested_by']) ? (int) $data['requested_by'] : $requester->id,
                 'impact_schedule_days' => (int) ($data['impact_schedule_days'] ?? 0),
                 'impact_budget_amount' => (float) ($data['impact_budget_amount'] ?? 0.00),
                 'impact_budget_hours'  => (float) ($data['impact_budget_hours'] ?? 0.00),
@@ -106,6 +107,19 @@ class ChangeRequestService
 
             event(new ChangeRequestCreated($cr, $requester));
 
+            try {
+                NotificationRuleService::trigger('projects.change_request.created', [
+                    'tenant_id'        => $project->tenant_id,
+                    'cr_number'        => $cr->cr_number,
+                    'title'            => $cr->title,
+                    'project'          => $project->name,
+                    'actor'            => $requester->name,
+                    'exclude_user_ids' => [$requester->id],
+                ], $project, $cr);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.change_request.created notification failed: ' . $e->getMessage());
+            }
+
             return $cr;
         });
     }
@@ -118,11 +132,12 @@ class ChangeRequestService
             ]);
         }
 
-        // Separation of duty: Requester cannot approve their own CR unless Project Manager or Project Owner
+        // Separation of duty: Requester cannot approve their own CR unless Project Manager, Project Owner, or System Admin
         if ((int) $cr->requested_by === (int) $approver->id) {
             $project = $cr->project;
             $isLead = (int) $project->manager_id === (int) $approver->id
-                || (int) $project->owner_id === (int) $approver->id;
+                || (int) $project->owner_id === (int) $approver->id
+                || $approver->hasRole('admin', 'super_admin', 'tenant_owner');
 
             if (! $isLead) {
                 throw ValidationException::withMessages([
@@ -175,6 +190,20 @@ class ChangeRequestService
                 ]
             );
 
+            try {
+                NotificationRuleService::trigger('projects.change_request.approved', [
+                    'tenant_id'          => $freshProject->tenant_id,
+                    'cr_number'          => $lockedCr->cr_number,
+                    'title'              => $lockedCr->title,
+                    'project'            => $freshProject->name,
+                    'actor'              => $approver->name,
+                    'created_by_user_id' => $lockedCr->requested_by,
+                    'exclude_user_ids'   => [$approver->id],
+                ], $freshProject, $lockedCr);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.change_request.approved notification failed: ' . $e->getMessage());
+            }
+
             return $lockedCr->fresh(['requester', 'approver', 'review']);
         });
     }
@@ -213,6 +242,21 @@ class ChangeRequestService
                     'rejection_remarks' => $remarks,
                 ]
             );
+
+            try {
+                NotificationRuleService::trigger('projects.change_request.rejected', [
+                    'tenant_id'          => $cr->project?->tenant_id ?? $cr->tenant_id,
+                    'cr_number'          => $cr->cr_number,
+                    'title'              => $cr->title,
+                    'project'            => $cr->project?->name ?? 'Project',
+                    'actor'              => $rejecter->name,
+                    'reason'             => $remarks,
+                    'created_by_user_id' => $cr->requested_by,
+                    'exclude_user_ids'   => [$rejecter->id],
+                ], $cr->project, $cr);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('projects.change_request.rejected notification failed: ' . $e->getMessage());
+            }
 
             return $cr->fresh(['requester', 'approver', 'review']);
         });

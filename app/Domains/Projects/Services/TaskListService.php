@@ -3,6 +3,7 @@
 namespace App\Domains\Projects\Services;
 
 use App\Domains\Projects\Models\Project;
+use App\Domains\Projects\Models\Task;
 use App\Domains\Projects\Models\TaskList;
 use App\Domains\Projects\Repositories\TaskListRepositoryInterface;
 use App\Domains\Projects\Repositories\TaskRepositoryInterface;
@@ -16,6 +17,7 @@ class TaskListService
         private readonly TaskRepositoryInterface $tasks,
         private readonly ActivityLogService $activity,
         private readonly ProjectMemberService $members,
+        private readonly MilestoneService $milestones,
     ) {
     }
 
@@ -67,7 +69,21 @@ class TaskListService
     {
         return DB::transaction(function () use ($taskList, $data) {
             $project = $taskList->project;
+            $oldMilestoneId = $taskList->milestone_id;
             $taskList = $this->taskLists->update($taskList->id, $data);
+
+            if (isset($data['milestone_id']) && (int) $data['milestone_id'] !== (int) $oldMilestoneId) {
+                Task::query()
+                    ->where('task_list_id', $taskList->id)
+                    ->update(['milestone_id' => $taskList->milestone_id]);
+
+                if ($oldMilestoneId) {
+                    $this->milestones->recalculateProgress((int) $oldMilestoneId);
+                }
+                if ($taskList->milestone_id) {
+                    $this->milestones->recalculateProgress((int) $taskList->milestone_id);
+                }
+            }
 
             if ($taskList->owner_id) {
                 $this->members->ensureCollaborator($project, $taskList->owner_id);

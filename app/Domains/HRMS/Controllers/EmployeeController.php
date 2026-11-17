@@ -625,6 +625,8 @@ class EmployeeController extends Controller
             'employment_type' => ['nullable', 'string', 'max:100'],
             'employee_stage' => ['nullable', 'string', 'max:100'],
             'office' => ['nullable', 'string', 'in:office,wfh,onsite'],
+            'timezone' => ['nullable', 'string', 'max:64'],
+            'time_zone' => ['nullable', 'string', 'max:64'],
             'wfh_latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'wfh_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'date_of_joining' => ['required', 'date'],
