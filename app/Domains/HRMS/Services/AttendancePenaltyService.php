@@ -22,11 +22,15 @@ class AttendancePenaltyService
                 return null;
             }
 
+            $empTz = $employee->timezone;
+
             if (!($punchTime instanceof Carbon)) {
-                $punchTime = Carbon::parse($punchTime);
+                $punchTime = Carbon::parse($punchTime, $empTz);
+            } else {
+                $punchTime = $punchTime->copy()->setTimezone($empTz);
             }
 
-            $shiftStartTime = Carbon::parse($date . ' ' . $shift->start_time);
+            $shiftStartTime = Carbon::parse($date . ' ' . $shift->start_time, $empTz);
             if ($punchTime->lte($shiftStartTime)) {
                 return null;
             }

@@ -19,12 +19,29 @@ class Branch extends BaseModel
         'state',
         'country',
         'postal_code',
+        'timezone',
         'status',
     ];
 
     protected $casts = [
         'status' => 'boolean',
     ];
+
+    /**
+     * Get the effective timezone: Branch override -> Company default -> App fallback
+     */
+    public function getTimezoneAttribute(?string $value): string
+    {
+        if (!empty($value)) {
+            return $value;
+        }
+
+        if ($this->relationLoaded('company') && !empty($this->company?->timezone)) {
+            return $this->company->timezone;
+        }
+
+        return $this->company?->timezone ?? config('app.timezone', 'Asia/Kolkata');
+    }
 
     /**
      * Branch belongs to a Company.

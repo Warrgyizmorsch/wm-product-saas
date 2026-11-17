@@ -13,10 +13,23 @@ use Illuminate\Support\Facades\DB;
 
 class AttendanceRepository implements AttendanceRepositoryInterface
 {
+    /**
+     * Resolve employee's current local time, falling back to server now if employee not resolved.
+     */
+    protected function getEmployeeLocalNow(?Employee $employee): Carbon
+    {
+        if (!$employee) {
+            return Carbon::now();
+        }
+        return $employee->local_now;
+    }
+
     public function getEmployeeTodayAttendance(int $employeeId): ?Attendance
     {
-        $today = Carbon::now()->format('Y-m-d');
-        $shiftCutoff = Carbon::now()->subHours(18);
+        $employee = Employee::with(['branch', 'company'])->find($employeeId);
+        $localNow = $this->getEmployeeLocalNow($employee);
+        $today = $localNow->format('Y-m-d');
+        $shiftCutoff = $localNow->copy()->subHours(18);
 
         return Attendance::where('employee_id', $employeeId)
             ->where(function ($q) use ($today, $shiftCutoff) {
@@ -37,8 +50,10 @@ class AttendanceRepository implements AttendanceRepositoryInterface
     {
         $selfiePath = $this->uploadSelfie($selfiePath, 'in');
         $tenantId = auth()->user()?->tenant_id;
-        $today = Carbon::now()->format('Y-m-d');
-        $shiftCutoff = Carbon::now()->subHours(18);
+        $employee = Employee::with(['branch', 'company'])->find($employeeId);
+        $localNow = $this->getEmployeeLocalNow($employee);
+        $today = $localNow->format('Y-m-d');
+        $shiftCutoff = $localNow->copy()->subHours(18);
 
         // 1. Auto-flag any old unclosed attendances (older than 18 hours or from past days) as missing logs FIRST
         // This guarantees stale open shifts from previous days never block check-in indefinitely!
@@ -103,7 +118,7 @@ class AttendanceRepository implements AttendanceRepositoryInterface
             // 3. Multi-Punch Allowed: Reopen session for the new work period
             // Calculate elapsed interim period between previous checkout and new check-in
             $prevCheckOut = \Carbon\Carbon::parse($existing->check_out);
-            $now = \Carbon\Carbon::now();
+            $now = $localNow;
             $interimMinutes = max(0, (int) $prevCheckOut->diffInMinutes($now));
 
             // Record the interim period as an authorized split shift interval
@@ -133,7 +148,7 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                     'attendance_id' => $existing->id,
                     'latitude'      => $latitude,
                     'longitude'     => $longitude,
-                    'created_at'    => Carbon::now(),
+                    'created_at'    => $localNow,
                 ]);
             }
 
@@ -297,14 +312,14 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         // Check if check-in is late relative to shift and evaluate penalization policy
         if ($employee) {
             app(\App\Domains\HRMS\Services\AttendancePenaltyService::class)
-                ->evaluateLateArrival($employee, $today, Carbon::now(), $status);
+                ->evaluateLateArrival($employee, $today, $localNow, $status);
         }
 
         return Attendance::create([
             'tenant_id' => $tenantId,
             'employee_id' => $employeeId,
             'date' => $today,
-            'check_in' => Carbon::now(),
+            'check_in' => $localNow,
             'location_type' => $locationType,
             'status' => $status,
             'check_in_latitude' => $latitude,
@@ -332,10 +347,9 @@ class AttendanceRepository implements AttendanceRepositoryInterface
             return $attendance;
         }
 
-        $now = Carbon::now();
+        $employee = Employee::with(['branch', 'company'])->find($attendance->employee_id);
+        $now = $this->getEmployeeLocalNow($employee);
         $attendance->check_out = $now;
-
-        $employee = Employee::find($attendance->employee_id);
         $locationType = $attendance->location_type;
 
         // Fetch attendance rule
@@ -557,6 +571,8 @@ class AttendanceRepository implements AttendanceRepositoryInterface
     public function breakIn(int $attendanceId, ?float $latitude = null, ?float $longitude = null)
     {
         $attendance = Attendance::findOrFail($attendanceId);
+        $employee = Employee::with(['branch', 'company'])->find($attendance->employee_id);
+        $localNow = $this->getEmployeeLocalNow($employee);
 
         if (!$attendance->isWorking()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
@@ -570,7 +586,6 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         }
 
         // Enhancement 2: Optional Break Geofence Validation
-        $employee = Employee::find($attendance->employee_id);
         $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
 
         if ($rule && !empty($rule->office_break_geofence) && $attendance->location_type === 'office') {
@@ -605,19 +620,21 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                 'attendance_id' => $attendance->id,
                 'latitude'      => $latitude,
                 'longitude'     => $longitude,
-                'created_at'    => Carbon::now(),
+                'created_at'    => $localNow,
             ]);
         }
 
         return AttendanceBreak::create([
             'attendance_id' => $attendanceId,
-            'break_in'      => Carbon::now(),
+            'break_in'      => $localNow,
         ]);
     }
 
     public function breakOut(int $attendanceId, ?float $latitude = null, ?float $longitude = null)
     {
         $attendance = Attendance::findOrFail($attendanceId);
+        $employee = Employee::with(['branch', 'company'])->find($attendance->employee_id);
+        $now = $this->getEmployeeLocalNow($employee);
         $activeBreak = $attendance->activeBreak();
 
         if (!$activeBreak) {
@@ -627,7 +644,6 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         }
 
         // Enhancement 2: Optional Break Geofence Validation
-        $employee = Employee::find($attendance->employee_id);
         $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
 
         if ($rule && !empty($rule->office_break_geofence) && $attendance->location_type === 'office') {
@@ -662,11 +678,10 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                 'attendance_id' => $attendance->id,
                 'latitude'      => $latitude,
                 'longitude'     => $longitude,
-                'created_at'    => Carbon::now(),
+                'created_at'    => $now,
             ]);
         }
 
-        $now = Carbon::now();
         $diffMins = max(1, (int) round($activeBreak->break_in->diffInMinutes($now)));
         $activeBreak->update([
             'break_out'        => $now,

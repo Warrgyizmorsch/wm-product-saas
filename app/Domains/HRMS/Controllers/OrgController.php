@@ -222,6 +222,8 @@ class OrgController extends Controller
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|max:500',
             'postal_code' => 'nullable|max:20',
+            'timezone' => 'nullable|string|max:64',
+            'time_zone' => 'nullable|string|max:64',
             'status' => 'required|in:0,1',
         ]);
 
@@ -231,6 +233,8 @@ class OrgController extends Controller
         } else {
             $validated['company_id'] = $request->company_id;
         }
+        $validated['timezone'] = $validated['timezone'] ?? $validated['time_zone'] ?? null;
+        unset($validated['time_zone']);
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->orgRepository->storeBranch($validated);
@@ -255,6 +259,8 @@ class OrgController extends Controller
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|max:500',
             'postal_code' => 'nullable|max:20',
+            'timezone' => 'nullable|string|max:64',
+            'time_zone' => 'nullable|string|max:64',
             'status' => 'required|in:0,1',
         ]);
 
@@ -264,6 +270,8 @@ class OrgController extends Controller
         } else {
             $validated['company_id'] = $request->company_id;
         }
+        $validated['timezone'] = $validated['timezone'] ?? $validated['time_zone'] ?? null;
+        unset($validated['time_zone']);
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->orgRepository->updateBranch($branch, $validated);
