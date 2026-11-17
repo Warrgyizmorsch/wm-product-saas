@@ -145,10 +145,8 @@
             messageEl.textContent = message || 'Are you sure you want to perform this action?';
         }
 
-        // Set Cancel Button Text
-        const cancelBtn = modalEl.querySelector('#{{ $id }}CancelBtn') || modalEl.querySelector('button[data-bs-dismiss="modal"]');
         // Set Cancel Button Text / Visibility
-        const cancelBtn = document.getElementById('{{ $id }}CancelBtn');
+        const cancelBtn = modalEl.querySelector('#{{ $id }}CancelBtn') || modalEl.querySelector('button[data-bs-dismiss="modal"]');
         if (cancelBtn) {
             if (opts.hideCancel === true || opts.cancelButtonText === false || opts.cancelButtonText === '') {
                 cancelBtn.style.display = 'none';
