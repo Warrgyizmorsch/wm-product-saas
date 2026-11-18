@@ -1270,7 +1270,7 @@ class SectionCalculationService
 
         // RT-IMPL-14 (RT-19 rule 7): the snapshot also stores the figures routing uses (per active machine / batch,
         // operator labor per machine), so routing reads them from this snapshot instead of calculating live.
-        $calc['calculation_details']['routing_resources'] = $this->getSectionResourceCosts($section);
+        $calc['calculation_details']['routing_resources'] = $this->getSectionResourceCosts($section, $calc['calculation_details']);
 
         // Assign sequential snapshot_number scoped per Section
         $nextSnapshotNumber = ((int) WorkCenterSectionCalculation::where('section_id', $section->id)->max('snapshot_number')) + 1;
@@ -1338,6 +1338,8 @@ class SectionCalculationService
             'work_center_snapshot_number'=> $wcCalc?->snapshot_number,
             'calculated_at'              => $snapshot?->created_at?->toIso8601String(),
             'has_pending_changes'        => in_array((int) $section->id, array_map('intval', $pending), true),
+            // false when the snapshot itself was taken while the section was inactive (calculate() marks is_active = false)
+            'section_active'             => ($snapshot?->calculation_details['is_active'] ?? true) !== false,
         ];
 
         if (!$snapshot || !is_array($routing)) {
@@ -1388,13 +1390,15 @@ class SectionCalculationService
      *     manual_batches: array<int, array>
      * }
      */
-    public function getSectionResourceCosts(WorkCenterSection $section): array
+    public function getSectionResourceCosts(WorkCenterSection $section, ?array $details = null): array
     {
-        $tenantId = (int) $section->tenant_id;
+        // The labor lines of this same calculation (calculate()['calculation_details']). calculateAndSave() passes
+        // the details it is about to store, so the routing figures are built from the stored per-worker values only.
+        $details ??= $this->calculate($section)['calculation_details'] ?? [];
 
-        $operatingHours = $this->calculateOperatingHours($section);
-        $shiftMap = $operatingHours['shift_map'] ?? [];
-        $uniqueOperatingHours = (float) ($operatingHours['unique_clock_hours'] ?? 0.0);
+        $uniqueOperatingHours = (float) ($details['operating_timeline']['section_unique_operating_hours']
+            ?? $details['operating_hours']['unique_clock_hours']
+            ?? 0.0);
 
         // 1. Active Machines in this section
         $machines = $section->machines()
@@ -1402,57 +1406,29 @@ class SectionCalculationService
             ->get();
         $activeMachinesCount = $machines->count();
 
-        // 2. Active Manual Batches in this section
-        $manualBatchesData = $this->calculateSectionManualBatches($section, $shiftMap, $uniqueOperatingHours);
-        $activeBatches = collect($manualBatchesData['manual_batches'] ?? [])
+        // 2. Active Manual Batches in this section (as stored in the calculation)
+        $activeBatches = collect($details['manual_batches']['batches'] ?? [])
             ->filter(fn($b) => !empty($b['active']))
             ->values();
 
-        // Map assigned employee assignment IDs across all batches in this section
-        $assignedEmployeeAssignmentIds = DB::table('production_section_manual_production_employees')
-            ->join('production_section_manual_productions', 'production_section_manual_productions.id', '=', 'production_section_manual_production_employees.manual_production_id')
-            ->where('production_section_manual_productions.section_id', $section->id)
-            ->whereNull('production_section_manual_productions.deleted_at')
-            ->pluck('production_section_manual_production_employees.work_center_employee_id')
+        // 3. Non-batch labor, from the stored per-worker values of this calculation (no HRMS / pay-grade read here).
+        // Only workers of ACTIVE batches are excluded; workers of an inactive batch count as non-batch.
+        $activeBatchIds = $activeBatches->pluck('id')->map(fn($id) => (int) $id)->all();
+        $activeBatchEmployeeIds = $activeBatches
+            ->flatMap(fn($b) => collect($b['internal_employees_details'] ?? [])->pluck('employee_id'))
+            ->map(fn($id) => (int) $id)
             ->all();
-
-        // 3. Unassigned Internal Labor (assigned to Section but NOT to any manual batch)
-        $internalAssignments = $section->employeeAssignments()
-            ->where('tenant_id', $tenantId)
-            ->where('active', true)
-            ->with('employee')
-            ->get();
 
         // RT-IMPL-12 (RT-14): sum DAILY cost of the non-batch workers, then average over the section operating hours.
         // (Summing hourly rates treated every worker as on the floor at the same time.)
-        $unassignedInternalLaborDailyCost = 0.0;
-        foreach ($internalAssignments as $assignment) {
-            if (in_array($assignment->id, $assignedEmployeeAssignmentIds, true)) {
-                continue; // Belongs to a manual batch
-            }
-            $emp = $assignment->employee;
-            if (!$emp || !$emp->status) {
-                continue;
-            }
-            $unassignedInternalLaborDailyCost += $emp->monthlyCtc() / 30; // HRMS monthly CTC ÷ 30 (WC-IMPL-07)
-        }
+        $unassignedInternalLaborDailyCost = collect($details['internal_labor']['employees'] ?? [])
+            ->filter(fn($e) => !empty($e['active']) && !in_array((int) ($e['employee_id'] ?? 0), $activeBatchEmployeeIds, true))
+            ->sum(fn($e) => (float) ($e['daily_cost'] ?? 0.0));
 
-        // 4. Unassigned External Contractor Labor (assigned to Section but manual_production_id IS NULL)
-        $externalAllocations = $section->externalWorkerAllocations()
-            ->where('tenant_id', $tenantId)
-            ->where('active', true)
-            ->whereNull('manual_production_id')
-            ->with('payGrade')
-            ->get();
-
-        $unassignedExternalLaborDailyCost = 0.0;
-        foreach ($externalAllocations as $alloc) {
-            $headcount = (int) ($alloc->number_of_external_workers ?? 1);
-            $ratePerHour = (float) ($alloc->payGrade?->hourly_rate ?? 0.0);
-            // contractors are paid for the full shift clock hours of their allocation (WC-19); 8 h fallback = WC-ISSUE-03
-            $allocShiftHours = (float) ($shiftMap[$alloc->shift_id]['duration_hours'] ?? 8.0);
-            $unassignedExternalLaborDailyCost += $headcount * $ratePerHour * $allocShiftHours;
-        }
+        $unassignedExternalLaborDailyCost = collect($details['external_labor']['allocations'] ?? [])
+            ->filter(fn($a) => !empty($a['active'])
+                && (empty($a['manual_production_id']) || !in_array((int) $a['manual_production_id'], $activeBatchIds, true)))
+            ->sum(fn($a) => (float) ($a['daily_cost'] ?? 0.0));
 
         $nonBatchDailyLaborCost = round($unassignedInternalLaborDailyCost + $unassignedExternalLaborDailyCost, 4);
         $totalUnassignedLaborCostPerHour = $uniqueOperatingHours > 0
@@ -1464,7 +1440,7 @@ class SectionCalculationService
 
         $formattedMachines = $machines->map(function ($m) use ($operatorLaborCostPerMachinePerHour, $nonBatchDailyLaborCost, $uniqueOperatingHours, $activeMachinesCount) {
             $capacity = (float) ($m->capacity ?? 0.0);
-            $operatingCost = $m->finalOperatingCostPerHour(); // RT-IMPL-11: entered cost, else consumption × rate
+            $operatingCost = $m->finalOperatingCostPerHour(); // the saved operating_cost_per_hour, exactly as entered
             $speedMinutes = $capacity > 0 ? round(60.0 / $capacity, 4) : 0.0;
             $unitLaborCost = $capacity > 0 ? round($operatorLaborCostPerMachinePerHour / $capacity, 4) : 0.0;
             $unitMachineCost = $capacity > 0 ? round($operatingCost / $capacity, 4) : 0.0;

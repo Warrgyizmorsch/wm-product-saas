@@ -8,14 +8,18 @@ use App\Domains\Production\Models\WorkCenterSection;
 /**
  * RT-IMPL-14 (RT-19 rule 7): "costs outdated" detection for a routing.
  *
- * Compares the figures SAVED on each operation with the latest section calculation snapshot — numbers only,
- * nothing is recalculated or saved. Computed when a page is displayed.
+ * Snapshot-only, no recalculation: the original resource values stored on each operation (`resource_snapshot`) are
+ * compared field by field with the same machine / manual batch in the latest section calculation snapshot.
+ * A section recalculated with no real change keeps the routing up to date. Computed when a page is displayed.
+ *
+ *   machine : run speed, operating cost per hour, operator labor per machine per hour
+ *   batch   : run speed, labor cost per hour
+ *   a machine / batch that is no longer in the latest section snapshot is outdated too.
  */
 class RoutingCostStatusService
 {
     public function __construct(
         private readonly SectionCalculationService $sectionCalculationService,
-        private readonly RoutingOperationCostCalculator $calculator,
     ) {}
 
     /**
@@ -35,11 +39,7 @@ class RoutingCostStatusService
                 $notCalculated = true;
                 $messages[] = 'Costs not calculated — open and save the routing.';
             } elseif (!$op->is_external && $op->section_id && ($op->machine_id || $op->section_manual_production_id)) {
-                if (!array_key_exists($op->section_id, $sectionCache)) {
-                    $section = WorkCenterSection::find($op->section_id);
-                    $sectionCache[$op->section_id] = $section ? $this->sectionCalculationService->getSnapshotResourceCosts($section) : null;
-                }
-                $latest = $sectionCache[$op->section_id];
+                $latest = $this->latestSnapshot((int) $op->section_id, $sectionCache);
 
                 if ($latest && empty($latest['not_calculated'])) {
                     $messages = $this->compare($op, $latest);
@@ -60,8 +60,8 @@ class RoutingCostStatusService
                 ? 'Create a new routing version to update.'
                 : 'Open and save the routing to refresh costs.',
             'operations'     => $result,
-            // RT-IMPL-18 (RT-29 rule 2): resources that are no longer active — statuses compared only
-            'inactive'        => $inactive = $this->inactiveResources($routing),
+            // RT-IMPL-18 (RT-29 rule 2): inactive sections / machines / batches — read from the section snapshot only
+            'inactive'        => $inactive = $this->inactiveResources($routing, $sectionCache),
             'inactive_header' => $inactive === [] ? null
                 : count($inactive) . ' operation(s) use inactive resources — '
                     . ($routing->isReadOnly() ? 'create a new routing version to update.' : 'choose another resource and save.'),
@@ -69,59 +69,49 @@ class RoutingCostStatusService
     }
 
     /**
-     * RT-IMPL-18: "OP-XXX uses machine MC-XX, which is currently inactive." for every operation whose work center,
-     * section, machine or batch is inactive or deleted.
+     * RT-IMPL-18: "OP-XXX uses section S-1, which is currently inactive." for every operation whose section was
+     * deactivated or deleted, or whose machine / manual batch is no longer listed as active in the section snapshot.
+     * Taken from the section snapshot (`section_active`, `machines`, `manual_batches`), not from the live work center /
+     * machine tables.
      *
+     * @param array<int, array|null> $sectionCache latest snapshot per section id, shared with check()
      * @return array<int, array{operation_id:int, operation_number:string, message:string}>
      */
-    public function inactiveResources(Routing $routing): array
+    public function inactiveResources(Routing $routing, array &$sectionCache = []): array
     {
-        $routing->loadMissing([
-            'operations.workCenter' => fn($q) => $q->withTrashed(),
-            'operations.section'    => fn($q) => $q->withTrashed(),
-            'operations.machine'    => fn($q) => $q->withTrashed(),
-            'operations.manualProduction' => fn($q) => $q->withTrashed(),
-        ]);
+        $routing->loadMissing('operations');
         $out = [];
 
         foreach ($routing->operations as $op) {
-            if ($op->is_external) {
+            if ($op->is_external || !$op->section_id) {
                 continue;
             }
-            $problems = [];
-            if ($op->work_center_id) {
-                $wc = $op->workCenter;
-                if (!$wc || (method_exists($wc, 'trashed') && $wc->trashed())) {
-                    $problems[] = 'work center #' . $op->work_center_id . ', which has been deleted';
-                } elseif ($wc->status !== 'active') {
-                    $problems[] = "work center {$wc->code}, which is currently {$wc->status}";
+
+            $latest = $this->latestSnapshot((int) $op->section_id, $sectionCache);
+            $problem = null;
+
+            if ($latest === null) {
+                $problem = 'section #' . $op->section_id . ', which has been deleted';
+            } elseif (!empty($latest['not_calculated'])) {
+                continue; // no snapshot to read yet — shown as "not calculated"
+            } elseif (($latest['section_active'] ?? true) === false) {
+                $problem = 'section ' . ($latest['section_code'] ?? '#' . $op->section_id) . ', which is currently inactive';
+            } elseif ($op->machine_id || $op->section_manual_production_id) {
+                // an active machine / batch is listed in the section snapshot; one that is not has left the section
+                $isMachine = (bool) $op->machine_id;
+                $resourceId = (int) ($isMachine ? $op->machine_id : $op->section_manual_production_id);
+                $list = $isMachine ? ($latest['machines'] ?? []) : ($latest['manual_batches'] ?? []);
+
+                if (!collect($list)->contains(fn($r) => (int) ($r['id'] ?? 0) === $resourceId)) {
+                    $snap = is_array($op->resource_snapshot) ? $op->resource_snapshot : [];
+                    $what = $isMachine
+                        ? 'machine ' . ($snap['code'] ?? "#{$resourceId}")
+                        : 'manual batch ' . ($snap['batch_name'] ?? "#{$resourceId}");
+                    $problem = "{$what}, which is no longer active in section " . ($latest['section_code'] ?? '#' . $op->section_id);
                 }
             }
-            if ($op->section_id) {
-                $sec = $op->section;
-                if (!$sec || (method_exists($sec, 'trashed') && $sec->trashed())) {
-                    $problems[] = 'section #' . $op->section_id . ', which has been deleted';
-                } elseif ($sec->status !== 'active') {
-                    $problems[] = "section {$sec->code}, which is currently {$sec->status}";
-                }
-            }
-            if ($op->machine_id) {
-                $m = $op->machine;
-                if (!$m || (method_exists($m, 'trashed') && $m->trashed())) {
-                    $problems[] = 'machine #' . $op->machine_id . ', which has been deleted';
-                } elseif ($m->status !== \App\Domains\Production\Models\Machine::STATUS_ACTIVE) {
-                    $problems[] = "machine {$m->code}, which is currently " . str_replace('_', ' ', $m->status);
-                }
-            }
-            if ($op->section_manual_production_id) {
-                $b = $op->manualProduction;
-                if (!$b || $b->trashed()) {
-                    $problems[] = 'manual batch #' . $op->section_manual_production_id . ', which has been deleted';
-                } elseif (!$b->active) {
-                    $problems[] = "manual batch {$b->batch_name}, which is currently inactive";
-                }
-            }
-            foreach ($problems as $problem) {
+
+            if ($problem !== null) {
                 $out[] = ['operation_id' => $op->id, 'operation_number' => $op->operation_number, 'message' => "{$op->operation_number} uses {$problem}."];
             }
         }
@@ -129,70 +119,64 @@ class RoutingCostStatusService
         return $out;
     }
 
-    private function compare($op, array $latest): array
+    /** Latest section snapshot figures (cached per call); null when the section no longer exists. */
+    private function latestSnapshot(int $sectionId, array &$cache): ?array
     {
-        $messages = [];
-        $snap = is_array($op->resource_snapshot) ? $op->resource_snapshot : [];
-        $code = $latest['section_code'] ?? '';
-
-        $inputs = [
-            'is_external'                  => false,
-            'machine_id'                   => $op->machine_id,
-            'section_manual_production_id' => $op->section_manual_production_id,
-            'setup_time_minutes'           => $op->setup_time_minutes,
-            'setup_time_per_piece_minutes' => $op->setup_time_per_piece_minutes,
-            'expected_yield_percentage'    => $op->expected_yield_percentage,
-        ];
-        $calc = $this->calculator->calculate($inputs, $latest);
-
-        if ($calc['error'] === 'not_in_snapshot') {
-            $what = $op->machine_id ? ('Machine ' . ($snap['code'] ?? $op->machine?->code ?? "#{$op->machine_id}")) : ('Manual batch ' . ($snap['batch_name'] ?? "#{$op->section_manual_production_id}"));
-            return ["{$what} is no longer active in section {$code} (snapshot #{$latest['snapshot_number']})."];
+        if (!array_key_exists($sectionId, $cache)) {
+            $section = WorkCenterSection::find($sectionId);
+            $cache[$sectionId] = $section ? $this->sectionCalculationService->getSnapshotResourceCosts($section) : null;
         }
 
-        $saved = [
-            'processing_time_minutes' => $op->processing_time_minutes,
-            'labor_cost_rate'         => $op->labor_cost_rate,
-            'machine_cost_rate'       => $op->machine_cost_rate,
-            'labor_cost_per_unit'     => $op->labor_cost_per_unit,
-            'machine_cost_per_unit'   => $op->machine_cost_per_unit,
-            'cost_per_unit'           => $op->cost_per_unit,
-            'setup_cost_per_run'      => $op->setup_cost_per_run,
-        ];
-        $differs = $this->calculator->mismatches($saved, $calc['figures']) !== [];
-        $newer = (int) ($latest['section_calculation_id'] ?? 0) !== (int) ($op->section_calculation_id ?? 0);
+        return $cache[$sectionId];
+    }
 
-        if ($differs) {
-            if ($newer) {
-                $messages[] = "Costs outdated — section {$code} has a newer calculation (snapshot #{$latest['snapshot_number']}).";
-            } else {
-                $messages[] = "Costs outdated — saved figures differ from section {$code} snapshot #{$latest['snapshot_number']}.";
+    /** One message per changed value: stored resource value of the operation vs the same resource in the latest snapshot. */
+    private function compare($op, array $latest): array
+    {
+        $snap = is_array($op->resource_snapshot) ? $op->resource_snapshot : [];
+        $sectionCode = $latest['section_code'] ?? '';
+        $snapshotNo = $latest['snapshot_number'] ?? '?';
+        $isMachine = (bool) $op->machine_id;
+        $resourceId = (int) ($isMachine ? $op->machine_id : $op->section_manual_production_id);
+        $list = $isMachine ? ($latest['machines'] ?? []) : ($latest['manual_batches'] ?? []);
+        $now = collect($list)->first(fn($r) => (int) ($r['id'] ?? 0) === $resourceId);
+
+        if ($now === null) {
+            $what = $isMachine
+                ? 'Machine ' . ($snap['code'] ?? "#{$resourceId}")
+                : 'Manual batch ' . ($snap['batch_name'] ?? "#{$resourceId}");
+
+            return ["{$what} is no longer active in section {$sectionCode} (snapshot #{$snapshotNo})."];
+        }
+
+        $speed = $now['speed_minutes_per_unit'] ?? null;
+        $checks = $isMachine
+            ? [
+                ['speed_minutes_per_unit', $speed, 'run speed', 'speed'],
+                ['operating_cost_per_hour', $now['operating_cost_per_hour'] ?? null, 'operating cost', 'money'],
+                ['operator_labor_cost_per_machine_per_hour', $now['operator_labor_cost_per_hour'] ?? $latest['operator_labor_cost_per_machine_per_hour'] ?? null, 'operator labor', 'money'],
+            ]
+            : [
+                ['speed_minutes_per_unit', $speed, 'run speed', 'speed'],
+                ['labor_cost_per_hour', $now['labor_cost_per_hour'] ?? null, 'labor cost', 'money'],
+            ];
+        $label = $isMachine
+            ? 'Machine ' . ($now['code'] ?? "#{$resourceId}")
+            : 'Batch ' . ($now['batch_name'] ?? "#{$resourceId}");
+
+        $messages = [];
+        foreach ($checks as [$key, $new, $name, $kind]) {
+            if ($new === null || !array_key_exists($key, $snap) || !is_numeric($snap[$key])) {
+                continue; // nothing stored to compare with
+            }
+            $old = (float) $snap[$key];
+            $new = (float) $new;
+            if (abs($old - $new) <= RoutingOperationCostCalculator::TOLERANCE + 1e-9) {
+                continue;
             }
 
-            $res = $calc['resource'] ?? [];
-            if ($op->machine_id) {
-                $oldCost = (float) ($snap['operating_cost_per_hour'] ?? 0);
-                $newCost = (float) ($res['operating_cost_per_hour'] ?? 0);
-                if (abs($oldCost - $newCost) > RoutingOperationCostCalculator::TOLERANCE) {
-                    $messages[] = 'Machine ' . ($res['code'] ?? '') . ' cost changed (was ' . format_currency($oldCost, 4) . '/hr, now ' . format_currency($newCost, 4) . '/hr).';
-                }
-                $oldLabor = (float) ($snap['operator_labor_cost_per_machine_per_hour'] ?? 0);
-                $newLabor = (float) ($res['operator_labor_cost_per_hour'] ?? 0);
-                if (abs($oldLabor - $newLabor) > RoutingOperationCostCalculator::TOLERANCE) {
-                    $messages[] = 'Operator labor changed (was ' . format_currency($oldLabor, 4) . '/hr, now ' . format_currency($newLabor, 4) . '/hr).';
-                }
-            } else {
-                $oldLabor = (float) ($snap['labor_cost_per_hour'] ?? 0);
-                $newLabor = (float) ($res['labor_cost_per_hour'] ?? 0);
-                if (abs($oldLabor - $newLabor) > RoutingOperationCostCalculator::TOLERANCE) {
-                    $messages[] = 'Batch ' . ($res['batch_name'] ?? '') . ' labor changed (was ' . format_currency($oldLabor, 4) . '/hr, now ' . format_currency($newLabor, 4) . '/hr).';
-                }
-            }
-            $oldCap = (float) ($snap['capacity'] ?? 0);
-            $newCap = (float) ($res['capacity'] ?? $res['capacity_per_hour'] ?? 0);
-            if ($oldCap > 0 && abs($oldCap - $newCap) > RoutingOperationCostCalculator::TOLERANCE) {
-                $messages[] = 'Capacity changed (was ' . format_decimal($oldCap) . ' u/h, now ' . format_decimal($newCap) . ' u/h).';
-            }
+            $fmt = fn(float $v) => $kind === 'money' ? format_currency($v, 4) . '/hr' : format_decimal($v) . ' min/unit';
+            $messages[] = "Costs outdated — {$label} {$name} changed (was {$fmt($old)}, now {$fmt($new)}) in section {$sectionCode} snapshot #{$snapshotNo}.";
         }
 
         return $messages;

@@ -66,22 +66,25 @@ class RoutingFiguresTest extends TestCase
 
     // ── RT-IMPL-11 ──────────────────────────────────────────────────────────
 
-    public function test_routing_uses_final_machine_cost_when_entered_cost_is_blank(): void
+    public function test_routing_uses_entered_machine_cost_exactly_with_no_energy_fallback(): void
     {
         $sec = $this->section([$this->morning->id]);
+        // entered cost 0 stays 0 — consumption × rate (2 × 5 = 10) is information only
         $m = $this->machine($sec, ['operating_cost_per_hour' => 0, 'consumption_per_hour' => 2, 'energy_rate_per_unit' => 5]);
 
-        $this->assertSame(10.0, $m->finalOperatingCostPerHour());
-        $this->assertSame('energy', $m->operatingCostBreakdown()['explanation_type']);
+        $this->assertSame(0.0, $m->finalOperatingCostPerHour());
+        $this->assertSame('none', $m->operatingCostBreakdown()['explanation_type']);
 
-        $res = app(SectionCalculationService::class)->getSectionResourceCosts($sec->fresh());
-        $this->assertEqualsWithDelta(10.0, $res['machines'][0]['operating_cost_per_hour'], 0.0001);
-        // 10/hr ÷ 60 u/h
-        $this->assertEqualsWithDelta(round(10 / 60, 4), $res['machines'][0]['machine_cost_per_unit'], 0.0001);
-
-        // entered cost wins when > 0
+        // entered cost is final, above or below consumption × rate
         $m->update(['operating_cost_per_hour' => 12]);
         $this->assertSame(12.0, $m->fresh()->finalOperatingCostPerHour());
+        $m->update(['operating_cost_per_hour' => 4]);
+        $this->assertSame(4.0, $m->fresh()->finalOperatingCostPerHour());
+
+        $res = app(SectionCalculationService::class)->getSectionResourceCosts($sec->fresh());
+        $this->assertEqualsWithDelta(4.0, $res['machines'][0]['operating_cost_per_hour'], 0.0001);
+        // 4/hr ÷ 60 u/h
+        $this->assertEqualsWithDelta(round(4 / 60, 4), $res['machines'][0]['machine_cost_per_unit'], 0.0001);
     }
 
     // ── RT-IMPL-12 ──────────────────────────────────────────────────────────

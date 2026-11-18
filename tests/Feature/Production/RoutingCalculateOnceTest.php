@@ -235,8 +235,8 @@ class RoutingCalculateOnceTest extends TestCase
         $this->recalc();
         $this->web()->get(route('production.routing.show', $routing->id))->assertOk()
             ->assertSee('routing-cost-status-banner', false)
-            ->assertSee('Costs outdated — section SEC-P has a newer calculation (snapshot #2).', false)
-            ->assertSee('Machine MC-P cost changed', false)
+            ->assertSee('Costs outdated — Machine MC-P operating cost changed (was', false)
+            ->assertSee('in section SEC-P snapshot #2.', false)
             ->assertSee('Create a new routing version to update.', false);
         $this->web()->get(route('production.routing.index'))->assertOk()->assertSee('routing-costs-outdated-badge', false);
         // saved figures did not move

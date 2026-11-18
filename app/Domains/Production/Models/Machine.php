@@ -203,8 +203,10 @@ class Machine extends BaseModel
 
     /**
      * The one rule for a machine's operating cost per hour, shared by the section calculation and routing:
-     * entered operating cost if > 0, else consumption × energy rate if > 0, else 0.
-     * Also returns the breakdown (base energy cost, additional cost, deductibles) and the explanation type.
+     * the saved `operating_cost_per_hour` exactly as entered (the field the user edits in the machine form —
+     * it may be above or below consumption × energy rate). Nothing is substituted when it is 0.
+     * Also returns the info breakdown (base energy cost, additional cost, deductibles) and the explanation type;
+     * those never change the final cost.
      *
      * @return array{base_energy_cost: float, entered_cost: float, additional_cost: float, deductibles: float,
      *               final_cost_per_hour: float, explanation_type: string}
@@ -232,9 +234,6 @@ class Machine extends BaseModel
         } elseif ($entered > 0.0) {
             $final = $entered;
             $type = 'flat';
-        } elseif ($base > 0.0) {
-            $final = $base;
-            $type = 'energy';
         } else {
             $final = 0.0;
             $type = 'none';

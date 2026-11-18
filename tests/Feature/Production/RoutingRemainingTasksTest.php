@@ -261,6 +261,7 @@ class RoutingRemainingTasksTest extends TestCase
         $active = $this->activate($this->draftRouting('Approved One'));
 
         $this->machine2->update(['status' => Machine::STATUS_INACTIVE]);
+        $this->recalc(); // the routing reads the section snapshot, so the machine leaves it once the section is recalculated
 
         // save with an inactive machine refused (web)
         $this->web()->post(route('production.routing.store'), ['name' => 'X', 'operations' => [$this->operation(['machine_id' => $this->machine2->id])]])
@@ -269,7 +270,7 @@ class RoutingRemainingTasksTest extends TestCase
 
         // approved routing shows the advisory; list shows the badge
         $this->web()->get(route('production.routing.show', $active->id))->assertOk()
-            ->assertSee('uses machine MC-R2, which is currently inactive')
+            ->assertSee('uses machine MC-R2, which is no longer active in section')
             ->assertSee('create a new routing version to update');
         $this->web()->get(route('production.routing.index'))->assertOk()->assertSee(__('production.inactive_resources'));
 
