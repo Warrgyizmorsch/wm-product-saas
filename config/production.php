@@ -20,6 +20,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Temp "no-BOM" production flow (branch-only prototype)
+    |--------------------------------------------------------------------------
+    | When true: work center / section / machine / cost figures are optional on routings, orders
+    | need no BOM and create no material requirements, scheduling accepts operations without a
+    | work center, and shop floor logs record the raw materials consumed (stock is deducted).
+    | Set PRODUCTION_TEMP_FLOW=true in .env on the prototype branch.
+    */
+    'temp_flow' => (bool) env('PRODUCTION_TEMP_FLOW', false),
+
+    /** Folder of the per-tenant consumption.json sidecar (default storage/app/temp-production). */
+    'temp_consumption_path' => env('PRODUCTION_TEMP_CONSUMPTION_PATH'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Routing Number Format
     |--------------------------------------------------------------------------
     | Q1: Format for auto-generated routing numbers.

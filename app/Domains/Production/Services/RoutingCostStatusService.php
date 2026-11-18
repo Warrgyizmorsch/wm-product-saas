@@ -23,6 +23,18 @@ class RoutingCostStatusService
      */
     public function check(Routing $routing): array
     {
+        // Temp no-BOM flow: a routing is only a list of operations — no cost figures to be outdated or missing
+        if (config('production.temp_flow')) {
+            return [
+                'outdated'        => false,
+                'not_calculated'  => false,
+                'action'          => '',
+                'operations'      => [],
+                'inactive'        => [],
+                'inactive_header' => null,
+            ];
+        }
+
         $routing->loadMissing('operations');
         $sectionCache = [];
         $result = [];

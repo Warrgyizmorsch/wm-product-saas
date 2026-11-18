@@ -321,10 +321,10 @@ class SchedulingService
 
             foreach ($operations as $op) {
                 if (!$op->is_external) {
-                    if (!$op->workCenter) {
+                    if (!$op->workCenter && !config('production.temp_flow')) {
                         throw new \LogicException("Cannot generate schedule: Work Center is missing for operation sequence [{$op->sequence}].");
                     }
-                    if (!$op->workCenter->isActive()) {
+                    if ($op->workCenter && !$op->workCenter->isActive()) {
                         throw new \LogicException("Cannot generate schedule: Work Center [{$op->workCenter->name}] for operation sequence [{$op->sequence}] is inactive.");
                     }
                 }
@@ -514,10 +514,10 @@ class SchedulingService
 
             foreach ($sortedOps as $op) {
                 if (!$op->is_external) {
-                    if (!$op->workCenter) {
+                    if (!$op->workCenter && !config('production.temp_flow')) {
                         throw new \LogicException("Cannot generate schedule: Work Center is missing for operation sequence [{$op->sequence}].");
                     }
-                    if (!$op->workCenter->isActive()) {
+                    if ($op->workCenter && !$op->workCenter->isActive()) {
                         throw new \LogicException("Cannot generate schedule: Work Center [{$op->workCenter->name}] for operation sequence [{$op->sequence}] is inactive.");
                     }
                 }

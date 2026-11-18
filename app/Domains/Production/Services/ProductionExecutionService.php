@@ -47,9 +47,10 @@ class ProductionExecutionService
         ?int $userId = null,
         bool $completeOperation = false,
         ?string $idempotencyKey = null,
-        ?int $batchId = null
+        ?int $batchId = null,
+        array $consumedMaterials = []
     ): ProductionOrderProgressLog {
-        return DB::transaction(function () use ($operationId, $produced, $rejected, $scrapped, $setupMinutes, $runMinutes, $remarks, $machineId, $userId, $completeOperation, $idempotencyKey, $batchId) {
+        return DB::transaction(function () use ($operationId, $produced, $rejected, $scrapped, $setupMinutes, $runMinutes, $remarks, $machineId, $userId, $completeOperation, $idempotencyKey, $batchId, $consumedMaterials) {
             $op = ProductionOrderOperation::findOrFail($operationId);
             $order = $op->order;
 
@@ -202,6 +203,11 @@ class ProductionExecutionService
                 'machine_id' => $machineId ?? $op->machine_id,
                 'remarks' => $remarks,
             ]);
+
+            // Temp no-BOM flow: raw materials consumed by this log (stock is deducted; failure rolls the log back)
+            if ($consumedMaterials !== []) {
+                app(ProductionMaterialService::class)->consumeForLog($order, $op, $log, $consumedMaterials, $userId);
+            }
 
             // 3. Update Operation-level metrics (accumulated per operation)
             $op->setup_time_actual += $setupMinutes;
