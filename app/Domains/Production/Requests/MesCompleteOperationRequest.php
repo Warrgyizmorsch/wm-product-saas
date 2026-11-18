@@ -22,6 +22,11 @@ class MesCompleteOperationRequest extends FormRequest
             'setup_minutes' => 'nullable|numeric|min:0',
             'run_minutes' => 'nullable|numeric|min:0',
             'remarks' => 'nullable|string|max:1000',
+            // Temp no-BOM flow: raw materials consumed by this log
+            'consumed_materials' => 'nullable|array',
+            'consumed_materials.*.product_id' => 'nullable|integer|exists:products,id',
+            'consumed_materials.*.quantity' => 'nullable|numeric|min:0',
+            'consumed_materials.*.warehouse_id' => 'nullable|integer|exists:warehouses,id',
         ];
     }
 }

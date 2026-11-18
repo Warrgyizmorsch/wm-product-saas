@@ -26,13 +26,24 @@ class StoreWorkCenterRequest extends FormRequest
             'description'           => 'nullable|string',
             'location'              => 'nullable|string|max:255',
             'overhead_cost'         => 'nullable|numeric|min:0',
-            'status'                => 'required|in:active,inactive',
+            'status'                => (config('production.temp_flow') ? 'nullable' : 'required') . '|in:active,inactive',
             'production_calendar_id' => [
                 'nullable', 'integer',
                 Rule::exists('production_calendars', 'id')->where('tenant_id', $tenantId)
             ],
-            'calculation_countdown_minutes' => 'required|integer|min:1|max:1440',
+            'calculation_countdown_minutes' => (config('production.temp_flow') ? 'nullable' : 'required') . '|integer|min:1|max:1440',
         ];
+    }
+
+    /** Temp no-BOM flow: status and countdown are optional and default when left empty. */
+    protected function prepareForValidation(): void
+    {
+        if (config('production.temp_flow')) {
+            $this->merge([
+                'status' => $this->input('status') ?: 'active',
+                'calculation_countdown_minutes' => $this->input('calculation_countdown_minutes') ?: 60,
+            ]);
+        }
     }
 
     public function messages(): array

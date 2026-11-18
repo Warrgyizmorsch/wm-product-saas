@@ -646,6 +646,7 @@
                 <input type="hidden" name="quantity_scrapped" value="0" id="log_scrappedInput">
                 <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks"
                     placeholder="Optional shift handover comments..." rows="2" />
+                @include('modules.production.partials.consumed-materials', ['cmId' => 'cmMesLog'])
             </div>
         </div>
     </x-ui.modal>
@@ -852,7 +853,7 @@
         </div>
 
         @php
-            $isOutsourcedOp = (bool) ($op->is_external || $op->isOutsourced() || $op->work_center_id === null);
+            $isOutsourcedOp = (bool) ($op->is_external || $op->isOutsourced() || ($op->work_center_id === null && !config('production.temp_flow')));
             $vendorName = $op->vendor->name ?? 'Subcontract Vendor';
         @endphp
 

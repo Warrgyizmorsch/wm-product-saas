@@ -337,7 +337,7 @@
                                             <select x-bind:name="'operations['+index+'][work_center_id]'"
                                                 class="form-select form-select-sm fs-11 routing-wc-select"
                                                 :data-row-uid="operation.uid"
-                                                x-bind:required="!operation.is_external"
+                                                x-bind:required="!operation.is_external && {{ config('production.temp_flow') ? 'false' : 'true' }}"
                                                 x-bind:disabled="operation.is_external">
                                                 <option value="">-- Select WC --</option>
                                                 @foreach ($workCenters as $wc)
@@ -354,7 +354,7 @@
                                             <select x-bind:name="'operations['+index+'][section_id]'"
                                                 class="form-select form-select-sm fs-11 routing-section-select"
                                                 :data-row-uid="operation.uid"
-                                                x-bind:required="!operation.is_external"
+                                                x-bind:required="!operation.is_external && {{ config('production.temp_flow') ? 'false' : 'true' }}"
                                                 x-bind:disabled="!operation.work_center_id || operation.is_external">
                                                 <option value="">-- Select Section --</option>
                                             </select>

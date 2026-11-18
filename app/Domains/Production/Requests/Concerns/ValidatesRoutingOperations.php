@@ -40,7 +40,7 @@ trait ValidatesRoutingOperations
             'operations.*.id'                             => 'nullable|integer', // RT-IMPL-09: existing operation (matched within this routing only)
             'operations.*.operation_number'               => 'nullable|string|max:50',
             'operations.*.name'                           => "{$req}|string|max:255",
-            'operations.*.operation_type'                 => "{$req}|in:{$operationTypes}",
+            'operations.*.operation_type'                 => (config('production.temp_flow') ? 'nullable' : $req) . "|in:{$operationTypes}",
             'operations.*.work_center_id'                 => ['nullable', $this->tenantExists('production_work_centers')],
             'operations.*.section_id'                     => ['nullable', $this->tenantExists('production_work_center_sections')],
             'operations.*.machine_id'                     => ['nullable', $this->tenantExists('production_machines')],
@@ -155,7 +155,9 @@ trait ValidatesRoutingOperations
                     }
                 }
             } else {
-                if (empty($workCenterId)) {
+                // Temp no-BOM flow: work center / section / machine are optional — validated only when given.
+                $tempFlow = (bool) config('production.temp_flow');
+                if (empty($workCenterId) && !$tempFlow) {
                     $validator->errors()->add("operations.{$index}.work_center_id", 'Work center is required for internal operations.');
                 }
 
@@ -169,7 +171,9 @@ trait ValidatesRoutingOperations
                     }
                 }
                 if (empty($sectionId)) {
-                    $validator->errors()->add("operations.{$index}.section_id", 'Section is required for internal operations.');
+                    if (!$tempFlow) {
+                        $validator->errors()->add("operations.{$index}.section_id", 'Section is required for internal operations.');
+                    }
                 } elseif ($workCenterId) {
                     $section = WorkCenterSection::find($sectionId);
                     if (!$section || (int) $section->work_center_id !== (int) $workCenterId) {
@@ -183,7 +187,9 @@ trait ValidatesRoutingOperations
                 $hasMachine = !empty($machineId);
                 $hasManual  = !empty($manualProductionId);
                 if (!$hasMachine && !$hasManual) {
-                    $validator->errors()->add("operations.{$index}.machine_id", 'Each internal operation must have either a Machine OR a Manual Production Batch selected.');
+                    if (!$tempFlow) {
+                        $validator->errors()->add("operations.{$index}.machine_id", 'Each internal operation must have either a Machine OR a Manual Production Batch selected.');
+                    }
                 } elseif ($hasMachine && $hasManual) {
                     $validator->errors()->add("operations.{$index}.machine_id", 'An operation cannot have both a Machine and a Manual Production Batch. Select only one.');
                 } else {
@@ -208,7 +214,9 @@ trait ValidatesRoutingOperations
 
             // RT-IMPL-14 (RT-19 rule 2): re-run the cost formula on the submitted inputs + the latest section snapshot.
             // Mismatch → refuse; match → the submitted values are saved as they are.
-            $this->checkOperationCosts($validator, $op, $index, $isExternal, $sectionId, $workCenterId);
+            if (!config('production.temp_flow')) {
+                $this->checkOperationCosts($validator, $op, $index, $isExternal, $sectionId, $workCenterId);
+            }
 
             // Alternatives
             if ($isAlternative) {

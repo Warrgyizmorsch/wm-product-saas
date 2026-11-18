@@ -552,7 +552,7 @@ class MesExecutionService
                 }
 
                 // Create progress log
-                ProductionOrderProgressLog::create([
+                $progressLog = ProductionOrderProgressLog::create([
                     'tenant_id' => $schedOp->order->tenant_id,
                     'production_order_id' => $schedOp->production_order_id,
                     'production_batch_id' => $batchId,
@@ -569,6 +569,17 @@ class MesExecutionService
                     'stop_time' => $now,
                     'remarks' => $data['remarks'] ?? null,
                 ]);
+
+                // Temp no-BOM flow: raw materials consumed by this log (stock deducted; failure rolls everything back)
+                if (config('production.temp_flow') && !empty($data['consumed_materials'])) {
+                    app(ProductionMaterialService::class)->consumeForLog(
+                        $schedOp->order ?? $schedOp->schedule->order,
+                        $orderOp,
+                        $progressLog,
+                        (array) $data['consumed_materials'],
+                        $operatorId
+                    );
+                }
 
                 // Determine if required target GOOD quantity has been reached
                 $targetQty = (float) ($orderOp->target_produced_qty > 0 ? $orderOp->target_produced_qty : ($schedOp->order->quantity_ordered ?? 0));
@@ -859,7 +870,8 @@ class MesExecutionService
                 $operatorId,
                 false, // Do NOT complete operation
                 $data['idempotency_key'] ?? null,
-                $batchId
+                $batchId,
+                config('production.temp_flow') ? (array) ($data['consumed_materials'] ?? []) : []
             );
 
             $orderOp->executed_by = $operatorId ?? $orderOp->executed_by;
