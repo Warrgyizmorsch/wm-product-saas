@@ -39,7 +39,7 @@ class WebToLeadController extends Controller
     public function index(Request $request): View
     {
         $tenant = tenant();
-        $baseUrl = $request->schemeAndHttpHost();
+        $baseUrl = url('/');
         $tenantIdentifier = $tenant ? ($tenant->slug ?: $tenant->id) : 1;
         $tenantId = $tenant ? $tenant->id : 1;
 
@@ -103,6 +103,8 @@ class WebToLeadController extends Controller
             $config['branch_id'] = branch_id() ?? current_branch_id() ?? Branch::where('tenant_id', $tenant->id)->where('company_id', $config['company_id'])->value('id') ?? Branch::where('tenant_id', $tenant->id)->value('id');
         }
 
+        [$config['company_id'], $config['branch_id']] = $this->resolveCompanyAndBranch($tenant, $config);
+
         $currentSettings = is_array($tenant->settings) ? $tenant->settings : [];
         $currentSettings['web_lead_form_schema'] = $fields;
         $currentSettings['web_lead_form_config'] = $config;
@@ -120,9 +122,7 @@ class WebToLeadController extends Controller
      */
     public function getFormConfig(Request $request, string|int $tenant): JsonResponse
     {
-        $tenantModel = is_numeric($tenant)
-            ? Tenant::find($tenant)
-            : Tenant::where('slug', $tenant)->first();
+        $tenantModel = $this->resolvePublicTenant($tenant);
 
         if (!$tenantModel) {
             return response()->json(['success' => false, 'message' => 'Tenant not found.'], 404);
@@ -136,8 +136,7 @@ class WebToLeadController extends Controller
             return !isset($f['is_active']) || $f['is_active'] === true || $f['is_active'] === 'true' || $f['is_active'] === 1;
         }));
 
-        $companyId = $savedConfig['company_id'] ?? Company::where('tenant_id', $tenantModel->id)->value('id');
-        $branchId = $savedConfig['branch_id'] ?? (Branch::where('tenant_id', $tenantModel->id)->where('company_id', $companyId)->value('id') ?? Branch::where('tenant_id', $tenantModel->id)->value('id'));
+        [$companyId, $branchId] = $this->resolveCompanyAndBranch($tenantModel, $savedConfig);
 
         return response()->json([
             'color' => $savedConfig['color'] ?? '#28a745',
@@ -162,9 +161,7 @@ class WebToLeadController extends Controller
     public function renderForm(Request $request, string|int $tenant): View|Response
     {
         // Resolve tenant by ID or slug
-        $tenantModel = is_numeric($tenant)
-            ? Tenant::find($tenant)
-            : Tenant::where('slug', $tenant)->first();
+        $tenantModel = $this->resolvePublicTenant($tenant);
 
         if (!$tenantModel) {
             abort(404, 'Form not found or tenant inactive.');
@@ -197,18 +194,7 @@ class WebToLeadController extends Controller
         $source = $request->query('source', 'Website Form');
 
         // Resolve Company and Branch IDs
-        $companyId = $request->query('company_id', $savedConfig['company_id'] ?? null);
-        if (!$companyId) {
-            $companyId = Company::where('tenant_id', $tenantModel->id)->value('id');
-        }
-
-        $branchId = $request->query('branch_id', $savedConfig['branch_id'] ?? null);
-        if (!$branchId && $companyId) {
-            $branchId = Branch::where('tenant_id', $tenantModel->id)->where('company_id', $companyId)->value('id');
-        }
-        if (!$branchId) {
-            $branchId = Branch::where('tenant_id', $tenantModel->id)->value('id');
-        }
+        [$companyId, $branchId] = $this->resolveCompanyAndBranch($tenantModel, $savedConfig);
 
         return response()
             ->view('modules.crm.web_forms.lead_form', [
@@ -279,9 +265,7 @@ class WebToLeadController extends Controller
             ], 422, $corsHeaders);
         }
 
-        $tenant = is_numeric($tenantId)
-            ? Tenant::find($tenantId)
-            : Tenant::where('slug', $tenantId)->first();
+        $tenant = $this->resolvePublicTenant($tenantId);
 
         if (!$tenant) {
             return response()->json([
@@ -305,8 +289,6 @@ class WebToLeadController extends Controller
             'address' => ['nullable', 'string', 'max:255'],
             'source' => ['nullable', 'string', 'max:100'],
             'redirect_url' => ['nullable', 'url', 'max:500'],
-            'company_id' => ['nullable', 'integer'],
-            'branch_id' => ['nullable', 'integer'],
         ]);
 
         if ($validator->fails()) {
@@ -337,18 +319,9 @@ class WebToLeadController extends Controller
         $settings = is_array($tenant->settings) ? $tenant->settings : [];
         $savedConfig = $settings['web_lead_form_config'] ?? [];
 
-        $companyId = $request->input('company_id') ?: ($savedConfig['company_id'] ?? null);
-        if (!$companyId) {
-            $companyId = Company::where('tenant_id', $tenant->id)->value('id');
-        }
-
-        $branchId = $request->input('branch_id') ?: ($savedConfig['branch_id'] ?? null);
-        if (!$branchId && $companyId) {
-            $branchId = Branch::where('tenant_id', $tenant->id)->where('company_id', $companyId)->value('id');
-        }
-        if (!$branchId) {
-            $branchId = Branch::where('tenant_id', $tenant->id)->value('id');
-        }
+        // Client-supplied company/branch IDs are ignored: they come only from the
+        // tenant's saved form config, checked to belong to that tenant.
+        [$companyId, $branchId] = $this->resolveCompanyAndBranch($tenant, $savedConfig);
 
         // Extract Custom Dynamic Fields
         $coreKeys = [
@@ -464,5 +437,56 @@ class WebToLeadController extends Controller
     // Lead Widget Loader Logic
 })();
 JS;
+    }
+    /**
+     * Public endpoints resolve the tenant by slug. A numeric identifier is
+     * accepted only for legacy tenants that have no slug (their embed codes
+     * were generated with the ID), and never for inactive tenants.
+     */
+    private function resolvePublicTenant(string|int|null $identifier): ?Tenant
+    {
+        $identifier = trim((string) $identifier);
+        if ($identifier === '') {
+            return null;
+        }
+
+        $inactive = [Tenant::STATUS_SUSPENDED, Tenant::STATUS_CANCELLED, Tenant::STATUS_ARCHIVED];
+
+        $tenant = Tenant::where('slug', $identifier)->first();
+
+        if (! $tenant && ctype_digit($identifier)) {
+            $tenant = Tenant::whereKey((int) $identifier)
+                ->where(fn ($q) => $q->whereNull('slug')->orWhere('slug', ''))
+                ->first();
+        }
+
+        if (! $tenant || in_array($tenant->status, $inactive, true)) {
+            return null;
+        }
+
+        return $tenant;
+    }
+
+    /**
+     * Company and branch for a public lead, taken from the saved form config
+     * only when they belong to the tenant; otherwise the tenant's defaults.
+     *
+     * @return array{0: ?int, 1: ?int}
+     */
+    private function resolveCompanyAndBranch(Tenant $tenant, array $config): array
+    {
+        $companyId = Company::where('tenant_id', $tenant->id)
+            ->whereKey($config['company_id'] ?? null)
+            ->value('id')
+            ?? Company::where('tenant_id', $tenant->id)->orderByDesc('is_default')->orderBy('id')->value('id');
+
+        $branchId = Branch::where('tenant_id', $tenant->id)
+            ->whereKey($config['branch_id'] ?? null)
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->value('id')
+            ?? ($companyId ? Branch::where('tenant_id', $tenant->id)->where('company_id', $companyId)->value('id') : null)
+            ?? Branch::where('tenant_id', $tenant->id)->value('id');
+
+        return [$companyId ? (int) $companyId : null, $branchId ? (int) $branchId : null];
     }
 }

@@ -80,4 +80,12 @@ return [
         'open'  => env('MOSSIE_WIDGET_OPEN', false),
     ],
 
+    // Meta Lead Ads webhook. POSTs must carry X-Hub-Signature-256 signed with
+    // the app secret: a tenant's own MetaConfiguration.app_secret, or this
+    // shared one for configurations that leave app_secret empty.
+    'meta' => [
+        'app_secret'   => env('META_APP_SECRET'),
+        'verify_token' => env('META_VERIFY_TOKEN'),
+    ],
+
 ];

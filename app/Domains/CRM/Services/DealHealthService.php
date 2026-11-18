@@ -38,12 +38,12 @@ class DealHealthService
         }
 
         try {
-            $response = Http::withoutVerifying()->timeout(8)->get($this->baseUrl . "/auth/user/{$userId}");
+            $response = Http::timeout(8)->get($this->baseUrl . "/auth/user/{$userId}");
             if ($response->successful()) {
                 $data = $response->json();
 
                 // Validate if Google OAuth token is actually valid or expired/revoked
-                $evalCheck = Http::withoutVerifying()->timeout(6)->get($this->baseUrl . "/agent/evaluate-emails/{$userId}", [
+                $evalCheck = Http::timeout(6)->get($this->baseUrl . "/agent/evaluate-emails/{$userId}", [
                     'limit' => 1
                 ]);
                 $rawCheck = json_encode($evalCheck->json() ?? []);
@@ -108,7 +108,7 @@ class DealHealthService
 
         try {
             // Attempt external AI Engine call
-            $response = Http::withoutVerifying()->timeout(4)->get($this->baseUrl . "/agent/evaluate-emails/{$userId}", [
+            $response = Http::timeout(4)->get($this->baseUrl . "/agent/evaluate-emails/{$userId}", [
                 'limit'        => 10,
                 'sender_email' => $contactEmail,
             ]);

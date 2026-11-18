@@ -49,7 +49,7 @@ class CrmSettingsController extends Controller
 
         $validated = $request->validate([
             'mode' => ['required', 'string', 'in:manual_creator,unassigned,round_robin'],
-            'default_owner_id' => ['nullable', 'integer'],
+            'default_owner_id' => ['nullable', 'integer', tenant_exists('users')],
             'round_robin_users' => ['nullable', 'array'],
             'round_robin_users.*' => ['integer'],
             'apply_on_web_forms' => ['nullable'],

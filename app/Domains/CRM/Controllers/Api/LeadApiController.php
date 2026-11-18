@@ -43,7 +43,7 @@ class LeadApiController extends Controller
     private function resolveTenantContext(): array
     {
         $user      = auth()->user();
-        $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
+        $tenantId  = $user?->tenant_id  ?? require_tenant_id();
         $companyId = company_id() ?? $user?->company_id;
         $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
 
@@ -219,6 +219,8 @@ class LeadApiController extends Controller
      * Full Database Lead Export API Kit for 3rd-party ERPs / CRM integrations.
      * Outputs all lead records with structured entity objects + complete database flat fields.
      */
+    private const EXPORT_MAX_ROWS = 1000;
+
     public function export(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Lead::class);
@@ -338,15 +340,16 @@ class LeadApiController extends Controller
 
         // 13. Pagination / Limit Handling (Supports both limit and per_page, plus page number)
         $totalCount = (clone $query)->count();
-        $limit = $request->filled('limit')
-            ? max((int)$request->input('limit'), 1)
-            : ($request->filled('per_page') ? max((int)$request->input('per_page'), 1) : null);
+        // Always paged, at most 1,000 rows per call: loading every lead exhausted
+        // the 512 MB memory limit at ~50k leads. Clients follow total_pages.
+        $requestedLimit = $request->filled('limit')
+            ? (int) $request->input('limit')
+            : ($request->filled('per_page') ? (int) $request->input('per_page') : self::EXPORT_MAX_ROWS);
+        $limit = min(max($requestedLimit, 1), self::EXPORT_MAX_ROWS);
 
         $page = $request->filled('page') ? max((int)$request->input('page'), 1) : 1;
 
-        if ($limit !== null) {
-            $query->forPage($page, $limit);
-        }
+        $query->forPage($page, $limit);
 
         $leads = $query->get();
 
@@ -478,7 +481,7 @@ class LeadApiController extends Controller
             'lead_number'        => 'nullable|string|max:100',
             'lead_type'          => 'nullable|string|in:b2b,b2c,B2B,B2C',
             'status'             => 'nullable|string|max:100',
-            'priority'           => 'nullable|string|max:50',
+            'priority'           => ['nullable', 'string', 'in:low,medium,high,urgent,Low,Medium,High,Urgent'],
             'source'             => 'nullable|string|max:255',
             'segment'            => 'nullable|string|max:255',
             'industry_type'      => 'nullable|string|max:255',
@@ -496,7 +499,7 @@ class LeadApiController extends Controller
             'phone'              => 'nullable|string|regex:/^[0-9]+$/|max:20',
 
             // Sales Rep / Owner
-            'lead_owner_id'      => 'nullable|integer',
+            'lead_owner_id'      => ['nullable', 'integer', tenant_exists('users')],
             'owner_email'        => 'nullable|email|max:255',
 
             // Financials & Dates
@@ -639,7 +642,7 @@ class LeadApiController extends Controller
             'tenant_id'           => $tenantId,
             'company_id'          => $companyId,
             'branch_id'           => $branchId,
-            'lead_number'         => !empty($data['lead_number']) ? trim((string)$data['lead_number']) : null,
+            'lead_number'         => null, // always numbered by Lead::creating
             'lead_type'           => $leadType,
             'call_date'           => $callDate,
             'company_name'        => $companyName,
@@ -849,11 +852,11 @@ class LeadApiController extends Controller
             'company_name'    => ['nullable', 'string', 'max:255'],
             'email'           => ['nullable', 'email', 'max:255'],
             'phone'           => ['nullable', 'string', 'max:50'],
-            'priority'        => ['nullable', 'in:low,medium,high,urgent'],
+            'priority'        => ['nullable', 'string', 'in:low,medium,high,urgent,Low,Medium,High,Urgent'],
             'status'          => ['nullable', 'string'],
             'status_id'       => ['nullable', 'integer'],
             'estimated_value' => ['nullable', 'numeric'],
-            'lead_owner_id'   => ['nullable', 'integer'],
+            'lead_owner_id'   => ['nullable', 'integer', tenant_exists('users')],
             'notes'           => ['nullable', 'string'],
         ]);
 
@@ -1092,7 +1095,6 @@ class LeadApiController extends Controller
             );
 
             // 4. Create Deal
-            $dealNo = 'DEAL-' . strtoupper(bin2hex(random_bytes(4)));
             $stageName = 'Qualification';
             if (!empty($validated['deal_status_id'])) {
                 $statusObj = DealStatus::find($validated['deal_status_id']);
@@ -1107,7 +1109,6 @@ class LeadApiController extends Controller
                 'branch_id'        => $branchId,
                 'crm_account_id'   => $account->id,
                 'crm_contact_id'   => $contact->id,
-                'deal_number'      => $dealNo,
                 'title'            => $dealTitle,
                 'stage'            => $stageName,
                 'estimated_value'  => $dealAmount,
@@ -1178,8 +1179,8 @@ class LeadApiController extends Controller
         $this->authorize('update', $lead);
 
         $validator = Validator::make($request->all(), [
-            'lead_owner_id' => 'nullable|integer|exists:users,id',
-            'owner_id'      => 'nullable|integer|exists:users,id',
+            'lead_owner_id' => ['nullable', 'integer', tenant_exists('users')],
+            'owner_id'      => ['nullable', 'integer', tenant_exists('users')],
             'note'          => 'nullable|string|max:500',
         ]);
 
@@ -1233,9 +1234,9 @@ class LeadApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'lead_ids'      => 'required|array|min:1',
-            'lead_ids.*'    => 'required|integer|exists:leads,id',
-            'lead_owner_id' => 'nullable|integer|exists:users,id',
-            'owner_id'      => 'nullable|integer|exists:users,id',
+            'lead_ids.*'    => ['required', 'integer', tenant_exists('leads')],
+            'lead_owner_id' => ['nullable', 'integer', tenant_exists('users')],
+            'owner_id'      => ['nullable', 'integer', tenant_exists('users')],
             'note'          => 'nullable|string|max:500',
         ]);
 
@@ -1389,7 +1390,7 @@ class LeadApiController extends Controller
                 'file_name'  => $doc->file_name,
                 'file_type'  => $doc->file_type,
                 'size'       => $doc->size,
-                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'url'        => route('api.crm.documents.download', $doc->id),
                 'created_at' => $doc->created_at?->toIso8601String(),
             ];
         });
@@ -1419,10 +1420,7 @@ class LeadApiController extends Controller
 
         $this->authorize('update', $lead);
 
-        $validator = Validator::make($request->all(), [
-            'documents'   => 'required',
-            'documents.*' => 'file|max:10240',
-        ]);
+        $validator = Validator::make($request->all(), LeadDocument::uploadRules());
 
         if ($validator->fails()) {
             return response()->json([
@@ -1446,7 +1444,7 @@ class LeadApiController extends Controller
                 'file_name'  => $doc->file_name,
                 'file_type'  => $doc->file_type,
                 'size'       => $doc->size,
-                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'url'        => route('api.crm.documents.download', $doc->id),
                 'created_at' => $doc->created_at?->toIso8601String(),
             ];
         });
@@ -1463,6 +1461,29 @@ class LeadApiController extends Controller
      * DELETE /api/crm/documents/{document}
      * Delete a single document.
      */
+    /**
+     * GET /api/crm/documents/{document}/download — authorised download for
+     * mobile / API clients (files are no longer on the public disk).
+     */
+    public function downloadDocument(int $id)
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $document = LeadDocument::where('tenant_id', $tenantId)->find($id);
+        $disk = $document?->storageDisk();
+
+        if (!$document || !$document->lead || !$disk) {
+            return response()->json(['success' => false, 'message' => 'Document not found.'], 404);
+        }
+
+        $this->authorize('view', $document->lead);
+
+        return response()->download(
+            \Illuminate\Support\Facades\Storage::disk($disk)->path($document->file_path),
+            $document->file_name,
+            ['X-Content-Type-Options' => 'nosniff']
+        );
+    }
+
     public function deleteDocument(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();

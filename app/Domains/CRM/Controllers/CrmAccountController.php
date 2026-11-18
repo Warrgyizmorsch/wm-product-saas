@@ -23,7 +23,7 @@ class CrmAccountController extends Controller
     {
         $this->authorize('viewAny', CrmAccount::class);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $search = $request->input('search');
 
         $query = CrmAccount::with(['contacts', 'deals', 'customer', 'owner'])
@@ -57,7 +57,7 @@ class CrmAccountController extends Controller
     {
         $this->authorize('create', CrmAccount::class);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $validated = $request->validate($this->getAccountValidationRules(), $this->getAccountValidationMessages());
 
@@ -218,7 +218,7 @@ class CrmAccountController extends Controller
                 ->with(['salesOrder.quotation.deal', 'items'])
                 ->latest()->get();
 
-            $tenantId = $customer->tenant_id ?? (tenant_id() ?? 1);
+            $tenantId = $customer->tenant_id ?? require_tenant_id();
             $creditNotes = \App\Domains\Accounting\Models\Journal::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('voucher_type', 'credit_note')
@@ -317,7 +317,7 @@ class CrmAccountController extends Controller
     {
         $this->authorize('update', $account);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $rules = $this->getAccountValidationRules();
         $rules['status'] = 'required|string|in:active,inactive';
@@ -419,7 +419,7 @@ class CrmAccountController extends Controller
     {
         $this->authorize('update', $account);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -467,7 +467,7 @@ class CrmAccountController extends Controller
 
     public function quickStoreContact(Request $request): \Illuminate\Http\JsonResponse
     {
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $validated = $request->validate([
             'crm_account_id' => [
@@ -559,7 +559,7 @@ class CrmAccountController extends Controller
         $this->authorize('update', $account);
 
         $validated = $request->validate([
-            'account_owner_id' => 'nullable|exists:users,id',
+            'account_owner_id' => ['nullable', tenant_exists('users')],
             'note' => 'nullable|string|max:500',
         ]);
 
@@ -594,8 +594,8 @@ class CrmAccountController extends Controller
 
         $validated = $request->validate([
             'account_ids' => 'required|array|min:1',
-            'account_ids.*' => 'required|integer|exists:crm_accounts,id',
-            'account_owner_id' => 'nullable|exists:users,id',
+            'account_ids.*' => ['required', 'integer', tenant_exists('crm_accounts')],
+            'account_owner_id' => ['nullable', tenant_exists('users')],
             'note' => 'nullable|string|max:500',
         ]);
 
@@ -643,7 +643,7 @@ class CrmAccountController extends Controller
             'credit_limit' => 'nullable|numeric|min:0',
             'opening_balance' => 'nullable|numeric|min:0',
             'opening_balance_type' => ['nullable', 'in:debit,credit'],
-            'owner_id' => 'nullable|exists:users,id',
+            'owner_id' => ['nullable', tenant_exists('users')],
             'street' => 'nullable|string|max:255',
             'city' => 'nullable|string|max:100',
             'state' => 'nullable|string|max:100',

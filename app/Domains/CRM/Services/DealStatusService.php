@@ -20,7 +20,7 @@ class DealStatusService
 
     public function createStatus(array $data): DealStatus
     {
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $data['tenant_id'] = $tenantId;
         $data['is_protected'] = false;
         $data['is_active'] = true;

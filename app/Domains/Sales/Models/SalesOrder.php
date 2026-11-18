@@ -97,6 +97,7 @@ class SalesOrder extends BaseModel
         'shipping_charges' => 'decimal:2',
         'adjustment'       => 'decimal:2',
         'total_amount'     => 'decimal:2',
+        'terms_conditions' => \App\Casts\SafeHtml::class,
     ];
 
     public function getEffectiveTaxModeAttribute(): string

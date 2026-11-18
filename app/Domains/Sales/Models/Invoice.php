@@ -100,6 +100,7 @@ class Invoice extends BaseModel
         'amount_paid'          => 'decimal:2',
         'balance_due'          => 'decimal:2',
         'distance_km'          => 'integer',
+        'notes'                => \App\Casts\SafeHtml::class,
     ];
 
     public function customer(): BelongsTo

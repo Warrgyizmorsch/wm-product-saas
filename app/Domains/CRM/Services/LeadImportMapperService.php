@@ -175,58 +175,66 @@ class LeadImportMapperService
         $tempPath = $file->storeAs('temp-imports', $token, 'local');
         $fullPath = Storage::disk('local')->path($tempPath);
 
-        // Read rows from spreadsheet
-        $spreadsheet = IOFactory::load($fullPath);
-        $worksheet = $spreadsheet->getActiveSheet();
-        $rawRows = $worksheet->toArray();
-
-        if (empty($rawRows) || count($rawRows) < 1) {
-            throw new \Exception('Uploaded spreadsheet is empty.');
-        }
-
-        // Find header row (first non-empty row)
-        $headerRowIndex = 0;
+        // Stream the file: only the header and a few sample rows are needed here.
+        // Loading the whole workbook (IOFactory::load + toArray) ran out of memory
+        // on large files (~1.9 GB for 1,00,000 rows).
         $headers = [];
-        foreach ($rawRows as $idx => $row) {
-            $nonEmpty = array_filter($row, fn($cell) => $cell !== null && trim((string)$cell) !== '');
-            if (count($nonEmpty) > 0) {
-                $headerRowIndex = $idx;
-                $headers = array_map(fn($h) => trim((string)$h), $row);
+        $headerRowNumber = 0;
+        $sampleRows = [];
+        $scannedDataRows = 0;
+        $rowNumber = 0;
+        $isNonEmpty = fn (array $row) => count(array_filter($row, fn ($cell) => $cell !== null && trim((string) $cell) !== '')) > 0;
+
+        foreach (\App\Support\SpreadsheetRowReader::rows($fullPath, $extension) as $row) {
+            $rowNumber++;
+            if (! $isNonEmpty($row)) {
+                continue;
+            }
+
+            if ($headers === []) {
+                // Header row = first non-empty row.
+                $headers = array_map(fn ($h) => trim((string) $h), $row);
+                $headerRowNumber = $rowNumber;
+                continue;
+            }
+
+            $scannedDataRows++;
+            $sampleRows[] = $row;
+            if (count($sampleRows) >= 5) {
                 break;
             }
         }
 
-        if (empty($headers)) {
-            throw new \Exception('Could not find a valid header row in the file.');
+        if ($headers === []) {
+            throw new \Exception($rowNumber === 0 ? 'Uploaded spreadsheet is empty.' : 'Could not find a valid header row in the file.');
         }
 
-        // Filter out empty trailing headers
+        // Name blank headers "Column N"
         $filteredHeaders = [];
         foreach ($headers as $colIdx => $headerTitle) {
-            if ($headerTitle !== '') {
-                $filteredHeaders[$colIdx] = $headerTitle;
-            } else {
-                $filteredHeaders[$colIdx] = 'Column ' . ($colIdx + 1);
-            }
+            $filteredHeaders[$colIdx] = $headerTitle !== '' ? $headerTitle : 'Column ' . ($colIdx + 1);
         }
 
-        // Extract 3-5 sample rows
-        $sampleRows = [];
-        $totalDataRows = 0;
-        for ($i = $headerRowIndex + 1; $i < count($rawRows); $i++) {
-            $row = $rawRows[$i];
-            $nonEmpty = array_filter($row, fn($cell) => $cell !== null && trim((string)$cell) !== '');
-            if (count($nonEmpty) === 0) {
-                continue;
+        $sampleRows = array_map(function (array $row) use ($filteredHeaders) {
+            $sampleRow = [];
+            foreach ($filteredHeaders as $colIdx => $headerTitle) {
+                $sampleRow[$headerTitle] = isset($row[$colIdx]) ? (string) $row[$colIdx] : '';
             }
-            $totalDataRows++;
+            return $sampleRow;
+        }, $sampleRows);
 
-            if (count($sampleRows) < 5) {
-                $sampleRow = [];
-                foreach ($filteredHeaders as $colIdx => $headerTitle) {
-                    $sampleRow[$headerTitle] = isset($row[$colIdx]) ? (string)$row[$colIdx] : '';
+        // Row count: an .xlsx states its last row, so the file needn't be read
+        // to the end. Otherwise count the remaining rows (cheap: no cells kept).
+        $lastRow = \App\Support\SpreadsheetRowReader::lastRowNumber($fullPath, $extension);
+        if ($lastRow !== null) {
+            $totalDataRows = max(0, $lastRow - $headerRowNumber);
+        } else {
+            $totalDataRows = 0;
+            $n = 0;
+            foreach (\App\Support\SpreadsheetRowReader::rows($fullPath, $extension) as $row) {
+                if (++$n > $headerRowNumber && $isNonEmpty($row)) {
+                    $totalDataRows++;
                 }
-                $sampleRows[] = $sampleRow;
             }
         }
 
@@ -316,9 +324,11 @@ class LeadImportMapperService
         }
 
         $fullPath = Storage::disk('local')->path($filePath);
-        $spreadsheet = IOFactory::load($fullPath);
-        $worksheet = $spreadsheet->getActiveSheet();
-        $rawRows = $worksheet->toArray();
+        $extension = strtolower(pathinfo($fileToken, PATHINFO_EXTENSION));
+
+        // Large files: rows are streamed and new leads are inserted in batches,
+        // which takes well under a minute for 1,00,000 rows instead of timing out.
+        @set_time_limit(600);
 
         // Options
         $defaultStatus = !empty($options['default_status']) ? trim($options['default_status']) : 'New';
@@ -328,25 +338,11 @@ class LeadImportMapperService
         $dryRun = !empty($options['dry_run']);
         
         // Resolve tenant, company, and branch context
-        $resolvedCompanyId = $companyId ?? (company_id() ?? auth()->user()?->company_id ?? \App\Models\Company::where('tenant_id', $tenantId)->where('is_default', true)->value('id') ?? \App\Models\Company::where('tenant_id', $tenantId)->value('id'));
-        $resolvedBranchId = $branchId ?? (branch_id() ?? auth()->user()?->branch_id ?? \App\Models\Branch::where('company_id', $resolvedCompanyId)->value('id') ?? null);
+        $resolvedCompanyId = $companyId ?? (company_id() ?? auth()->user()?->company_id ?? \App\Domains\HRMS\Models\Company::where('tenant_id', $tenantId)->where('is_default', true)->value('id') ?? \App\Domains\HRMS\Models\Company::where('tenant_id', $tenantId)->value('id'));
+        $resolvedBranchId = $branchId ?? (branch_id() ?? auth()->user()?->branch_id ?? \App\Domains\HRMS\Models\Branch::where('company_id', $resolvedCompanyId)->value('id') ?? null);
 
-        // Locate header row & map column names to indexes
+        // Header row & column name -> index map are taken while streaming below.
         $headerMap = [];
-        $headerRowIndex = 0;
-        foreach ($rawRows as $idx => $row) {
-            $nonEmpty = array_filter($row, fn($c) => $c !== null && trim((string)$c) !== '');
-            if (count($nonEmpty) > 0) {
-                $headerRowIndex = $idx;
-                foreach ($row as $colIdx => $colName) {
-                    $trimmed = trim((string)$colName);
-                    if ($trimmed !== '') {
-                        $headerMap[$trimmed] = $colIdx;
-                    }
-                }
-                break;
-            }
-        }
 
         // Cache users for owner resolution scoped to tenant
         $allUsers = User::query()
@@ -380,7 +376,7 @@ class LeadImportMapperService
             $existingLeadsQuery->where('company_id', $resolvedCompanyId);
         }
 
-        $existingLeads = $existingLeadsQuery->select(['id', 'phone', 'email', 'company_name'])->get();
+        $existingLeads = $existingLeadsQuery->toBase()->select(['id', 'phone', 'email', 'company_name'])->get();
 
         $phoneMap = [];
         $emailMap = [];
@@ -420,7 +416,7 @@ class LeadImportMapperService
         $skippedCount = 0;
         $errors = [];
 
-        $getValue = function (array $row, string $fieldKey) use ($mapping, $headerMap) {
+        $getValue = function (array $row, string $fieldKey) use ($mapping, &$headerMap) { // by reference: filled once the header row is read
             if (empty($mapping[$fieldKey])) {
                 return null;
             }
@@ -437,15 +433,58 @@ class LeadImportMapperService
             DB::beginTransaction();
         }
 
-        try {
-            $year = date('Y');
-            $currentCount = Lead::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereYear('created_at', $year)->count();
+        // New leads waiting to be inserted. Leads created earlier in this same file
+        // are remembered in the match maps by their lead number until inserted.
+        $pending = [];
+        $year = date('Y');
+        $numberPrefix = 'LD-' . $year . '-';
+        $now = now()->toDateTimeString();
 
-            for ($i = $headerRowIndex + 1; $i < count($rawRows); $i++) {
-                $rowNum = $i + 1;
-                $row = $rawRows[$i];
+        $flushPending = function () use (&$pending, $tenantId, $year, $numberPrefix): void {
+            if ($pending === []) {
+                return;
+            }
+            $first = \App\Support\TenantSequence::reserve($tenantId, "lead:{$year}", count($pending), fn () => \App\Support\TenantSequence::highestSuffix(
+                Lead::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('lead_number', 'like', $numberPrefix . '%')->pluck('lead_number')
+            ));
+            foreach ($pending as $i => &$row) {
+                $row['lead_number'] = $numberPrefix . str_pad((string) ($first + $i), 4, '0', STR_PAD_LEFT);
+                unset($row['_key']);
+            }
+            unset($row);
+            DB::table('leads')->insert($pending);
+            $pending = [];
+        };
+
+        // A match against a lead from this same file: insert what's pending so it has an ID.
+        $resolveMatch = function ($matched) use (&$pending, $flushPending, $tenantId) {
+            if (! is_string($matched)) {
+                return $matched;
+            }
+            $flushPending();
+            [$field, $value] = explode(':', $matched, 2);
+            return Lead::withoutGlobalScopes()->where('tenant_id', $tenantId)->where($field, $value)->orderByDesc('id')->value('id');
+        };
+
+        try {
+            $rowNum = 0;
+            $headerFound = false;
+
+            foreach (\App\Support\SpreadsheetRowReader::rows($fullPath, $extension) as $row) {
+                $rowNum++;
                 $nonEmpty = array_filter($row, fn($c) => $c !== null && trim((string)$c) !== '');
                 if (count($nonEmpty) === 0) {
+                    continue;
+                }
+
+                if (! $headerFound) {
+                    foreach ($row as $colIdx => $colName) {
+                        $trimmed = trim((string) $colName);
+                        if ($trimmed !== '') {
+                            $headerMap[$trimmed] = $colIdx;
+                        }
+                    }
+                    $headerFound = true;
                     continue;
                 }
 
@@ -456,7 +495,9 @@ class LeadImportMapperService
 
                 // Validation: At least one identifier must exist
                 if (empty($contactPerson) && empty($companyName) && empty($phone) && empty($email)) {
-                    $errors[] = "Row #{$rowNum}: Skipped because no Contact Name, Company Name, Phone, or Email was provided.";
+                    if (count($errors) < 500) {
+                        $errors[] = "Row #{$rowNum}: Skipped because no Contact Name, Company Name, Phone, or Email was provided.";
+                    }
                     $skippedCount++;
                     continue;
                 }
@@ -481,12 +522,14 @@ class LeadImportMapperService
                 // Find existing match
                 $matchedId = null;
                 $cleanPhoneDigits = $phone ? preg_replace('/[^0-9]/', '', $phone) : '';
+                $emailKey = $email ? strtolower(trim($email)) : '';
+                $companyKey = $companyName ? strtolower(trim($companyName)) : '';
                 if ($cleanPhoneDigits && strlen($cleanPhoneDigits) >= 7 && isset($phoneMap[$cleanPhoneDigits])) {
                     $matchedId = $phoneMap[$cleanPhoneDigits];
-                } elseif ($email && isset($emailMap[strtolower(trim($email))])) {
-                    $matchedId = $emailMap[strtolower(trim($email))];
-                } elseif ($companyName && isset($companyMap[strtolower(trim($companyName))])) {
-                    $matchedId = $companyMap[strtolower(trim($companyName))];
+                } elseif ($emailKey !== '' && isset($emailMap[$emailKey])) {
+                    $matchedId = $emailMap[$emailKey];
+                } elseif ($companyKey !== '' && isset($companyMap[$companyKey])) {
+                    $matchedId = $companyMap[$companyKey];
                 }
 
                 $leadPayload = [
@@ -519,62 +562,86 @@ class LeadImportMapperService
                     'address' => $getValue($row, 'address') ?: null,
                 ];
 
-                if (!$dryRun) {
+                if ($dryRun) {
                     if ($matchedId) {
-                        if ($updateExisting) {
-                            $existingObj = Lead::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($matchedId);
-                            if ($existingObj) {
-                                $existingObj->update($leadPayload);
-                                $updatedCount++;
-                            } else {
-                                $skippedCount++;
-                            }
-                        } else {
-                            $skippedCount++;
-                        }
+                        $updateExisting ? $updatedCount++ : $skippedCount++;
                     } else {
-                        $currentCount++;
-                        $leadPayload['lead_number'] = 'LD-' . $year . '-' . str_pad((string)$currentCount, 4, '0', STR_PAD_LEFT);
-                        $createdLead = Lead::create($leadPayload);
-
-                        if (empty($createdLead->lead_owner_id)) {
-                            try {
-                                app(\App\Domains\CRM\Services\LeadAssignmentService::class)->assignLeadOwner($createdLead, 'api_import', $leadPayload);
-                            } catch (\Throwable $e) {
-                                // Silent fallback
-                            }
-                        }
-                        
-                        // Register in memory map
-                        if ($cleanPhoneDigits && strlen($cleanPhoneDigits) >= 7) {
-                            $phoneMap[$cleanPhoneDigits] = $createdLead->id;
-                        }
-                        if ($email) {
-                            $emailMap[strtolower(trim($email))] = $createdLead->id;
-                        }
-                        if ($companyName) {
-                            $companyMap[strtolower(trim($companyName))] = $createdLead->id;
-                        }
-
                         $importedCount++;
+                        // Later rows in the file that repeat this one count as matches, as on a real run.
+                        $marker = 'dry';
+                        if ($cleanPhoneDigits && strlen($cleanPhoneDigits) >= 7) { $phoneMap[$cleanPhoneDigits] = $marker; }
+                        if ($emailKey !== '') { $emailMap[$emailKey] = $marker; }
+                        if ($companyKey !== '') { $companyMap[$companyKey] = $marker; }
                     }
-                } else {
-                    // Dry run counting
-                    if ($matchedId) {
-                        if ($updateExisting) {
-                            $updatedCount++;
-                        } else {
-                            $skippedCount++;
-                        }
+                    continue;
+                }
+
+                if ($matchedId) {
+                    $matchedId = $resolveMatch($matchedId);
+                    $existingObj = ($updateExisting && $matchedId) ? Lead::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($matchedId) : null;
+                    if ($existingObj) {
+                        $existingObj->update($leadPayload);
+                        $updatedCount++;
                     } else {
-                        $importedCount++;
+                        $skippedCount++;
+                    }
+                    continue;
+                }
+
+                if (empty($ownerId)) {
+                    // No owner: go through the model so auto-assignment rules run.
+                    $createdLead = Lead::create($leadPayload);
+                    try {
+                        app(\App\Domains\CRM\Services\LeadAssignmentService::class)->assignLeadOwner($createdLead, 'api_import', $leadPayload);
+                    } catch (\Throwable $e) {
+                        // Silent fallback
+                    }
+                    $marker = $createdLead->id;
+                } else {
+                    // Bulk path: what Lead's model hooks would do, done here.
+                    $leadPayload['gstin'] = \App\Services\TaxIdentityService::normalizeGstin($leadPayload['gstin']);
+                    $leadPayload['expected_sale_date'] = $leadPayload['expected_sale_date']?->toDateString();
+                    $leadPayload['next_followup_date'] = $leadPayload['next_followup_date']?->toDateTimeString();
+                    $leadPayload['call_date'] = $leadPayload['call_date']->toDateTimeString();
+                    $leadPayload['created_at'] = $now;
+                    $leadPayload['updated_at'] = $now;
+                    $pending[] = $leadPayload;
+
+                    // Find it again by a field it was stored with, until it has an ID.
+                    $marker = $emailKey !== '' ? 'email:' . $email : ($phone ? 'phone:' . $phone : 'company_name:' . $companyName);
+                    if (count($pending) >= 500) {
+                        $flushPending();
                     }
                 }
+
+                // Register in memory map
+                if ($cleanPhoneDigits && strlen($cleanPhoneDigits) >= 7) {
+                    $phoneMap[$cleanPhoneDigits] = $marker;
+                }
+                if ($emailKey !== '') {
+                    $emailMap[$emailKey] = $marker;
+                }
+                if ($companyKey !== '') {
+                    $companyMap[$companyKey] = $marker;
+                }
+
+                $importedCount++;
+            }
+
+            if (! $headerFound) {
+                throw new \Exception('Uploaded spreadsheet is empty.');
+            }
+
+            if (! $dryRun) {
+                $flushPending();
             }
 
             if (!$dryRun) {
                 DB::commit();
                 Storage::disk('local')->delete($filePath);
+                // Bulk inserts skip the model's saved hook, so clear its caches once here.
+                \Illuminate\Support\Facades\Cache::forget("tenant_{$tenantId}_dup_graph_v2");
+                \Illuminate\Support\Facades\Cache::forget("tenant_{$tenantId}_lead_status_counts");
             }
 
             return [

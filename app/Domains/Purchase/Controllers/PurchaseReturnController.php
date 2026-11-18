@@ -272,7 +272,6 @@ class PurchaseReturnController extends Controller
             ->setOptions([
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => true,
-                'isPhpEnabled' => true,
             ]);
 
         $fileName = 'Debit_Note_' . str_replace(['/', '\\', ' '], '_', $return->return_number) . '.pdf';

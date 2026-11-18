@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->appendToGroup('web', SetLocale::class);
         $middleware->appendToGroup('web', SetCurrency::class);
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
 
         $middleware->alias([
             'identify.tenant' => IdentifyTenant::class,

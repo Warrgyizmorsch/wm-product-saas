@@ -28,7 +28,7 @@ class CrmDealApiController extends Controller
     private function resolveTenantContext(): array
     {
         $user      = auth()->user();
-        $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
+        $tenantId  = $user?->tenant_id  ?? require_tenant_id();
         $companyId = company_id() ?? $user?->company_id;
         $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
 
@@ -332,14 +332,14 @@ class CrmDealApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'title'           => 'required|string|max:255',
-            'crm_account_id'  => 'nullable|integer|exists:crm_accounts,id',
-            'crm_contact_id'  => 'nullable|integer|exists:crm_contacts,id',
+            'crm_account_id'  => ['nullable', 'integer', tenant_exists('crm_accounts')],
+            'crm_contact_id'  => ['nullable', 'integer', tenant_exists('crm_contacts')],
             'estimated_value' => 'nullable|numeric|min:0',
             'stage'           => 'nullable|string|max:100',
             'closing_date'    => 'nullable|date',
             'lead_source'     => 'nullable|string|max:255',
             'probability'     => 'nullable|integer|min:0|max:100',
-            'owner_id'        => 'nullable|integer|exists:users,id',
+            'owner_id'        => ['nullable', 'integer', tenant_exists('users')],
             'notes'           => 'nullable|string',
             'product_ids'     => 'nullable|array',
             'product_ids.*'   => 'integer',
@@ -400,14 +400,14 @@ class CrmDealApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'title'           => 'nullable|string|max:255',
-            'crm_account_id'  => 'nullable|integer|exists:crm_accounts,id',
-            'crm_contact_id'  => 'nullable|integer|exists:crm_contacts,id',
+            'crm_account_id'  => ['nullable', 'integer', tenant_exists('crm_accounts')],
+            'crm_contact_id'  => ['nullable', 'integer', tenant_exists('crm_contacts')],
             'estimated_value' => 'nullable|numeric|min:0',
             'stage'           => 'nullable|string|max:100',
             'closing_date'    => 'nullable|date',
             'lead_source'     => 'nullable|string|max:255',
             'probability'     => 'nullable|integer|min:0|max:100',
-            'owner_id'        => 'nullable|integer|exists:users,id',
+            'owner_id'        => ['nullable', 'integer', tenant_exists('users')],
             'notes'           => 'nullable|string',
             'close_reason'    => 'nullable|string|max:255',
             'product_ids'     => 'nullable|array',
@@ -917,8 +917,8 @@ class CrmDealApiController extends Controller
         $this->authorize('update', $deal);
 
         $validator = Validator::make($request->all(), [
-            'deal_owner_id' => 'nullable|integer|exists:users,id',
-            'owner_id'      => 'nullable|integer|exists:users,id',
+            'deal_owner_id' => ['nullable', 'integer', tenant_exists('users')],
+            'owner_id'      => ['nullable', 'integer', tenant_exists('users')],
             'note'          => 'nullable|string|max:500',
         ]);
 
@@ -978,9 +978,9 @@ class CrmDealApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'deal_ids'      => 'required|array|min:1',
-            'deal_ids.*'    => 'required|integer|exists:crm_deals,id',
-            'deal_owner_id' => 'nullable|integer|exists:users,id',
-            'owner_id'      => 'nullable|integer|exists:users,id',
+            'deal_ids.*'    => ['required', 'integer', tenant_exists('crm_deals')],
+            'deal_owner_id' => ['nullable', 'integer', tenant_exists('users')],
+            'owner_id'      => ['nullable', 'integer', tenant_exists('users')],
             'note'          => 'nullable|string|max:500',
         ]);
 
@@ -1074,7 +1074,7 @@ class CrmDealApiController extends Controller
                 'file_name'  => $doc->file_name,
                 'file_type'  => $doc->file_type,
                 'size'       => $doc->size,
-                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'url'        => route('api.crm.documents.download', $doc->id),
                 'created_at' => $doc->created_at?->toIso8601String(),
             ];
         }) : collect();
@@ -1094,10 +1094,7 @@ class CrmDealApiController extends Controller
     {
         $this->authorize('update', $deal);
 
-        $validator = Validator::make($request->all(), [
-            'documents'   => 'required',
-            'documents.*' => 'file|max:10240',
-        ]);
+        $validator = Validator::make($request->all(), \App\Domains\CRM\Models\LeadDocument::uploadRules());
 
         if ($validator->fails()) {
             return response()->json([
@@ -1148,7 +1145,7 @@ class CrmDealApiController extends Controller
                 'file_name'  => $doc->file_name,
                 'file_type'  => $doc->file_type,
                 'size'       => $doc->size,
-                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'url'        => route('api.crm.documents.download', $doc->id),
                 'created_at' => $doc->created_at?->toIso8601String(),
             ];
         });
