@@ -259,6 +259,59 @@ class TempFlowTest extends TestCase
             ->assertSee('Store must issue raw materials');
     }
 
+    public function test_seeder_replays_the_seven_chosen_vouchers_with_the_sheet_order_numbers(): void
+    {
+        $seeder = new JeyenkayLubricantsDemoSeeder();
+        $seeder->replay = true;
+        $seeder->run($this->tenant->id);
+
+        $routing = Routing::where('name', 'Test-jan')->firstOrFail();
+        $this->assertSame(['Heating', 'Bleading'], $routing->operations()->orderBy('sequence')->pluck('name')->all());
+
+        // exactly the 7 vouchers, order number = voucher number, all on Test-jan
+        $orders = ProductionOrder::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('order_number', 'like', 'OP/2627/%')->get();
+        $this->assertEqualsCanonicalizing(JeyenkayLubricantsDemoSeeder::REPLAY_VOUCHERS, $orders->pluck('order_number')->all());
+        $this->assertSame([$routing->id], $orders->pluck('routing_id')->map(fn ($i) => (int) $i)->unique()->values()->all());
+
+        $consumed = function (string $voucher) use ($orders) {
+            $order = $orders->firstWhere('order_number', $voucher);
+
+            return collect(app(ProductionMaterialService::class)->consumptionReport($order))
+                ->map(fn ($r) => [$r['product_name'], (float) $r['quantity'], $r['unit'], $r['operation_number']])->sortBy(0)->values()->all();
+        };
+
+        // ZIRCON-12 — 4 orders, 4 different mixes, exactly the sheet quantities
+        $this->assertEquals([['BASE OIL AP 70N LUOJIASHAN', 65000.0, 'ltr', 'OP-010'], ['HP MILJUTE SUPER N 12', 4999.0, 'ltr', 'OP-020']], $consumed('OP/2627/0000345'));
+        $this->assertCount(3, $consumed('OP/2627/0000353'));
+        $this->assertEquals([['BASE OIL AP 70N LUOJIASHAN', 55200.0, 'ltr', 'OP-010'], ['WHITE OIL LIGHT', 14790.0, 'ltr', 'OP-020']], $consumed('OP/2627/0000365'));
+        $this->assertCount(3, $consumed('OP/2627/0000371'));
+
+        // AMBER OIL - 32 — same materials, different quantities
+        $this->assertEquals([['HP MILJUTE 32', 4990.0, 'ltr', 'OP-020'], ['RUBESS 32', 65000.0, 'ltr', 'OP-010']], $consumed('OP/2627/0000344'));
+        $this->assertEquals([['HP MILJUTE 32', 2330.0, 'ltr', 'OP-020'], ['RUBESS 32', 57840.0, 'ltr', 'OP-010']], $consumed('OP/2627/0000351'));
+        $rubess = Product::withoutGlobalScopes()->where('sku', 'RUBESS-32')->firstOrFail();
+        $this->assertEquals(65000.0 + 57840.0, (float) ProductionOrderIssue::where('product_id', $rubess->id)->sum('quantity_issued'));
+        $sheetTotal = collect(JeyenkayLubricantsDemoSeeder::readRawMaterials())->where('name', 'RUBESS 32')->sum('qty'); // opening stock covers every voucher of the sheet
+        $this->assertEquals(ceil($sheetTotal * 1.25) - (65000 + 57840), (float) ProductWarehouseStock::withoutGlobalScopes()->where('product_id', $rubess->id)->value('quantity'));
+
+        // ZIRCON - ASCO D2 — output in kgs, inputs mix kgs and litres
+        $asco = $consumed('OP/2627/0000367');
+        $this->assertEqualsCanonicalizing(
+            [['FIBROL SVL 700', 3.0, 'kgs'], ['FIBROL SVL 250', 3.0, 'kgs'], ['HP WITEOL 15', 370.0, 'ltr'], ['BASE OIL AP 70N LUOJIASHAN', 556.0, 'ltr'], ['EMUL WHITE', 78.0, 'kgs']],
+            array_map(fn ($r) => array_slice($r, 0, 3), $asco)
+        );
+        $ascoOrder = $orders->firstWhere('order_number', 'OP/2627/0000367');
+        $this->assertEquals(920.0, (float) $ascoOrder->quantity_ordered);
+
+        // finished goods received under the sheet's batch no
+        $this->assertNotNull(\App\Domains\Inventory\Models\Batch::withoutGlobalScopes()->where('batch_number', 'ZIRC12/73')->first());
+        $this->assertNotNull(\App\Domains\Inventory\Models\Batch::withoutGlobalScopes()->where('batch_number', 'ZASCO/17')->first());
+
+        // idempotent
+        $seeder->run($this->tenant->id);
+        $this->assertSame(7, ProductionOrder::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('order_number', 'like', 'OP/2627/%')->count());
+    }
+
     public function test_flag_off_keeps_the_bom_requirement_for_manufactured_products(): void
     {
         config(['production.temp_flow' => false]);
@@ -272,6 +325,7 @@ class TempFlowTest extends TestCase
         $before = Product::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count();
 
         $seeder = new JeyenkayLubricantsDemoSeeder();
+        $seeder->replay = false;
         $seeder->run($this->tenant->id);
 
         $products = Product::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->get();

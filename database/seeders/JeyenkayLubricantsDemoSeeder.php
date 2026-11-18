@@ -24,17 +24,44 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  *   - finished goods (manufacture) and raw / semi-finished materials (buy), batch tracked
  *   - one warehouse JEY-WH when the tenant has none, and opening stock per raw material
  *     (consumed total in the sheet + 25 %), as a single FIFO lot per material
- *   - optional replay (JEYENKAY_REPLAY=1): one temp-flow production order per finished-good voucher, released and
- *     logged with the raw materials consumed under the same batch no
+ *   - the routing "Test-jan" (Heating -> Bleading) — an existing one is reused as it is
+ *   - a replay of selected vouchers (REPLAY_VOUCHERS) as temp-flow production orders on Test-jan: released, logged on
+ *     both operations with the raw materials of the same batch no consumed, finished goods received into stock under
+ *     that batch no. JEYENKAY_REPLAY=0 skips it, JEYENKAY_REPLAY=all replays every voucher of the sheet.
  *
  * NOT part of DatabaseSeeder / db:seed. Run on demand:
  *   php artisan db:seed --class=JeyenkayLubricantsDemoSeeder
- *   JEYENKAY_TENANT_ID=1 JEYENKAY_REPLAY=1 PRODUCTION_TEMP_FLOW=true php artisan db:seed --class=JeyenkayLubricantsDemoSeeder
+ *   JEYENKAY_TENANT_ID=1 JEYENKAY_REPLAY=0 php artisan db:seed --class=JeyenkayLubricantsDemoSeeder
  */
 class JeyenkayLubricantsDemoSeeder extends Seeder
 {
     public const FG_FILE = __DIR__ . '/data/jeyenkay_fg_manufactured.xlsx';
     public const RM_FILE = __DIR__ . '/data/jeyenkay_rm_consumed.xlsx';
+
+    /**
+     * Vouchers replayed by default. Each becomes a production order whose order number IS the sheet's voucher number.
+     *  JNK ZIRCON-12 (4 orders, 4 different material mixes):
+     *    OP/2627/0000345  BASE OIL AP 70N + HP MILJUTE SUPER N 12
+     *    OP/2627/0000353  VELVEX WHITE TECHNICAL + BASE OIL AP 70N + HP MILJUTE SUPER N 12
+     *    OP/2627/0000365  BASE OIL AP 70N + WHITE OIL LIGHT
+     *    OP/2627/0000371  BASE OIL AP 70N + VELVEX WHITE TECHNICAL 60 + WHITE OIL A-20
+     *  JNK AMBER OIL - 32 (same materials, different quantities):
+     *    OP/2627/0000344  RUBESS 32 65,000 + HP MILJUTE 32 4,990
+     *    OP/2627/0000351  RUBESS 32 57,840 + HP MILJUTE 32 2,330
+     *  JNK ZIRCON - ASCO D2 (output in kgs, inputs mix kgs and litres):
+     *    OP/2627/0000367  FIBROL SVL 700 3kg + FIBROL SVL 250 3kg + HP WITEOL 15 370ltr + BASE OIL AP 70N 556ltr + EMUL WHITE 78kg
+     */
+    public const REPLAY_VOUCHERS = [
+        'OP/2627/0000345', 'OP/2627/0000353', 'OP/2627/0000365', 'OP/2627/0000371',
+        'OP/2627/0000344', 'OP/2627/0000351',
+        'OP/2627/0000367',
+    ];
+
+    /** Vouchers whose first operation is logged in two shifts (none by default). */
+    public const PARTIAL_SHIFT_VOUCHERS = [];
+
+    /** null = decide from JEYENKAY_REPLAY (default on; "0" turns it off, "all" replays every voucher). */
+    public ?bool $replay = null;
 
     public function run(?int $tenantId = null): void
     {
@@ -56,9 +83,13 @@ class JeyenkayLubricantsDemoSeeder extends Seeder
 
         $this->command?->info("Jeyenkay demo (tenant {$tenantId}): {$fgCount} finished goods, {$rmCount} raw materials created; {$stockCount} opening stock lots posted.");
 
-        if (filter_var(env('JEYENKAY_REPLAY', false), FILTER_VALIDATE_BOOLEAN)) {
-            $replayed = $this->replayVouchers($tenantId, $fgRows, $rmRows, $warehouseId);
-            $this->command?->info("Replayed {$replayed} production voucher(s) as temp-flow orders.");
+        $mode = strtolower((string) env('JEYENKAY_REPLAY', '1'));
+        $replay = $this->replay ?? ! in_array($mode, ['0', 'false', 'off', 'no'], true);
+        if ($replay) {
+            $routingId = $this->ensureTestJanRouting($tenantId);
+            $rows = $mode === 'all' ? $fgRows : array_values(array_filter($fgRows, fn ($r) => in_array($r['voucher'], self::REPLAY_VOUCHERS, true)));
+            $replayed = $this->replayVouchers($tenantId, $rows, $rmRows, $warehouseId, $routingId);
+            $this->command?->info("Replayed {$replayed} production voucher(s) as temp-flow orders on routing Test-jan (#{$routingId}).");
         }
     }
 
@@ -232,16 +263,58 @@ class JeyenkayLubricantsDemoSeeder extends Seeder
         return $posted;
     }
 
-    // ─── replay ──────────────────────────────────────────────────────────────
+    // ─── test-jan routing + replayed production orders ───────────────────────
 
     /**
-     * One temp-flow order per finished-good voucher, released and logged once with the raw materials of the same batch no.
-     * Skips vouchers already replayed (order description carries the voucher no).
+     * The "Test-jan" routing (Heating -> Bleading). An existing routing of that name is reused untouched; otherwise it is
+     * created with the same two operations and, when found by name, the same work centers.
      */
-    public function replayVouchers(int $tenantId, array $fgRows, array $rmRows, int $warehouseId): int
+    public function ensureTestJanRouting(int $tenantId): int
+    {
+        $existing = DB::table('routings')->where('tenant_id', $tenantId)->where('name', 'Test-jan')->orderByDesc('id')->value('id');
+        if ($existing) {
+            return (int) $existing;
+        }
+
+        $routingId = (int) DB::table('routings')->insertGetId([
+            'tenant_id' => $tenantId, 'routing_number' => 'RTG-TESTJAN', 'name' => 'Test-jan', 'version' => '1.0.0',
+            'status' => 'active', 'effective_from' => now()->toDateString(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $wc = fn (string $like) => DB::table('production_work_centers')->where('tenant_id', $tenantId)->where('name', 'like', $like)->value('id');
+        $heating = DB::table('production_routing_operations')->insertGetId($this->routingOp($tenantId, $routingId, 10, 'Heating', $wc('Sub-Assembly%'), null));
+        DB::table('production_routing_operations')->insert($this->routingOp($tenantId, $routingId, 20, 'Bleading', $wc('Roll Converting%'), $heating));
+
+        return $routingId;
+    }
+
+    private function routingOp(int $tenantId, int $routingId, int $sequence, string $name, $workCenterId, ?int $previousId): array
+    {
+        $values = [
+            'tenant_id' => $tenantId, 'routing_id' => $routingId, 'sequence' => $sequence,
+            'operation_number' => 'OP-' . str_pad((string) $sequence, 3, '0', STR_PAD_LEFT), 'name' => $name,
+            'operation_type' => 'manufacturing', 'work_center_id' => $workCenterId ?: null, 'previous_operation_id' => $previousId,
+            'setup_time_minutes' => 0, 'processing_time_minutes' => 0, 'expected_yield_percentage' => 100, 'cost_per_unit' => 0,
+            'is_external' => false, 'created_at' => now(), 'updated_at' => now(),
+        ];
+
+        return array_intersect_key($values, array_flip(Schema::getColumnListing('production_routing_operations')));
+    }
+
+    /**
+     * Replays finished-good vouchers as temp-flow production orders on the Test-jan routing (Heating -> Bleading):
+     * order -> release -> shop floor logs on each operation with the raw materials of the same batch no consumed
+     * (the first half of the batch's materials at Heating, the rest at Bleading) -> finished goods received into
+     * stock under the sheet's batch no. Partial-shift vouchers log Heating twice (60 % / 40 %).
+     * Skips vouchers already replayed (order description carries the voucher no). Times are illustrative.
+     *
+     * @return int number of orders created
+     */
+    public function replayVouchers(int $tenantId, array $fgRows, array $rmRows, int $warehouseId, ?int $routingId = null): int
     {
         config(['production.temp_flow' => true]);
 
+        $routingId ??= $this->ensureTestJanRouting($tenantId);
         $userId = DB::table('users')->where('tenant_id', $tenantId)->orderBy('id')->value('id');
         $branchId = DB::table('warehouses')->where('id', $warehouseId)->value('branch_id');
         $companyId = DB::table('warehouses')->where('id', $warehouseId)->value('company_id');
@@ -250,7 +323,7 @@ class JeyenkayLubricantsDemoSeeder extends Seeder
 
         foreach ($fgRows as $fg) {
             $marker = "Voucher {$fg['voucher']}";
-            if (ProductionOrder::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('description', 'like', "%{$marker}%")->exists()) {
+            if (ProductionOrder::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('order_number', $fg['voucher'])->exists()) {
                 continue;
             }
 
@@ -261,26 +334,79 @@ class JeyenkayLubricantsDemoSeeder extends Seeder
 
             $orderService = app(ProductionOrderService::class);
             $order = $orderService->createDirect([
-                'product_id' => (int) $productId, 'quantity_ordered' => $fg['qty'],
+                'order_number' => $fg['voucher'], 'product_id' => (int) $productId, 'quantity_ordered' => $fg['qty'], 'routing_id' => $routingId,
                 'start_date' => $fg['date'], 'end_date' => $fg['date'],
                 'description' => "{$marker} / Batch {$fg['batch']}",
                 'branch_id' => $branchId, 'company_id' => $companyId,
             ], $tenantId, $userId);
             $orderService->release($order->id, (int) $userId);
 
-            $op = ProductionOrderOperation::where('production_order_id', $order->id)->orderBy('sequence')->first();
-            $consumed = $rmByBatch->get($fg['batch'], collect())->map(function ($line) use ($tenantId, $warehouseId) {
-                return [
-                    'product_id' => DB::table('products')->where('tenant_id', $tenantId)->where('sku', self::sku($line['name']))->value('id'),
-                    'quantity' => $line['qty'],
-                    'warehouse_id' => $warehouseId,
-                ];
-            })->all();
+            $ops = ProductionOrderOperation::where('production_order_id', $order->id)->orderBy('sequence')->get();
+            $lines = $rmByBatch->get($fg['batch'], collect())->map(fn ($l) => [
+                'product_id' => DB::table('products')->where('tenant_id', $tenantId)->where('sku', self::sku($l['name']))->value('id'),
+                'quantity' => $l['qty'], 'warehouse_id' => $warehouseId,
+            ])->values();
 
-            app(ProductionExecutionService::class)->logProgress(
-                $op->id, $fg['qty'], 0.0, 0.0, 0.0, 0.0, "{$marker} / Batch {$fg['batch']}",
-                null, $userId, true, 'jeyenkay-' . md5($fg['voucher']), null, $consumed
-            );
+            // materials per operation: first half at the first operation, the rest at the last one
+            $firstCount = $ops->count() > 1 ? (int) ceil($lines->count() / 2) : $lines->count();
+            $perOp = [$ops->first()->id => $lines->take($firstCount)->all()];
+            if ($ops->count() > 1) {
+                $perOp[$ops->last()->id] = $lines->slice($firstCount)->values()->all();
+            }
+
+            $partial = in_array($fg['voucher'], self::PARTIAL_SHIFT_VOUCHERS, true);
+            $logIds = [];
+            foreach ($ops as $i => $op) {
+                $opLines = $perOp[$op->id] ?? [];
+                $runMinutes = $i === 0 ? 180.0 : 90.0;
+                $setupMinutes = $i === 0 ? 15.0 : 10.0;
+
+                $slices = ($partial && $i === 0) ? [0.6, 0.4] : [1.0];
+                $producedSoFar = 0.0;
+                $consumedSoFar = [];
+                foreach ($slices as $s => $share) {
+                    $final = $s === count($slices) - 1;
+                    $qty = $final ? round($fg['qty'] - $producedSoFar, 4) : round($fg['qty'] * $share, 4);
+                    $producedSoFar += $qty;
+
+                    $sliceLines = [];
+                    foreach ($opLines as $k => $line) {
+                        $q = $final ? round($line['quantity'] - ($consumedSoFar[$k] ?? 0.0), 4) : round($line['quantity'] * $share, 4);
+                        $consumedSoFar[$k] = ($consumedSoFar[$k] ?? 0.0) + $q;
+                        $sliceLines[] = ['quantity' => $q] + $line;
+                    }
+
+                    $minutes = count($slices) > 1 ? round($runMinutes * $share, 2) : $runMinutes;
+                    $log = app(ProductionExecutionService::class)->logProgress(
+                        $op->id, $qty, 0.0, 0.0, $s === 0 ? $setupMinutes : 0.0, $minutes,
+                        "{$marker} / Batch {$fg['batch']}" . (count($slices) > 1 ? ' (shift ' . ($s + 1) . ' of ' . count($slices) . ')' : ''),
+                        null, $userId, $final, 'jeyenkay-' . md5($fg['voucher'] . $op->id . $s), null, $sliceLines
+                    );
+                    $logIds[] = $log->id;
+                }
+            }
+
+            // sheet date on the logs and consumption rows (they are created "now")
+            foreach ($logIds as $n => $logId) {
+                $at = $fg['date'] . ' ' . sprintf('%02d:00:00', 8 + $n * 3);
+                DB::table('production_order_progress_logs')->where('id', $logId)->update(['recorded_at' => $at]);
+                DB::table('production_order_issues')->where('production_order_id', $order->id)->where('remarks', 'like', "%shop floor log #{$logId} %")->update(['issued_at' => $at]);
+            }
+
+            // finished goods into stock under the sheet's batch no (skipped with a warning if the order cannot be received yet)
+            try {
+                app(ProductionExecutionService::class)->receiveFinishedGoods($order->id, $fg['qty'], 'passed', "{$marker} / Batch {$fg['batch']}", $userId, $warehouseId, $fg['batch']);
+            } catch (\Throwable $e) {
+                $this->command?->warn("Finished goods of {$fg['voucher']} were not received into stock: " . $e->getMessage());
+            }
+
+            // all operations are done and the output is received: close the order like the order page would
+            try {
+                app(ProductionOrderService::class)->evaluateAndAutoCompleteOrder($order->id, $userId);
+            } catch (\Throwable $e) {
+                $this->command?->warn("Order {$fg['voucher']} could not be completed automatically: " . $e->getMessage());
+            }
+
             $replayed++;
         }
 
