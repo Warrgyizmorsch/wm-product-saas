@@ -115,10 +115,10 @@ class LeadFollowupApiController extends Controller
             'title'                => 'nullable|string|max:255',
             'duration_minutes'     => 'nullable|integer|min:1',
             'guest_emails'         => 'nullable|string|max:500',
-            'assigned_to_id'       => 'nullable|exists:users,id',
-            'tagged_user_id'       => 'nullable|exists:users,id',
+            'assigned_to_id'       => ['nullable', tenant_exists('users')],
+            'tagged_user_id'       => ['nullable', tenant_exists('users')],
             'tagged_user_ids'      => 'nullable|array',
-            'tagged_user_ids.*'    => 'integer|exists:users,id',
+            'tagged_user_ids.*'    => ['integer', tenant_exists('users')],
             'sync_google_calendar' => 'nullable|boolean',
             'create_meet_link'     => 'nullable|boolean',
             'next_activity_type'   => 'nullable|string|max:50',
@@ -144,7 +144,7 @@ class LeadFollowupApiController extends Controller
         $isNextMeeting = !empty($request->input('next_followup_date')) && strcasecmp((string)$nextActivityType, 'Meeting') === 0;
         $isMeeting = (strcasecmp((string)$activityType, 'Meeting') === 0) || $isNextMeeting;
 
-        $tenantId = $lead->tenant_id ?? (auth()->user()?->tenant_id ?? (tenant_id() ?? 1));
+        $tenantId = $lead->tenant_id ?? (auth()->user()?->tenant_id ?? require_tenant_id());
         $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
         $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];
         $isGeoVerificationEnabled = !empty($settings['field_visit_verification']);
@@ -407,8 +407,11 @@ class LeadFollowupApiController extends Controller
     public function myMeetings(Request $request): JsonResponse
     {
         $user = auth()->user();
-        $userId = (int)($request->input('user_id') ?: ($user?->id ?? 1));
-        $tenantId = $user?->tenant_id ?? (tenant_id() ?? 1);
+        abort_unless($user, 401);
+        $isAdmin = in_array(strtolower(str_replace([' ', '_', '-'], '', (string) ($user->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
+        // Only admins may look at another user's meetings; everyone else sees their own.
+        $userId = $isAdmin && $request->filled('user_id') ? (int) $request->input('user_id') : (int) $user->id;
+        $tenantId = $user->tenant_id ?? require_tenant_id();
 
         $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
         $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];
@@ -698,7 +701,7 @@ class LeadFollowupApiController extends Controller
             }
         }
 
-        $tenantId = $followup->tenant_id ?? (auth()->user()?->tenant_id ?? (tenant_id() ?? 1));
+        $tenantId = $followup->tenant_id ?? (auth()->user()?->tenant_id ?? require_tenant_id());
         $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
         $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];
         $isGeoVerificationEnabled = !empty($settings['field_visit_verification']);
@@ -794,16 +797,7 @@ class LeadFollowupApiController extends Controller
         $followup = $this->resolveFollowupInstance(...$args);
 
         $user = auth()->user();
-        $isHost = ($followup->assigned_to_id == $user?->id) || ($followup->lead?->lead_owner_id == $user?->id) || ($followup->deal?->owner_id == $user?->id);
-        $isAdmin = $user && in_array(strtolower(str_replace([' ', '_', '-'], '', (string)($user->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
-
-        if (!$isHost && !$isAdmin) {
-            if ($followup->lead) {
-                $this->authorize('update', $followup->lead);
-            } elseif ($followup->deal) {
-                $this->authorize('update', $followup->deal);
-            }
-        }
+        $this->authorizeFollowupChange($followup);
 
         // Defensive fallback: If Postman or client sent body as raw Text without application/json header
         if (!$request->has('status') && !empty($request->getContent())) {
@@ -831,7 +825,7 @@ class LeadFollowupApiController extends Controller
 
         $request->merge(['status' => $normalizedStatus]);
 
-        $tenantId = $followup->tenant_id ?? (auth()->user()?->tenant_id ?? (tenant_id() ?? 1));
+        $tenantId = $followup->tenant_id ?? (auth()->user()?->tenant_id ?? require_tenant_id());
         $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
         $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];
         $isGeoVerificationEnabled = !empty($settings['field_visit_verification']);
@@ -879,7 +873,7 @@ class LeadFollowupApiController extends Controller
             'notes'                => 'nullable|string',
             'outcome'              => 'nullable|string',
             'tagged_user_ids'      => 'nullable|array',
-            'tagged_user_ids.*'    => 'nullable|exists:users,id',
+            'tagged_user_ids.*'    => ['nullable', tenant_exists('users')],
             'latitude'             => 'nullable|numeric|between:-90,90',
             'longitude'            => 'nullable|numeric|between:-180,180',
             'location_address'     => 'nullable|string|max:500',
@@ -1045,22 +1039,13 @@ class LeadFollowupApiController extends Controller
         $followup = $this->resolveFollowupInstance(...$args);
 
         $user = auth()->user();
-        $isHost = ($followup->assigned_to_id == $user?->id) || ($followup->lead?->lead_owner_id == $user?->id) || ($followup->deal?->owner_id == $user?->id);
-        $isAdmin = $user && in_array(strtolower(str_replace([' ', '_', '-'], '', (string)($user->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
-
-        if (!$isHost && !$isAdmin) {
-            if ($followup->lead) {
-                $this->authorize('update', $followup->lead);
-            } elseif ($followup->deal) {
-                $this->authorize('update', $followup->deal);
-            }
-        }
+        $this->authorizeFollowupChange($followup);
 
         $targetStatus = $request->input('status', $followup->status);
         $activityType = $request->input('type', $followup->type);
         $isGeoRequired = $this->followupService->isGeoVerificationRequired($targetStatus, $activityType, $followup);
 
-        $tenantId = $followup->tenant_id ?? (auth()->user()?->tenant_id ?? (tenant_id() ?? 1));
+        $tenantId = $followup->tenant_id ?? (auth()->user()?->tenant_id ?? require_tenant_id());
         $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
         $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];
         $isGeoVerificationEnabled = !empty($settings['field_visit_verification']);
@@ -1091,9 +1076,9 @@ class LeadFollowupApiController extends Controller
             'notes'             => 'nullable|string',
             'type'              => 'nullable|string|in:Call,Email,Meeting,Demo,Task',
             'followup_date'     => 'nullable|date',
-            'tagged_user_id'    => 'nullable|exists:users,id',
+            'tagged_user_id'    => ['nullable', tenant_exists('users')],
             'tagged_user_ids'   => 'nullable|array',
-            'tagged_user_ids.*' => 'nullable|exists:users,id',
+            'tagged_user_ids.*' => ['nullable', tenant_exists('users')],
             'is_reschedule'     => 'nullable|boolean',
             'latitude'          => 'nullable|numeric|between:-90,90',
             'longitude'         => 'nullable|numeric|between:-180,180',
@@ -1180,6 +1165,8 @@ class LeadFollowupApiController extends Controller
         $followup = $this->resolveFollowupInstance(...$args);
         $request = request();
 
+        $this->authorizeFollowupChange($followup);
+
         // Support multiple parameter keys for mobile app backward compatibility
         $userId = $request->input('assigned_to_id') 
             ?? $request->input('tagged_user_id') 
@@ -1196,7 +1183,7 @@ class LeadFollowupApiController extends Controller
             ], 422);
         }
 
-        $assignee = \App\Models\User::find($userId);
+        $assignee = \App\Models\User::query()->whereKey($userId)->where('tenant_id', $followup->tenant_id)->first();
         if (!$assignee) {
             return response()->json([
                 'success' => false,
@@ -1270,16 +1257,7 @@ class LeadFollowupApiController extends Controller
         $followup = $this->resolveFollowupInstance(...$args);
 
         $user = auth()->user();
-        $isHost = ($followup->assigned_to_id == $user?->id) || ($followup->lead?->lead_owner_id == $user?->id) || ($followup->deal?->owner_id == $user?->id);
-        $isAdmin = $user && in_array(strtolower(str_replace([' ', '_', '-'], '', (string)($user->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
-
-        if (!$isHost && !$isAdmin) {
-            if ($followup->lead) {
-                $this->authorize('update', $followup->lead);
-            } elseif ($followup->deal) {
-                $this->authorize('update', $followup->deal);
-            }
-        }
+        $this->authorizeFollowupChange($followup);
 
         $this->followupService->deleteFollowup($followup);
 
@@ -1287,5 +1265,32 @@ class LeadFollowupApiController extends Controller
             'success' => true,
             'message' => 'Followup removed successfully.',
         ]);
+    }
+    /**
+     * Only the meeting's host (assignee, lead owner, deal owner), a tenant admin,
+     * or someone who may update the parent lead/deal can change a follow-up.
+     * A follow-up with no lead or deal is limited to its host and admins.
+     */
+    private function authorizeFollowupChange(\App\Domains\CRM\Models\LeadFollowup $followup): void
+    {
+        $user = auth()->user();
+        abort_unless($user, 401);
+
+        $isHost = ($followup->assigned_to_id == $user->id)
+            || ($followup->lead?->lead_owner_id == $user->id)
+            || ($followup->deal?->owner_id == $user->id);
+        $isAdmin = in_array(strtolower(str_replace([' ', '_', '-'], '', (string) ($user->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
+
+        if ($isHost || $isAdmin) {
+            return;
+        }
+
+        if ($followup->lead) {
+            $this->authorize('update', $followup->lead);
+        } elseif ($followup->deal) {
+            $this->authorize('update', $followup->deal);
+        } else {
+            abort(403);
+        }
     }
 }

@@ -23,16 +23,19 @@ class MetaLeadService
 
         if ($mode === 'subscribe' && !empty($token)) {
             // Check if token matches any active configuration or default fallback
-            $matches = MetaConfiguration::where('is_active', true)
+            $matches = MetaConfiguration::withoutGlobalScopes()
+                ->where('is_active', true)
                 ->where('verify_token', $token)
                 ->exists();
 
-            if ($matches || $token === 'meta_erp_token' || $token === config('services.meta.verify_token')) {
-                Log::info('[Meta Webhook] Verification successful for token: ' . $token);
+            $globalToken = (string) config('services.meta.verify_token');
+
+            if ($matches || ($globalToken !== '' && hash_equals($globalToken, (string) $token))) {
+                Log::info('[Meta Webhook] Verification successful.');
                 return (string) $challenge;
             }
 
-            Log::warning('[Meta Webhook] Verification token mismatch: ' . $token);
+            Log::warning('[Meta Webhook] Verification token mismatch.');
         }
 
         return null;
@@ -43,8 +46,13 @@ class MetaLeadService
      */
     public function processWebhook(Request $request): array
     {
+        $signingSecret = $this->matchingSignatureSecret($request);
+        if ($signingSecret === null) {
+            throw new MetaWebhookSignatureException('Invalid or missing X-Hub-Signature-256.');
+        }
+
         $payload = $request->all();
-        Log::info('[Meta Webhook] Received event payload:', ['payload' => $payload]);
+        Log::info('[Meta Webhook] Received signed event.', ['entries' => count($payload['entry'] ?? [])]);
 
         $results = [];
         $entries = $payload['entry'] ?? [];
@@ -72,13 +80,22 @@ class MetaLeadService
                 }
 
                 // Resolve matching Meta Configuration
-                $config = MetaConfiguration::where('is_active', true)
-                    ->where(function ($q) use ($pageId) {
-                        if (!empty($pageId)) {
-                            $q->where('page_id', $pageId)->orWhereNull('page_id');
-                        }
-                    })
-                    ->first() ?: MetaConfiguration::where('is_active', true)->first();
+                $config = $pageId === '' ? null : MetaConfiguration::withoutGlobalScopes()
+                    ->where('is_active', true)
+                    ->where('page_id', $pageId)
+                    ->first();
+
+                $configSecret = (string) ($config?->app_secret ?? '');
+                $signedForConfig = $config && (
+                    ($configSecret !== '' && hash_equals($configSecret, $signingSecret))
+                    || ($configSecret === '' && hash_equals((string) config('services.meta.app_secret'), $signingSecret))
+                );
+
+                if (! $signedForConfig) {
+                    Log::warning('[Meta Webhook] Ignoring leadgen event for an unknown or mismatched page.', ['page_id' => $pageId]);
+                    $results[] = ['leadgen_id' => $leadgenId, 'status' => 'ignored'];
+                    continue;
+                }
 
                 // Idempotency check: Don't ingest same leadgen_id twice
                 $existingLog = MetaLeadLog::where('leadgen_id', $leadgenId)->first();
@@ -94,7 +111,7 @@ class MetaLeadService
 
                 // Create initial log entry
                 $log = $existingLog ?: new MetaLeadLog();
-                $log->tenant_id = $config?->tenant_id ?? 1;
+                $log->tenant_id = $config->tenant_id;
                 $log->meta_configuration_id = $config?->id;
                 $log->leadgen_id = $leadgenId;
                 $log->page_id = $pageId;
@@ -159,7 +176,10 @@ class MetaLeadService
         $extracted['ad_name'] = $leadData['ad_name'] ?? null;
         $extracted['form_name'] = $leadData['form_name'] ?? null;
 
-        $tenantId = $config?->tenant_id ?? 1;
+        $tenantId = $config?->tenant_id;
+        if (! $tenantId) {
+            throw new \Exception('Meta configuration has no tenant.');
+        }
         $companyId = $config?->company_id;
         $branchId = $config?->branch_id;
 
@@ -302,5 +322,35 @@ class MetaLeadService
         }
 
         return $result;
+    }
+    /**
+     * Meta signs every POST with HMAC-SHA256 of the raw body using the app
+     * secret. Returns the secret that matches, or null when none does.
+     */
+    private function matchingSignatureSecret(Request $request): ?string
+    {
+        $header = (string) $request->header('X-Hub-Signature-256', '');
+        if (! str_starts_with($header, 'sha256=')) {
+            return null;
+        }
+
+        $body = $request->getContent();
+
+        $secrets = MetaConfiguration::withoutGlobalScopes()
+            ->where('is_active', true)
+            ->whereNotNull('app_secret')
+            ->where('app_secret', '!=', '')
+            ->pluck('app_secret')
+            ->push((string) config('services.meta.app_secret'))
+            ->filter()
+            ->unique();
+
+        foreach ($secrets as $secret) {
+            if (hash_equals('sha256='.hash_hmac('sha256', $body, (string) $secret), $header)) {
+                return (string) $secret;
+            }
+        }
+
+        return null;
     }
 }

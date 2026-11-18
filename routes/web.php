@@ -24,8 +24,10 @@ Route::post('/webhooks/razorpay', [RazorpayWebhookController::class, 'handle'])
 
 // Public Meta (Facebook & Instagram) Lead Ads Webhook Route (GET for handshake verification, POST for lead ingestion)
 Route::match(['get', 'post'], '/webhooks/meta-leadgen', [\App\Domains\Platform\Controllers\MetaWebhookController::class, 'handle'])
+    ->middleware('throttle:120,1')
     ->name('webhooks.meta-leadgen');
 Route::match(['get', 'post'], '/api/webhooks/meta-leadgen', [\App\Domains\Platform\Controllers\MetaWebhookController::class, 'handle'])
+    ->middleware('throttle:120,1')
     ->name('api.webhooks.meta-leadgen');
 
 // Public Biometric ADMS Webhook Route (for physical terminals pushing punch records)
@@ -44,10 +46,10 @@ Route::get('/api/crm/public/form-config/{tenant}', [\App\Domains\CRM\Controllers
 Route::get('/embed/lead-widget.js', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'renderWidgetJs'])
     ->name('embed.lead-widget');
 Route::match(['post', 'options'], '/forms/lead-capture', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'submit'])
-    ->middleware('throttle:30,1')
+    ->middleware('throttle:public-lead-form')
     ->name('forms.lead-capture.submit');
 Route::match(['post', 'options'], '/api/crm/public/lead-capture', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'submit'])
-    ->middleware('throttle:30,1')
+    ->middleware('throttle:public-lead-form')
     ->name('api.crm.public.lead-capture');
 
 // Platform console for the SaaS owner's staff — deliberately outside the

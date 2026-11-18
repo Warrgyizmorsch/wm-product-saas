@@ -26,8 +26,11 @@ class GoogleCalendarIntegrationService
     public function exchangeAuthCode(string $authCode, ?int $userId = null): ?string
     {
         try {
-            $resolvedUserId = $userId ?? auth()->id() ?? 1;
-            $response = Http::withoutVerifying()->timeout(10)->post($this->baseUrl . '/auth/token', [
+            $resolvedUserId = $userId ?? auth()->id();
+            if (! $resolvedUserId) {
+                return null;
+            }
+            $response = Http::timeout(10)->post($this->baseUrl . '/auth/token', [
                 'auth_code' => trim($authCode),
                 'user_id'   => $resolvedUserId,
             ]);
@@ -76,13 +79,10 @@ class GoogleCalendarIntegrationService
             $userSettings = is_array($user->settings) ? $user->settings : (json_decode($user->settings ?? '{}', true) ?: []);
         }
 
-        $resolvedUserId = $userId 
-            ?? (request()?->filled('google_user_id') ? (int) request('google_user_id') : null)
-            ?? (request()?->filled('user_id') ? (int) request('user_id') : null)
-            ?? (session('google_user_id') ? (int) session('google_user_id') : null)
-            ?? ($userSettings['google_user_id'] ?? null)
-            ?? auth()->id() 
-            ?? 1;
+        // Never taken from the request: the integration identifies users by this
+        // number alone, so a client-chosen ID would read someone else's account.
+        $resolvedUserId = $userId ?? auth()->id();
+        abort_unless($resolvedUserId, 401);
 
         $resolvedToken = $token 
             ?? request()?->input('google_token') 
@@ -155,7 +155,8 @@ class GoogleCalendarIntegrationService
             return null;
         }
 
-        $googleUserId = $req->input('google_user_id') ?: $req->input('user_id') ?: (session('google_user_id') ?: auth()->id() ?: 1);
+        $googleUserId = auth()->id();
+        abort_unless($googleUserId, 401);
         if ($googleUserId) {
             session(['google_user_id' => (int) $googleUserId]);
         }
@@ -384,7 +385,7 @@ class GoogleCalendarIntegrationService
      */
     public function disconnectAccount(): void
     {
-        $resolvedUserId = auth()->id() ?? 1;
+        $resolvedUserId = auth()->id();
         \Illuminate\Support\Facades\Cache::forget("google_cal_connected_{$resolvedUserId}");
 
         session()->forget([

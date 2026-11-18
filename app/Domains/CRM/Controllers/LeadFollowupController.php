@@ -29,9 +29,9 @@ class LeadFollowupController extends Controller
             'priority' => 'nullable|string',
             'segment' => 'nullable|string',
             'sub_status' => 'nullable|string',
-            'tagged_user_id' => 'nullable|exists:users,id',
+            'tagged_user_id' => ['nullable', tenant_exists('users')],
             'tagged_user_ids' => 'nullable|array',
-            'tagged_user_ids.*' => 'nullable|exists:users,id',
+            'tagged_user_ids.*' => ['nullable', tenant_exists('users')],
             'recording' => 'nullable|file|max:20480',
             'next_activity_type' => 'nullable|string',
             'next_followup_date' => 'nullable|string',
@@ -155,9 +155,9 @@ class LeadFollowupController extends Controller
             'notes' => 'nullable|string',
             'type' => 'nullable|string|in:Call,Email,Meeting,Demo,Task',
             'followup_date' => 'nullable|string',
-            'tagged_user_id' => 'nullable|exists:users,id',
+            'tagged_user_id' => ['nullable', tenant_exists('users')],
             'tagged_user_ids' => 'nullable|array',
-            'tagged_user_ids.*' => 'nullable|exists:users,id',
+            'tagged_user_ids.*' => ['nullable', tenant_exists('users')],
             'is_reschedule' => 'nullable|boolean',
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -245,9 +245,9 @@ class LeadFollowupController extends Controller
             'title' => 'nullable|string',
             'duration_minutes' => 'nullable|integer',
             'guest_emails' => 'nullable|string',
-            'tagged_user_id' => 'nullable|exists:users,id',
+            'tagged_user_id' => ['nullable', tenant_exists('users')],
             'tagged_user_ids' => 'nullable|array',
-            'tagged_user_ids.*' => 'nullable|exists:users,id',
+            'tagged_user_ids.*' => ['nullable', tenant_exists('users')],
             'next_activity_type' => 'nullable|string',
             'next_followup_date' => 'nullable|string',
         ]);
@@ -445,7 +445,7 @@ class LeadFollowupController extends Controller
 
         $user = auth()->user();
         $userId = (int) ($request->input('user_id') ?: ($user?->id ?? 1));
-        $tenantId = $user?->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $user?->tenant_id ?? require_tenant_id();
 
         $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
         $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];

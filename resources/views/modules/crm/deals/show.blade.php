@@ -4121,9 +4121,13 @@
             const fallbackLoginUrl = "https://love14-deal-health-scoring.hf.space/auth/login?user_id={{ auth()->id() ?? 1 }}&next=" + encodeURIComponent(window.location.href);
 
             // Attempt direct browser fetch with credentials (sends SameSite=None / cross-origin cookie)
+            // Give up after 8 s so a sleeping integration doesn't leave the badge spinning forever.
+            const authTimeout = new AbortController();
+            setTimeout(() => authTimeout.abort(), 8000);
             fetch(hfAuthUrl, {
                 method: "GET",
                 credentials: "include",
+                signal: authTimeout.signal,
                 headers: {
                     "Accept": "application/json"
                 }

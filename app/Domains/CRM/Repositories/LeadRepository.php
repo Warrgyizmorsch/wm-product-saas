@@ -222,7 +222,7 @@ class LeadRepository
     public function qualifyLead(Lead $lead): bool
     {
         $oldStatus = $lead->status;
-        $tenantId = $lead->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $lead->tenant_id ?? require_tenant_id();
 
         // 1. Find or Create CrmDeal
         $deal = null;

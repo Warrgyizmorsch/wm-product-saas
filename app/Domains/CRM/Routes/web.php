@@ -26,28 +26,28 @@ Route::prefix('crm')
 
         // Web-to-Lead Forms & Widget Builder
         Route::get('web-forms', [WebToLeadController::class, 'index'])->name('web-forms.index');
-        Route::post('web-forms/save-schema', [WebToLeadController::class, 'saveSchema'])->name('web-forms.save-schema');
+        Route::post('web-forms/save-schema', [WebToLeadController::class, 'saveSchema'])->middleware('permission:crm.webforms.manage')->name('web-forms.save-schema');
 
         // CRM Settings Routes
         Route::get('settings', [CrmSettingsController::class, 'index'])->name('settings.index');
-        Route::post('settings/quotation-approval-policy', [CrmSettingsController::class, 'updateQuotationApprovalPolicy'])->name('settings.update-quotation-approval-policy');
-        Route::post('settings/lead-assignment', [CrmSettingsController::class, 'updateLeadAssignment'])->name('settings.update-lead-assignment');
-        Route::post('settings/field-visit-verification', [CrmSettingsController::class, 'updateFieldVisitVerification'])->name('settings.update-field-visit-verification');
+        Route::post('settings/quotation-approval-policy', [CrmSettingsController::class, 'updateQuotationApprovalPolicy'])->middleware('permission:crm.settings.manage')->name('settings.update-quotation-approval-policy');
+        Route::post('settings/lead-assignment', [CrmSettingsController::class, 'updateLeadAssignment'])->middleware('permission:crm.settings.manage')->name('settings.update-lead-assignment');
+        Route::post('settings/field-visit-verification', [CrmSettingsController::class, 'updateFieldVisitVerification'])->middleware('permission:crm.settings.manage')->name('settings.update-field-visit-verification');
         // CRM Masters Routes
         Route::prefix('masters')->as('masters.')->group(function (): void {
             Route::get('lead-statuses', [LeadStatusController::class, 'index'])->name('lead-statuses.index');
-            Route::post('lead-statuses', [LeadStatusController::class, 'store'])->name('lead-statuses.store');
-            Route::put('lead-statuses/{leadStatus}', [LeadStatusController::class, 'update'])->name('lead-statuses.update');
-            Route::delete('lead-statuses/{leadStatus}', [LeadStatusController::class, 'destroy'])->name('lead-statuses.destroy');
-            Route::post('lead-statuses/reorder', [LeadStatusController::class, 'reorder'])->name('lead-statuses.reorder');
-            Route::post('lead-statuses/{leadStatus}/move/{direction}', [LeadStatusController::class, 'move'])->name('lead-statuses.move');
+            Route::post('lead-statuses', [LeadStatusController::class, 'store'])->middleware('permission:crm.masters.manage')->name('lead-statuses.store');
+            Route::put('lead-statuses/{leadStatus}', [LeadStatusController::class, 'update'])->middleware('permission:crm.masters.manage')->name('lead-statuses.update');
+            Route::delete('lead-statuses/{leadStatus}', [LeadStatusController::class, 'destroy'])->middleware('permission:crm.masters.manage')->name('lead-statuses.destroy');
+            Route::post('lead-statuses/reorder', [LeadStatusController::class, 'reorder'])->middleware('permission:crm.masters.manage')->name('lead-statuses.reorder');
+            Route::post('lead-statuses/{leadStatus}/move/{direction}', [LeadStatusController::class, 'move'])->middleware('permission:crm.masters.manage')->name('lead-statuses.move');
 
             Route::get('deal-statuses', [DealStatusController::class, 'index'])->name('deal-statuses.index');
-            Route::post('deal-statuses', [DealStatusController::class, 'store'])->name('deal-statuses.store');
-            Route::put('deal-statuses/{dealStatus}', [DealStatusController::class, 'update'])->name('deal-statuses.update');
-            Route::delete('deal-statuses/{dealStatus}', [DealStatusController::class, 'destroy'])->name('deal-statuses.destroy');
-            Route::post('deal-statuses/reorder', [DealStatusController::class, 'reorder'])->name('deal-statuses.reorder');
-            Route::post('deal-statuses/{dealStatus}/move/{direction}', [DealStatusController::class, 'move'])->name('deal-statuses.move');
+            Route::post('deal-statuses', [DealStatusController::class, 'store'])->middleware('permission:crm.masters.manage')->name('deal-statuses.store');
+            Route::put('deal-statuses/{dealStatus}', [DealStatusController::class, 'update'])->middleware('permission:crm.masters.manage')->name('deal-statuses.update');
+            Route::delete('deal-statuses/{dealStatus}', [DealStatusController::class, 'destroy'])->middleware('permission:crm.masters.manage')->name('deal-statuses.destroy');
+            Route::post('deal-statuses/reorder', [DealStatusController::class, 'reorder'])->middleware('permission:crm.masters.manage')->name('deal-statuses.reorder');
+            Route::post('deal-statuses/{dealStatus}/move/{direction}', [DealStatusController::class, 'move'])->middleware('permission:crm.masters.manage')->name('deal-statuses.move');
         });
 
         // CRM Accounts Routes
@@ -68,7 +68,7 @@ Route::prefix('crm')
         // CRM Deals Routes
         Route::get('deals', [CrmDealController::class, 'index'])->name('deals.index');
         Route::get('deals/export', [CrmDealController::class, 'export'])->name('deals.export');
-        Route::get('deals/kanban', [CrmDealController::class, 'kanban'])->name('deals.kanban');
+        Route::get('deals/kanban', [CrmDealController::class, 'kanban'])->middleware('throttle:60,1')->name('deals.kanban');
         Route::get('deals/activities', [DealActivityController::class, 'index'])->name('deals.activities');
         Route::get('deals/create', [CrmDealController::class, 'create'])->name('deals.create');
         Route::get('deals/google-auth-status', [CrmDealController::class, 'checkGoogleAuth'])->name('deals.googleAuthStatus');
@@ -144,15 +144,14 @@ Route::prefix('crm')
         Route::post('leads/import', [LeadController::class, 'import'])
             ->name('leads.import');
         Route::get('leads/export', [LeadController::class, 'export'])
+            ->middleware('throttle:10,1')
             ->name('leads.export');
         Route::post('leads/check-duplicate', [LeadController::class, 'checkDuplicate'])
             ->name('leads.checkDuplicate');
         Route::post('leads/bulk-assign', [LeadController::class, 'bulkAssign'])
             ->name('leads.bulkAssign');
-        Route::get('leads/{lead}/convert', [LeadController::class, 'showConvertForm'])
-            ->name('leads.showConvertForm');
-        Route::post('leads/{lead}/convert', [LeadController::class, 'processConvert'])
-            ->name('leads.processConvert');
+        // Lead conversion goes through qualify (web) or POST api/crm/leads/{lead}/convert-to-deal;
+        // the old leads/{lead}/convert routes pointed at controller methods that don't exist.
         Route::patch('leads/{lead}/qualify', [LeadController::class, 'qualify'])
             ->name('leads.qualify');
         Route::get('leads/{lead}/past-activities', [LeadController::class, 'getPastActivities'])

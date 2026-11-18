@@ -59,7 +59,8 @@ class TwilioSettingController extends Controller
         $validated = $request->validate([
             'name' => ['nullable', 'string', 'max:100'],
             'account_sid' => ['required', 'string', 'max:100'],
-            'auth_token' => ['required', 'string', 'max:255'],
+            // Saved secrets are never sent back to the browser, so a blank field keeps them.
+            'auth_token' => ['nullable', 'string', 'max:255'],
             'phone_number' => ['nullable', 'string', 'max:50'],
             'twiml_app_sid' => ['nullable', 'string', 'max:100'],
             'gemini_api_key' => ['nullable', 'string', 'max:255'],
@@ -81,10 +82,18 @@ class TwilioSettingController extends Controller
 
         $config->name = ($validated['name'] ?? null) ?: 'Primary Twilio Account';
         $config->account_sid = trim($validated['account_sid']);
-        $config->auth_token = trim($validated['auth_token']);
+        if (!empty($validated['auth_token'])) {
+            $config->auth_token = trim($validated['auth_token']);
+        } elseif (empty($config->auth_token)) {
+            return back()->withInput()->withErrors(['auth_token' => 'The Twilio auth token is required.']);
+        }
         $config->phone_number = !empty($validated['phone_number']) ? trim($validated['phone_number']) : null;
         $config->twiml_app_sid = !empty($validated['twiml_app_sid']) ? trim($validated['twiml_app_sid']) : null;
-        $config->gemini_api_key = !empty($validated['gemini_api_key']) ? trim($validated['gemini_api_key']) : null;
+        if (!empty($validated['gemini_api_key'])) {
+            $config->gemini_api_key = trim($validated['gemini_api_key']);
+        } elseif ($request->boolean('clear_gemini_api_key')) {
+            $config->gemini_api_key = null;
+        }
         $config->default_lead_owner_id = !empty($validated['default_lead_owner_id']) ? (int)$validated['default_lead_owner_id'] : null;
         $config->default_source = ($validated['default_source'] ?? null) ?: 'Twilio Call';
         $config->default_priority = ($validated['default_priority'] ?? null) ?: 'Medium';

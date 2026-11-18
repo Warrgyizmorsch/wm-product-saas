@@ -35,26 +35,28 @@ class CrmFollowupReminderService
 
         $this->applyScopeFilters($advanceQuery, $tenantId, $userId);
 
-        $upcomingFollowups = $advanceQuery->with(['lead', 'deal.account'])->take(50)->get();
-
-        foreach ($upcomingFollowups as $followup) {
-            try {
-                if ($followup->lead_id && $followup->lead) {
-                    $this->dispatchLeadAdvanceReminder($followup, $now);
-                    $dispatchedCount++;
-                } elseif ($followup->crm_deal_id && $followup->deal) {
-                    $this->dispatchDealAdvanceReminder($followup, $now);
-                    $dispatchedCount++;
-                } else {
-                    $followup->update(['advance_reminder_sent_at' => $now]);
+        // Every due row, in batches: a fixed take(50) across all tenants left the
+        // rest late or skipped whenever more than 50 fell due in the same minute.
+        $advanceQuery->with(['lead', 'deal.account'])->chunkById(200, function ($upcomingFollowups) use ($now, &$dispatchedCount) {
+            foreach ($upcomingFollowups as $followup) {
+                try {
+                    if ($followup->lead_id && $followup->lead) {
+                        $this->dispatchLeadAdvanceReminder($followup, $now);
+                        $dispatchedCount++;
+                    } elseif ($followup->crm_deal_id && $followup->deal) {
+                        $this->dispatchDealAdvanceReminder($followup, $now);
+                        $dispatchedCount++;
+                    } else {
+                        $followup->update(['advance_reminder_sent_at' => $now]);
+                    }
+                } catch (\Throwable $e) {
+                    if (app()->environment('testing')) {
+                        throw $e;
+                    }
+                    Log::warning("Error dispatching CRM advance reminder for followup #{$followup->id}: " . $e->getMessage());
                 }
-            } catch (\Throwable $e) {
-                if (app()->environment('testing')) {
-                    throw $e;
-                }
-                Log::warning("Error dispatching CRM advance reminder for followup #{$followup->id}: " . $e->getMessage());
             }
-        }
+        });
 
         // -------------------------------------------------------------
         // Phase 2: Exact-Time Due Reminders (Due Now)
@@ -67,26 +69,28 @@ class CrmFollowupReminderService
 
         $this->applyScopeFilters($dueQuery, $tenantId, $userId);
 
-        $dueFollowups = $dueQuery->with(['lead', 'deal.account'])->take(50)->get();
-
-        foreach ($dueFollowups as $followup) {
-            try {
-                if ($followup->lead_id && $followup->lead) {
-                    $this->dispatchLeadDueReminder($followup, $now);
-                    $dispatchedCount++;
-                } elseif ($followup->crm_deal_id && $followup->deal) {
-                    $this->dispatchDealDueReminder($followup, $now);
-                    $dispatchedCount++;
-                } else {
-                    $followup->update(['reminder_sent_at' => $now]);
+        // Every due row, in batches: a fixed take(50) across all tenants left the
+        // rest late or skipped whenever more than 50 fell due in the same minute.
+        $dueQuery->with(['lead', 'deal.account'])->chunkById(200, function ($dueFollowups) use ($now, &$dispatchedCount) {
+            foreach ($dueFollowups as $followup) {
+                try {
+                    if ($followup->lead_id && $followup->lead) {
+                        $this->dispatchLeadDueReminder($followup, $now);
+                        $dispatchedCount++;
+                    } elseif ($followup->crm_deal_id && $followup->deal) {
+                        $this->dispatchDealDueReminder($followup, $now);
+                        $dispatchedCount++;
+                    } else {
+                        $followup->update(['reminder_sent_at' => $now]);
+                    }
+                } catch (\Throwable $e) {
+                    if (app()->environment('testing')) {
+                        throw $e;
+                    }
+                    Log::warning("Error dispatching CRM due reminder for followup #{$followup->id}: " . $e->getMessage());
                 }
-            } catch (\Throwable $e) {
-                if (app()->environment('testing')) {
-                    throw $e;
-                }
-                Log::warning("Error dispatching CRM due reminder for followup #{$followup->id}: " . $e->getMessage());
             }
-        }
+        });
 
         return $dispatchedCount;
     }
@@ -357,6 +361,20 @@ class CrmFollowupReminderService
                 }
             }
         }
-        return array_values(array_unique(array_filter($targetUserIds)));
+        $targetUserIds = array_values(array_unique(array_filter($targetUserIds)));
+
+        if ($targetUserIds === []) {
+            return [];
+        }
+
+        // Defence in depth: rows saved before the validators were tenant-scoped
+        // may point at users of another tenant. Only notify this tenant's users.
+        return \App\Models\User::withoutGlobalScopes()
+            ->whereIn('id', $targetUserIds)
+            ->where('tenant_id', $followup->tenant_id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
     }
 }

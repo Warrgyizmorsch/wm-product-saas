@@ -42,10 +42,13 @@ class Lead extends Model
                 $lead->lead_owner_id = auth()->id();
             }
             if (empty($lead->lead_number)) {
-                $tenantId = $lead->tenant_id ?? (tenant_id() ?? 1);
+                $tenantId = (int) ($lead->tenant_id ?? require_tenant_id());
                 $year = date('Y');
-                $count = static::where('tenant_id', $tenantId)->whereYear('created_at', $year)->count() + 1;
-                $lead->lead_number = 'LD-' . $year . '-' . str_pad((string)$count, 4, '0', STR_PAD_LEFT);
+                $prefix = 'LD-' . $year . '-';
+                $next = \App\Support\TenantSequence::next($tenantId, "lead:{$year}", fn () => \App\Support\TenantSequence::highestSuffix(
+                    static::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('lead_number', 'like', $prefix . '%')->pluck('lead_number')
+                ));
+                $lead->lead_number = $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
             }
         });
 
@@ -91,14 +94,14 @@ class Lead extends Model
         });
 
         static::saved(function ($lead) {
-            $tid = $lead->tenant_id ?? (tenant_id() ?? 1);
-            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_dup_graph");
+            $tid = $lead->tenant_id ?? require_tenant_id();
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_dup_graph_v2");
             \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_lead_status_counts");
         });
 
         static::deleted(function ($lead) {
-            $tid = $lead->tenant_id ?? (tenant_id() ?? 1);
-            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_dup_graph");
+            $tid = $lead->tenant_id ?? require_tenant_id();
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_dup_graph_v2");
             \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_lead_status_counts");
         });
     }

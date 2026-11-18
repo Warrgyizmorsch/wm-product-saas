@@ -78,6 +78,9 @@ class LeadController extends Controller
         return view('modules.crm.leads.index', compact('leads', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users', 'leadStatuses'));
     }
 
+    /** Cards rendered per kanban column; the rest are reachable from the list view. */
+    private const KANBAN_CARDS_PER_COLUMN = 50;
+
     public function kanban(Request $request)
     {
         $this->authorize('viewAny', Lead::class);
@@ -87,14 +90,13 @@ class LeadController extends Controller
         $statuses = $leadStatuses->pluck('name')->toArray();
 
         $query = Lead::query()
-            ->where('tenant_id', $tenantId)
-            ->with(['owner', 'quotations']);
+            ->where('tenant_id', $tenantId);
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('company_name', 'like', "%{$search}%")
-                  ->orWhere('contact_name', 'like', "%{$search}%")
+                  ->orWhere('contact_person', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%");
             });
@@ -124,19 +126,34 @@ class LeadController extends Controller
             });
         }
 
-        $allLeads = $query->orderBy('updated_at', 'desc')->get();
+        // Per-column queries with a cap, plus one grouped query for counts and
+        // totals. Loading every lead with its quotations ran out of memory
+        // (HTTP 500) at 30k leads.
+        $latestQuoteTotal = '(SELECT q.total_amount FROM quotations q WHERE q.lead_id = leads.id AND q.deleted_at IS NULL ORDER BY q.id DESC LIMIT 1)';
+        $stats = (clone $query)
+            ->selectRaw("COALESCE(NULLIF(status, ''), 'New') as kanban_status, COUNT(*) as lead_count, SUM(COALESCE(NULLIF(expected_amount, 0), {$latestQuoteTotal}, 0)) as lead_total")
+            ->groupBy('kanban_status')
+            ->get()
+            ->keyBy('kanban_status');
 
         $kanbanData = [];
         foreach ($statuses as $status) {
-            $leadsInStatus = $allLeads->filter(fn($l) => ($l->status ?: 'New') === $status);
-            $totalAmount = $leadsInStatus->sum(function($l) {
-                return (float) ($l->expected_amount ?: ($l->quotations->last()?->total_amount ?: 0));
-            });
+            $leadsInStatus = (clone $query)
+                ->where(function ($q) use ($status) {
+                    $q->where('status', $status);
+                    if ($status === 'New') {
+                        $q->orWhereNull('status')->orWhere('status', '');
+                    }
+                })
+                ->with(['owner', 'quotations'])
+                ->orderBy('updated_at', 'desc')
+                ->limit(self::KANBAN_CARDS_PER_COLUMN)
+                ->get();
 
             $kanbanData[$status] = [
                 'leads' => $leadsInStatus,
-                'count' => $leadsInStatus->count(),
-                'total_amount' => $totalAmount,
+                'count' => (int) ($stats->get($status)?->lead_count ?? 0),
+                'total_amount' => (float) ($stats->get($status)?->lead_total ?? 0),
             ];
         }
 
@@ -451,7 +468,14 @@ class LeadController extends Controller
     public function export()
     {
         $this->authorize('viewAny', Lead::class);
-        return Excel::download(new LeadExport, 'leads_export.xlsx');
+
+        $export = new LeadExport();
+
+        return response()->streamDownload(function () use ($export) {
+            $out = fopen('php://output', 'w');
+            $export->streamCsv($out);
+            fclose($out);
+        }, 'leads_export_' . now()->format('Y-m-d') . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function create()
@@ -475,7 +499,7 @@ class LeadController extends Controller
         $details = $this->leadRepo->getLeadDetails($lead, request()->input('active_quotation_id'));
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
-        $nextQuotationNumber = $this->quotationService->getNextQuotationNumber();
+        $nextQuotationNumber = $this->quotationService->previewNextQuotationNumber();
         $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses();
 
         return view('modules.crm.leads.show', array_merge(
@@ -638,7 +662,7 @@ class LeadController extends Controller
         $this->authorize('update', $lead);
 
         $validated = $request->validate([
-            'lead_owner_id' => 'nullable|exists:users,id',
+            'lead_owner_id' => ['nullable', tenant_exists('users')],
             'note' => 'nullable|string|max:500',
         ]);
 
@@ -684,8 +708,8 @@ class LeadController extends Controller
         $this->authorize('viewAny', Lead::class);
         $validated = $request->validate([
             'lead_ids' => 'required|array|min:1',
-            'lead_ids.*' => 'required|integer|exists:leads,id',
-            'lead_owner_id' => 'nullable|exists:users,id',
+            'lead_ids.*' => ['required', 'integer', tenant_exists('leads')],
+            'lead_owner_id' => ['nullable', tenant_exists('users')],
             'note' => 'nullable|string|max:500',
         ]);
 
@@ -766,7 +790,7 @@ class LeadController extends Controller
     public function uploadDocuments(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
-        $request->validate(['documents' => 'required', 'documents.*' => 'file|max:10240']);
+        $request->validate(LeadDocument::uploadRules());
         $this->leadService->uploadDocuments($lead, $request->file('documents'));
 
         return redirect()->back()->with('success', 'Lead documents uploaded successfully!');
@@ -774,20 +798,29 @@ class LeadController extends Controller
 
     public function viewDocument(LeadDocument $document)
     {
-        if (!$document->lead || !Storage::disk('public')->exists($document->file_path)) {
+        $disk = $document->storageDisk();
+        if (!$document->lead || !$disk) {
             abort(404);
         }
         $this->authorize('view', $document->lead);
-        return response()->file(Storage::disk('public')->path($document->file_path));
+
+        // Only PDFs and raster images are shown inline; everything else downloads.
+        $inline = in_array(strtolower((string) $document->file_type), ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif'], true);
+        $headers = ['X-Content-Type-Options' => 'nosniff', 'Content-Security-Policy' => "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"];
+
+        return $inline
+            ? response()->file(Storage::disk($disk)->path($document->file_path), $headers)
+            : response()->download(Storage::disk($disk)->path($document->file_path), $document->file_name, $headers);
     }
 
     public function downloadDocument(LeadDocument $document)
     {
-        if (!$document->lead || !Storage::disk('public')->exists($document->file_path)) {
+        $disk = $document->storageDisk();
+        if (!$document->lead || !$disk) {
             abort(404);
         }
         $this->authorize('view', $document->lead);
-        return response()->download(Storage::disk('public')->path($document->file_path), $document->file_name);
+        return response()->download(Storage::disk($disk)->path($document->file_path), $document->file_name, ['X-Content-Type-Options' => 'nosniff']);
     }
 
     public function deleteDocument(LeadDocument $document)
@@ -810,7 +843,7 @@ class LeadController extends Controller
         $isB2B = $request->input('lead_type', 'b2b') === 'b2b';
 
         $rules = [
-            'lead_owner_id' => 'nullable|exists:users,id',
+            'lead_owner_id' => ['nullable', tenant_exists('users')],
             'company_name' => $isB2B ? 'required|string|max:255' : 'nullable|string|max:255',
             'company_email' => $isB2B ? 'required|email|max:255' : 'nullable|email|max:255',
             'company_phone' => 'nullable|string|regex:/^[0-9]+$/',
@@ -839,7 +872,7 @@ class LeadController extends Controller
             'product_ids' => 'nullable|array',
             'product_ids.*' => 'nullable',
             'items' => 'nullable|array',
-            'items.*.product_id' => 'nullable|integer|exists:products,id',
+            'items.*.product_id' => ['nullable', 'integer', tenant_exists('products')],
             'items.*.quantity' => 'nullable|numeric|min:1',
         ];
 

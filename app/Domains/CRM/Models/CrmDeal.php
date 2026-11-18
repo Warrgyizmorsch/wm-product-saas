@@ -38,7 +38,13 @@ class CrmDeal extends BaseModel
 
         static::creating(function ($deal) {
             if (empty($deal->deal_number)) {
-                $deal->deal_number = 'DL-' . date('Y') . '-' . str_pad((string)(static::whereYear('created_at', date('Y'))->count() + 1), 5, '0', STR_PAD_LEFT);
+                $tenantId = (int) ($deal->tenant_id ?? require_tenant_id());
+                $year = date('Y');
+                $prefix = 'DL-' . $year . '-';
+                $next = \App\Support\TenantSequence::next($tenantId, "deal:{$year}", fn () => \App\Support\TenantSequence::highestSuffix(
+                    static::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('deal_number', 'like', $prefix . '%')->pluck('deal_number')
+                ));
+                $deal->deal_number = $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
             }
             if (empty($deal->owner_id) && auth()->check()) {
                 $deal->owner_id = auth()->id();

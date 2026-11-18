@@ -50,8 +50,10 @@ class CustomerController extends Controller
             $query->whereIn('status', [$status, ucfirst($status)]);
         }
 
-        $sort = $request->input('sort_by', 'created_at');
-        $direction = $request->input('sort_order', 'desc');
+        // Only known columns and directions: anything else used to raise a SQL error (HTTP 500).
+        $sort = in_array($request->input('sort_by'), ['name', 'email', 'status', 'created_at', 'updated_at', 'id'], true)
+            ? $request->input('sort_by') : 'created_at';
+        $direction = strtolower((string) $request->input('sort_order')) === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sort, $direction);
 
         $customers = $query->paginate(10)->withQueryString();

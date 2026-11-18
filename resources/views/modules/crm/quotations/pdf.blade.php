@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="pdf-page-numbers" content="right=95;bottom=24;size=8.5;font=Helvetica">
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Sales Quotation - {{ $quotation->quotation_number }}</title>
@@ -676,19 +677,5 @@
     </table>
 
     <!-- 7. INLINE CANVAS SCRIPT FOR PAGE NUMBER (Page 1 of 2, Page 2 of 2) -->
-    <script type="text/php">
-        if (isset($pdf)) {
-            $pdf->page_script(function ($pageNumber, $pageCount, $canvas, $fontMetrics) {
-                $text = "Page " . $pageNumber . " of " . $pageCount;
-                $font = $fontMetrics->getFont("Helvetica", "normal");
-                $size = 8.5;
-                $color = array(100/255, 116/255, 139/255);
-                $w = $canvas->get_width();
-                $h = $canvas->get_height();
-                $canvas->text($w - 95, $h - 24, $text, $font, $size, $color);
-            });
-        }
-    </script>
-
 </body>
 </html>

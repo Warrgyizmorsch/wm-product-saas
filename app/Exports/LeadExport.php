@@ -14,7 +14,15 @@ class LeadExport implements FromCollection, WithHeadings, WithMapping
      */
     public function collection()
     {
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+        return $this->query()->orderBy('id', 'desc')->get();
+    }
+
+    /**
+     * The leads this user may export, unordered (callers stream it in chunks).
+     */
+    public function query(): \Illuminate\Database\Eloquent\Builder
+    {
+        $tenantId = require_tenant_id();
         $query = Lead::where('tenant_id', $tenantId)->with(['owner']);
 
         $currentUser = auth()->user();
@@ -26,7 +34,34 @@ class LeadExport implements FromCollection, WithHeadings, WithMapping
             });
         }
 
-        return $query->orderBy('id', 'desc')->get();
+        return $query;
+    }
+
+    /**
+     * Writes every row as CSV to $handle, 1,000 leads at a time, so memory stays
+     * flat however many leads the tenant has (the old in-memory export failed
+     * with HTTP 500 at ~50k leads).
+     *
+     * @param resource $handle
+     */
+    public function streamCsv($handle): void
+    {
+        fwrite($handle, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel opens accents correctly
+        fputcsv($handle, $this->headings());
+
+        foreach ($this->query()->lazyByIdDesc(1000) as $lead) {
+            fputcsv($handle, array_map([self::class, 'csvSafe'], $this->map($lead)));
+        }
+    }
+
+    /** Stops spreadsheet apps from treating a cell as a formula (CSV injection). */
+    private static function csvSafe(mixed $value): mixed
+    {
+        if (is_string($value) && $value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 
     /**

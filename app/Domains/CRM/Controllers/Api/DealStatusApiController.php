@@ -18,7 +18,7 @@ class DealStatusApiController extends Controller
 
     private function resolveTenantId(): int
     {
-        return (int)(auth()->user()?->tenant_id ?? (tenant_id() ?? 1));
+        return (int)(auth()->user()?->tenant_id ?? require_tenant_id());
     }
 
     /**

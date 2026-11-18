@@ -94,6 +94,7 @@ class Quotation extends BaseModel
         'total_amount'    => 'decimal:2',
         'is_current'      => 'boolean',
         'revision_number' => 'integer',
+        'terms_conditions' => \App\Casts\SafeHtml::class,
     ];
 
     public function getEffectiveTaxModeAttribute(): string

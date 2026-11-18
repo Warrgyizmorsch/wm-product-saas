@@ -88,6 +88,8 @@ class PurchaseOrder extends BaseModel
         'igst_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'grand_total' => 'decimal:2',
+        'notes' => \App\Casts\SafeHtml::class,
+        'terms_conditions' => \App\Casts\SafeHtml::class,
     ];
 
     public function getOrderNumberAttribute(): string

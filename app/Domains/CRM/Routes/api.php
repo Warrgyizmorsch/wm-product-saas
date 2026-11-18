@@ -24,12 +24,12 @@ Route::prefix('api/crm')
         // ==========================================
         Route::prefix('lead-statuses')->name('lead-statuses.')->group(function () {
             Route::get('/', [LeadStatusApiController::class, 'index'])->name('index');
-            Route::post('/', [LeadStatusApiController::class, 'store'])->name('store');
-            Route::post('/reorder', [LeadStatusApiController::class, 'reorder'])->name('reorder');
+            Route::post('/', [LeadStatusApiController::class, 'store'])->middleware('permission:crm.masters.manage')->name('store');
+            Route::post('/reorder', [LeadStatusApiController::class, 'reorder'])->middleware('permission:crm.masters.manage')->name('reorder');
             Route::get('/{leadStatus}', [LeadStatusApiController::class, 'show'])->whereNumber('leadStatus')->name('show');
-            Route::put('/{leadStatus}', [LeadStatusApiController::class, 'update'])->whereNumber('leadStatus')->name('update');
-            Route::patch('/{leadStatus}', [LeadStatusApiController::class, 'update'])->whereNumber('leadStatus')->name('patch');
-            Route::delete('/{leadStatus}', [LeadStatusApiController::class, 'destroy'])->whereNumber('leadStatus')->name('destroy');
+            Route::put('/{leadStatus}', [LeadStatusApiController::class, 'update'])->middleware('permission:crm.masters.manage')->whereNumber('leadStatus')->name('update');
+            Route::patch('/{leadStatus}', [LeadStatusApiController::class, 'update'])->middleware('permission:crm.masters.manage')->whereNumber('leadStatus')->name('patch');
+            Route::delete('/{leadStatus}', [LeadStatusApiController::class, 'destroy'])->middleware('permission:crm.masters.manage')->whereNumber('leadStatus')->name('destroy');
         });
 
         // ==========================================
@@ -37,12 +37,12 @@ Route::prefix('api/crm')
         // ==========================================
         Route::prefix('deal-statuses')->name('deal-statuses.')->group(function () {
             Route::get('/', [DealStatusApiController::class, 'index'])->name('index');
-            Route::post('/', [DealStatusApiController::class, 'store'])->name('store');
-            Route::post('/reorder', [DealStatusApiController::class, 'reorder'])->name('reorder');
+            Route::post('/', [DealStatusApiController::class, 'store'])->middleware('permission:crm.masters.manage')->name('store');
+            Route::post('/reorder', [DealStatusApiController::class, 'reorder'])->middleware('permission:crm.masters.manage')->name('reorder');
             Route::get('/{dealStatus}', [DealStatusApiController::class, 'show'])->whereNumber('dealStatus')->name('show');
-            Route::put('/{dealStatus}', [DealStatusApiController::class, 'update'])->whereNumber('dealStatus')->name('update');
-            Route::patch('/{dealStatus}', [DealStatusApiController::class, 'update'])->whereNumber('dealStatus')->name('patch');
-            Route::delete('/{dealStatus}', [DealStatusApiController::class, 'destroy'])->whereNumber('dealStatus')->name('destroy');
+            Route::put('/{dealStatus}', [DealStatusApiController::class, 'update'])->middleware('permission:crm.masters.manage')->whereNumber('dealStatus')->name('update');
+            Route::patch('/{dealStatus}', [DealStatusApiController::class, 'update'])->middleware('permission:crm.masters.manage')->whereNumber('dealStatus')->name('patch');
+            Route::delete('/{dealStatus}', [DealStatusApiController::class, 'destroy'])->middleware('permission:crm.masters.manage')->whereNumber('dealStatus')->name('destroy');
         });
 
         // ==========================================
@@ -138,6 +138,7 @@ Route::prefix('api/crm')
         Route::match(['put', 'patch', 'post'], 'followups/{followup}/status', [LeadFollowupApiController::class, 'updateStatus'])->whereNumber('followup')->name('followups.status');
         Route::match(['put', 'patch', 'post'], 'followups/{followup}/assign', [LeadFollowupApiController::class, 'assignMeeting'])->whereNumber('followup')->name('followups.assign');
         Route::delete('followups/{followup}', [LeadFollowupApiController::class, 'destroy'])->whereNumber('followup')->name('followups.destroy');
+        Route::get('documents/{document}/download', [LeadApiController::class, 'downloadDocument'])->whereNumber('document')->name('documents.download');
         Route::delete('documents/{document}', [LeadApiController::class, 'deleteDocument'])->whereNumber('document')->name('documents.destroy');
 
         // Nested lead followups routes
@@ -217,6 +218,6 @@ Route::prefix('api/crm')
         // ==========================================
         Route::prefix('settings')->name('settings.')->group(function () {
             Route::get('/', [\App\Domains\CRM\Controllers\Api\CrmSettingsApiController::class, 'index'])->name('index');
-            Route::post('/', [\App\Domains\CRM\Controllers\Api\CrmSettingsApiController::class, 'update'])->name('update');
+            Route::post('/', [\App\Domains\CRM\Controllers\Api\CrmSettingsApiController::class, 'update'])->middleware('permission:crm.settings.manage')->name('update');
         });
     });
