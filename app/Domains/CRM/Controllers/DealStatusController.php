@@ -36,8 +36,10 @@ class DealStatusController extends Controller
             }
         }
 
-        $sortBy = $request->input('sort_by', 'sort_order');
-        $sortOrder = $request->input('sort_order', 'asc');
+        // Only known columns and directions: anything else used to raise a SQL error (HTTP 500).
+        $sortBy = in_array($request->input('sort_by'), ['sort_order', 'name', 'created_at', 'id'], true)
+            ? $request->input('sort_by') : 'sort_order';
+        $sortOrder = strtolower((string) $request->input('sort_order')) === 'desc' ? 'desc' : 'asc';
         $query->orderBy($sortBy, $sortOrder)->orderBy('id', 'asc');
 
         $statuses = $query->paginate(15)->withQueryString();
@@ -49,7 +51,7 @@ class DealStatusController extends Controller
     {
         $this->authorize('create', DealStatus::class);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $validated = $request->validate([
             'name'        => [
@@ -90,7 +92,7 @@ class DealStatusController extends Controller
     {
         $this->authorize('update', $dealStatus);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $validated = $request->validate([
             'name'        => [
@@ -169,7 +171,7 @@ class DealStatusController extends Controller
     {
         $this->authorize('update', $dealStatus);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $statuses = $this->service->getAllStatuses($tenantId)->values();
 
         $currentIndex = $statuses->search(fn($item) => $item->id === $dealStatus->id);

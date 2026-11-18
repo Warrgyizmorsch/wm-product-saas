@@ -50,7 +50,9 @@ return [
     |
     */
 
-    'expiration' => null,
+    // API tokens expire after 30 days by default (a stolen token used to work
+    // until someone deleted it). sanctum:prune-expired runs daily.
+    'expiration' => env('SANCTUM_EXPIRATION', 60 * 24 * 30),
 
     /*
     |--------------------------------------------------------------------------

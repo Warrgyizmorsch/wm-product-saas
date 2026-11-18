@@ -14,119 +14,139 @@ class LeadDuplicateService
      */
     public function getDuplicateGraph(int $tenantId): array
     {
-        $cacheKey = "tenant_{$tenantId}_dup_graph";
+        // v2: the cached graph holds only integer maps (no per-lead meta), and is
+        // stored compressed. The old graph (~430 bytes per lead) overflowed the
+        // database cache row above ~37k leads and needed 200+ MB to build.
+        $cacheKey = "tenant_{$tenantId}_dup_graph_v2";
 
-        return Cache::remember($cacheKey, 60, function () use ($tenantId) {
-            $allLeads = Lead::query()
-                ->where('tenant_id', $tenantId)
-                ->whereNull('deleted_at')
-                ->select(['id', 'lead_number', 'gstin', 'email', 'company_email', 'phone', 'company_phone'])
-                ->orderBy('id', 'asc')
-                ->get();
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && ($decoded = @gzuncompress(base64_decode($cached))) !== false) {
+            $graph = @unserialize($decoded, ['allowed_classes' => false]);
+            if (is_array($graph)) {
+                return $graph;
+            }
+        }
 
-            $leadMetaMap = [];
-            $gstinIndex = [];
-            $emailIndex = [];
-            $phoneIndex = [];
+        $graph = $this->buildDuplicateGraph($tenantId);
+        Cache::put($cacheKey, base64_encode(gzcompress(serialize($graph), 6)), 60);
 
-            $duplicateOfMap = [];
-            $originalHasDuplicates = [];
+        return $graph;
+    }
 
-            foreach ($allLeads as $l) {
-                $id = $l->id;
-                $gstin = !empty($l->gstin) ? strtoupper(trim($l->gstin)) : null;
-                $ce = !empty($l->email) ? strtolower(trim($l->email)) : null;
-                $compE = !empty($l->company_email) ? strtolower(trim($l->company_email)) : null;
-                $cp = !empty($l->phone) ? preg_replace('/[^0-9]/', '', $l->phone) : null;
-                $compP = !empty($l->company_phone) ? preg_replace('/[^0-9]/', '', $l->company_phone) : null;
+    private function buildDuplicateGraph(int $tenantId): array
+    {
+        $allLeads = Lead::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->select(['id', 'gstin', 'email', 'company_email', 'phone', 'company_phone'])
+            ->toBase()
+            ->lazyById(2000, 'id');
 
-                $emails = array_values(array_unique(array_filter([$ce, $compE])));
-                $phones = array_values(array_unique(array_filter([$cp, $compP], fn($p) => strlen($p) >= 5)));
+        $gstinIndex = [];
+        $emailIndex = [];
+        $phoneIndex = [];
 
-                $num = $l->lead_number ?: ('LD-' . str_pad((string)$id, 4, '0', STR_PAD_LEFT));
+        $duplicateOfMap = [];
+        $originalHasDuplicates = [];
 
-                $leadMetaMap[$id] = [
-                    'id' => $id,
-                    'lead_number' => $num,
-                    'gstin' => $gstin,
-                    'contact_email' => $ce,
-                    'company_email' => $compE,
-                    'contact_phone' => $cp,
-                    'company_phone' => $compP,
-                    'emails' => $emails,
-                    'phones' => $phones,
-                ];
+        foreach ($allLeads as $l) {
+            $id = $l->id;
+            $gstin = !empty($l->gstin) ? strtoupper(trim($l->gstin)) : null;
+            $ce = !empty($l->email) ? strtolower(trim($l->email)) : null;
+            $compE = !empty($l->company_email) ? strtolower(trim($l->company_email)) : null;
+            $cp = !empty($l->phone) ? preg_replace('/[^0-9]/', '', $l->phone) : null;
+            $compP = !empty($l->company_phone) ? preg_replace('/[^0-9]/', '', $l->company_phone) : null;
 
-                // Find matches from earlier leads using inverted indexes (O(1) lookups)
-                $earlierMatches = [];
+            $emails = array_values(array_unique(array_filter([$ce, $compE])));
+            $phones = array_values(array_unique(array_filter([$cp, $compP], fn($p) => strlen($p) >= 5)));
 
-                if (!empty($gstin) && isset($gstinIndex[$gstin])) {
-                    foreach ($gstinIndex[$gstin] as $mId) {
+
+            // Find matches from earlier leads using inverted indexes (O(1) lookups)
+            $earlierMatches = [];
+
+            if (!empty($gstin) && isset($gstinIndex[$gstin])) {
+                foreach ($gstinIndex[$gstin] as $mId) {
+                    $earlierMatches[$mId] = true;
+                }
+            }
+
+            foreach ($emails as $em) {
+                if (isset($emailIndex[$em])) {
+                    foreach ($emailIndex[$em] as $mId) {
                         $earlierMatches[$mId] = true;
-                    }
-                }
-
-                foreach ($emails as $em) {
-                    if (isset($emailIndex[$em])) {
-                        foreach ($emailIndex[$em] as $mId) {
-                            $earlierMatches[$mId] = true;
-                        }
-                    }
-                }
-
-                foreach ($phones as $ph) {
-                    if (isset($phoneIndex[$ph])) {
-                        foreach ($phoneIndex[$ph] as $mId) {
-                            $earlierMatches[$mId] = true;
-                        }
-                    }
-                    if (strlen($ph) >= 10) {
-                        $suffix = substr($ph, -10);
-                        if (isset($phoneIndex[$suffix])) {
-                            foreach ($phoneIndex[$suffix] as $mId) {
-                                $earlierMatches[$mId] = true;
-                            }
-                        }
-                    }
-                }
-
-                if (!empty($earlierMatches)) {
-                    $origId = min(array_keys($earlierMatches));
-                    while (isset($duplicateOfMap[$origId])) {
-                        $origId = $duplicateOfMap[$origId];
-                    }
-                    $duplicateOfMap[$id] = $origId;
-                    $originalHasDuplicates[$origId] = true;
-                }
-
-                // Register this lead into inverted indexes for subsequent leads
-                if (!empty($gstin)) {
-                    $gstinIndex[$gstin][] = $id;
-                }
-                foreach ($emails as $em) {
-                    $emailIndex[$em][] = $id;
-                }
-                foreach ($phones as $ph) {
-                    $phoneIndex[$ph][] = $id;
-                    if (strlen($ph) >= 10) {
-                        $phoneIndex[substr($ph, -10)][] = $id;
                     }
                 }
             }
 
-            $allDuplicateAndOriginalIds = array_values(array_unique(array_merge(
-                array_keys($duplicateOfMap),
-                array_keys($originalHasDuplicates)
-            )));
+            foreach ($phones as $ph) {
+                if (isset($phoneIndex[$ph])) {
+                    foreach ($phoneIndex[$ph] as $mId) {
+                        $earlierMatches[$mId] = true;
+                    }
+                }
+                if (strlen($ph) >= 10) {
+                    $suffix = substr($ph, -10);
+                    if (isset($phoneIndex[$suffix])) {
+                        foreach ($phoneIndex[$suffix] as $mId) {
+                            $earlierMatches[$mId] = true;
+                        }
+                    }
+                }
+            }
 
-            return [
-                'duplicateOfMap' => $duplicateOfMap,
-                'originalHasDuplicates' => $originalHasDuplicates,
-                'leadMetaMap' => $leadMetaMap,
-                'allDuplicateAndOriginalIds' => $allDuplicateAndOriginalIds,
-                'duplicatesCount' => count($allDuplicateAndOriginalIds),
-            ];
-        });
+            if (!empty($earlierMatches)) {
+                $origId = min(array_keys($earlierMatches));
+                while (isset($duplicateOfMap[$origId])) {
+                    $origId = $duplicateOfMap[$origId];
+                }
+                $duplicateOfMap[$id] = $origId;
+                $originalHasDuplicates[$origId] = true;
+            }
+
+            // Register this lead into inverted indexes for subsequent leads
+            if (!empty($gstin)) {
+                $gstinIndex[$gstin][] = $id;
+            }
+            foreach ($emails as $em) {
+                $emailIndex[$em][] = $id;
+            }
+            foreach ($phones as $ph) {
+                $phoneIndex[$ph][] = $id;
+                if (strlen($ph) >= 10) {
+                    $phoneIndex[substr($ph, -10)][] = $id;
+                }
+            }
+        }
+
+        $allDuplicateAndOriginalIds = array_values(array_unique(array_merge(
+            array_keys($duplicateOfMap),
+            array_keys($originalHasDuplicates)
+        )));
+
+        return [
+            'duplicateOfMap' => $duplicateOfMap,
+            'originalHasDuplicates' => $originalHasDuplicates,
+            'allDuplicateAndOriginalIds' => $allDuplicateAndOriginalIds,
+            'duplicatesCount' => count($allDuplicateAndOriginalIds),
+        ];
+    }
+
+    /**
+     * Normalised match keys for one lead row (model or plain object).
+     */
+    private function metaFor(object $l): array
+    {
+        $id = (int) $l->id;
+
+        return [
+            'id' => $id,
+            'lead_number' => ($l->lead_number ?? null) ?: ('LD-' . str_pad((string) $id, 4, '0', STR_PAD_LEFT)),
+            'gstin' => !empty($l->gstin) ? strtoupper(trim($l->gstin)) : null,
+            'contact_email' => !empty($l->email) ? strtolower(trim($l->email)) : null,
+            'company_email' => !empty($l->company_email) ? strtolower(trim($l->company_email)) : null,
+            'contact_phone' => !empty($l->phone) ? preg_replace('/[^0-9]/', '', $l->phone) : null,
+            'company_phone' => !empty($l->company_phone) ? preg_replace('/[^0-9]/', '', $l->company_phone) : null,
+        ];
     }
 
     /**
@@ -138,10 +158,29 @@ class LeadDuplicateService
         $graph = $this->getDuplicateGraph($tenantId);
         $duplicateOfMap = $graph['duplicateOfMap'];
         $originalHasDuplicates = $graph['originalHasDuplicates'];
-        $leadMetaMap = $graph['leadMetaMap'];
 
         if (empty($leads)) {
             return $graph['duplicatesCount'];
+        }
+
+        // Meta for this page's leads, plus the originals they point at.
+        $leadMetaMap = [];
+        $originalIds = [];
+        foreach ($leads as $pageLead) {
+            $leadMetaMap[(int) $pageLead->id] = $this->metaFor($pageLead);
+            if (isset($duplicateOfMap[$pageLead->id])) {
+                $originalIds[] = $duplicateOfMap[$pageLead->id];
+            }
+        }
+        $missingIds = array_values(array_diff(array_unique($originalIds), array_keys($leadMetaMap)));
+        if ($missingIds !== []) {
+            Lead::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->whereIn('id', $missingIds)
+                ->get(['id', 'lead_number', 'gstin', 'email', 'company_email', 'phone', 'company_phone'])
+                ->each(function ($original) use (&$leadMetaMap) {
+                    $leadMetaMap[(int) $original->id] = $this->metaFor($original);
+                });
         }
 
         foreach ($leads as $lead) {

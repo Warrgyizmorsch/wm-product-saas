@@ -17,7 +17,7 @@ class CrmDashboardApiController extends Controller
     private function resolveTenantContext(): array
     {
         $user      = auth()->user();
-        $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
+        $tenantId  = $user?->tenant_id  ?? require_tenant_id();
         $companyId = company_id() ?? $user?->company_id;
         $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
 

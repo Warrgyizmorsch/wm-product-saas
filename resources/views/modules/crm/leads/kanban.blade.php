@@ -373,6 +373,12 @@
                             <i class="feather-inbox fs-3 d-block mb-1"></i>No leads in {{ $status }}
                         </div>
                     @endforelse
+                    @php $hiddenLeads = $columnData['count'] - $leads->count(); @endphp
+                    @if($hiddenLeads > 0)
+                        <a href="{{ route('crm.leads.index', ['status' => $status]) }}" class="d-block text-center py-2 fs-12 text-primary kanban-more-link">
+                            +{{ $hiddenLeads }} more &rarr;
+                        </a>
+                    @endif
                 </div>
             </div>
         @endforeach

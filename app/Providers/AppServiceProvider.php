@@ -38,6 +38,14 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Branching::class);
         $this->app->singleton(BranchContext::class, fn ($app) => $app->make(Branching::class));
 
+        // One AccessService per request / queued job so its memoised permission
+        // decisions never outlive the request or leak to another user.
+        $this->app->scoped(\App\Services\Access\AccessService::class);
+
+        // dompdf's inline PHP stays off (config/dompdf.php); templates that want
+        // "Page X of Y" declare a <meta name="pdf-page-numbers"> tag instead.
+        $this->app->extend('dompdf.wrapper', fn ($pdf) => \App\Support\PdfPageNumbers::register($pdf));
+
         // Loads every module's Routes/menu.php once per request.
         $this->app->singleton(\App\Core\Navigation\MenuRegistry::class);
 
@@ -493,6 +501,26 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // AccessService memoises RBAC rows for the request. Drop that memo when
+        // any RBAC row changes, and after every request (tests and long-running
+        // workers reuse one container across requests).
+        $flushAccess = function (): void {
+            if ($this->app->resolved(\App\Services\Access\AccessService::class)) {
+                $this->app->make(\App\Services\Access\AccessService::class)->flush();
+            }
+        };
+        foreach ([
+            \App\Models\Access\Role::class,
+            \App\Models\Access\Permission::class,
+            \App\Models\Access\RolePermission::class,
+            \App\Models\Access\UserRole::class,
+            \App\Models\Access\UserPermissionOverride::class,
+        ] as $rbacModel) {
+            $rbacModel::saved($flushAccess);
+            $rbacModel::deleted($flushAccess);
+        }
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Foundation\Http\Events\RequestHandled::class, $flushAccess);
+
         // Some hosts (older MySQL/MariaDB, or MyISAM as the effective engine) cap
         // index keys at 1000 bytes; utf8mb4 string(255) unique columns (e.g.
         // users.email) exceed that. 191 chars * 4 bytes = 764 bytes, safely under it.
@@ -536,6 +564,14 @@ class AppServiceProvider extends ServiceProvider
             $client = $request->user()?->id ? "u:{$request->user()->id}" : "ip:{$request->ip()}";
             return "t:{$tenantId}:{$client}";
         };
+
+        // Public web-to-lead form: keyed on tenant + IP, so one busy office behind a
+        // NAT posting to one tenant's form doesn't use up another form's budget.
+        \Illuminate\Support\Facades\RateLimiter::for('public-lead-form', function (\Illuminate\Http\Request $request) {
+            $form = (string) ($request->input('tenant') ?: $request->input('tenant_id') ?: 'unknown');
+
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(30)->by(sha1($form . '|' . $request->ip()));
+        });
 
         // Accounting integration kit: the relay polls and reports one job at a time.
         \Illuminate\Support\Facades\RateLimiter::for('accounting-integration', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {

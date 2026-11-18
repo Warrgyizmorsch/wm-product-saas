@@ -366,7 +366,7 @@ class LeadService
         $uploadedIds = $lead->documents ?? [];
 
         foreach ($files as $file) {
-            $path = $file->storeTenantFile('lead_documents/' . $lead->id, 'public');
+            $path = $file->storeTenantFile('lead_documents/' . $lead->id, 'local');
 
             $document = LeadDocument::create([
                 'tenant_id' => $lead->tenant_id,
@@ -391,6 +391,7 @@ class LeadService
     {
         $lead = $document->lead;
         $document->delete();
+        Storage::disk('local')->delete($document->file_path);
         Storage::disk('public')->delete($document->file_path);
 
         if ($lead) {

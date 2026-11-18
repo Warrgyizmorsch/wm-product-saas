@@ -33,7 +33,29 @@ class QuotationService
         return $this->quotations->find($id);
     }
 
+    /**
+     * Allocates the next quotation number for the current tenant. Use only when
+     * the number is about to be saved; previewNextQuotationNumber() is for display.
+     */
     public function getNextQuotationNumber(): string
+    {
+        $tenantId = require_tenant_id();
+        $year = now()->format('Y');
+        $prefix = "{$year}-";
+
+        $next = \App\Support\TenantSequence::next($tenantId, "quotation:{$year}", fn () => \App\Support\TenantSequence::highestSuffix(
+            Quotation::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('quotation_number', 'like', "{$prefix}%")
+                ->pluck('quotation_number')
+                ->map(fn ($n) => str_replace('QT-', '', (string) $n))
+        ));
+
+        return 'QT-' . $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+    }
+
+    /** Likely next number, for showing on forms. Does not reserve it. */
+    public function previewNextQuotationNumber(): string
     {
         $year = now()->format('Y');
         $prefix = "{$year}-";

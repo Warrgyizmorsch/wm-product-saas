@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="pdf-page-numbers" content="right=85;bottom=22;size=8;font=DejaVu Sans">
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Payment Voucher - {{ $payment->payment_number }}</title>
@@ -661,19 +662,5 @@
     </table>
 
     <!-- ── 7. INLINE CANVAS SCRIPT FOR EXACT PAGE NUMBERING (Page 1 of 1, etc.) ── -->
-    <script type="text/php">
-        if (isset($pdf)) {
-            $pdf->page_script(function ($pageNumber, $pageCount, $canvas, $fontMetrics) {
-                $text = "Page " . $pageNumber . " of " . $pageCount;
-                $font = $fontMetrics->getFont("DejaVu Sans", "normal");
-                $size = 8;
-                $color = array(100/255, 116/255, 139/255);
-                $w = $canvas->get_width();
-                $h = $canvas->get_height();
-                $canvas->text($w - 85, $h - 22, $text, $font, $size, $color);
-            });
-        }
-    </script>
-
 </body>
 </html>

@@ -97,10 +97,10 @@ class QuotationController extends Controller
             : ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'];
 
         $validated = $request->validate([
-            'lead_id'             => ['nullable', 'integer', 'exists:leads,id'],
-            'crm_account_id'      => ['nullable', 'integer', 'exists:crm_accounts,id'],
-            'crm_deal_id'         => ['nullable', 'integer', 'exists:crm_deals,id'],
-            'sales_person_id'     => ['nullable', 'exists:users,id'],
+            'lead_id'             => ['nullable', 'integer', tenant_exists('leads')],
+            'crm_account_id'      => ['nullable', 'integer', tenant_exists('crm_accounts')],
+            'crm_deal_id'         => ['nullable', 'integer', tenant_exists('crm_deals')],
+            'sales_person_id'     => ['nullable', tenant_exists('users')],
             'quotation_number'    => ['required', 'string', 'max:255'],
             'quotation_date'      => ['required', 'date'],
             'expiry_date'         => ['nullable', 'date', 'after_or_equal:quotation_date'],
@@ -114,7 +114,7 @@ class QuotationController extends Controller
             'phone'               => ['nullable', 'string', 'max:50'],
             'email'               => ['nullable', 'email', 'max:255'],
             'items.*.item_name'   => ['nullable', 'string', 'max:255'],
-            'items.*.product_id'  => ['required', 'integer', 'exists:products,id'],
+            'items.*.product_id'  => ['required', 'integer', tenant_exists('products')],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'numeric', 'min:0.01'],
             'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
@@ -195,7 +195,6 @@ class QuotationController extends Controller
         $this->authorize('view', $quotation);
 
         $pdf = Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
-        $pdf->setOption('isPhpEnabled', true);
         if (request()->has('preview') || request()->has('stream')) {
             return $pdf->stream("Quotation_{$quotation->quotation_number}.pdf");
         }
@@ -370,10 +369,10 @@ class QuotationController extends Controller
             : ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'];
 
         $validated = $request->validate([
-            'lead_id'             => ['nullable', 'integer', 'exists:leads,id'],
-            'crm_account_id'      => ['nullable', 'integer', 'exists:crm_accounts,id'],
-            'crm_deal_id'         => ['nullable', 'integer', 'exists:crm_deals,id'],
-            'sales_person_id'     => ['nullable', 'exists:users,id'],
+            'lead_id'             => ['nullable', 'integer', tenant_exists('leads')],
+            'crm_account_id'      => ['nullable', 'integer', tenant_exists('crm_accounts')],
+            'crm_deal_id'         => ['nullable', 'integer', tenant_exists('crm_deals')],
+            'sales_person_id'     => ['nullable', tenant_exists('users')],
             'quotation_number'    => ['required', 'string', 'max:255'],
             'quotation_date'      => ['required', 'date'],
             'expiry_date'         => ['nullable', 'date', 'after_or_equal:quotation_date'],
@@ -387,7 +386,7 @@ class QuotationController extends Controller
             'phone'               => ['nullable', 'string', 'max:50'],
             'email'               => ['nullable', 'email', 'max:255'],
             'items.*.item_name'   => ['nullable', 'string', 'max:255'],
-            'items.*.product_id'  => ['required', 'integer', 'exists:products,id'],
+            'items.*.product_id'  => ['required', 'integer', tenant_exists('products')],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'numeric', 'min:0.01'],
             'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
@@ -577,7 +576,7 @@ class QuotationController extends Controller
         if (!$quotation) abort(404, 'Quotation not found.');
         $this->authorize('update', $quotation);
 
-        $tenantId = $quotation->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $quotation->tenant_id ?? require_tenant_id();
         $lead = $quotation->lead;
 
         $gstin = trim((string)($lead ? $lead->gstin : ($quotation->gstin ?? '')));
@@ -658,10 +657,10 @@ class QuotationController extends Controller
 
         $request->validate([
             'conversion_mode'      => 'required|string|in:existing,create_new',
-            'existing_customer_id' => 'required_if:conversion_mode,existing|nullable|integer|exists:customers,id',
+            'existing_customer_id' => ['required_if:conversion_mode,existing', 'nullable', 'integer', tenant_exists('customers')],
         ]);
 
-        $tenantId = $quotation->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $quotation->tenant_id ?? require_tenant_id();
         $mode = $request->input('conversion_mode');
 
         if ($mode === 'existing') {

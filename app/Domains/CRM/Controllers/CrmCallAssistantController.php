@@ -56,7 +56,7 @@ class CrmCallAssistantController extends Controller
             }
         }
 
-        $tenantId = $lead->tenant_id ?? (current_tenant_id() ?? 1);
+        $tenantId = $lead->tenant_id ?? (current_require_tenant_id());
         $twilioConfig = TwilioConfiguration::where('tenant_id', $tenantId)->first();
         $apiKey = $twilioConfig?->gemini_api_key ?: (config('services.gemini.api_key') ?: env('GEMINI_API_KEY'));
         if (empty($apiKey)) {
@@ -303,11 +303,11 @@ class CrmCallAssistantController extends Controller
             'next_action' => ['nullable', 'string', 'max:100'],
             'lead_status' => ['nullable', 'string', 'max:50'],
             'sentiment' => ['nullable', 'string', 'max:50'],
-            'pending_followup_id' => ['nullable', 'integer'],
+            'pending_followup_id' => ['nullable', 'integer', tenant_exists('lead_followups')],
             'recording_url' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $tenantId = $lead->tenant_id ?? (current_tenant_id() ?? 1);
+        $tenantId = $lead->tenant_id ?? (current_require_tenant_id());
         $companyId = $lead->company_id ?? current_company_id();
         $branchId = $lead->branch_id ?? current_branch_id();
         $userId = auth()->id() ?: ($lead->lead_owner_id ?: 1);
@@ -455,7 +455,7 @@ class CrmCallAssistantController extends Controller
             }
         }
 
-        $tenantId = $lead->tenant_id ?? (current_tenant_id() ?? 1);
+        $tenantId = $lead->tenant_id ?? (current_require_tenant_id());
         $twilioConfig = TwilioConfiguration::where('tenant_id', $tenantId)->first();
 
         if (!$twilioConfig || empty($twilioConfig->account_sid) || empty($twilioConfig->auth_token) || empty($twilioConfig->phone_number)) {
@@ -528,7 +528,7 @@ class CrmCallAssistantController extends Controller
         $this->authorize('update', $lead);
 
         $callSid = $request->input('call_sid');
-        $tenantId = $lead->tenant_id ?? (current_tenant_id() ?? 1);
+        $tenantId = $lead->tenant_id ?? (current_require_tenant_id());
         $twilioConfig = TwilioConfiguration::where('tenant_id', $tenantId)->first();
 
         if ($twilioConfig && !empty($twilioConfig->account_sid) && !empty($twilioConfig->auth_token)) {
@@ -599,7 +599,7 @@ class CrmCallAssistantController extends Controller
             return response()->json(['success' => false, 'status' => 'unknown', 'message' => 'No Call SID provided.']);
         }
 
-        $tenantId = $lead->tenant_id ?? (current_tenant_id() ?? 1);
+        $tenantId = $lead->tenant_id ?? (current_require_tenant_id());
         $twilioConfig = TwilioConfiguration::where('tenant_id', $tenantId)->first();
 
         if (!$twilioConfig || empty($twilioConfig->account_sid) || empty($twilioConfig->auth_token)) {
@@ -698,8 +698,12 @@ class CrmCallAssistantController extends Controller
         $toNumber = $request->input('To') ?: $request->input('to_number');
         $fromNumber = $request->input('From') ?: $request->input('Caller');
 
-        $twilioConfig = TwilioConfiguration::where('is_active', true)->first();
-        $callerId = $twilioConfig?->phone_number ?: $fromNumber;
+        // Set by VerifyTwilioSignature: the config that owns this signed request.
+        $twilioConfig = $request->attributes->get('twilioConfig');
+        $callerId = $twilioConfig?->phone_number;
+        if (empty($callerId)) {
+            return response('<?xml version="1.0" encoding="UTF-8"?>' . "\n" . '<Response><Reject/></Response>', 200, ['Content-Type' => 'text/xml']);
+        }
 
         // Clean target number to E.164
         $cleanToNumber = preg_replace('/[^\d+]/', '', (string)$toNumber);
@@ -727,7 +731,12 @@ class CrmCallAssistantController extends Controller
      */
     public function handleTwilioStatusWebhook(Request $request): \Illuminate\Http\Response
     {
-        Log::info('Twilio Status Callback: ' . json_encode($request->all()));
+        // IDs and status only: the full payload carries customer phone numbers.
+        Log::info('Twilio Status Callback', [
+            'call_sid' => $request->input('CallSid'),
+            'status' => $request->input('CallStatus'),
+            'duration' => $request->input('CallDuration'),
+        ]);
         return response('<Response/>', 200, ['Content-Type' => 'text/xml']);
     }
 
@@ -991,7 +1000,7 @@ PROMPT;
             }
         }
 
-        $tenantId = $deal->tenant_id ?? (current_tenant_id() ?? 1);
+        $tenantId = $deal->tenant_id ?? (current_require_tenant_id());
         $twilioConfig = TwilioConfiguration::where('tenant_id', $tenantId)->first();
 
         if (!$twilioConfig || empty($twilioConfig->account_sid) || empty($twilioConfig->auth_token) || empty($twilioConfig->phone_number)) {
@@ -1060,7 +1069,7 @@ PROMPT;
         $this->authorize('update', $deal);
 
         $callSid = $request->input('call_sid');
-        $tenantId = $deal->tenant_id ?? (current_tenant_id() ?? 1);
+        $tenantId = $deal->tenant_id ?? (current_require_tenant_id());
         $twilioConfig = TwilioConfiguration::where('tenant_id', $tenantId)->first();
 
         if ($twilioConfig && !empty($twilioConfig->account_sid) && !empty($twilioConfig->auth_token)) {
@@ -1131,7 +1140,7 @@ PROMPT;
             return response()->json(['success' => false, 'status' => 'unknown', 'message' => 'No Call SID provided.']);
         }
 
-        $tenantId = $deal->tenant_id ?? (current_tenant_id() ?? 1);
+        $tenantId = $deal->tenant_id ?? (current_require_tenant_id());
         $twilioConfig = TwilioConfiguration::where('tenant_id', $tenantId)->first();
 
         if (!$twilioConfig || empty($twilioConfig->account_sid) || empty($twilioConfig->auth_token)) {
@@ -1200,7 +1209,7 @@ PROMPT;
             }
         }
 
-        $tenantId = $deal->tenant_id ?? (current_tenant_id() ?? 1);
+        $tenantId = $deal->tenant_id ?? (current_require_tenant_id());
         $twilioConfig = TwilioConfiguration::where('tenant_id', $tenantId)->first();
         $apiKey = $twilioConfig?->gemini_api_key ?: (config('services.gemini.api_key') ?: env('GEMINI_API_KEY'));
         if (empty($apiKey)) {
@@ -1425,11 +1434,11 @@ PROMPT;
             'stage' => ['nullable', 'string', 'max:50'],
             'deal_stage' => ['nullable', 'string', 'max:50'],
             'sentiment' => ['nullable', 'string', 'max:50'],
-            'pending_followup_id' => ['nullable', 'integer'],
+            'pending_followup_id' => ['nullable', 'integer', tenant_exists('lead_followups')],
             'recording_url' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $tenantId = $deal->tenant_id ?? (current_tenant_id() ?? 1);
+        $tenantId = $deal->tenant_id ?? (current_require_tenant_id());
         $companyId = $deal->company_id ?? current_company_id();
         $branchId = $deal->branch_id ?? current_branch_id();
         $userId = auth()->id() ?: ($deal->owner_id ?: 1);

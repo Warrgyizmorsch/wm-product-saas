@@ -35,7 +35,9 @@
             if (isFetching) return;
             isFetching = true;
 
-            fetch('/global-approvals', {
+            // Server-rendered URL so installs under a sub-folder work too.
+            const approvalsUrl = (triggerEl && triggerEl.dataset.approvalsUrl) || 'global-approvals';
+            fetch(approvalsUrl, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',

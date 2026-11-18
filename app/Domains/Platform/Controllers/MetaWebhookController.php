@@ -41,11 +41,14 @@ class MetaWebhookController extends Controller
                 'status' => 'EVENT_RECEIVED',
                 'results' => $results,
             ], 200);
+        } catch (\App\Services\MetaWebhookSignatureException $e) {
+            return response()->json(['success' => false, 'status' => 'INVALID_SIGNATURE'], 403);
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('[Meta Webhook] Processing failed: '.$e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'status' => 'ERROR',
-                'message' => $e->getMessage(),
             ], 200); // Return 200 so Meta doesn't aggressively retry on parse failures
         }
     }

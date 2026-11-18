@@ -16,7 +16,7 @@ class CrmAccountApiController extends Controller
     private function resolveTenantContext(): array
     {
         $user      = auth()->user();
-        $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
+        $tenantId  = $user?->tenant_id  ?? require_tenant_id();
         $companyId = company_id() ?? $user?->company_id;
         $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
 
@@ -167,7 +167,7 @@ class CrmAccountApiController extends Controller
             'billing_state'   => 'nullable|string|max:100',
             'billing_country' => 'nullable|string|max:100',
             'billing_zip'     => 'nullable|string|regex:/^[0-9]+$/|max:10',
-            'owner_id'        => 'nullable|integer|exists:users,id',
+            'owner_id'        => ['nullable', 'integer', tenant_exists('users')],
             'status'          => 'nullable|string|in:active,inactive',
             // Primary contact fields (flat from screen)
             'contact_name'    => 'nullable|string|max:255',
@@ -344,7 +344,7 @@ class CrmAccountApiController extends Controller
             'billing_state'   => 'nullable|string|max:100',
             'billing_country' => 'nullable|string|max:100',
             'billing_zip'     => 'nullable|string|regex:/^[0-9]+$/|max:10',
-            'owner_id'        => 'nullable|integer|exists:users,id',
+            'owner_id'        => ['nullable', 'integer', tenant_exists('users')],
             'status'          => 'nullable|string|in:active,inactive',
         ], $this->accountValidationMessages());
 
@@ -406,8 +406,8 @@ class CrmAccountApiController extends Controller
         $this->authorize('update', $account);
 
         $validator = Validator::make($request->all(), [
-            'account_owner_id' => 'nullable|integer|exists:users,id',
-            'owner_id'         => 'nullable|integer|exists:users,id',
+            'account_owner_id' => ['nullable', 'integer', tenant_exists('users')],
+            'owner_id'         => ['nullable', 'integer', tenant_exists('users')],
             'note'             => 'nullable|string|max:500',
         ]);
 
@@ -446,9 +446,9 @@ class CrmAccountApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'account_ids'      => 'required|array|min:1',
-            'account_ids.*'    => 'required|integer|exists:crm_accounts,id',
-            'account_owner_id' => 'nullable|integer|exists:users,id',
-            'owner_id'         => 'nullable|integer|exists:users,id',
+            'account_ids.*'    => ['required', 'integer', tenant_exists('crm_accounts')],
+            'account_owner_id' => ['nullable', 'integer', tenant_exists('users')],
+            'owner_id'         => ['nullable', 'integer', tenant_exists('users')],
             'note'             => 'nullable|string|max:500',
         ]);
 
