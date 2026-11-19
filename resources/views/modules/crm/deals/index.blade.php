@@ -1114,6 +1114,12 @@
                 </tbody>
             </x-ui.odoo-form-ui>
         </div>
+
+        {{-- Pagination --}}
+        <div class="pt-3">
+            <x-ui.pagination :currentPage="$deals->currentPage()" :totalPages="$deals->lastPage()"
+                :totalResults="$deals->total()" :perPage="$deals->perPage()" />
+        </div>
     </div>
 
     <!-- Offcanvas Drawer: Quick Single & Bulk Deal Assignment -->
