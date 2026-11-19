@@ -17,7 +17,8 @@ class GoogleCalendarIntegrationService
 
     public function __construct()
     {
-        $this->baseUrl = config('services.google_workspace.base_url', 'https://love14-deal-health-scoring.hf.space');
+        // Set once in .env (DEAL_HEALTH_BASE_URL) via config/services.php.
+        $this->baseUrl = (string) config('services.deal_health.base_url');
     }
 
     /**

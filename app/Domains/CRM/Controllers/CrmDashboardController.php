@@ -184,7 +184,7 @@ class CrmDashboardController extends Controller
         $periodQuotationsQuery = (clone $quotationsQuery)->whereBetween('created_at', [$startDate, $endDate]);
 
         // 1. KPI Metrics
-        $currentLeadsCount = (clone $periodLeadsQuery)->count();
+        $currentLeadsCount = (clone $periodLeadsQuery)->count(); // index-only count, cheap
         $prevLeadsCount = (clone $leadsQuery)->whereBetween('created_at', [$prevStartDate, $prevEndDate])->count();
         $leadsGrowth = $this->calculatePercentageChange($prevLeadsCount, $currentLeadsCount);
 
@@ -219,68 +219,77 @@ class CrmDashboardController extends Controller
         $totalQuotationValue = $currentQuotations->sum('total_amount');
         $pendingQuotationsCount = (clone $periodQuotationsQuery)->whereIn('status', ['draft', 'pending_approval', 'sent'])->count();
 
+        // Every lead KPI on this page comes from ONE scan of the period's leads.
+        // They used to be ~10 separate queries (and before that, whole lead lists
+        // loaded into PHP), each re-reading every lead: ~1 s apiece at 1 lakh leads.
+        // "Qualified" keeps the old rule: any status other than New/Lost, NULL included.
+        $sourceGroups = [
+            'whatsapp' => ["source IN ('WhatsApp Bot', 'WhatsApp', 'whatsapp') OR utm_source = 'whatsapp'"],
+            'meta' => ["source IN ('Meta Ads', 'Facebook / Instagram', 'Meta', 'Facebook', 'Instagram') OR utm_source IN ('meta', 'facebook', 'instagram')"],
+            'web' => ["source IN ('Web Form', 'Website', 'Web / Inbound', 'Web-to-Lead', 'Widget', 'Embed Widget', 'Website Form') OR utm_source IN ('website', 'web', 'embed')"],
+            'third' => ["source IN ('Meta Ads', 'Facebook / Instagram', 'Meta', 'Facebook', 'Instagram', 'WhatsApp Bot', 'WhatsApp', 'whatsapp', "
+                . "'Web Form', 'Website', 'Web / Inbound', 'Web-to-Lead', 'Widget', 'Embed Widget', 'Website Form', "
+                . "'Justdial', 'JustDial', 'IndiaMART', 'Indiamart', 'TradeIndia', 'Tradeindia', 'Google Ads', "
+                . "'API', 'Webhook', 'Third-Party', 'Third Party', 'Portal') OR utm_source IS NOT NULL"],
+        ];
+        $qualifiedSql = "(status IS NULL OR status NOT IN ('New', 'Lost'))";
+        $wonSql = "status = 'Won'";
+        $selects = [
+            'COUNT(*) AS all_total',
+            "SUM(CASE WHEN {$qualifiedSql} THEN 1 ELSE 0 END) AS all_qualified",
+            "SUM(CASE WHEN {$wonSql} THEN 1 ELSE 0 END) AS all_won",
+            "SUM(CASE WHEN (crm_deal_id IS NOT NULL AND crm_deal_id <> 0) OR LOWER(status) IN ('qualified', 'dealing', 'won') THEN 1 ELSE 0 END) AS converted_total",
+            "SUM(CASE WHEN (crm_deal_id IS NOT NULL AND crm_deal_id <> 0) OR LOWER(status) IN ('qualified', 'dealing', 'won') THEN COALESCE(expected_amount, 0) ELSE 0 END) AS converted_value",
+        ];
+        foreach (['new', 'contacted', 'qualified', 'dealing', 'won'] as $statusKey) {
+            $selects[] = "SUM(CASE WHEN LOWER(status) = '{$statusKey}' THEN 1 ELSE 0 END) AS status_{$statusKey}";
+        }
+        foreach ($sourceGroups as $key => [$condition]) {
+            $selects[] = "SUM(CASE WHEN {$condition} THEN 1 ELSE 0 END) AS {$key}_total";
+            $selects[] = "SUM(CASE WHEN ({$condition}) AND {$qualifiedSql} THEN 1 ELSE 0 END) AS {$key}_qualified";
+            $selects[] = "SUM(CASE WHEN ({$condition}) AND {$wonSql} THEN 1 ELSE 0 END) AS {$key}_won";
+            $selects[] = "SUM(CASE WHEN ({$condition}) AND {$wonSql} THEN COALESCE(expected_amount, 0) ELSE 0 END) AS {$key}_won_revenue";
+        }
+        $leadKpis = (clone $periodLeadsQuery)->toBase()->selectRaw(implode(",\n", $selects))->first();
+        $kpi = fn (string $column): int => (int) ($leadKpis->{$column} ?? 0);
+        $kpiMoney = fn (string $column): float => (float) ($leadKpis->{$column} ?? 0);
+
         // WhatsApp Bot Leads & Auto-Qualification
-        $whatsappLeads = (clone $periodLeadsQuery)
-            ->where(function($q) {
-                $q->whereIn('source', ['WhatsApp Bot', 'WhatsApp', 'whatsapp'])
-                  ->orWhere('utm_source', 'whatsapp');
-            })
-            ->get();
-        $whatsappLeadsCount = $whatsappLeads->count();
-        $whatsappQualifiedCount = $whatsappLeads->whereNotIn('status', ['New', 'Lost'])->count();
+        $whatsappLeadsCount = $kpi('whatsapp_total');
+        $whatsappQualifiedCount = $kpi('whatsapp_qualified');
         $whatsappQualificationRate = $whatsappLeadsCount > 0 ? round(($whatsappQualifiedCount / $whatsappLeadsCount) * 100, 1) : 0;
-        $whatsappWonCount = $whatsappLeads->where('status', 'Won')->count();
-        $whatsappWonRevenue = $whatsappLeads->where('status', 'Won')->sum('expected_amount');
+        $whatsappWonCount = $kpi('whatsapp_won');
+        $whatsappWonRevenue = $kpiMoney('whatsapp_won_revenue');
 
         // Meta (Facebook & Instagram) Leads & Conversion
-        $metaLeads = (clone $periodLeadsQuery)
-            ->where(function($q) {
-                $q->whereIn('source', ['Meta Ads', 'Facebook / Instagram', 'Meta', 'Facebook', 'Instagram'])
-                  ->orWhereIn('utm_source', ['meta', 'facebook', 'instagram']);
-            })
-            ->get();
-        $metaLeadsCount = $metaLeads->count();
-        $metaQualifiedCount = $metaLeads->whereNotIn('status', ['New', 'Lost'])->count();
+        $metaLeadsCount = $kpi('meta_total');
+        $metaQualifiedCount = $kpi('meta_qualified');
         $metaQualifiedRate = $metaLeadsCount > 0 ? round(($metaQualifiedCount / $metaLeadsCount) * 100, 1) : 0;
-        $metaWonCount = $metaLeads->where('status', 'Won')->count();
-        $metaWonRevenue = $metaLeads->where('status', 'Won')->sum('expected_amount');
+        $metaWonCount = $kpi('meta_won');
+        $metaWonRevenue = $kpiMoney('meta_won_revenue');
         $metaWinRate = $metaLeadsCount > 0 ? round(($metaWonCount / $metaLeadsCount) * 100, 1) : 0;
 
         // Website / Embed Forms / Web-to-Lead Inbound Leads
-        $webLeads = (clone $periodLeadsQuery)
-            ->where(function($q) {
-                $q->whereIn('source', ['Web Form', 'Website', 'Web / Inbound', 'Web-to-Lead', 'Widget', 'Embed Widget', 'Website Form'])
-                  ->orWhereIn('utm_source', ['website', 'web', 'embed']);
-            })
-            ->get();
-        $webLeadsCount = $webLeads->count();
-        $webQualifiedCount = $webLeads->whereNotIn('status', ['New', 'Lost'])->count();
-        $webWonRevenue = $webLeads->where('status', 'Won')->sum('expected_amount');
+        $webLeadsCount = $kpi('web_total');
+        $webQualifiedCount = $kpi('web_qualified');
+        $webWonRevenue = $kpiMoney('web_won_revenue');
 
         // Generic Third-Party & Inbound Ingestion (Meta, WhatsApp, Web, Justdial, IndiaMART, APIs, etc.)
-        $thirdPartyLeads = (clone $periodLeadsQuery)
-            ->where(function($q) {
-                $q->whereIn('source', [
-                    'Meta Ads', 'Facebook / Instagram', 'Meta', 'Facebook', 'Instagram',
-                    'WhatsApp Bot', 'WhatsApp', 'whatsapp',
-                    'Web Form', 'Website', 'Web / Inbound', 'Web-to-Lead', 'Widget', 'Embed Widget', 'Website Form',
-                    'Justdial', 'JustDial', 'IndiaMART', 'Indiamart', 'TradeIndia', 'Tradeindia', 'Google Ads',
-                    'API', 'Webhook', 'Third-Party', 'Third Party', 'Portal'
-                ])
-                ->orWhereNotNull('utm_source');
-            })
-            ->get();
-        $thirdPartyLeadsCount = $thirdPartyLeads->count();
-        $thirdPartyQualifiedCount = $thirdPartyLeads->whereNotIn('status', ['New', 'Lost'])->count();
+        $thirdPartyLeadsCount = $kpi('third_total');
+        $thirdPartyQualifiedCount = $kpi('third_qualified');
         $thirdPartyQualifiedRate = $thirdPartyLeadsCount > 0 ? round(($thirdPartyQualifiedCount / $thirdPartyLeadsCount) * 100, 1) : 0;
-        $thirdPartyWonCount = $thirdPartyLeads->where('status', 'Won')->count();
-        $thirdPartyWonRevenue = $thirdPartyLeads->where('status', 'Won')->sum('expected_amount');
+        $thirdPartyWonCount = $kpi('third_won');
+        $thirdPartyWonRevenue = $kpiMoney('third_won_revenue');
         $thirdPartyWinRate = $thirdPartyLeadsCount > 0 ? round(($thirdPartyWonCount / $thirdPartyLeadsCount) * 100, 1) : 0;
 
         // 2. Enterprise Multi-Stage Sales Funnel Breakdown
-        $allLeads = (clone $periodLeadsQuery)->get();
-        $leadStatusCounts = $allLeads->groupBy(fn($l) => ucfirst(strtolower($l->status)))
-            ->map(fn($group) => $group->count());
+        $leadStatusCounts = collect([
+            'New' => $kpi('status_new'),
+            'Contacted' => $kpi('status_contacted'),
+            'Qualified' => $kpi('status_qualified'),
+            'Dealing' => $kpi('status_dealing'),
+            'Won' => $kpi('status_won'),
+        ]);
 
         $funnelStages = [
             'New'           => $leadStatusCounts->get('New', 0),
@@ -291,19 +300,15 @@ class CrmDashboardController extends Controller
         ];
 
         $totalFunnelLeads = $currentLeadsCount;
-        $contactedFunnelLeads = $allLeads->whereNotIn('status', ['New', 'Lost'])->count();
-        $dealConvertedLeads = $allLeads->filter(function($l) {
-            return !empty($l->crm_deal_id) || in_array(ucfirst(strtolower($l->status)), ['Qualified', 'Dealing', 'Won']);
-        })->count();
-        $dealConvertedValue = $allLeads->filter(function($l) {
-            return !empty($l->crm_deal_id) || in_array(ucfirst(strtolower($l->status)), ['Qualified', 'Dealing', 'Won']);
-        })->sum('expected_amount');
+        $contactedFunnelLeads = $kpi('all_qualified');
+        $dealConvertedLeads = $kpi('converted_total');
+        $dealConvertedValue = $kpiMoney('converted_value');
         if ($dealConvertedValue <= 0) {
             $dealConvertedValue = $pipelineValue;
         }
 
         $quotationFunnelCount = $totalQuotationsCount;
-        $wonFunnelCount = $allLeads->where('status', 'Won')->count();
+        $wonFunnelCount = $kpi('all_won');
 
         $funnelDetailed = [
             'stages' => [
@@ -429,7 +434,7 @@ class CrmDashboardController extends Controller
         $campaignLeadIds = (clone $periodLeadsQuery)
             ->whereNotNull('utm_campaign')
             ->where('utm_campaign', '!=', '')
-            ->pluck('id');
+            ->select('leads.id'); // used as a subquery, never loaded into PHP
 
         $campContactedLeads = (clone $periodLeadsQuery)
             ->whereNotNull('utm_campaign')
@@ -462,32 +467,13 @@ class CrmDashboardController extends Controller
             'revenue' => $campaignPerformance->pluck('won_revenue')->toArray(),
         ];
 
-        $availableCampaigns = Lead::where('tenant_id', $tenantId)
-            ->whereNotNull('utm_campaign')
-            ->where('utm_campaign', '!=', '')
-            ->distinct()
-            ->pluck('utm_campaign')
-            ->filter()
-            ->values()
-            ->toArray();
-
-        $availableAdsets = Lead::where('tenant_id', $tenantId)
-            ->whereNotNull('utm_term')
-            ->where('utm_term', '!=', '')
-            ->distinct()
-            ->pluck('utm_term')
-            ->filter()
-            ->values()
-            ->toArray();
-
-        $availableAds = Lead::where('tenant_id', $tenantId)
-            ->whereNotNull('utm_content')
-            ->where('utm_content', '!=', '')
-            ->distinct()
-            ->pluck('utm_content')
-            ->filter()
-            ->values()
-            ->toArray();
+        // Filter dropdown options scan every lead of the tenant (three times) and
+        // change rarely, so they are cached per tenant for 10 minutes.
+        [$availableCampaigns, $availableAdsets, $availableAds] = \Illuminate\Support\Facades\Cache::remember(
+            "tenant_{$tenantId}_crm_dashboard_utm_options",
+            600,
+            fn () => $this->utmFilterOptions($tenantId)
+        );
 
         // 4. Deal Pipeline Stage Breakdown
         $dealStages = (clone $periodDealsQuery)
@@ -718,6 +704,26 @@ class CrmDashboardController extends Controller
         return round((($current - $previous) / $previous) * 100, 1);
     }
 
+    /**
+     * Distinct campaign / adset / ad values for the dashboard filters.
+     *
+     * @return array{0: array<int, string>, 1: array<int, string>, 2: array<int, string>}
+     */
+    private function utmFilterOptions(int $tenantId): array
+    {
+        return array_map(
+            fn (string $column) => Lead::where('tenant_id', $tenantId)
+                ->whereNotNull($column)
+                ->where($column, '!=', '')
+                ->distinct()
+                ->pluck($column)
+                ->filter()
+                ->values()
+                ->toArray(),
+            ['utm_campaign', 'utm_term', 'utm_content']
+        );
+    }
+
     private function getMonthlyTrend(
         int $tenantId, 
         string $companyScope = 'current', 
@@ -727,49 +733,59 @@ class CrmDashboardController extends Controller
         ?string $adset = null,
         ?string $adName = null
     ): array {
+        // Two grouped queries for all six months (was two queries per month).
+        $rangeStart = Carbon::now()->subMonths(5)->startOfMonth();
+        $rangeEnd = Carbon::now()->endOfMonth();
+
+        $leadsQ = Lead::where('tenant_id', $tenantId)->whereBetween('created_at', [$rangeStart, $rangeEnd]);
+        $dealsQ = CrmDeal::where('tenant_id', $tenantId)->whereBetween('updated_at', [$rangeStart, $rangeEnd]);
+
+        if ($companyScope === 'current' && current_company_id()) {
+            $leadsQ->where('company_id', current_company_id());
+            $dealsQ->where('company_id', current_company_id());
+        }
+        if ($ownerId) {
+            $leadsQ->where('lead_owner_id', $ownerId);
+            $dealsQ->where('owner_id', $ownerId);
+        }
+        if ($leadType) {
+            $leadsQ->where('lead_type', $leadType);
+            $dealsQ->whereHas('lead', fn($l) => $l->where('lead_type', $leadType));
+        }
+        if ($campaign) {
+            $leadsQ->where('utm_campaign', $campaign);
+            $dealsQ->where(function($q) use ($campaign) {
+                $q->whereHas('lead', fn($l) => $l->where('utm_campaign', $campaign))
+                  ->orWhere('lead_source', $campaign);
+            });
+        }
+        if ($adset) {
+            $leadsQ->where('utm_term', $adset);
+            $dealsQ->whereHas('lead', fn($l) => $l->where('utm_term', $adset));
+        }
+        if ($adName) {
+            $leadsQ->where('utm_content', $adName);
+            $dealsQ->whereHas('lead', fn($l) => $l->where('utm_content', $adName));
+        }
+
+        $leadsByMonth = $leadsQ->toBase()
+            ->selectRaw($this->yearMonthSql('created_at') . ' AS ym, COUNT(*) AS total')
+            ->groupBy('ym')
+            ->pluck('total', 'ym');
+        $revenueByMonth = $dealsQ->whereIn(DB::raw('LOWER(stage)'), ['won', 'closed won'])->toBase()
+            ->selectRaw($this->yearMonthSql('crm_deals.updated_at') . ' AS ym, SUM(estimated_value) AS total')
+            ->groupBy('ym')
+            ->pluck('total', 'ym');
+
         $months = [];
         $leadsData = [];
         $revenueData = [];
-
         for ($i = 5; $i >= 0; $i--) {
             $monthDate = Carbon::now()->subMonths($i);
-            $start = $monthDate->copy()->startOfMonth();
-            $end = $monthDate->copy()->endOfMonth();
-
-            $leadsQ = Lead::where('tenant_id', $tenantId)->whereBetween('created_at', [$start, $end]);
-            $dealsQ = CrmDeal::where('tenant_id', $tenantId)->whereBetween('updated_at', [$start, $end]);
-
-            if ($companyScope === 'current' && current_company_id()) {
-                $leadsQ->where('company_id', current_company_id());
-                $dealsQ->where('company_id', current_company_id());
-            }
-            if ($ownerId) {
-                $leadsQ->where('lead_owner_id', $ownerId);
-                $dealsQ->where('owner_id', $ownerId);
-            }
-            if ($leadType) {
-                $leadsQ->where('lead_type', $leadType);
-                $dealsQ->whereHas('lead', fn($l) => $l->where('lead_type', $leadType));
-            }
-            if ($campaign) {
-                $leadsQ->where('utm_campaign', $campaign);
-                $dealsQ->where(function($q) use ($campaign) {
-                    $q->whereHas('lead', fn($l) => $l->where('utm_campaign', $campaign))
-                      ->orWhere('lead_source', $campaign);
-                });
-            }
-            if ($adset) {
-                $leadsQ->where('utm_term', $adset);
-                $dealsQ->whereHas('lead', fn($l) => $l->where('utm_term', $adset));
-            }
-            if ($adName) {
-                $leadsQ->where('utm_content', $adName);
-                $dealsQ->whereHas('lead', fn($l) => $l->where('utm_content', $adName));
-            }
-
+            $key = $monthDate->format('Y-m');
             $months[] = $monthDate->format('M Y');
-            $leadsData[] = $leadsQ->count();
-            $revenueData[] = (float) $dealsQ->whereIn(DB::raw('LOWER(stage)'), ['won', 'closed won'])->sum('estimated_value');
+            $leadsData[] = (int) ($leadsByMonth[$key] ?? 0);
+            $revenueData[] = (float) ($revenueByMonth[$key] ?? 0);
         }
 
         return [
@@ -777,6 +793,14 @@ class CrmDashboardController extends Controller
             'leads'   => $leadsData,
             'revenue' => $revenueData,
         ];
+    }
+
+    /** "YYYY-MM" of a datetime column, on MySQL/MariaDB and on SQLite (tests). */
+    private function yearMonthSql(string $column): string
+    {
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', {$column})"
+            : "DATE_FORMAT({$column}, '%Y-%m')";
     }
 
     private function getSalesLeaderboard(
@@ -790,47 +814,59 @@ class CrmDashboardController extends Controller
         ?string $adName = null
     ): array {
         $users = User::where('tenant_id', $tenantId)->get(['id', 'name']);
+
+        // Two grouped queries for all reps (was two queries per user).
+        $leadsQ = Lead::where('tenant_id', $tenantId)
+            ->whereIn('lead_owner_id', $users->pluck('id'))
+            ->whereBetween('created_at', [$startDate, $endDate]);
+
+        $dealsQ = CrmDeal::where('tenant_id', $tenantId)
+            ->whereIn('owner_id', $users->pluck('id'))
+            ->whereBetween('created_at', [$startDate, $endDate]);
+
+        if ($companyScope === 'current' && current_company_id()) {
+            $leadsQ->where('company_id', current_company_id());
+            $dealsQ->where('company_id', current_company_id());
+        }
+        if ($leadType) {
+            $leadsQ->where('lead_type', $leadType);
+            $dealsQ->whereHas('lead', fn($l) => $l->where('lead_type', $leadType));
+        }
+        if ($campaign) {
+            $leadsQ->where('utm_campaign', $campaign);
+            $dealsQ->where(function($q) use ($campaign) {
+                $q->whereHas('lead', fn($l) => $l->where('utm_campaign', $campaign))
+                  ->orWhere('lead_source', $campaign);
+            });
+        }
+        if ($adset) {
+            $leadsQ->where('utm_term', $adset);
+            $dealsQ->whereHas('lead', fn($l) => $l->where('utm_term', $adset));
+        }
+        if ($adName) {
+            $leadsQ->where('utm_content', $adName);
+            $dealsQ->whereHas('lead', fn($l) => $l->where('utm_content', $adName));
+        }
+
+        $leadCounts = $leadsQ->toBase()
+            ->selectRaw('lead_owner_id AS owner, COUNT(*) AS total')
+            ->groupBy('lead_owner_id')
+            ->pluck('total', 'owner');
+        $dealStats = $dealsQ->toBase()
+            ->selectRaw("crm_deals.owner_id AS owner, COUNT(*) AS total,
+                SUM(CASE WHEN LOWER(stage) IN ('won', 'closed won') THEN 1 ELSE 0 END) AS won,
+                SUM(CASE WHEN LOWER(stage) IN ('won', 'closed won') THEN COALESCE(estimated_value, 0) ELSE 0 END) AS won_revenue")
+            ->groupBy('crm_deals.owner_id')
+            ->get()
+            ->keyBy('owner');
+
         $leaderboard = [];
-
         foreach ($users as $user) {
-            $leadsQ = Lead::where('tenant_id', $tenantId)
-                ->where('lead_owner_id', $user->id)
-                ->whereBetween('created_at', [$startDate, $endDate]);
-
-            $dealsQ = CrmDeal::where('tenant_id', $tenantId)
-                ->where('owner_id', $user->id)
-                ->whereBetween('created_at', [$startDate, $endDate]);
-
-            if ($companyScope === 'current' && current_company_id()) {
-                $leadsQ->where('company_id', current_company_id());
-                $dealsQ->where('company_id', current_company_id());
-            }
-            if ($leadType) {
-                $leadsQ->where('lead_type', $leadType);
-                $dealsQ->whereHas('lead', fn($l) => $l->where('lead_type', $leadType));
-            }
-            if ($campaign) {
-                $leadsQ->where('utm_campaign', $campaign);
-                $dealsQ->where(function($q) use ($campaign) {
-                    $q->whereHas('lead', fn($l) => $l->where('utm_campaign', $campaign))
-                      ->orWhere('lead_source', $campaign);
-                });
-            }
-            if ($adset) {
-                $leadsQ->where('utm_term', $adset);
-                $dealsQ->whereHas('lead', fn($l) => $l->where('utm_term', $adset));
-            }
-            if ($adName) {
-                $leadsQ->where('utm_content', $adName);
-                $dealsQ->whereHas('lead', fn($l) => $l->where('utm_content', $adName));
-            }
-
-            $leadsCount = $leadsQ->count();
-            $deals = $dealsQ->get();
-            $dealsCount = $deals->count();
-            $wonDeals = $deals->filter(fn($d) => in_array(strtolower((string)$d->stage), ['won', 'closed won']));
-            $wonRevenue = (float) $wonDeals->sum('estimated_value');
-            $wonCount = $wonDeals->count();
+            $leadsCount = (int) ($leadCounts[$user->id] ?? 0);
+            $deal = $dealStats->get($user->id);
+            $dealsCount = (int) ($deal->total ?? 0);
+            $wonCount = (int) ($deal->won ?? 0);
+            $wonRevenue = (float) ($deal->won_revenue ?? 0);
 
             if ($leadsCount > 0 || $dealsCount > 0) {
                 $leaderboard[] = [
