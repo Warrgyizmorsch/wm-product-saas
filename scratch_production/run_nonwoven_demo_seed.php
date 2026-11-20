@@ -16,30 +16,27 @@ $app = require_once __DIR__ . '/../bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
-use Database\Seeders\NonWovenDemoMasterDataSeeder;
+use Database\Seeders\NonWovenPlantSeeder;
 use Illuminate\Support\Facades\DB;
 
-$tenantId = 1;
+$tenantId = (int) (\App\Models\Tenant::where('slug', config('tenancy.local_fallback_slug'))->value('id') ?: 1);
+$branchId = (int) DB::table('branches')->where('tenant_id', $tenantId)->where('code', NonWovenPlantSeeder::DEMO_BRANCH_CODE)->value('id');
 $startTime = microtime(true);
 
 echo str_repeat('=', 96) . PHP_EOL;
-echo "  NON-WOVEN DEMO PLANT - DATA RUNNER (Tenant ID: {$tenantId}, Branch: 3)" . PHP_EOL;
+echo "  NON-WOVEN DEMO PLANT - DATA RUNNER (Tenant ID: {$tenantId}, Branch: {$branchId})" . PHP_EOL;
 echo str_repeat('=', 96) . PHP_EOL . PHP_EOL;
 
-$data = NonWovenDemoMasterDataSeeder::loadData();
-if ($data === null) {
-    echo 'Data file missing or invalid: ' . NonWovenDemoMasterDataSeeder::DATA_FILE . PHP_EOL;
-    exit(1);
-}
+$data = NonWovenPlantSeeder::loadData();
 
 // ── 1. LOAD ───────────────────────────────────────────────────────────────────
 echo '>>> STEP 1: Loading master data...' . PHP_EOL;
-(new NonWovenDemoMasterDataSeeder())->run($tenantId);
+(new NonWovenPlantSeeder())->run($tenantId);
 echo '    done.' . PHP_EOL . PHP_EOL;
 
 // ── 2. VERIFY ─────────────────────────────────────────────────────────────────
 $currency = $data['meta']['money_currency'] ?? 'INR';
-$rate = NonWovenDemoMasterDataSeeder::rateToBase($currency);
+$rate = NonWovenPlantSeeder::rateToBase($currency);
 $show = fn ($v) => rtrim(rtrim(number_format((float) $v, 4, '.', ''), '0'), '.');
 
 // 2.1 Shifts
@@ -110,7 +107,7 @@ $stockRows = DB::table('product_warehouse_stocks')
     ->join('products', 'product_warehouse_stocks.product_id', '=', 'products.id')
     ->join('warehouses', 'product_warehouse_stocks.warehouse_id', '=', 'warehouses.id')
     ->where('product_warehouse_stocks.tenant_id', $tenantId)
-    ->where('warehouses.branch_id', 3)
+    ->where('warehouses.branch_id', $branchId)
     ->whereIn('products.sku', $prodCodes)
     ->select('products.sku', 'products.name', 'warehouses.code as wh_code', 'product_warehouse_stocks.quantity', 'product_warehouse_stocks.unit_cost')
     ->get();
