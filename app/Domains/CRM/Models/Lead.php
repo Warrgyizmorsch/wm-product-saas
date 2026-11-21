@@ -81,8 +81,8 @@ class Lead extends Model
                     throw new \InvalidArgumentException('Lead status is Won and permanently locked. Status cannot be changed.');
                 }
 
-                // Permanent lock: Once Dealing, it cannot be changed to another status manually (except to Won when authorized)
-                if ($oldStatus === 'dealing' && !in_array($newStatus, ['dealing', 'won']) && !static::$allowWonTransition) {
+                // Permanent lock: Once Dealing, it cannot be changed to another status manually (except to Won or Lost when authorized/deal closes)
+                if ($oldStatus === 'dealing' && !in_array($newStatus, ['dealing', 'won', 'lost']) && !static::$allowWonTransition) {
                     throw new \InvalidArgumentException('Lead status in Dealing stage is locked. Status cannot be changed.');
                 }
 
