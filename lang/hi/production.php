@@ -2463,6 +2463,8 @@ return [
   'bom_run_per_unit' => 'रन / यूनिट',
   'bom_yield' => 'उपज',
   'bom_sub_bom_scheduled_warning' => 'निर्धारित — :date से शुरू; यह BOM उसी तारीख से पहले शुरू नहीं होगा।',
+  'bom_sub_bom_replaced_warning' => 'पहले चुना गया सब-BOM (#:id) अब उपलब्ध नहीं है (बदला गया, रद्द, समाप्त या हटाया गया)। वर्तमान सक्रिय सब-BOM चुना गया है — सहेजने से पहले जाँच लें।',
+  'bom_sub_bom_dropped_warning' => 'पहले चुना गया सब-BOM (#:id) अब उपलब्ध नहीं है और कोई अन्य सब-BOM सक्रिय नहीं है — इस सामग्री को आगे विस्तारित नहीं किया जाएगा।',
   'bom_sub_bom_inactive_warning' => 'उप-BOM :status है — इस BOM का नया संस्करण बनाएं।',
   'bom_remove_primary_with_alts' => ':primary और उसके :count विकल्प हटाएं?',
   'bom_draft_restored' => 'ड्राफ्ट बहाल',

@@ -41,6 +41,7 @@
 | **BM-IMPL-18** | BOM import: service-based, one row per allocation, routing + operation columns, draft-only update, template / export | BM-27 | 🛠️ Applied (code working) |
 | **BM-IMPL-19** | BOM API: shared rules, safe header-only update, materials + allocations response | BM-28 | 🛠️ Applied (code working) |
 | **BM-IMPL-20** | Final BOM cleanup: drop master scrap column, remove under_revision, verify leftovers — do LAST | BM-31 | 🟢 Agreed |
+| **BM-IMPL-21** | Sub-BOM link fixes from the 2026-11-23 BOM-creation audit: deleted / expired sub-BOM, import by number, revise / duplicate with a superseded sub-BOM | BM-08 (rules 2, 4, 7) | 🛠️ Applied (code working) — awaiting user verification |
 | **BM-DEF-01** | Scrap rules in detail + connection with Routing operation yield | BM-10 | ⏭️ Deferred |
 | **BM-DEF-02** | All BOM costing: material cost live vs saved, cost field, sub-BOM cost, routing cost, cost columns | BM-21, 22–26 (cost parts) | ⏭️ Deferred |
 | **BM-DEF-03** | Downstream use of BOM data (where-used, MRP, orders, plans, ECO) | BM-29 | ⏭️ Deferred |
@@ -397,6 +398,23 @@
 | 2 | `under_revision` status | Remove `ProductionBom::STATUS_UNDER_REVISION` (31), `isUnderRevision()` (~181), status comment (48), `ProductionBomPolicy.php` 33, `Api/ProductionBomApiController.php` 132, `submitApproval()` allowed statuses, lang keys / badges |
 | 3 | Check covered leftovers are gone | BM-IMPL-03 #5, BM-IMPL-08 #7–#10 / #13, BM-IMPL-18 #6, RT-IMPL-19 markers |
 | 4 | Done check | `grep -rn "under_revision\|material_scrap_percentage.*production_bom_items\|syncRoutingOperationMaterials\|isFormula" app resources database routes tests` returns nothing relevant; full test suite passes (BM-30) |
+
+---
+
+## BM-IMPL-21: Sub-BOM Link Fixes (BOM-Creation Audit, 2026-11-23)
+* **Source Decision:** BM-08 rules 2, 4 and 7 (no new decision — the code did not follow them)
+* **Status:** 🛠️ Applied (code working) 2026-11-23 — awaiting user verification. Found by running ~190 BOM-create cases through the real form routes on a copy of the real schema, then confirmed in the browser (Revise form).
+* **Implementation notes:** One sub-BOM rule set, four faults:
+
+| # | Fault found | Fix | Where |
+| :-: | :--- | :--- | :--- |
+| 1 | A **soft-deleted** sub-BOM could be linked, passed the execution tree check, was exploded by readers and raised no parent warning (`withoutGlobalScopes()` also drops the soft-delete filter) | Deleted BOMs excluded from the link check, the tree check (`validateBomTreeForExecution`, both lookups), `ProductionBom::subBomFor()` and the warning look-ups; a deleted sub-BOM warns the parent like a cancelled one ("was deleted") | `ProductionBomService::validateChildBomLink / validateBomTreeForExecution`, `ProductionBom::subBomFor / getComponentWarnings` |
+| 2 | An **expired** sub-BOM (status not yet moved by the daily job) could be linked when the parent had no expiry date | Reject a sub-BOM whose expiry is before today: *"expired on {date} and can no longer be used as a sub-BOM"*. A sub-BOM expiring today or later stays selectable (BM-08 rule 4); a finite sub-BOM expiry under an open-ended parent stays allowed | `validateChildBomLink` |
+| 3 | **Import** resolved `child_bom_number` by number alone → the oldest version (often inactive); an unknown number was dropped silently | One resolver (`resolveSelectableChildBomId`): the selectable version (approved / scheduled, not expired, not deleted, same tenant, made for that component) already in effect, newest first; preview shows *"Sub-BOM 'X' has no approved or scheduled, non-expired version for component 'Y'"* instead of dropping it | `ProductionMasterImportService` |
+| 4 | **Revise / Duplicate** carried a sub-BOM that had been superseded / cancelled / expired: the form showed "— No sub-BOM —" but posted the old id, and Save failed with *"must be approved, scheduled, or active"* | Form: `fetchChildBomStatus()` replaces a carried-over choice that is not in the selectable list by the current active BOM (or drops it) and shows a notice (`bom_sub_bom_replaced_warning` / `bom_sub_bom_dropped_warning`, en / hi / bg). API / service: `buildCopyPayload()` does the same and adds a warning; new `isSelectableChildBom()` / `currentSelectableChildBom()` | `bom/partials/_form_script.blade.php`, `_form.blade.php`, `ProductionBomService::buildCopyPayload`, `lang/*/production.php` |
+
+* **Tests:** `tests/Feature/Production/BomChildLinkRulesTest.php` (9 tests; 7 fail without the fixes).
+* **Not changed (needs a decision):** no "repoint parents to the new sub-BOM version" action — after a new sub-BOM version is approved, every approved parent keeps the old one (warning, blocked for new orders) until a new parent version is made. Also not enforced: unit of the allocation vs the material / sub-BOM base unit, sub-BOM type (engineering / sales / phantom), inactive product or material.
 
 ## Deferred Items
 

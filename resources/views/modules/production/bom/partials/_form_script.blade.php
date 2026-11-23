@@ -98,6 +98,11 @@
             },
 
             subBomWarning(item) {
+                if (item.child_bom_replaced_from) {
+                    return (item.child_bom_id
+                        ? @js(__('production.bom_sub_bom_replaced_warning'))
+                        : @js(__('production.bom_sub_bom_dropped_warning'))).replace(':id', item.child_bom_replaced_from);
+                }
                 const v = (item.child_bom_versions || []).find(x => String(x.id) === String(item.child_bom_id));
                 if (v && v.status === 'scheduled') {
                     return @js(__('production.bom_sub_bom_scheduled_warning')).replace(':date', v.effective_date || '');
@@ -246,9 +251,11 @@
                             child_bom_id: null,
                             child_bom_versions: [],
                             child_bom_loading: false,
+                            child_bom_replaced_from: null,
                             allocations: []
                         };
                     }
+                    if (item.child_bom_replaced_from) map[matId].child_bom_replaced_from = item.child_bom_replaced_from;
 
                     if (!map[matId].child_bom_id && item.child_bom_id) map[matId].child_bom_id = item.child_bom_id;
                     if ((!map[matId].child_bom_versions || map[matId].child_bom_versions.length === 0) && item.child_bom_versions && item.child_bom_versions.length) map[matId].child_bom_versions = item.child_bom_versions;
@@ -540,7 +547,8 @@
                     priority: item.priority || "",
                     child_bom_status: 'none',
                     child_bom_versions: [],
-                    child_bom_loading: false
+                    child_bom_loading: false,
+                    child_bom_replaced_from: null
                 };
             },
 
@@ -594,8 +602,18 @@
                     .then(data => {
                         item.child_bom_status = data.status || 'none';
                         item.child_bom_versions = data.versions || [];
+                        // BM-08 rule 2/4: the picker lists only selectable sub-BOMs. A choice carried over from a copy / an
+                        // older draft that is no longer one of them (superseded, cancelled, expired, deleted) must not be
+                        // posted unseen: it is replaced visibly by the current active BOM (or dropped when none exists).
+                        const wasStale = !!item.child_bom_id && !item.child_bom_versions.some(v => String(v.id) === String(item.child_bom_id));
+                        if (wasStale) {
+                            this.items.forEach(it => {
+                                if (String(it.material_id) === String(item.material_id)) it.child_bom_replaced_from = item.child_bom_id;
+                            });
+                            item.child_bom_id = null;
+                        }
                         if (!item.child_bom_id) {
-                            const sibling = this.items.find(it => it !== item && String(it.material_id) === String(item.material_id) && it.child_bom_id);
+                            const sibling = wasStale ? null : this.items.find(it => it !== item && String(it.material_id) === String(item.material_id) && it.child_bom_id);
                             item.child_bom_id = sibling ? sibling.child_bom_id : (data.bom_id ? String(data.bom_id) : null);
                         }
                         this.setSubBomForMaterial(item.material_id, item.child_bom_id);
@@ -863,7 +881,8 @@
                     priority: 1,
                     child_bom_status: 'none',
                     child_bom_versions: [],
-                    child_bom_loading: false
+                    child_bom_loading: false,
+                    child_bom_replaced_from: null
                 });
                 this.expandedOps[opId] = true;
                 this.$nextTick(() => {

@@ -341,6 +341,14 @@ class ProductionMasterImportService
                         $itemErrors[] = "Row {$itemRowNum}: 'Alternative Of' primary Component Code is required for alternative items.";
                     }
 
+                    // BM-08: a sub-BOM number must name a version of THIS component that can be selected today
+                    // (approved or scheduled, not expired, not deleted). Never silently dropped, never an old version.
+                    if ($childBomNum !== '' && $compProductId) {
+                        if ($this->resolveSelectableChildBomId($childBomNum, (int) $compProductId, $tenantId) === null) {
+                            $itemErrors[] = "Row {$itemRowNum}: Sub-BOM '{$childBomNum}' has no approved or scheduled, non-expired version for component '{$compSku}'.";
+                        }
+                    }
+
                     if (!empty($itemErrors)) {
                         $rowErrors = array_merge($rowErrors, $itemErrors);
                     } else {
@@ -986,6 +994,36 @@ class ProductionMasterImportService
     }
 
     /**
+     * The id of the sub-BOM version a BOM number stands for. Versions of one BOM share its number, so the number alone is
+     * ambiguous: take the version that can be selected today (BM-08 rule 4 — approved or scheduled, not expired, not
+     * deleted, same tenant, made for this component). Prefer the one already in effect (newest first), else the soonest
+     * scheduled one. Null when no version qualifies.
+     */
+    private function resolveSelectableChildBomId(string $bomNumber, int $componentProductId, int $tenantId): ?int
+    {
+        $today = Carbon::today()->toDateString();
+
+        $candidates = ProductionBom::query()
+            ->where('tenant_id', $tenantId)
+            ->where('bom_number', trim($bomNumber))
+            ->where('product_id', $componentProductId)
+            ->whereIn('status', [ProductionBom::STATUS_APPROVED, ProductionBom::STATUS_SCHEDULED])
+            ->where(fn ($q) => $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', $today))
+            ->get(['id', 'status', 'effective_date']);
+
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        $inEffect = $candidates
+            ->filter(fn ($b) => ! $b->effective_date || Carbon::parse($b->effective_date)->toDateString() <= $today)
+            ->sortByDesc('id')
+            ->first();
+
+        return (int) ($inEffect ?? $candidates->sortBy('effective_date')->first())->id;
+    }
+
+    /**
      * BM-IMPL-18: import item rows → the allocation payload the BOM form / API send (operation by sequence or
      * operation number of the BOM's routing, alternative link by row, sub-BOM by number). Priority is not defaulted
      * (BM-IMPL-07 — the shared rules require it on alternatives).
@@ -1000,7 +1038,7 @@ class ProductionMasterImportService
         foreach ($items as $idx => $item) {
             $childBomId = null;
             if (!empty($item['child_bom_number'])) {
-                $childBomId = ProductionBom::where('tenant_id', $tenantId)->where('bom_number', $item['child_bom_number'])->value('id');
+                $childBomId = $this->resolveSelectableChildBomId((string) $item['child_bom_number'], (int) ($item['material_id'] ?? 0), $tenantId);
             }
 
             $routingOpId = $item['routing_operation_id'] ?? null;

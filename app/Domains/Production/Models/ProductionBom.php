@@ -218,7 +218,8 @@ class ProductionBom extends BaseModel
             ->whereNotNull('child_bom_id')
             ->value('child_bom_id');
 
-        return $childId ? self::withoutGlobalScopes()->find($childId) : null;
+        // withoutGlobalScopes() also drops the soft-delete filter: a deleted sub-BOM must not be exploded
+        return $childId ? self::withoutGlobalScopes()->whereNull('deleted_at')->find($childId) : null;
     }
 
     public function getActiveRoutingAttribute(): ?Routing
@@ -381,13 +382,17 @@ class ProductionBom extends BaseModel
                     ?? self::withoutGlobalScopes()->find($explicitChildBomId);
 
                 if ($childBom) {
-                    $childStatusStr = ucfirst($childBom->status);
-                    $isChildCancelled = ($childBom->status === 'cancelled');
+                    // a soft-deleted sub-BOM is gone for good: warn exactly like a cancelled one
+                    $childIsDeleted = method_exists($childBom, 'trashed') && $childBom->trashed();
+                    $childStatusStr = $childIsDeleted ? 'Deleted' : ucfirst($childBom->status);
+                    $isChildCancelled = $childIsDeleted || ($childBom->status === 'cancelled');
+                    $childVerb = $childIsDeleted ? 'deleted' : 'cancelled';
                     $isChildInactive = in_array($childBom->status, ['inactive', 'superseded'], true)
                         || ($childBom->expiry_date && Carbon::parse($childBom->expiry_date)->toDateString() < $today);
 
                     // Check if a newer approved version exists for this component product
                     $latestApprovedBom = self::withoutGlobalScopes()
+                        ->whereNull('deleted_at')
                         ->where('tenant_id', $this->tenant_id)
                         ->where('product_id', $row->material_id)
                         ->whereIn('status', ['approved', 'active'])
@@ -403,8 +408,8 @@ class ProductionBom extends BaseModel
 
                     if ($isChildCancelled) {
                         $message = $hasNewerVersion
-                            ? "Sub-BOM {$childBom->bom_number} v{$childBom->version} [Status: Cancelled] for '{$materialName}' was cancelled and a newer approved version v{$latestApprovedBom->version} [Status: Active] ({$latestApprovedBom->bom_number}) is available."
-                            : "Sub-BOM {$childBom->bom_number} v{$childBom->version} [Status: Cancelled] for '{$materialName}' was cancelled and has no active replacement.";
+                            ? "Sub-BOM {$childBom->bom_number} v{$childBom->version} [Status: {$childStatusStr}] for '{$materialName}' was {$childVerb} and a newer approved version v{$latestApprovedBom->version} [Status: Active] ({$latestApprovedBom->bom_number}) is available."
+                            : "Sub-BOM {$childBom->bom_number} v{$childBom->version} [Status: {$childStatusStr}] for '{$materialName}' was {$childVerb} and has no active replacement.";
 
                         $warnings[] = [
                             'type'                => 'cancelled',
@@ -468,6 +473,7 @@ class ProductionBom extends BaseModel
             } else {
                 // If material has BOMs, but child_bom_id was not explicitly set on this row
                 $activeChildBom = self::withoutGlobalScopes()
+                    ->whereNull('deleted_at')
                     ->where('tenant_id', $this->tenant_id)
                     ->where('product_id', $row->material_id)
                     ->whereIn('status', ['approved', 'active', 'scheduled'])

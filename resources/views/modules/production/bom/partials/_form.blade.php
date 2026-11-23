@@ -781,7 +781,12 @@
                                                             </div>
                                                         </template>
                                                         <template x-if="!item.child_bom_loading && item.child_bom_versions.length === 0">
-                                                            <span class="text-muted fs-11">—</span>
+                                                            <div>
+                                                                <span class="text-muted fs-11">—</span>
+                                                                <template x-if="subBomWarning(item)">
+                                                                    <div class="fs-10 text-warning mt-0.5" x-text="subBomWarning(item)"></div>
+                                                                </template>
+                                                            </div>
                                                         </template>
                                                     </td>
                                                 </tr>

@@ -490,6 +490,28 @@ class ProductionBomService
             $warnings[] = 'Some materials sit on operations removed from the routing — move or remove them before saving.';
         }
 
+        // BM-08 rule 2/4: a copy must not carry a sub-BOM that can no longer be selected (the old version was superseded,
+        // cancelled, expired or deleted). Point the material at the sub-BOM that is current today and say so; when there is
+        // none, leave it empty. The old choice would be rejected on save anyway.
+        $childByMaterial = [];
+        foreach ($source->operationMaterials as $om) {
+            if (!$om->child_bom_id || array_key_exists($om->material_id, $childByMaterial)) {
+                continue;
+            }
+            $old = ProductionBom::withoutGlobalScopes()->find($om->child_bom_id);
+            if ($old && $this->isSelectableChildBom($old)) {
+                $childByMaterial[$om->material_id] = (int) $om->child_bom_id;
+                continue;
+            }
+            $current = $this->currentSelectableChildBom((int) $om->material_id, (int) $source->tenant_id);
+            $childByMaterial[$om->material_id] = $current?->id;
+            $materialName = $om->material?->name ?? ('#' . $om->material_id);
+            $oldLabel = $old ? "{$old->bom_number} v{$old->version}" : "#{$om->child_bom_id}";
+            $warnings[] = $current
+                ? "Sub-BOM {$oldLabel} for {$materialName} is no longer available — replaced by {$current->bom_number} v{$current->version}. Check it before saving."
+                : "Sub-BOM {$oldLabel} for {$materialName} is no longer available and no other sub-BOM is active — choose one or leave the material without a sub-BOM.";
+        }
+
         return [
             'source_bom_id'  => $source->id,
             'source_version' => $source->version,
@@ -516,7 +538,10 @@ class ProductionBomService
                 'is_alternative'            => (bool) $om->is_alternative,
                 'replaces_row_uid'          => $om->replaces_routing_material_id ? 'copy_' . $om->replaces_routing_material_id : null,
                 'priority'                  => $om->is_alternative ? $om->priority : null,
-                'child_bom_id'              => $om->child_bom_id,
+                // array_key_exists, not ??: a material whose sub-BOM was dropped is mapped to null on purpose
+                'child_bom_id'              => $om->child_bom_id
+                    ? (array_key_exists($om->material_id, $childByMaterial) ? $childByMaterial[$om->material_id] : $om->child_bom_id)
+                    : null,
                 'sequence'                  => $om->sequence,
                 'notes'                     => $om->notes,
             ])->values()->all(),
@@ -747,6 +772,41 @@ class ProductionBomService
         }
     }
 
+    /**
+     * BM-08 rule 4: can this BOM be chosen as a sub-BOM today? Approved or scheduled, not deleted, not expired.
+     */
+    public function isSelectableChildBom(ProductionBom $bom): bool
+    {
+        if ($bom->trashed() || !in_array($bom->status, [ProductionBom::STATUS_APPROVED, ProductionBom::STATUS_ACTIVE, ProductionBom::STATUS_SCHEDULED], true)) {
+            return false;
+        }
+
+        return !$bom->expiry_date || Carbon::parse($bom->expiry_date)->toDateString() >= Carbon::today()->toDateString();
+    }
+
+    /**
+     * The sub-BOM a material should use today: the selectable version already in effect (newest first), else the
+     * soonest scheduled one — the same default the BOM form pre-selects (boms/check-child).
+     */
+    public function currentSelectableChildBom(int $materialProductId, int $tenantId): ?ProductionBom
+    {
+        $today = Carbon::today()->toDateString();
+
+        $candidates = ProductionBom::withoutGlobalScopes()
+            ->whereNull('deleted_at')
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $materialProductId)
+            ->get()
+            ->filter(fn (ProductionBom $b) => $this->isSelectableChildBom($b));
+
+        $inEffect = $candidates
+            ->filter(fn (ProductionBom $b) => !$b->effective_date || Carbon::parse($b->effective_date)->toDateString() <= $today)
+            ->sortByDesc('id')
+            ->first();
+
+        return $inEffect ?? $candidates->sortBy('effective_date')->first();
+    }
+
     public function validateChildBomLink(
         int $childBomId,
         int $materialProductId,
@@ -759,12 +819,13 @@ class ProductionBomService
             throw new InvalidArgumentException("A BOM cannot link to itself as a child BOM.");
         }
 
-        $childBom = ProductionBom::withoutGlobalScopes()->find($childBomId);
+        // withoutGlobalScopes() also drops the soft-delete filter, so a deleted BOM has to be excluded explicitly
+        $childBom = ProductionBom::withoutGlobalScopes()->whereNull('deleted_at')->find($childBomId);
         if (!$childBom || ($tenantId !== null && (int) $childBom->tenant_id !== $tenantId)) {
             throw new InvalidArgumentException("Linked child BOM not found.");
         }
 
-        if ($childBom->product_id !== $materialProductId) {
+        if ((int) $childBom->product_id !== $materialProductId) {
             throw new InvalidArgumentException("Linked child BOM product does not match component material product.");
         }
 
@@ -775,6 +836,12 @@ class ProductionBomService
 
         if (!in_array($childBom->status, [ProductionBom::STATUS_APPROVED, ProductionBom::STATUS_ACTIVE, ProductionBom::STATUS_SCHEDULED], true)) {
             throw new InvalidArgumentException("Linked child BOM ({$childBom->bom_number}) must be approved, scheduled, or active.");
+        }
+
+        // BM-08 rule 4: an expired sub-BOM is not selectable (the daily job may not have moved its status yet)
+        $childExpiryDate = $childBom->expiry_date ? Carbon::parse($childBom->expiry_date)->toDateString() : null;
+        if ($childExpiryDate !== null && $childExpiryDate < Carbon::today()->toDateString()) {
+            throw new InvalidArgumentException("Linked child BOM ({$childBom->bom_number} v{$childBom->version}) expired on {$childExpiryDate} and can no longer be used as a sub-BOM.");
         }
 
         $childEffective = $childBom->effective_date ? Carbon::parse($childBom->effective_date)->toDateString() : null;
@@ -875,6 +942,7 @@ class ProductionBomService
             if (!empty($row->child_bom_id)) {
                 $childBom = ProductionBom::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
                     ->find($row->child_bom_id);
 
                 if (!$childBom) {
@@ -899,6 +967,7 @@ class ProductionBomService
             ) {
                 $activeChildBom = ProductionBom::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
                     ->where('product_id', $material->id)
                     ->whereIn('status', ['approved', 'active'])
                     ->where(function ($q) {

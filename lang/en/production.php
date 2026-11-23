@@ -2378,6 +2378,8 @@ return array (
   'bom_run_per_unit' => 'Run / unit',
   'bom_yield' => 'Yield',
   'bom_sub_bom_scheduled_warning' => 'Scheduled — starts :date; this BOM starts on that date at the earliest.',
+  'bom_sub_bom_replaced_warning' => 'The sub-BOM chosen earlier (#:id) is no longer available (superseded, cancelled, expired or deleted). The current active sub-BOM was selected — check it before saving.',
+  'bom_sub_bom_dropped_warning' => 'The sub-BOM chosen earlier (#:id) is no longer available and no other sub-BOM is active — this material will not be exploded further.',
   'bom_sub_bom_inactive_warning' => 'Sub-BOM is :status — create a new version of this BOM.',
   'bom_remove_primary_with_alts' => 'Remove :primary and its :count alternative(s)?',
   'bom_draft_restored' => 'Draft restored',
