@@ -112,10 +112,10 @@ class DealActivityApiController extends Controller
             'title'                => 'nullable|string|max:255',
             'duration_minutes'     => 'nullable|integer|min:1',
             'guest_emails'         => 'nullable|string|max:500',
-            'assigned_to_id'       => 'nullable|exists:users,id',
-            'tagged_user_id'       => 'nullable|exists:users,id',
+            'assigned_to_id'       => ['nullable', tenant_exists('users')],
+            'tagged_user_id'       => ['nullable', tenant_exists('users')],
             'tagged_user_ids'      => 'nullable|array',
-            'tagged_user_ids.*'    => 'integer|exists:users,id',
+            'tagged_user_ids.*'    => ['integer', tenant_exists('users')],
             'sync_google_calendar' => 'nullable|boolean',
             'create_meet_link'     => 'nullable|boolean',
             'latitude'             => 'nullable|numeric|between:-90,90',
@@ -139,7 +139,7 @@ class DealActivityApiController extends Controller
         $activityType = $validated['type'] ?? 'Meeting';
         $isMeeting = strcasecmp((string)$activityType, 'Meeting') === 0;
 
-        $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $deal->tenant_id ?? require_tenant_id();
         $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
         $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];
         $isGeoVerificationEnabled = !empty($settings['field_visit_verification']);

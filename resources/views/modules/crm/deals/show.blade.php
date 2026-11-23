@@ -1766,7 +1766,7 @@
                                         <span>{{ __('crm.ai_deal_health') }}</span>
                                     </h5>
                                     <div class="d-flex align-items-center gap-2">
-                                        <a href="https://love14-deal-health-scoring.hf.space/auth/login?user_id={{ auth()->id() ?? 1 }}&next={{ urlencode(url()->current()) }}" 
+                                        <a href="{{ config('services.deal_health.base_url') }}/auth/login?user_id={{ auth()->id() ?? 1 }}&next={{ urlencode(url()->current()) }}" 
                                             id="googleAuthBadge" 
                                             target="_blank" 
                                             class="badge bg-secondary text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center"
@@ -4117,13 +4117,18 @@
         // Auto-check Google Auth Status on Page Load (Direct browser cookie check + backend sync)
         function checkGoogleAuthStatus() {
             const badge = $('#googleAuthBadge');
-            const hfAuthUrl = "https://love14-deal-health-scoring.hf.space/auth/me";
-            const fallbackLoginUrl = "https://love14-deal-health-scoring.hf.space/auth/login?user_id={{ auth()->id() ?? 1 }}&next=" + encodeURIComponent(window.location.href);
+            const dealHealthBaseUrl = @json(config('services.deal_health.base_url'));
+            const hfAuthUrl = dealHealthBaseUrl + "/auth/me";
+            const fallbackLoginUrl = dealHealthBaseUrl + "/auth/login?user_id={{ auth()->id() ?? 1 }}&next=" + encodeURIComponent(window.location.href);
 
             // Attempt direct browser fetch with credentials (sends SameSite=None / cross-origin cookie)
+            // Give up after 8 s so a sleeping integration doesn't leave the badge spinning forever.
+            const authTimeout = new AbortController();
+            setTimeout(() => authTimeout.abort(), 8000);
             fetch(hfAuthUrl, {
                 method: "GET",
                 credentials: "include",
+                signal: authTimeout.signal,
                 headers: {
                     "Accept": "application/json"
                 }

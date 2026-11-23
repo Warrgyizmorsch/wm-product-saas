@@ -13,6 +13,38 @@ use Illuminate\Support\Collection;
 
 class AccessService
 {
+    /*
+     * Per-request memo (the service is bound `scoped`). Every permission check
+     * used to run ~6 queries, and RBAC global scopes call allows() on every
+     * query, so ordinary pages ran 500-900 queries. Only raw RBAC data is
+     * cached here, never a decision, and the keys carry every user attribute
+     * the data depends on. flush() runs whenever an RBAC row changes.
+     */
+
+    /** @var array<string, Collection<int, int>> */
+    private array $roleIdCache = [];
+
+    /** @var array<string, int>|null permission name => id */
+    private ?array $permissionIds = null;
+
+    /** @var array<string, bool> */
+    private array $platformAdminCache = [];
+
+    /** @var array<string, array<int, list<string>>> roleIds key => permission_id => scopes */
+    private array $grantCache = [];
+
+    /** @var array<int, Collection<int, UserPermissionOverride>> user id => overrides */
+    private array $overrideCache = [];
+
+    public function flush(): void
+    {
+        $this->roleIdCache = [];
+        $this->permissionIds = null;
+        $this->platformAdminCache = [];
+        $this->grantCache = [];
+        $this->overrideCache = [];
+    }
+
     /**
      * @param array{
      *     tenant_id?: int|null,
@@ -69,29 +101,17 @@ class AccessService
 
         $tenantId = $context['tenant_id'] ?? $user->tenant_id;
         $roleIds = $this->roleIdsFor($user, $tenantId);
-        if ($roleIds->isNotEmpty()) {
-            $isPlatformAdminRole = Role::query()
-                ->whereIn('id', $roleIds)
-                ->whereIn('slug', ['super_admin', 'admin'])
-                // Only the platform's own system roles: a tenant can create a role
-                // with slug "admin" of its own, which must never reach other tenants.
-                ->whereNull('tenant_id')
-                ->where('is_system', true)
-                ->exists();
-            if ($isPlatformAdminRole) {
-                return true;
-            }
+        if ($roleIds->isNotEmpty() && $this->rolesIncludePlatformAdmin($roleIds)) {
+            return true;
         }
 
-        $permission = Permission::query()
-            ->where('name', $permissionName)
-            ->first();
+        $permissionId = $this->permissionIdFor($permissionName);
 
-        if ($permission === null) {
+        if ($permissionId === null) {
             return false;
         }
 
-        $override = $this->matchingOverride($user, $permission->id, $context);
+        $override = $this->matchingOverride($user, $permissionId, $context);
 
         if ($override !== null) {
             // Deny and allow are deliberately asymmetric. A deny always applies:
@@ -119,18 +139,60 @@ class AccessService
             return false;
         }
 
-        $grants = RolePermission::query()
-            ->whereIn('role_id', $roleIds)
-            ->where('permission_id', $permission->id)
-            ->get();
-
-        foreach ($grants as $grant) {
-            if ($this->scopeMatches($grant->scope, $user, $context)) {
+        foreach ($this->grantedScopes($roleIds, $permissionId) as $scope) {
+            if ($this->scopeMatches($scope, $user, $context)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Scopes at which any of $roleIds holds $permissionId (one query per
+     * distinct role set per request).
+     *
+     * @param Collection<int, int> $roleIds
+     * @return list<string>
+     */
+    private function grantedScopes(Collection $roleIds, int $permissionId): array
+    {
+        $key = $roleIds->sort()->implode(',');
+
+        if (! isset($this->grantCache[$key])) {
+            $byPermission = [];
+            foreach (RolePermission::query()->whereIn('role_id', $roleIds)->get(['permission_id', 'scope']) as $grant) {
+                $byPermission[(int) $grant->permission_id][] = (string) $grant->scope;
+            }
+            $this->grantCache[$key] = $byPermission;
+        }
+
+        return $this->grantCache[$key][$permissionId] ?? [];
+    }
+
+    private function permissionIdFor(string $permissionName): ?int
+    {
+        $this->permissionIds ??= Permission::query()->pluck('id', 'name')->map(fn ($id) => (int) $id)->all();
+
+        return $this->permissionIds[$permissionName] ?? null;
+    }
+
+    /**
+     * Only the platform's own system roles: a tenant can create a role with
+     * slug "admin" of its own, which must never reach other tenants.
+     *
+     * @param Collection<int, int> $roleIds
+     */
+    private function rolesIncludePlatformAdmin(Collection $roleIds): bool
+    {
+        $key = $roleIds->sort()->implode(',');
+
+        return $this->platformAdminCache[$key] ??= Role::query()
+            ->whereIn('id', $roleIds)
+            ->whereIn('slug', ['super_admin', 'admin'])
+            ->whereNull('tenant_id')
+            ->where('is_system', true)
+            ->exists();
     }
 
     /**
@@ -144,16 +206,12 @@ class AccessService
             return false;
         }
 
-        $permission = Permission::query()->where('name', $permissionName)->first();
-        if ($permission === null) {
+        $permissionId = $this->permissionIdFor($permissionName);
+        if ($permissionId === null) {
             return false;
         }
 
-        return RolePermission::query()
-            ->whereIn('role_id', $roleIds)
-            ->where('permission_id', $permission->id)
-            ->where('scope', $scope)
-            ->exists();
+        return in_array($scope, $this->grantedScopes($roleIds, $permissionId), true);
     }
 
     /**
@@ -213,19 +271,8 @@ class AccessService
 
         $roleIds = $this->roleIdsFor($user, $user->tenant_id);
 
-        if ($roleIds->isNotEmpty()) {
-            $isPlatformAdminRole = Role::query()
-                ->whereIn('id', $roleIds)
-                ->whereIn('slug', ['super_admin', 'admin'])
-                // Only the platform's own system roles: a tenant can create a role
-                // with slug "admin" of its own, which must never reach other tenants.
-                ->whereNull('tenant_id')
-                ->where('is_system', true)
-                ->exists();
-
-            if ($isPlatformAdminRole) {
-                return null;
-            }
+        if ($roleIds->isNotEmpty() && $this->rolesIncludePlatformAdmin($roleIds)) {
+            return null;
         }
 
         $modules = collect();
@@ -287,12 +334,7 @@ class AccessService
     {
         $roleIds = $this->roleIdsFor($user, $tenantId ?? $user->tenant_id);
 
-        return $roleIds->isNotEmpty() && Role::query()
-            ->whereIn('id', $roleIds)
-            ->whereIn('slug', ['super_admin', 'admin'])
-            ->whereNull('tenant_id')
-            ->where('is_system', true)
-            ->exists();
+        return $roleIds->isNotEmpty() && $this->rolesIncludePlatformAdmin($roleIds);
     }
 
     public function hasRole(User $user, string $roleSlug, ?int $tenantId = null): bool
@@ -366,22 +408,19 @@ class AccessService
         $branchId = $context['branch_id'] ?? null;
         $departmentId = $context['department_id'] ?? null;
 
-        return UserPermissionOverride::query()
+        $overrides = $this->overrideCache[$user->id] ??= UserPermissionOverride::query()
             ->where('user_id', $user->id)
-            ->where('permission_id', $permissionId)
-            ->where(function ($query) use ($tenantId): void {
-                $query->whereNull('tenant_id')
-                    ->orWhere('tenant_id', $tenantId);
-            })
-            ->where(function ($query) use ($branchId): void {
-                $query->whereNull('branch_id')
-                    ->when($branchId !== null, fn ($q) => $q->orWhere('branch_id', $branchId));
-            })
-            ->where(function ($query) use ($departmentId): void {
-                $query->whereNull('department_id')
-                    ->when($departmentId !== null, fn ($q) => $q->orWhere('department_id', $departmentId));
-            })
-            ->orderBy('allowed')
+            ->get();
+
+        $matches = fn ($value, $wanted): bool => $value === null || ($wanted !== null && (string) $value === (string) $wanted);
+
+        return $overrides
+            ->filter(fn (UserPermissionOverride $o) => (int) $o->permission_id === $permissionId
+                && ($o->tenant_id === null || (string) $o->tenant_id === (string) $tenantId)
+                && $matches($o->branch_id, $branchId)
+                && $matches($o->department_id, $departmentId))
+            // A deny (allowed = false) wins over an allow, as orderBy('allowed') did.
+            ->sortBy(fn (UserPermissionOverride $o) => (int) (bool) $o->allowed)
             ->first();
     }
 
@@ -389,6 +428,16 @@ class AccessService
      * @return Collection<int, int>
      */
     private function roleIdsFor(User $user, ?int $tenantId): Collection
+    {
+        $key = implode('|', [$user->id, $user->tenant_id, $user->role_id, $user->role, $tenantId]);
+
+        return $this->roleIdCache[$key] ??= $this->loadRoleIds($user, $tenantId);
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function loadRoleIds(User $user, ?int $tenantId): Collection
     {
         // The legacy users.role_id column carries no tenant of its own — it is
         // implicitly "this user's role in their own home tenant", never a

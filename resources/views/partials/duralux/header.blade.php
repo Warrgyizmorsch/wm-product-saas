@@ -91,7 +91,7 @@
                 {{-- Approvals (assets/js/approval-center.js) --}}
                 <div class="dropdown nxl-h-item" id="header-approvals-dropdown">
                     <a href="javascript:void(0);" class="nxl-head-link ax-icon-btn me-0" data-bs-toggle="dropdown" role="button"
-                        data-bs-auto-close="outside" id="header-approvals-trigger" title="{{ __('ui.approvals') }}">
+                        data-bs-auto-close="outside" id="header-approvals-trigger" data-approvals-url="{{ route('global-approvals') }}" title="{{ __('ui.approvals') }}">
                         <i class="feather-check-square"></i>
                         <span class="badge bg-success nxl-h-badge d-none" id="header-approvals-badge">0</span>
                     </a>
@@ -118,13 +118,13 @@
                 <div class="dropdown nxl-h-item ax-user">
                     <a href="javascript:void(0);" class="ax-avatar" data-bs-toggle="dropdown" role="button" data-bs-auto-close="outside" aria-label="{{ __('ui.account') }}">
                         <img src="{{ $headerAvatarUrl }}" alt="" class="user-avtar object-fit-cover"
-                            onerror="this.onerror=null; this.src='/assets/images/avatar/default.png';">
+                            onerror="this.onerror=null; this.src='{{ asset('assets/images/avatar/default.png') }}';">
                         <span class="ax-avatar-status"></span>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-user-dropdown ax-user-menu">
                         <a href="{{ route('profile.show') }}" class="ax-user-card">
                             <img src="{{ $headerAvatarUrl }}" alt="" class="object-fit-cover"
-                                onerror="this.onerror=null; this.src='/assets/images/avatar/default.png';">
+                                onerror="this.onerror=null; this.src='{{ asset('assets/images/avatar/default.png') }}';">
                             <span class="min-w-0">
                                 <span class="ax-user-name">{{ $headerUser->name ?? __('ui.erp_admin') }}</span>
                                 <span class="ax-user-email">{{ $headerUser->email ?? '' }}</span>

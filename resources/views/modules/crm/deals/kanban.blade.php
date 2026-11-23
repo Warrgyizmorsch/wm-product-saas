@@ -221,7 +221,7 @@
                             {{ $columnTitle }}
                         </span>
                         <span class="badge {{ $config['badge'] }} rounded-pill px-2 py-1 fs-11 col-count">
-                            {{ $deals->count() }}
+                            {{ $columnData['count'] ?? $deals->count() }}
                         </span>
                     </div>
                     <div class="fs-11 text-muted fw-semibold mt-1">
@@ -233,8 +233,8 @@
                 <div class="kanban-cards-body" id="kanban_col_{{ Str::slug($stageKey) }}">
                     @forelse($deals as $deal)
                         @php
-                            $dealValue = (float)($deal->actual_value ?: $deal->estimated_value);
-                            $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists() ? '1' : '0';
+                            $dealValue = (float)($deal->kanban_value ?? ($deal->actual_value ?: $deal->estimated_value));
+                            $hasAcceptedQuote = $deal->has_accepted_quote ? '1' : '0';
                             $hasCustomer = !empty($deal->account?->customer_id) ? '1' : '0';
                             $isWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
                             $isWonOrLost = in_array($deal->stage, ['Won', 'Closed Won', 'Lost', 'Closed Lost']);
@@ -305,6 +305,12 @@
                             {{ __('crm.no_deals_found') }}
                         </div>
                     @endforelse
+                    @php $hiddenDeals = ($columnData['count'] ?? $deals->count()) - $deals->count(); @endphp
+                    @if($hiddenDeals > 0)
+                        <a href="{{ route('crm.deals.index', ['stage' => $stageKey]) }}" class="d-block text-center py-2 fs-12 text-primary kanban-more-link">
+                            +{{ $hiddenDeals }} more &rarr;
+                        </a>
+                    @endif
                 </div>
             </div>
         @endforeach

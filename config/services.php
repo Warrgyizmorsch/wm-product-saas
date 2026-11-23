@@ -80,4 +80,18 @@ return [
         'open'  => env('MOSSIE_WIDGET_OPEN', false),
     ],
 
+    // Deal health / Gmail / Google Calendar integration server. The only place
+    // its address is set: CRM services and the deal page all read this.
+    'deal_health' => [
+        'base_url' => rtrim((string) env('DEAL_HEALTH_BASE_URL', ''), '/'),
+    ],
+
+    // Meta Lead Ads webhook. POSTs must carry X-Hub-Signature-256 signed with
+    // the app secret: a tenant's own MetaConfiguration.app_secret, or this
+    // shared one for configurations that leave app_secret empty.
+    'meta' => [
+        'app_secret'   => env('META_APP_SECRET'),
+        'verify_token' => env('META_VERIFY_TOKEN'),
+    ],
+
 ];

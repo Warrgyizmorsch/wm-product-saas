@@ -96,8 +96,10 @@ Route::prefix('v1/accounting/integrations')->group(base_path('app/Domains/Accoun
 
 // Twilio Voice Telephony Webhook Routes (Public endpoints called by Twilio Cloud)
 Route::match(['get', 'post'], 'crm/webhooks/twilio/voice', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'handleTwilioVoiceWebhook'])
+    ->middleware(['throttle:120,1', \App\Http\Middleware\VerifyTwilioSignature::class])
     ->name('api.crm.webhooks.twilio.voice');
 Route::match(['get', 'post'], 'crm/webhooks/twilio/status', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'handleTwilioStatusWebhook'])
+    ->middleware(['throttle:120,1', \App\Http\Middleware\VerifyTwilioSignature::class])
     ->name('api.crm.webhooks.twilio.status');
 
 // Public Demo Requests API (For landing page mossierp.com)

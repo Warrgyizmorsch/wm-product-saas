@@ -221,6 +221,8 @@ class CrmAuthorizationTest extends TestCase
             ->get(route('crm.leads.export'));
 
         $response->assertOk();
-        $response->assertHeader('content-disposition', 'attachment; filename=leads_export.xlsx');
+        // Streamed as CSV so large tenants don't run out of memory (audit BUG-05).
+        $response->assertHeader('content-disposition', 'attachment; filename=leads_export_' . now()->format('Y-m-d') . '.csv');
+        $this->assertStringContainsString('Lead Number', $response->streamedContent());
     }
 }

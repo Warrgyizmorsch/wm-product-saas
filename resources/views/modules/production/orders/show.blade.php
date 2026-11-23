@@ -197,7 +197,9 @@
             @php
                 $latestSlip = $order->requisitionSlips->last();
                 $slipStatusLower = strtolower($latestSlip?->status ?? '');
-                $hasIssuedMaterial = in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
+                // Temp no-BOM flow: no requisition slip exists, so there is no material issue to wait for
+                $hasIssuedMaterial = config('production.temp_flow')
+                    || in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
             @endphp
 
             @if($hasIssuedMaterial)
@@ -1245,6 +1247,8 @@
                                     <span class="fs-12 text-muted">{{ __('production.wip_tracking_subtitle') }}</span>
                                 </div>
                             </div>
+
+                            @include('modules.production.partials.consumed-materials-report', ['order' => $order])
 
                             @if(isset($wipWorkCenterSummaries) && $wipWorkCenterSummaries->isNotEmpty())
                                 {{-- Summary Metrics Cards --}}
@@ -2665,6 +2669,7 @@
                         {{-- Tab 5: Material Issues --}}
                         <div class="tab-pane fade {{ $activeTab === 'vtab-issues' ? 'show active' : '' }}" id="vtab-issues"
                             role="tabpanel" aria-labelledby="vtab-issues-tab">
+                            @include('modules.production.partials.consumed-materials-report', ['order' => $order])
                             <h5 class="fw-bold text-dark mb-3">{{ __('production.material_issues_log') }}</h5>
                             <div class="table-responsive">
                                 <table class="erp-thin-table">
@@ -2820,6 +2825,12 @@
                                             <th style="width:10%">{{ __('production.logged_by') }}</th>
                                         </tr>
                                     </thead>
+                                    @php
+                                        // Temp no-BOM flow: materials consumed per log (JSON sidecar)
+                                        $consumedByLog = config('production.temp_flow')
+                                            ? app(\App\Domains\Production\Services\ProductionMaterialService::class)->consumptionByLog($order->tenant_id, $order->id)
+                                            : [];
+                                    @endphp
                                     <tbody>
                                         @forelse($order->progressLogs as $log)
                                             <tr>
@@ -2828,6 +2839,9 @@
                                                     <span class="fw-semibold text-dark">{{ $log->operation->name ?? '—' }}</span>
                                                     <small class="text-muted d-block font-monospace fs-10">Op:
                                                         {{ $log->operation->operation_number ?? '—' }}</small>
+                                                    @foreach(($consumedByLog[$log->id]['lines'] ?? []) as $line)
+                                                        <small class="text-muted d-block fs-10">Consumed: {{ $line['product_name'] }} — {{ rtrim(rtrim(number_format($line['quantity'], 4, '.', ''), '0'), '.') }}</small>
+                                                    @endforeach
                                                 </td>
                                                 <td class="text-center text-success fw-bold">
                                                     {{ number_format($log->quantity_produced, 2) }}
@@ -4040,6 +4054,8 @@
 
                     <x-ui.odoo-form-ui type="input" label="{{ __('production.remarks') }}" name="remarks"
                         placeholder="E.g. operator name, work center notes" />
+
+                    @include('modules.production.partials.consumed-materials', ['cmId' => 'cmOrderLog'])
 
                     <div class="odoo-form-group">
                         <label class="odoo-form-label">{{ __('production.completion') }}</label>

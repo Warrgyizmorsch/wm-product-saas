@@ -599,6 +599,10 @@ class ProductionOrderController extends Controller
             'remarks' => 'nullable|string|max:255',
             'machine_id' => 'nullable|exists:production_machines,id',
             'complete_operation' => 'nullable|boolean',
+            'consumed_materials' => 'nullable|array',
+            'consumed_materials.*.product_id' => 'nullable|exists:products,id',
+            'consumed_materials.*.quantity' => 'nullable|numeric|min:0',
+            'consumed_materials.*.warehouse_id' => 'nullable|exists:warehouses,id',
         ]);
 
         ProductionOrderOperation::where('tenant_id', $order->tenant_id)
@@ -620,7 +624,8 @@ class ProductionOrderController extends Controller
                 Auth::id(),
                 (bool) $request->input('complete_operation', false),
                 null,
-                $resolvedBatchId ? (int) $resolvedBatchId : null
+                $resolvedBatchId ? (int) $resolvedBatchId : null,
+                config('production.temp_flow') ? (array) $request->input('consumed_materials', []) : []
             );
 
             return redirect()->back()->with('success', 'Execution progress logged successfully.');

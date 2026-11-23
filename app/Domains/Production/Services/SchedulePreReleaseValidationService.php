@@ -61,7 +61,10 @@ class SchedulePreReleaseValidationService
                 ];
             }
 
-            if (!$isExternal && (!$op->workCenter || !$op->workCenter->isActive())) {
+            // Temp no-BOM flow: an operation without a work center is unconstrained (no capacity / shift rules)
+            $unconstrained = config('production.temp_flow') && !$op->work_center_id;
+
+            if (!$isExternal && !$unconstrained && (!$op->workCenter || !$op->workCenter->isActive())) {
                 $errors[] = [
                     'code'         => 'INACTIVE_WORK_CENTER',
                     'severity'     => 'error',
@@ -74,7 +77,7 @@ class SchedulePreReleaseValidationService
             if (!$isExternal && $op->work_center_id) {
                 $opLabel = "Operation sequence {$op->sequence}";
 
-                if (!$op->machine_id && !$op->section_manual_production_id) {
+                if (!$op->machine_id && !$op->section_manual_production_id && !config('production.temp_flow')) {
                     $errors[] = [
                         'code'         => 'NO_RESOURCE_ASSIGNED',
                         'severity'     => 'error',

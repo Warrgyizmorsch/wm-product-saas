@@ -490,6 +490,9 @@ class ProductionOrderService
                 );
                 $this->persistPlannedMaterials($order, $plan['consolidated_materials']);
                 $this->snapshotPlannedOperations($order, $plan['snapshot_tree_operations'], $userId);
+            } elseif (! $bom && config('production.temp_flow')) {
+                // Temp no-BOM flow: operations come from the optional routing, no materials are planned.
+                $this->snapshotTempFlowOperations($order, $routing, $userId);
             }
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [
@@ -1636,6 +1639,59 @@ class ProductionOrderService
      * and the primary operations of exploded child BOMs (level 2+), with dependencies inside each BOM's
      * routing and a cross-assembly link from each child BOM's last operation to the parent operation using it.
      */
+    /**
+     * Temp no-BOM flow: snapshot the routing's primary operations (every resource / time field optional) onto the order.
+     * Without a routing a single default "Production" operation is created so WIP, scheduling and logging still work.
+     */
+    private function snapshotTempFlowOperations(ProductionOrder $order, ?Routing $routing, ?int $userId = null): void
+    {
+        $quantity = (float) $order->quantity_ordered;
+        $routingOps = $routing
+            ? $routing->operations()->where('is_alternative', false)->orderBy('sequence')->get()
+            : collect();
+
+        if ($routingOps->isEmpty()) {
+            ProductionOrderOperation::create([
+                'tenant_id' => $order->tenant_id,
+                'production_order_id' => $order->id,
+                'source_product_id' => $order->product_id,
+                'bom_level' => 1,
+                'target_produced_qty' => round($quantity, 4),
+                'is_intermediate' => false,
+                'quantity_claimed' => 0.0000,
+                'sequence' => 10,
+                'operation_number' => 'OP-010',
+                'name' => 'Production',
+                'status' => ProductionOrderOperation::STATUS_WAITING,
+                'setup_time_planned' => 0,
+                'processing_time_planned' => 0,
+                'total_time_planned' => 0,
+                'setup_time_actual' => 0.00,
+                'processing_time_actual' => 0.00,
+                'quantity_produced' => 0.0000,
+                'quantity_rejected' => 0.0000,
+                'quantity_scrapped' => 0.0000,
+                'is_external' => false,
+            ]);
+            $this->reconcileOperationReadiness($order);
+
+            return;
+        }
+
+        $entries = $routingOps->map(fn ($op) => [
+            'routing_operation' => $op,
+            'target_produced_qty' => $quantity,
+            'selected_routing_material_ids' => [],
+            'source_product_id' => $order->product_id,
+            'source_bom_id' => null,
+            'source_routing_id' => $routing->id,
+            'bom_level' => 1,
+            'is_intermediate' => false,
+        ])->all();
+
+        $this->snapshotPlannedOperations($order, $entries, $userId);
+    }
+
     private function snapshotPlannedOperations(ProductionOrder $order, array $entries, ?int $userId = null): void
     {
         $created = [];
@@ -1657,16 +1713,16 @@ class ProductionOrderService
                 'is_intermediate' => (bool) $entry['is_intermediate'],
                 'quantity_claimed' => 0.0000,
                 'sequence' => $routingOp->sequence,
-                'operation_number' => $routingOp->operation_number,
+                'operation_number' => $routingOp->operation_number ?: ('OP-' . str_pad((string) $routingOp->sequence, 3, '0', STR_PAD_LEFT)),
                 'name' => $routingOp->name,
                 'work_center_id' => $routingOp->work_center_id,
                 'section_id' => $routingOp->section_id,
                 'machine_id' => $routingOp->machine_id,
                 'section_manual_production_id' => $routingOp->section_manual_production_id,
                 'status' => ProductionOrderOperation::STATUS_WAITING,
-                'setup_time_planned' => $routingOp->setup_time_minutes,
+                'setup_time_planned' => (float) ($routingOp->setup_time_minutes ?? 0),
                 'processing_time_planned' => $processingTime,
-                'total_time_planned' => (float) $routingOp->setup_time_minutes + $processingTime,
+                'total_time_planned' => (float) ($routingOp->setup_time_minutes ?? 0) + $processingTime,
                 'setup_time_actual' => 0.00,
                 'processing_time_actual' => 0.00,
                 'quantity_produced' => 0.0000,

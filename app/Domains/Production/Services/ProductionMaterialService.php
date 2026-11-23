@@ -434,6 +434,266 @@ class ProductionMaterialService
     // ─── Private Helpers ─────────────────────────────────────────────────────────
 
     /**
+     * Temp no-BOM flow: raw materials consumed while logging shop floor progress (no reservation involved).
+     *
+     * Per line: stock outflow with the same reference as a normal material issue (so the existing consumption
+     * journal Dr WIP / Cr Inventory is posted), a ProductionOrderIssue (reservation null, issue_type 'consumption'),
+     * lot traces and WIP material cost. Insufficient stock throws and rolls back the whole log (call inside the
+     * log's DB transaction). The per-log lines are also written to a JSON sidecar for display.
+     *
+     * @param  array<int, array{product_id:int|string, quantity:float|string, warehouse_id?:int|string|null}> $lines
+     * @return array<int, ProductionOrderIssue>
+     */
+    public function consumeForLog(
+        \App\Domains\Production\Models\ProductionOrder $order,
+        ?\App\Domains\Production\Models\ProductionOrderOperation $op,
+        \App\Domains\Production\Models\ProductionOrderProgressLog $log,
+        array $lines,
+        ?int $userId = null
+    ): array {
+        $lines = array_values(array_filter($lines, fn ($l) => !empty($l['product_id']) && (float) ($l['quantity'] ?? 0) > 0));
+        if ($lines === []) {
+            return [];
+        }
+
+        $issues = [];
+        $stored = [];
+
+        foreach ($lines as $line) {
+            $productId = (int) $line['product_id'];
+            $quantity = (float) $line['quantity'];
+
+            $product = Product::withoutGlobalScopes()->where('tenant_id', $order->tenant_id)->find($productId);
+            if (! $product) {
+                throw new InvalidArgumentException("Consumed material #{$productId} does not exist for this tenant.");
+            }
+
+            $warehouseId = !empty($line['warehouse_id'])
+                ? (int) $line['warehouse_id']
+                : (int) (Warehouse::where('tenant_id', $order->tenant_id)->orderByDesc('is_default')->orderBy('id')->value('id') ?? 0);
+            if (! $warehouseId) {
+                throw new InvalidArgumentException("A warehouse is required to consume {$product->name}.");
+            }
+            $this->assertWarehouseActive($warehouseId, $order->tenant_id);
+
+            $transaction = StockService::recordOutflow(
+                $order->tenant_id,
+                $productId,
+                $warehouseId,
+                $quantity,
+                'Production Material Issue',
+                $order->id
+            );
+
+            $allocations = $transaction->consumed_allocations ?? [];
+
+            $issue = ProductionOrderIssue::create([
+                'tenant_id'           => $order->tenant_id,
+                'company_id'          => $order->company_id ?? company_id(),
+                'branch_id'           => $order->branch_id ?? branch_id(),
+                'production_order_id' => $order->id,
+                'reservation_id'      => null,
+                'product_id'          => $productId,
+                'warehouse_id'        => $warehouseId,
+                'inventory_batch_id'  => !empty($allocations) ? $allocations[0]['batch_id'] : null,
+                'quantity_issued'     => $quantity,
+                'issue_type'          => 'consumption',
+                'issued_by'           => $userId,
+                'issued_at'           => now(),
+                'remarks'             => 'Consumed in shop floor log #' . $log->id . ($op ? " ({$op->operation_number})" : ''),
+            ]);
+
+            foreach ($allocations as $allocation) {
+                ProductionOrderIssueBatch::create([
+                    'tenant_id'                 => $order->tenant_id,
+                    'production_order_issue_id' => $issue->id,
+                    'inventory_batch_id'        => $allocation['batch_id'],
+                    'quantity'                  => $allocation['quantity_consumed'],
+                    'stock_transaction_id'      => $transaction->id,
+                ]);
+
+                ProductionLotTrace::create([
+                    'tenant_id'   => $order->tenant_id,
+                    'source_type' => 'lot',
+                    'source_id'   => $allocation['batch_id'],
+                    'target_type' => 'order',
+                    'target_id'   => $order->id,
+                    'quantity'    => $allocation['quantity_consumed'],
+                    'remarks'     => "Material consumed from batch #{$allocation['batch_id']} by production order #{$order->id}.",
+                ]);
+            }
+
+            $cost = (float) ($transaction->total_value ?? 0.0);
+            if ($cost <= 0.0) {
+                $cost = $quantity * (float) ($product->unit_cost ?? $product->cost_price ?? 0.0);
+            }
+            app(ProductionWipService::class)->addMaterialCost($order->id, $cost);
+
+            $issues[] = $issue;
+            $stored[] = [
+                'product_id'   => $productId,
+                'product_name' => $product->name,
+                'warehouse_id' => $warehouseId,
+                'quantity'     => $quantity,
+                'issue_id'     => $issue->id,
+            ];
+        }
+
+        app(ProductionEventService::class)->writeEvent($order->tenant_id, [
+            'production_order_id' => $order->id,
+            'event_type'          => 'Material Consumed',
+            'title'               => 'Material Consumed',
+            'description'         => count($stored) . " material line(s) consumed in progress log #{$log->id}.",
+            'severity'            => 'info',
+            'event_source'        => 'ProductionMaterialService',
+            'triggered_by'        => $userId,
+        ]);
+
+        $this->appendConsumptionJson($order->tenant_id, [
+            'log_id'      => $log->id,
+            'order_id'    => $order->id,
+            'operation_id' => $op?->id,
+            'recorded_at' => now()->toDateTimeString(),
+            'lines'       => $stored,
+        ]);
+
+        return $issues;
+    }
+
+    private function consumptionJsonPath(int $tenantId): string
+    {
+        $base = config('production.temp_consumption_path') ?: storage_path('app/temp-production');
+
+        return rtrim($base, '/\\') . "/{$tenantId}/consumption.json";
+    }
+
+    /** JSON sidecar of consumed-material lines per progress log (no table exists for it). */
+    private function appendConsumptionJson(int $tenantId, array $entry): void
+    {
+        $path = $this->consumptionJsonPath($tenantId);
+        if (! is_dir(dirname($path))) {
+            @mkdir(dirname($path), 0775, true);
+        }
+
+        $handle = fopen($path, 'c+');
+        if (! $handle) {
+            return;
+        }
+        try {
+            flock($handle, LOCK_EX);
+            $existing = json_decode((string) stream_get_contents($handle), true);
+            $existing = is_array($existing) ? $existing : [];
+            $existing[] = $entry;
+            ftruncate($handle, 0);
+            rewind($handle);
+            fwrite($handle, json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            fflush($handle);
+            flock($handle, LOCK_UN);
+        } finally {
+            fclose($handle);
+        }
+    }
+
+    /**
+     * Consumed-material lines recorded per progress log of an order, keyed by log id.
+     * Entries whose log no longer exists (rolled back) are ignored.
+     *
+     * @return array<int, array>
+     */
+    public function consumptionByLog(int $tenantId, int $orderId): array
+    {
+        $logIds = \App\Domains\Production\Models\ProductionOrderProgressLog::withoutGlobalScopes()
+            ->where('production_order_id', $orderId)->pluck('id')->all();
+
+        $byLog = [];
+        $path = $this->consumptionJsonPath($tenantId);
+        $entries = is_file($path) ? json_decode((string) @file_get_contents($path), true) : null;
+        foreach (is_array($entries) ? $entries : [] as $entry) {
+            if ((int) ($entry['order_id'] ?? 0) === $orderId && in_array($entry['log_id'] ?? null, $logIds, true)) {
+                $byLog[(int) $entry['log_id']] = $entry;
+            }
+        }
+
+        // The JSON file is only a sidecar: any consumption issue it does not know about (file lost / edited) is rebuilt
+        // from the DB — the issue's remarks carry "shop floor log #<id>".
+        $known = collect($byLog)->pluck('lines')->flatten(1)->pluck('issue_id')->all();
+        $orphans = ProductionOrderIssue::withoutGlobalScopes()->with('product')
+            ->where('tenant_id', $tenantId)->where('production_order_id', $orderId)->where('issue_type', 'consumption')
+            ->whereNotIn('id', $known ?: [0])->get();
+        foreach ($orphans as $issue) {
+            if (! preg_match('/shop floor log #(\d+)/', (string) $issue->remarks, $m) || ! in_array((int) $m[1], $logIds, true)) {
+                continue;
+            }
+            $logId = (int) $m[1];
+            $byLog[$logId] ??= [
+                'log_id' => $logId, 'order_id' => $orderId, 'operation_id' => null,
+                'recorded_at' => $issue->issued_at?->toDateTimeString(), 'lines' => [],
+            ];
+            $byLog[$logId]['lines'][] = [
+                'product_id' => $issue->product_id, 'product_name' => $issue->product?->name,
+                'warehouse_id' => $issue->warehouse_id, 'quantity' => (float) $issue->quantity_issued, 'issue_id' => $issue->id,
+            ];
+        }
+
+        return $byLog;
+    }
+
+    /**
+     * Temp no-BOM flow: every material consumed on the order, one row per consumed line, with the operation, progress log,
+     * production batch, material, unit, warehouse, inventory lot(s), cost and who logged it.
+     *
+     * @return array<int, array<string, mixed>> newest first
+     */
+    public function consumptionReport(\App\Domains\Production\Models\ProductionOrder $order): array
+    {
+        $byLog = $this->consumptionByLog($order->tenant_id, $order->id);
+        if ($byLog === []) {
+            return [];
+        }
+
+        $logs = \App\Domains\Production\Models\ProductionOrderProgressLog::withoutGlobalScopes()
+            ->with(['operation', 'batch', 'user'])
+            ->whereIn('id', array_keys($byLog))->get()->keyBy('id');
+
+        $issues = ProductionOrderIssue::withoutGlobalScopes()
+            ->with(['product.uom', 'warehouse', 'user', 'batches.inventoryBatch', 'batches.stockTransaction'])
+            ->where('production_order_id', $order->id)
+            ->whereIn('id', collect($byLog)->pluck('lines')->flatten(1)->pluck('issue_id')->all())
+            ->get()->keyBy('id');
+
+        $rows = [];
+        foreach ($byLog as $logId => $entry) {
+            $log = $logs[$logId] ?? null;
+            foreach ($entry['lines'] as $line) {
+                $issue = $issues[$line['issue_id']] ?? null;
+                $rows[] = [
+                    'log_id'           => $logId,
+                    'recorded_at'      => $log?->recorded_at ?? $entry['recorded_at'] ?? null,
+                    'operation_id'     => $log?->operation_id,
+                    'operation_number' => $log?->operation?->operation_number,
+                    'operation_name'   => $log?->operation?->name,
+                    'production_batch' => $log?->batch?->batch_number,
+                    'quantity_produced' => (float) ($log?->quantity_produced ?? 0),
+                    'product_id'       => $line['product_id'],
+                    'sku'              => $issue?->product?->sku,
+                    'product_name'     => $line['product_name'] ?? $issue?->product?->name,
+                    'unit'             => $issue?->product?->uom?->code,
+                    'quantity'         => (float) $line['quantity'],
+                    'warehouse'        => $issue?->warehouse?->name,
+                    'inventory_lots'   => $issue ? $issue->batches->map(fn ($b) => ($b->inventoryBatch?->batch_number ?? '#' . $b->inventory_batch_id) . ' (' . rtrim(rtrim(number_format((float) $b->quantity, 4, '.', ''), '0'), '.') . ')')->implode(', ') : '',
+                    'cost'             => $issue ? (float) $issue->total_cost : 0.0,
+                    'user'             => $log?->user?->name ?? $issue?->user?->name,
+                    'issue_id'         => $line['issue_id'],
+                ];
+            }
+        }
+
+        usort($rows, fn ($a, $b) => strcmp((string) $b['recorded_at'], (string) $a['recorded_at']) ?: $b['log_id'] <=> $a['log_id']);
+
+        return $rows;
+    }
+
+    /**
      * Assert warehouse is active and belongs to the tenant.
      *
      * @throws InvalidArgumentException

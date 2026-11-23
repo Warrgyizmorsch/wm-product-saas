@@ -448,6 +448,20 @@
                                 </template>
                             </div>
                         </div>
+                        @if(config('production.temp_flow'))
+                        {{-- Temp no-BOM flow: pick any routing (a list of operations) or leave empty for one default operation --}}
+                        <div class="odoo-form-group">
+                            <label class="odoo-form-label">{{ __('production.process_routing') }}</label>
+                            <div class="flex-grow-1">
+                                <select name="routing_id" id="routing_temp_select" class="form-select form-select-sm">
+                                    <option value="">— No routing (single default operation) —</option>
+                                    @foreach(\App\Domains\Production\Models\Routing::query()->orderBy('name')->get(['id', 'name', 'routing_number', 'version']) as $tempRouting)
+                                        <option value="{{ $tempRouting->id }}" @selected(old('routing_id') == $tempRouting->id)>{{ $tempRouting->routing_number }} — {{ $tempRouting->name }} (v{{ $tempRouting->version }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        @else
                         <div class="odoo-form-group">
                             <label class="odoo-form-label">{{ __('production.process_routing') }}</label>
                             <div class="flex-grow-1">
@@ -461,6 +475,7 @@
                                 </template>
                             </div>
                         </div>
+                        @endif
 
                         <x-ui.odoo-form-ui type="select" label="{{ __('production.production_mode') }}" name="production_mode" id="production_mode_select">
                             <option value="standard" @selected(old('production_mode', 'standard') === 'standard')>{{ __('production.mode_standard') }}</option>

@@ -31,7 +31,7 @@ class CrmDealController extends Controller
             return $redirect;
         }
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $search = $request->input('search');
         $stage = $request->input('stage');
         $dateFrom = $request->input('date_from');
@@ -111,17 +111,20 @@ class CrmDealController extends Controller
             }
         }
 
-        $deals = $query->orderBy('id', 'desc')->paginate(100);
+        $deals = $query->orderBy('id', 'desc')->paginate(10)->withQueryString();
         $users = \App\Models\User::orderBy('name')->get();
 
         return view('modules.crm.deals.index', compact('deals', 'users', 'search', 'stage', 'stageCounts', 'dateFrom', 'dateTo', 'dealStatuses'));
     }
 
+    /** Cards rendered per kanban column; the rest are reachable from the list view. */
+    private const KANBAN_CARDS_PER_COLUMN = 50;
+
     public function kanban(Request $request): View
     {
         $this->authorize('viewAny', CrmDeal::class);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
 
@@ -152,28 +155,59 @@ class CrmDealController extends Controller
             ];
         }
 
-        $dealsQuery = CrmDeal::with(['account', 'contact', 'quotations', 'lead'])
-            ->where('tenant_id', $tenantId);
+        // Each column loads only its most recent deals; counts and totals come
+        // from one grouped query. Loading every deal (with a query per card) took
+        // ~24 s and 35k queries at 1,000 deals.
+        $perColumn = self::KANBAN_CARDS_PER_COLUMN;
 
-        $allDeals = $dealsQuery
-            ->orderBy('updated_at', 'desc')
-            ->get();
+        // Legacy stage names shown under their current column.
+        $stageAliases = ['Closed Won' => 'Won', 'Closed Lost' => 'Lost', 'New' => 'Qualification', 'Qualified' => 'Needs Analysis'];
+        $rawStagesFor = function (string $stageKey) use ($stageAliases): array {
+            $raw = array_keys(array_filter($stageAliases, fn ($target) => $target === $stageKey));
+            if (! array_key_exists($stageKey, $stageAliases)) {
+                $raw[] = $stageKey;
+            }
+
+            return $raw;
+        };
+
+        $baseQuery = CrmDeal::query()->where('tenant_id', $tenantId);
+
+        // SQL form of CrmDeal::getActualValueAttribute() (latest live sales order,
+        // else latest accepted quotation, else the estimate), so neither the
+        // totals nor the cards need two queries per deal.
+        $dealValueSql = 'COALESCE('
+            . "(SELECT NULLIF(so.total_amount, 0) FROM sales_orders so WHERE so.crm_deal_id = crm_deals.id AND so.status <> 'Cancelled' AND so.deleted_at IS NULL ORDER BY so.id DESC LIMIT 1), "
+            . "(SELECT NULLIF(q.total_amount, 0) FROM quotations q WHERE q.crm_deal_id = crm_deals.id AND q.status IN ('Accepted', 'Converted', 'Won') AND q.deleted_at IS NULL ORDER BY q.id DESC LIMIT 1), "
+            . 'estimated_value, 0)';
+
+        $stageStats = (clone $baseQuery)
+            ->selectRaw("stage, COUNT(*) as deal_count, SUM({$dealValueSql}) as deal_total")
+            ->groupBy('stage')
+            ->get()
+            ->keyBy('stage');
 
         $kanbanData = [];
         foreach ($stages as $stageKey => $info) {
-            $filteredDeals = $allDeals->filter(function($d) use ($stageKey) {
-                $stg = $d->stage;
-                if ($stg === 'Closed Won') $stg = 'Won';
-                if ($stg === 'Closed Lost') $stg = 'Lost';
-                if ($stg === 'New') $stg = 'Qualification';
-                if ($stg === 'Qualified') $stg = 'Needs Analysis';
-                return $stg === $stageKey;
-            });
+            $rawStages = $rawStagesFor($stageKey);
+
+            $columnDeals = (clone $baseQuery)
+                ->whereIn('stage', $rawStages)
+                ->select('crm_deals.*')
+                ->selectRaw("{$dealValueSql} as kanban_value")
+                ->with(['account', 'contact', 'lead'])
+                ->withExists(['quotations as has_accepted_quote' => fn ($q) => $q->where('status', 'Accepted')])
+                ->orderBy('updated_at', 'desc')
+                ->limit($perColumn)
+                ->get();
+
+            $stats = collect($rawStages)->map(fn ($raw) => $stageStats->get($raw))->filter();
 
             $kanbanData[$stageKey] = [
                 'info'  => $info,
-                'deals' => $filteredDeals,
-                'total' => $filteredDeals->sum(fn($d) => $d->actual_value ?: $d->estimated_value),
+                'deals' => $columnDeals,
+                'count' => (int) $stats->sum('deal_count'),
+                'total' => (float) $stats->sum('deal_total'),
             ];
         }
 
@@ -184,7 +218,7 @@ class CrmDealController extends Controller
     {
         $this->authorize('create', CrmDeal::class);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $accounts = CrmAccount::where('tenant_id', $tenantId)->orderBy('name')->get();
         $selectedAccountId = $request->input('account_id') ?? $request->input('crm_account_id');
         $contacts = $selectedAccountId 
@@ -202,7 +236,7 @@ class CrmDealController extends Controller
     {
         $this->authorize('create', CrmDeal::class);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
         $validStages = array_unique(array_merge(
@@ -211,14 +245,14 @@ class CrmDealController extends Controller
         ));
 
         $validated = $request->validate([
-            'crm_account_id'  => 'required|exists:crm_accounts,id',
-            'crm_contact_id'  => 'nullable|exists:crm_contacts,id',
+            'crm_account_id'  => ['required', tenant_exists('crm_accounts')],
+            'crm_contact_id'  => ['nullable', tenant_exists('crm_contacts')],
             'title'           => 'required|string|max:255',
             'estimated_value' => 'required|numeric|min:0',
             'stage'           => 'nullable|string|in:' . implode(',', $validStages),
             'closing_date'    => 'nullable|date',
             'lead_source'     => 'nullable|string|max:100',
-            'owner_id'        => 'nullable|exists:users,id',
+            'owner_id'        => ['nullable', tenant_exists('users')],
             'notes'           => 'nullable|string',
         ]);
 
@@ -295,9 +329,9 @@ class CrmDealController extends Controller
             session(['google_calendar_connected' => true]);
         }
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $deal->load(['account.contacts', 'account.owner', 'contact', 'quotations.items.product', 'salesOrders', 'owner']);
-        $nextQuotationNumber = app(\App\Domains\CRM\Services\QuotationService::class)->getNextQuotationNumber();
+        $nextQuotationNumber = app(\App\Domains\CRM\Services\QuotationService::class)->previewNextQuotationNumber();
         $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
         $users = \App\Models\User::orderBy('name')->get();
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
@@ -368,7 +402,7 @@ class CrmDealController extends Controller
     {
         $this->authorize('update', $deal);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $accounts = CrmAccount::where('tenant_id', $tenantId)->orderBy('name')->get();
         $contacts = $deal->crm_account_id 
             ? CrmContact::where('crm_account_id', $deal->crm_account_id)->orderBy('name')->get()
@@ -384,7 +418,7 @@ class CrmDealController extends Controller
     {
         $this->authorize('update', $deal);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
         $validStages = array_unique(array_merge(
@@ -393,15 +427,15 @@ class CrmDealController extends Controller
         ));
 
         $validated = $request->validate([
-            'crm_account_id'  => 'required|exists:crm_accounts,id',
-            'crm_contact_id'  => 'nullable|exists:crm_contacts,id',
+            'crm_account_id'  => ['required', tenant_exists('crm_accounts')],
+            'crm_contact_id'  => ['nullable', tenant_exists('crm_contacts')],
             'title'           => 'required|string|max:255',
             'estimated_value' => 'required|numeric|min:0',
             'stage'           => 'required|string|in:' . implode(',', $validStages),
             'close_reason'    => 'nullable|string|max:255',
             'closing_date'    => 'nullable|date',
             'lead_source'     => 'nullable|string|max:100',
-            'owner_id'        => 'nullable|exists:users,id',
+            'owner_id'        => ['nullable', tenant_exists('users')],
             'notes'           => 'nullable|string',
         ]);
 
@@ -476,7 +510,7 @@ class CrmDealController extends Controller
     {
         $this->authorize('update', $deal);
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
         $validStages = array_unique(array_merge(
@@ -582,15 +616,12 @@ class CrmDealController extends Controller
     {
         $this->authorize('update', $deal);
 
-        $request->validate([
-            'documents' => 'required',
-            'documents.*' => 'file|max:10240'
-        ]);
+        $request->validate(\App\Domains\CRM\Models\LeadDocument::uploadRules());
 
         $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)->first();
 
         if (!$linkedLead) {
-            $tenantId = tenant_id() ?? 1;
+            $tenantId = require_tenant_id();
             $linkedLead = \App\Domains\CRM\Models\Lead::create([
                 'tenant_id'      => $tenantId,
                 'company_name'   => $deal->account ? $deal->account->name : $deal->title,
@@ -646,7 +677,7 @@ class CrmDealController extends Controller
     {
         $this->authorize('update', $deal);
 
-        $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $deal->tenant_id ?? require_tenant_id();
         $deal->load(['account.contacts', 'contact', 'lead']);
 
         $account = $deal->account;
@@ -725,7 +756,7 @@ class CrmDealController extends Controller
     {
         $this->authorize('update', $deal);
 
-        $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $deal->tenant_id ?? require_tenant_id();
 
         $request->validate([
             'conversion_mode'      => 'required|string|in:existing,create_new',
@@ -745,7 +776,7 @@ class CrmDealController extends Controller
 
     private function executeDealCustomerConversion(CrmDeal $deal, ?int $existingCustomerId, string $mode, bool $skipDuplicateCheck = false): RedirectResponse|View
     {
-        $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $deal->tenant_id ?? require_tenant_id();
         $deal->load(['account', 'contact', 'lead']);
         $account = $deal->account;
 
@@ -995,8 +1026,8 @@ class CrmDealController extends Controller
      */
     public function checkGoogleAuth(DealHealthService $service): JsonResponse
     {
-        $userId = request('user_id') ?: (auth()->id() ?? 1);
-        $status = $service->checkAuthStatus((int) $userId);
+        // Always the signed-in user: the integration knows users only by this ID.
+        $status = $service->checkAuthStatus((int) auth()->id());
         return response()->json($status);
     }
 
@@ -1107,7 +1138,7 @@ class CrmDealController extends Controller
         $this->authorize('update', $deal);
 
         $validated = $request->validate([
-            'deal_owner_id' => 'nullable|exists:users,id',
+            'deal_owner_id' => ['nullable', tenant_exists('users')],
             'note' => 'nullable|string|max:500',
         ]);
 
@@ -1167,8 +1198,8 @@ class CrmDealController extends Controller
         $this->authorize('viewAny', CrmDeal::class);
         $validated = $request->validate([
             'deal_ids' => 'required|array|min:1',
-            'deal_ids.*' => 'required|integer|exists:crm_deals,id',
-            'deal_owner_id' => 'nullable|exists:users,id',
+            'deal_ids.*' => ['required', 'integer', tenant_exists('crm_deals')],
+            'deal_owner_id' => ['nullable', tenant_exists('users')],
             'note' => 'nullable|string|max:500',
         ]);
 

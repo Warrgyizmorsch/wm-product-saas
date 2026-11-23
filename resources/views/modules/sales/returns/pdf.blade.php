@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="pdf-page-numbers" content="right=85;bottom=24;size=8.5;font=DejaVu Sans">
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Credit Note - {{ $return->return_number }}</title>
@@ -537,20 +538,5 @@
     </table>
 
     <!-- ── DYNAMIC PAGE NUMBER SCRIPT (DOMPDF) ── -->
-    <script type="text/php">
-        if (isset($pdf)) {
-            $font = $fontMetrics->get_font("DejaVu Sans", "normal");
-            $size = 8.5;
-            $color = array(0.39, 0.45, 0.55); // #64748b
-            
-            // X and Y coordinates for bottom right
-            // A4 page width = 595.28 points, height = 841.89 points
-            // Margins: right = 15mm (~42.5pt), bottom = 22mm (~62.3pt)
-            $x = 510;
-            $y = 818;
-            $text = "Page {PAGE_NUM} of {PAGE_COUNT}";
-            $pdf->page_text($x, $y, $text, $font, $size, $color);
-        }
-    </script>
 </body>
 </html>

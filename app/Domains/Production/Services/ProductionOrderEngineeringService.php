@@ -145,6 +145,17 @@ class ProductionOrderEngineeringService
             'selected_material_ids'  => [],
         ];
 
+        // Temp no-BOM flow: no BOM, no material requirements. An optional routing is only a list of operations to
+        // snapshot — it is not validated for costs / resources.
+        if (config('production.temp_flow')) {
+            if ($requestedRoutingId) {
+                $result['routing'] = Routing::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($requestedRoutingId);
+                $result['routing_status'] = $result['routing'] ? 'active' : 'not_required';
+            }
+
+            return $result;
+        }
+
         if (!$this->requiresEngineering($product)) {
             return $result;
         }

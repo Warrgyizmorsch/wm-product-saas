@@ -60,7 +60,7 @@ class LeadAssignmentService
      */
     public function assignLeadOwner(Lead $lead, string $channel = 'web_form', array $extraData = []): array
     {
-        $tenantId = $lead->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $lead->tenant_id ?? require_tenant_id();
         $tenant = Tenant::find($tenantId);
         if (!$tenant) {
             return ['assigned' => false, 'owner_id' => $lead->lead_owner_id, 'reason' => 'Tenant not found'];

@@ -127,7 +127,8 @@
                                     </label>
                                     <div class="input-group input-group-sm">
                                         <input type="password" name="auth_token" id="auth_token" class="form-control font-monospace" 
-                                               value="{{ old('auth_token', $twilioConfig?->auth_token) }}" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" required>
+                                               value="" autocomplete="new-password"
+                                               placeholder="{{ $twilioConfig?->auth_token ? 'Saved (ends ' . substr($twilioConfig->auth_token, -4) . ') - leave blank to keep' : 'Paste your Twilio auth token' }}" @unless($twilioConfig?->auth_token) required @endunless>
                                         <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('auth_token')">
                                             <i class="feather-eye" id="auth_token_icon"></i>
                                         </button>
@@ -184,12 +185,19 @@
                                     </label>
                                     <div class="input-group input-group-sm">
                                         <input type="password" name="gemini_api_key" id="gemini_api_key" class="form-control font-monospace" 
-                                               value="{{ old('gemini_api_key', $twilioConfig?->gemini_api_key) }}" placeholder="AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                                               value="" autocomplete="new-password"
+                                               placeholder="{{ $twilioConfig?->gemini_api_key ? 'Saved (ends ' . substr($twilioConfig->gemini_api_key, -4) . ') - leave blank to keep' : 'Paste your Gemini API key' }}">
                                         <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('gemini_api_key')">
                                             <i class="feather-eye" id="gemini_api_key_icon"></i>
                                         </button>
                                     </div>
-                                    <span class="text-muted fs-11">Leave blank to use global system AI, or provide tenant's custom Gemini API key.</span>
+                                    <span class="text-muted fs-11">Leave blank to keep the saved key (or the global system AI if none is saved).</span>
+                                    @if($twilioConfig?->gemini_api_key)
+                                        <div class="form-check mt-1">
+                                            <input class="form-check-input" type="checkbox" name="clear_gemini_api_key" value="1" id="clear_gemini_api_key">
+                                            <label class="form-check-label fs-11" for="clear_gemini_api_key">Remove the saved key and use the global system AI</label>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>

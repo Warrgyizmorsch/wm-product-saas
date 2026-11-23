@@ -97,6 +97,8 @@ class RbacSeeder extends Seeder
             'crm.quotations.update' => $permissions['crm.quotations.update'],
             'crm.quotations.approve' => $permissions['crm.quotations.approve'],
             'crm.quotations.delete' => $permissions['crm.quotations.delete'],
+            'crm.webforms.manage' => $permissions['crm.webforms.manage'],
+            'crm.masters.manage' => $permissions['crm.masters.manage'],
         ], RolePermission::SCOPE_TENANT);
 
         // "create" abilities have no existing record to own yet, so they're granted at
@@ -750,6 +752,9 @@ class RbacSeeder extends Seeder
             ['name' => 'crm.quotations.update', 'module' => 'crm', 'entity' => 'quotations', 'action' => 'update'],
             ['name' => 'crm.quotations.approve', 'module' => 'crm', 'entity' => 'quotations', 'action' => 'approve'],
             ['name' => 'crm.quotations.delete', 'module' => 'crm', 'entity' => 'quotations', 'action' => 'delete'],
+            ['name' => 'crm.settings.manage', 'module' => 'crm', 'entity' => 'settings', 'action' => 'manage'],
+            ['name' => 'crm.webforms.manage', 'module' => 'crm', 'entity' => 'webforms', 'action' => 'manage'],
+            ['name' => 'crm.masters.manage', 'module' => 'crm', 'entity' => 'masters', 'action' => 'manage'],
             ['name' => 'inventory.products.view', 'module' => 'inventory', 'entity' => 'products', 'action' => 'view'],
             ['name' => 'inventory.products.create', 'module' => 'inventory', 'entity' => 'products', 'action' => 'create'],
             ['name' => 'inventory.products.update', 'module' => 'inventory', 'entity' => 'products', 'action' => 'update'],

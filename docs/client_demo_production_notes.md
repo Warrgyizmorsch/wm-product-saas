@@ -110,7 +110,7 @@
 
 ## 3. Work Centers, Sections, Shifts & Warehouses (Demo Plant Setup)
 
-> **Status:** Agreed & Configured in `database/seeders/data/nonwoven_demo_data.json`.  
+> **Status:** Agreed & Configured in `database/seeders/NonWovenPlantSeeder.php`.  
 > **Scope:** Tenant 1, Branch 3 ("Bangalore Tech Center").
 
 ### 3.1 Four Production Shifts (Tenant-Wide)
@@ -242,7 +242,7 @@
 
 ## 5. Bill of Materials (BOM) & Workstation Allocations
 
-> **Status:** Agreed & Configured in `database/seeders/data/nonwoven_demo_data.json`.  
+> **Status:** Agreed & Configured in `database/seeders/NonWovenPlantSeeder.php`.  
 > **Architecture Rule (2-Tier BOM):**
 > * **Tier 1 (`production_bom_items`):** Consolidated master recipe per finished product. One row per unique material per BOM (`allocation_role` = `primary` or `alternative`).
 > * **Tier 2 (`production_routing_operation_materials`):** Workstation allocations assigned to specific routing operations. Every operation in the routing has designated direct materials, packaging, or QA consumables allocated to ensure complete visibility in the BOM UI and accurate unit costing. Supports alternative materials with priority and replacement targets.

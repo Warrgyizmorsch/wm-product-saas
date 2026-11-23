@@ -21,7 +21,7 @@ class QuotationApiController extends Controller
     private function resolveTenantContext(): array
     {
         $user      = auth()->user();
-        $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
+        $tenantId  = $user?->tenant_id  ?? require_tenant_id();
         $companyId = company_id() ?? $user?->company_id;
         $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
 
@@ -80,17 +80,17 @@ class QuotationApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'quotation_number' => 'nullable|string|max:100',
-            'customer_id'      => 'nullable|integer',
-            'lead_id'          => 'nullable|integer',
-            'crm_account_id'   => 'nullable|integer',
-            'crm_deal_id'      => 'nullable|integer',
+            'customer_id'      => ['nullable', 'integer', tenant_exists('customers')],
+            'lead_id'          => ['nullable', 'integer', tenant_exists('leads')],
+            'crm_account_id'   => ['nullable', 'integer', tenant_exists('crm_accounts')],
+            'crm_deal_id'      => ['nullable', 'integer', tenant_exists('crm_deals')],
             'quotation_date'   => 'nullable|date',
             'valid_until'      => 'nullable|date',
             'subject'          => 'nullable|string|max:255',
             'terms'            => 'nullable|string',
             'notes'            => 'nullable|string',
             'items'            => 'required|array|min:1',
-            'items.*.product_id'   => 'required|integer',
+            'items.*.product_id'   => ['required', 'integer', tenant_exists('products')],
             'items.*.quantity'     => 'required|numeric|min:0.01',
             'items.*.unit_price'   => 'required|numeric|min:0',
             'items.*.tax_rate'     => 'nullable|numeric|min:0',
@@ -109,7 +109,13 @@ class QuotationApiController extends Controller
         $validated['tenant_id']  = $tenantId;
         $validated['company_id'] = $companyId;
         $validated['branch_id']  = $branchId;
-        $validated['user_id']    = auth()->id() ?? 1;
+        $validated['user_id']    = auth()->id();
+        // The API's field names differ from the model's: map them, and default the
+        // date (quotation_date is NOT NULL, so a missing one used to give HTTP 500).
+        $validated['quotation_date']   = $validated['quotation_date'] ?? now()->toDateString();
+        $validated['expiry_date']      = $validated['valid_until'] ?? null;
+        $validated['terms_conditions'] = $validated['terms'] ?? null;
+        unset($validated['valid_until'], $validated['terms']);
 
         if (empty($validated['quotation_number'])) {
             $validated['quotation_number'] = $this->quotationService->getNextQuotationNumber();
@@ -437,7 +443,6 @@ class QuotationApiController extends Controller
         $this->authorize('view', $quotation);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
-        $pdf->setOption('isPhpEnabled', true);
         return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
     }
 
@@ -506,7 +511,7 @@ class QuotationApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'conversion_mode'      => 'nullable|string|in:existing,create_new',
-            'existing_customer_id' => 'required_if:conversion_mode,existing|nullable|integer|exists:customers,id',
+            'existing_customer_id' => ['required_if:conversion_mode,existing', 'nullable', 'integer', tenant_exists('customers')],
         ]);
 
         if ($validator->fails()) {

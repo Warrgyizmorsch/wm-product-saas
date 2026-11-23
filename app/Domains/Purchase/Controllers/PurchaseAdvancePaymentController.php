@@ -181,7 +181,6 @@ class PurchaseAdvancePaymentController extends Controller
             ->setOptions([
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => true,
-                'isPhpEnabled' => true,
             ]);
 
         $fileName = 'Advance_Receipt_' . str_replace(['/', '\\', ' '], '_', $advance->payment_number) . '.pdf';

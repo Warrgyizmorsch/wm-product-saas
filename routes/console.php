@@ -110,3 +110,7 @@ Artisan::command('fcm:test {target : User ID, Email, or FCM registration token} 
     return 1;
 })->purpose('Send a test Firebase Cloud Messaging (FCM) push notification to a user or token');
 
+// Expired Sanctum API tokens (config/sanctum.php 'expiration').
+Schedule::command('sanctum:prune-expired --hours=24')
+    ->dailyAt('03:15')
+    ->withoutOverlapping();

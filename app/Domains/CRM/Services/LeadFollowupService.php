@@ -394,7 +394,7 @@ class LeadFollowupService
                 $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
                 $distanceMeters = (int) round($earthRadius * $c);
 
-                $tenantId = $existingFollowup->tenant_id ?? (tenant_id() ?? 1);
+                $tenantId = $existingFollowup->tenant_id ?? require_tenant_id();
                 $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
                 $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];
                 $allowedRadius = (int)($settings['geofence_radius_meters'] ?? 500);
