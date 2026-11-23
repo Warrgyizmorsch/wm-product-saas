@@ -134,6 +134,8 @@ class LeadImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 
             try {
                 $lead = new Lead([
+                    'provenance'         => 'import',
+                    'is_inbound_enquiry' => false,
                     'tenant_id'          => $tenantId,
                     'company_id'         => $companyId,
                     'branch_id'          => $branchId,

@@ -16,6 +16,7 @@
             <div class="erp-single-panel bg-white p-4 p-md-5 rounded-3 border shadow-sm">
                 <form action="{{ route('purchase.vendors.store') }}" method="POST" id="vendorForm" class="odoo-sheet">
                     @csrf
+                    @include('partials.party-duplicate-warning', ['checkUrl' => route('purchase.vendors.duplicate-check')])
 
                     {{-- Top Header Bar (Matches Accounts & Transporters Sheet) --}}
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border-bottom pb-3 gap-2">
@@ -59,10 +60,20 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('purchase.supplier_code_id')" name="code" id="code" :value="old('code', $autoCode)" placeholder="e.g. VEND-0001" :errorText="$errors->first('code')" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('purchase.active_status')" name="status" id="status" :required="true" :searchable="false" :errorText="$errors->first('status')">
-                                <option value="active" {{ old('status', 'active') === 'active' ? 'selected' : '' }}>{{ __('purchase.active') }}</option>
-                                <option value="inactive" {{ old('status') === 'inactive' ? 'selected' : '' }}>{{ __('purchase.inactive') }}</option>
-                            </x-ui.odoo-form-ui>
+                            @if(app(\App\Services\PartyVerificationService::class)->enabled())
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold text-dark fs-12">{{ __('purchase.active_status') }}</label>
+                                    <input type="hidden" name="status" value="inactive">
+                                    <div class="form-control-plaintext fs-13 text-muted border rounded px-3 py-2 bg-light">
+                                        <strong>Inactive until verified</strong> — an authorised verifier must check this supplier before it becomes active.
+                                    </div>
+                                </div>
+                            @else
+                                <x-ui.odoo-form-ui type="select" :label="__('purchase.active_status')" name="status" id="status" :required="true" :searchable="false" :errorText="$errors->first('status')">
+                                    <option value="active" {{ old('status', 'active') === 'active' ? 'selected' : '' }}>{{ __('purchase.active') }}</option>
+                                    <option value="inactive" {{ old('status') === 'inactive' ? 'selected' : '' }}>{{ __('purchase.inactive') }}</option>
+                                </x-ui.odoo-form-ui>
+                            @endif
 
                             {{-- Section 2: Taxation & Statutory Info --}}
                             <div class="border-top pt-4 mt-4">

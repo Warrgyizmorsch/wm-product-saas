@@ -22,6 +22,7 @@
                 <form action="{{ route('purchase.vendors.update', $vendor->id) }}" method="POST" id="vendorForm" class="odoo-sheet">
                     @csrf
                     @method('PUT')
+                    @include('partials.party-duplicate-warning', ['checkUrl' => route('purchase.vendors.duplicate-check', ['ignore_id' => $vendor->id])])
 
                     {{-- Top Header Bar --}}
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border-bottom pb-3 gap-2">
@@ -65,10 +66,44 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('purchase.supplier_code_id')" name="code" id="code" :value="old('code', $vendor->code)" placeholder="e.g. VEND-0001" :required="true" :errorText="$errors->first('code')" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('purchase.active_status')" name="status" id="status" :required="true" :searchable="false" :errorText="$errors->first('status')">
-                                <option value="active" {{ old('status', strtolower($vendor->status)) === 'active' ? 'selected' : '' }}>{{ __('purchase.active') }}</option>
-                                <option value="inactive" {{ old('status', strtolower($vendor->status)) === 'inactive' ? 'selected' : '' }}>{{ __('purchase.inactive') }}</option>
-                            </x-ui.odoo-form-ui>
+                            @php
+                                $partyVerification = app(\App\Services\PartyVerificationService::class);
+                                $partyStatus = app(\App\Services\PartyStatusService::class);
+                                $partyBankChange = app(\App\Services\PartyBankChangeService::class);
+                                $bankProtected = $partyBankChange->isProtected($vendor);
+                                $openBankChange = $bankProtected ? $partyBankChange->openRequest($vendor) : null;
+                            @endphp
+                            @if($partyVerification->enabled())
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold text-dark fs-12">{{ __('purchase.active_status') }}</label>
+                                    <input type="hidden" name="status" value="{{ strtolower($vendor->status) }}">
+                                    @if(! $vendor->isVerified())
+                                        <div class="form-control-plaintext fs-13 text-muted border rounded px-3 py-2 bg-light">
+                                            <strong>Inactive: {{ strtolower($vendor->verificationLabel()) }}</strong>
+                                        </div>
+                                    @elseif(strtolower($vendor->status) === 'active')
+                                        <div class="d-flex align-items-center justify-content-between border rounded px-3 py-2 bg-light fs-13">
+                                            <span><strong>Active</strong></span>
+                                            <a href="{{ route('purchase.vendors.deactivate.create', $vendor->id) }}" class="btn btn-sm btn-outline-danger">Make inactive</a>
+                                        </div>
+                                    @else
+                                        <div class="d-flex align-items-center justify-content-between border rounded px-3 py-2 bg-light fs-13">
+                                            <span>
+                                                <strong>Inactive</strong>
+                                                @if($vendor->inactive_reason)
+                                                    <span class="text-muted">({{ $partyStatus->reasonLabel($vendor->inactive_reason) }})</span>
+                                                @endif
+                                            </span>
+                                            <a href="{{ route('purchase.vendors.reactivate.create', $vendor->id) }}" class="btn btn-sm btn-outline-success">Reactivate</a>
+                                        </div>
+                                    @endif
+                                </div>
+                            @else
+                                <x-ui.odoo-form-ui type="select" :label="__('purchase.active_status')" name="status" id="status" :required="true" :searchable="false" :errorText="$errors->first('status')">
+                                    <option value="active" {{ old('status', strtolower($vendor->status)) === 'active' ? 'selected' : '' }}>{{ __('purchase.active') }}</option>
+                                    <option value="inactive" {{ old('status', strtolower($vendor->status)) === 'inactive' ? 'selected' : '' }}>{{ __('purchase.inactive') }}</option>
+                                </x-ui.odoo-form-ui>
+                            @endif
 
                             {{-- Section 2: Taxation & Statutory Info --}}
                             <div class="border-top pt-4 mt-4">
@@ -106,11 +141,28 @@
                             <div class="border-top pt-4 mt-4">
                                 <h6 class="fw-bold text-primary mb-3"><i class="feather-credit-card me-2"></i>{{ __('purchase.section_4_bank_accounting_setup') }}</h6>
 
-                                <x-ui.odoo-form-ui type="input" :label="__('purchase.bank_name')" name="bank_name" id="bank_name" :value="old('bank_name', $vendor->bank_name)" placeholder="e.g. HDFC Bank / ICICI Bank" :errorText="$errors->first('bank_name')" />
+                                @if($bankProtected)
+                                    <div class="border rounded-3 p-3 mb-3 bg-light fs-13">
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                            <span class="badge bg-soft-info text-info">Bank details locked</span>
+                                            @if($openBankChange)
+                                                <a href="{{ route('purchase.vendors.bank-changes.show', $openBankChange->id) }}" class="btn btn-sm btn-outline-warning">View open bank change request</a>
+                                            @else
+                                                <a href="{{ route('purchase.vendors.bank-changes.create', $vendor->id) }}" class="btn btn-sm btn-outline-primary">Request bank change</a>
+                                            @endif
+                                        </div>
+                                        <div><span class="text-muted">{{ __('purchase.bank_name') }}:</span> <strong>{{ $vendor->bank_name ?: '—' }}</strong></div>
+                                        <div><span class="text-muted">{{ __('purchase.bank_account_number') }}:</span> <strong class="font-monospace">{{ $vendor->account_number ?: '—' }}</strong></div>
+                                        <div><span class="text-muted">{{ __('purchase.ifsc_swift_code') }}:</span> <strong class="font-monospace">{{ $vendor->ifsc_code ?: '—' }}</strong></div>
+                                        <div class="fs-11 text-muted mt-1">Bank details can only be changed through a callback-verified bank change request.</div>
+                                    </div>
+                                @else
+                                    <x-ui.odoo-form-ui type="input" :label="__('purchase.bank_name')" name="bank_name" id="bank_name" :value="old('bank_name', $vendor->bank_name)" placeholder="e.g. HDFC Bank / ICICI Bank" :errorText="$errors->first('bank_name')" />
 
-                                <x-ui.odoo-form-ui type="input" inputType="text" :label="__('purchase.bank_account_number')" name="account_number" id="account_number" :value="old('account_number', $vendor->account_number)" placeholder="e.g. 50100234567890" oninput="this.value = this.value.replace(/[^0-9]/g, '')" maxlength="50" :errorText="$errors->first('account_number')" />
+                                    <x-ui.odoo-form-ui type="input" inputType="text" :label="__('purchase.bank_account_number')" name="account_number" id="account_number" :value="old('account_number', $vendor->account_number)" placeholder="e.g. 50100234567890" oninput="this.value = this.value.replace(/[^0-9]/g, '')" maxlength="50" :errorText="$errors->first('account_number')" />
 
-                                <x-ui.odoo-form-ui type="input" :label="__('purchase.ifsc_swift_code')" name="ifsc_code" id="ifsc_code" :value="old('ifsc_code', $vendor->ifsc_code)" placeholder="e.g. HDFC0001234" :errorText="$errors->first('ifsc_code')" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('purchase.ifsc_swift_code')" name="ifsc_code" id="ifsc_code" :value="old('ifsc_code', $vendor->ifsc_code)" placeholder="e.g. HDFC0001234" :errorText="$errors->first('ifsc_code')" />
+                                @endif
 
                                 <x-ui.odoo-form-ui type="select" :label="__('purchase.default_payment_terms')" name="payment_terms" id="payment_terms" :searchable="false" :errorText="$errors->first('payment_terms')">
                                     <option value="">{{ __('purchase.choose_payment_terms') }}</option>

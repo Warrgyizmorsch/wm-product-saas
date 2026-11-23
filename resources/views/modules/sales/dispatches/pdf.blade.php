@@ -346,14 +346,30 @@
             <div class="info-grid">
                 <!-- Ship To -->
                 <div class="info-card">
+                    @php
+                        $siteReceiver = $dispatch->siteContact ?: $dispatch->invoice?->siteContact ?: $dispatch->salesOrder?->siteContact;
+                        $shipGstin = $dispatch->ship_to_gstin ?: $dispatch->invoice?->ship_to_gstin ?: $dispatch->salesOrder?->ship_to_gstin;
+                    @endphp
                     <div class="card-label">📍 Ship To (Consignee Destination)</div>
-                    <div class="card-title">{{ $dispatch->customer?->name ?: 'Direct Customer Outward' }}</div>
+                    <div class="card-title">
+                        {{ $dispatch->customer?->name ?: 'Direct Customer Outward' }}
+                        @if($dispatch->shippingBranch)
+                            <span style="font-size: 10px; color: #475569; font-weight: normal;">({{ $dispatch->shippingBranch->name }})</span>
+                        @endif
+                    </div>
+                    @if($shipGstin)
+                        <div class="card-detail"><strong>Ship-To GSTIN:</strong> {{ $shipGstin }}</div>
+                    @endif
                     @if($dispatch->shipping_address)
                         <div class="card-detail">{!! nl2br(e($dispatch->shipping_address)) !!}</div>
                     @elseif($dispatch->customer?->address)
                         <div class="card-detail">{!! nl2br(e($dispatch->customer->address)) !!}</div>
                     @endif
-                    @if($dispatch->customer?->phone)
+                    @if($siteReceiver)
+                        <div class="card-detail" style="margin-top: 4px; font-weight: 600;">
+                            Site Receiver: {{ $siteReceiver->name }}@if($siteReceiver->mobile ?: $siteReceiver->phone) ({{ $siteReceiver->mobile ?: $siteReceiver->phone }})@endif
+                        </div>
+                    @elseif($dispatch->customer?->phone)
                         <div class="card-detail" style="margin-top: 4px; font-weight: 600;">Phone: {{ $dispatch->customer->phone }}</div>
                     @endif
                 </div>

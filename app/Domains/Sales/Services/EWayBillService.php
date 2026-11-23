@@ -158,11 +158,21 @@ class EWayBillService
         $tenant = tenant();
         $customer = $invoice->customer ?: $invoice->salesOrder?->customer;
 
+        $sellerOrg = billing_organization_details($invoice);
+        $ownBranch = $invoice->branch;
         $comp = $invoice->company ?: company();
-        $sellerGstin = $comp?->gst_number ?: ($tenant?->gstin ?: ($tenant?->billing_gstin ?: ''));
-        $sellerStateCode = (int)substr($sellerGstin, 0, 2) ?: 0;
-        $buyerGstin = $customer?->gstin ?: '';
-        $buyerStateCode = (int)substr($buyerGstin, 0, 2) ?: 0;
+        $billBranch = $invoice->billingBranch ?: $invoice->salesOrder?->billingBranch;
+        $shipBranch = $invoice->shippingBranch ?: $invoice->salesOrder?->shippingBranch;
+
+        $sellerGstin = strtoupper(trim((string) ($invoice->seller_gstin ?: ($sellerOrg['gstin'] ?: ($comp?->gst_number ?: ($tenant?->gstin ?: ($tenant?->billing_gstin ?: '')))))));
+        $sellerStateCode = (int) ($invoice->seller_state_code ?: ($sellerOrg['state_code'] ?: (substr($sellerGstin, 0, 2) ?: 0)));
+
+        $buyerGstin = strtoupper(trim((string) ($invoice->bill_to_gstin ?: ($invoice->salesOrder?->bill_to_gstin ?: ($billBranch?->effectiveGstin() ?: ($customer?->gstin ?: ''))))));
+        $buyerStateCode = (int) ($invoice->place_of_supply_state ?: (strlen($buyerGstin) >= 2 ? substr($buyerGstin, 0, 2) : ($billBranch?->effectiveStateCode() ?: 0)));
+        $shipToStateCode = (int) (
+            $shipBranch?->effectiveStateCode()
+            ?: (strlen((string) ($invoice->ship_to_gstin ?? '')) >= 2 ? substr((string) $invoice->ship_to_gstin, 0, 2) : $buyerStateCode)
+        );
 
         $items = [];
         $totTaxable = 0;
@@ -216,18 +226,18 @@ class EWayBillService
             'docNo'            => $invoice->invoice_number,
             'docDate'          => ($invoice->invoice_date ? $invoice->invoice_date->format('d/m/Y') : date('d/m/Y')),
             'fromGstin'        => $sellerGstin,
-            'fromTrdName'      => $tenant?->name ?? 'SaaS ERP Global',
-            'fromAddr1'        => 'H-1, Industrial Area',
-            'fromPlace'        => 'Udaipur',
-            'fromPincode'      => 313001,
+            'fromTrdName'      => $sellerOrg['name'] ?: ($tenant?->name ?? ''),
+            'fromAddr1'        => $ownBranch?->address ?: ($comp?->address ?: ($sellerOrg['address'] ?? '')),
+            'fromPlace'        => $ownBranch?->city ?: ($comp?->city ?: ''),
+            'fromPincode'      => (int) ($ownBranch?->postal_code ?: ($comp?->postal_code ?: 0)),
             'actFromStateCode' => $sellerStateCode,
             'fromStateCode'    => $sellerStateCode,
             'toGstin'          => $buyerGstin,
             'toTrdName'        => $customer?->name ?? 'Valued Client',
-            'toAddr1'          => $customer?->address_line1 ?: 'Commercial Complex, Main Road',
-            'toPlace'          => $customer?->city ?: 'Mumbai',
-            'toPincode'        => (int)($customer?->postal_code ?: 400001),
-            'actToStateCode'   => $buyerStateCode,
+            'toAddr1'          => $shipBranch?->address_line1 ?: ($invoice->shipping_address ? explode("\n", $invoice->shipping_address)[0] : ($billBranch?->address_line1 ?: ($customer?->address_line1 ?: ''))),
+            'toPlace'          => $shipBranch?->city ?: ($billBranch?->city ?: ($customer?->city ?: '')),
+            'toPincode'        => (int) ($shipBranch?->postal_code ?: ($billBranch?->postal_code ?: ($customer?->postal_code ?: 0))),
+            'actToStateCode'   => $shipToStateCode ?: $buyerStateCode,
             'toStateCode'      => $buyerStateCode,
             'totalValue'       => round($totTaxable, 2),
             'cgstValue'        => round($totCgst, 2),

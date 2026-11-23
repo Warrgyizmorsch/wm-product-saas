@@ -460,6 +460,13 @@
                     @if($payment->vendor?->gstin)
                         <div><strong>GSTIN:</strong> {{ $payment->vendor->gstin }}</div>
                     @endif
+                    @if($payment->vendor?->bank_name || $payment->vendor?->account_number)
+                        <div style="margin-top: 3px; border-top: 1px solid #e2e8f0; padding-top: 3px;">
+                            <strong>Beneficiary Bank:</strong> {{ $payment->vendor->bank_name ?: '—' }} &bull;
+                            <strong>A/C:</strong> <span class="font-monospace">{{ $payment->vendor->account_number ?: '—' }}</span> &bull;
+                            <strong>IFSC:</strong> <span class="font-monospace">{{ $payment->vendor->ifsc_code ?: '—' }}</span>
+                        </div>
+                    @endif
                     @if($payment->vendor?->address)
                         <div style="margin-top: 3px; border-top: 1px solid #e2e8f0; padding-top: 3px; font-size: 8.5px; color: #64748b;">
                             {{ $payment->vendor->address }}

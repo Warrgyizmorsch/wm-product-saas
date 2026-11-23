@@ -40,6 +40,14 @@ class Quotation extends BaseModel
             if (empty($quotation->sales_person_id) && auth()->check()) {
                 $quotation->sales_person_id = auth()->id();
             }
+
+            $guard = app(\App\Services\PartyTransactionGuard::class);
+            if ($guard->enabled()) {
+                $customerId = $quotation->customer_id ?? $quotation->customer?->id;
+                if ($customerId) {
+                    $guard->assertCanTransact('customer', $customerId, $quotation->tenant_id, 'quotation', 'customer_id');
+                }
+            }
         });
     }
 

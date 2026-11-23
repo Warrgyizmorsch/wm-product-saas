@@ -378,6 +378,54 @@
         @endforeach
     </div>
 </div>
+
+<!-- Loss Reason Modal for Kanban (FRS Ref 2.5 / Task C-04) -->
+<div class="modal fade" id="kanbanLossModal" tabindex="-1" aria-labelledby="kanbanLossModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-soft-danger text-danger py-3 px-4 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-alert-triangle fs-18"></i>
+                    <h6 class="modal-title fw-bold fs-14 mb-0" id="kanbanLossModalLabel">Mark Lead as Closed Lost</h6>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="cancelKanbanLoss()"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="fs-12 text-muted mb-3">
+                    Per CRM governance policy, closed deals require a structured loss reason and an auto-scheduled future nurture follow-up.
+                </p>
+                <div class="mb-3">
+                    <label class="form-label fs-12 fw-bold text-dark">Loss Reason Category <span class="text-danger">*</span></label>
+                    <select id="kanbanLossReasonSelect" class="form-select form-select-sm" required onchange="toggleKanbanCompetitorField(this)">
+                        <option value="">Select loss reason...</option>
+                        @foreach($lossReasons ?? \App\Domains\CRM\Models\CrmLossReason::getActiveReasons() as $reason)
+                            <option value="{{ $reason->id }}" data-competitor="{{ $reason->requires_competitor ? '1' : '0' }}">
+                                {{ $reason->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-3" id="kanbanCompetitorField" style="display: none;">
+                    <label class="form-label fs-12 fw-bold text-dark">Competitor Won Against Us <span class="text-danger">*</span></label>
+                    <input type="text" id="kanbanCompetitorInput" class="form-control form-control-sm" placeholder="e.g. Godrej, Featherlite, Local Fabricator">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fs-12 fw-bold text-dark">Variance Remarks / Loss Feedback</label>
+                    <textarea id="kanbanLossRemarks" class="form-control form-control-sm" rows="2" placeholder="Specific notes on why lead was lost..."></textarea>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label fs-12 fw-bold text-dark">Future Nurture Follow-up Date</label>
+                    <input type="date" id="kanbanNurtureDate" class="form-control form-control-sm" value="{{ now()->addDays(90)->toDateString() }}">
+                    <div class="form-text fs-11 text-muted">Auto-schedules a touchpoint task in CRM so the account is re-contacted in the future.</div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2 px-4 border-top">
+                <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal" onclick="cancelKanbanLoss()">Cancel</button>
+                <button type="button" class="btn btn-sm btn-danger fw-bold" onclick="confirmKanbanLoss()">Confirm Loss & Schedule Nurture</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -573,12 +621,82 @@
                     return false;
                 }
 
+                // Guard 5: Lost Stage requires structured Loss Reason (FRS 2.5 / C-04)
+                if (newStatus === 'Lost') {
+                    const cardToMove = draggedCard;
+                    const targetDropZone = this;
+                    const origParent = originalParent;
+                    const origNextSib = originalNextSibling;
+
+                    openKanbanLossModal(cardToMove, targetDropZone, leadId, companyName, origParent, origNextSib);
+                    return false;
+                }
+
                 // Any other regular column move (e.g. New -> Qualified)
                 commitStatusChange(draggedCard, this, leadId, companyName, newStatus, originalParent, originalNextSibling);
             });
         });
 
-        function commitStatusChange(card, dropZone, leadId, companyName, newStatus, origParent, origNextSib) {
+        let activeLossCardContext = null;
+        function openKanbanLossModal(card, dropZone, leadId, companyName, origParent, origNextSib) {
+            activeLossCardContext = { card, dropZone, leadId, companyName, origParent, origNextSib };
+            const modalEl = document.getElementById('kanbanLossModal');
+            if (modalEl) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            }
+        }
+
+        function cancelKanbanLoss() {
+            if (activeLossCardContext) {
+                const { card, origParent, origNextSib } = activeLossCardContext;
+                if (origNextSib) {
+                    origParent.insertBefore(card, origNextSib);
+                } else {
+                    origParent.appendChild(card);
+                }
+                recalculateTotals();
+                activeLossCardContext = null;
+            }
+        }
+
+        window.toggleKanbanCompetitorField = function(select) {
+            const opt = select.options[select.selectedIndex];
+            const req = opt && opt.getAttribute('data-competitor') === '1';
+            const field = document.getElementById('kanbanCompetitorField');
+            if (field) {
+                field.style.display = req ? 'block' : 'none';
+            }
+        };
+
+        window.cancelKanbanLoss = cancelKanbanLoss;
+
+        window.confirmKanbanLoss = function() {
+            if (!activeLossCardContext) return;
+            const reasonId = document.getElementById('kanbanLossReasonSelect')?.value;
+            if (!reasonId) {
+                alert('Please select a loss reason category.');
+                return;
+            }
+            const competitor = document.getElementById('kanbanCompetitorInput')?.value;
+            const remarks = document.getElementById('kanbanLossRemarks')?.value;
+            const nurtureDate = document.getElementById('kanbanNurtureDate')?.value;
+
+            const { card, dropZone, leadId, companyName, origParent, origNextSib } = activeLossCardContext;
+            const modalEl = document.getElementById('kanbanLossModal');
+            if (modalEl) {
+                bootstrap.Modal.getInstance(modalEl)?.hide();
+            }
+
+            commitStatusChange(card, dropZone, leadId, companyName, 'Lost', origParent, origNextSib, {
+                loss_reason_id: reasonId,
+                lost_to_competitor: competitor,
+                loss_remarks: remarks,
+                nurture_followup_date: nurtureDate,
+            });
+            activeLossCardContext = null;
+        };
+
+        function commitStatusChange(card, dropZone, leadId, companyName, newStatus, origParent, origNextSib, extraData = {}) {
             // Append card to new column
             const emptyMsg = dropZone.querySelector('.empty-col-msg');
             if (emptyMsg) emptyMsg.remove();
@@ -612,7 +730,7 @@
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
-                body: JSON.stringify({ status: newStatus })
+                body: JSON.stringify(Object.assign({ status: newStatus }, extraData))
             })
             .then(async res => {
                 let data = {};

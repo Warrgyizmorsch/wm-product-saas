@@ -71,7 +71,9 @@ class PurchaseOrderController extends Controller
 
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $products = Product::where('tenant_id', $tenantId)->get();
-        $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
+        $warehouses = Warehouse::withoutGlobalScope('branch')->where('tenant_id', $tenantId)->where('status', 'active')->with('branch')->get();
+        $ownBranches = \App\Domains\HRMS\Models\Branch::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $customers = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
         $requisitions = PurchaseRequisition::where('tenant_id', $tenantId)->where('status', 'Approved')->get();
 
         $selectedRequisitionId = $request->input('requisition_id');
@@ -309,6 +311,8 @@ class PurchaseOrderController extends Controller
             'vendors',
             'products',
             'warehouses',
+            'ownBranches',
+            'customers',
             'requisitions',
             'selectedRequisitionId',
             'requisitionItemIds',
@@ -336,6 +340,10 @@ class PurchaseOrderController extends Controller
             'delivery_date' => 'nullable|date',
             'expected_delivery_date' => 'nullable|date',
             'vendor_id' => 'required|integer|exists:vendors,id',
+            'vendor_branch_id' => 'nullable|integer|exists:party_branches,id',
+            'delivery_branch_id' => 'nullable|integer|exists:branches,id',
+            'delivery_party_branch_id' => 'nullable|integer|exists:party_branches,id',
+            'site_contact_id' => 'nullable|integer|exists:contacts,id',
             'location' => 'nullable|string',
             'reference' => 'nullable|string',
             'supplier_quotation_number' => 'nullable|string',
@@ -397,6 +405,8 @@ class PurchaseOrderController extends Controller
                 ]);
             }
         }
+
+        $validated['enforce_delivery_target'] = (bool) config('party_verification.branches_enabled', true);
 
         $po = $this->orderService->storeOrder($validated, $tenantId);
 
@@ -476,12 +486,16 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'Only Draft Purchase Orders can be edited.');
         }
 
+        $order->loadMissing(['deliveryBranch', 'deliveryPartyBranch', 'siteContact', 'vendorBranch']);
+
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $products = Product::where('tenant_id', $tenantId)->get();
-        $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
+        $warehouses = Warehouse::withoutGlobalScope('branch')->where('tenant_id', $tenantId)->where('status', 'active')->with('branch')->get();
+        $ownBranches = \App\Domains\HRMS\Models\Branch::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $customers = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
         $requisitions = PurchaseRequisition::where('tenant_id', $tenantId)->where('status', 'Approved')->get();
 
-        return view('modules.purchase.orders.edit', compact('order', 'vendors', 'products', 'warehouses', 'requisitions'));
+        return view('modules.purchase.orders.edit', compact('order', 'vendors', 'products', 'warehouses', 'ownBranches', 'customers', 'requisitions'));
     }
 
     public function update(Request $request, int $id)
@@ -498,6 +512,10 @@ class PurchaseOrderController extends Controller
 
         $validated = $request->validate([
             'vendor_id' => 'required|integer|exists:vendors,id',
+            'vendor_branch_id' => 'nullable|integer|exists:party_branches,id',
+            'delivery_branch_id' => 'nullable|integer|exists:branches,id',
+            'delivery_party_branch_id' => 'nullable|integer|exists:party_branches,id',
+            'site_contact_id' => 'nullable|integer|exists:contacts,id',
             'po_date' => 'nullable|date',
             'date' => 'nullable|date',
             'expected_delivery_date' => 'nullable|date',
@@ -540,11 +558,7 @@ class PurchaseOrderController extends Controller
             'items.*.total_amount' => 'nullable|numeric|min:0',
         ]);
 
-        if (!empty($validated['items'])) {
-            $this->orderService->updateOrder($order, $validated);
-        } else {
-            $this->orderRepo->update($order, $validated);
-        }
+        $this->orderService->updateOrder($order, $validated);
 
         return redirect()->route('purchase.orders.show', $id)
             ->with('success', 'Purchase Order updated successfully.');
@@ -559,6 +573,19 @@ class PurchaseOrderController extends Controller
 
         if ($order->status !== 'Draft') {
             return redirect()->back()->with('error', 'Only Draft Purchase Orders can be confirmed.');
+        }
+
+        try {
+            app(\App\Services\PartyTransactionGuard::class)->assertCanTransact(
+                'vendor',
+                $order->vendor_id,
+                $order->tenant_id,
+                'purchase order approval',
+                'vendor_id'
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $msg = collect($e->errors())->flatten()->first() ?: $e->getMessage();
+            return redirect()->back()->with('error', $msg);
         }
 
         $this->orderService->confirmOrder($order);

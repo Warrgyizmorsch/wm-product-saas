@@ -874,6 +874,23 @@
                         @endif
                     </div>
                 @endif
+                @if ($invoice->einvoice_status === 'Failed' && !empty($invoice->einvoice_error))
+                    <!-- E-Invoice Generation Failed Alert -->
+                    <div class="p-2.5 mb-3 rounded border bg-light d-flex align-items-center justify-content-between flex-wrap gap-2 d-print-none" style="border-left: 4px solid #dc2626 !important;">
+                        <div class="d-flex align-items-center gap-2.5 text-danger">
+                            <i class="feather-alert-triangle fs-16 flex-shrink-0"></i>
+                            <div class="fs-11">
+                                <span class="fw-bold d-block text-danger">E-Invoice Notice</span>
+                                <span class="text-secondary">{{ $invoice->einvoice_error }}</span>
+                            </div>
+                        </div>
+                        @if ($invoice->customer_id)
+                            <a href="{{ route('crm.customers.show', $invoice->customer_id) }}" class="btn btn-xs btn-outline-danger fw-semibold px-2.5 py-1 fs-11">
+                                <i class="feather-edit me-1"></i>View Customer Details
+                            </a>
+                        @endif
+                    </div>
+                @endif
 
                 <!-- 1. Invoice Document Header -->
                 <div class="row align-items-start pb-4 border-bottom mb-4">

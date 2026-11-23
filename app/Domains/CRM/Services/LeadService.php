@@ -136,6 +136,13 @@ class LeadService
             'priority' => $validated['priority'] ?? 'Select an Option',
             'segment' => $validated['segment'] ?? 'Select an Option',
             'industry_type' => $validated['industry_type'] ?? null,
+            'provenance' => $validated['provenance'] ?? 'manual',
+            'is_inbound_enquiry' => false,
+            'project_type' => $validated['project_type'] ?? null,
+            'approx_quantity' => isset($validated['approx_quantity']) && $validated['approx_quantity'] !== '' ? (int)$validated['approx_quantity'] : null,
+            'decision_timeline' => $validated['decision_timeline'] ?? null,
+            'competitor_name' => $validated['competitor_name'] ?? null,
+            'decision_maker_identified' => !empty($validated['decision_maker_identified']),
             'country' => $validated['country'] ?? null,
             'state' => $validated['state'] ?? null,
             'city' => $validated['city'] ?? null,
@@ -176,6 +183,9 @@ class LeadService
             );
             self::notifyLeadAssigned($lead, $lead->lead_owner_id, auth()->id());
         }
+
+        // FRS 2.5: every new open lead gets a dated next action for its owner.
+        app(LeadNextActionService::class)->ensureNextAction($lead->fresh());
 
         // Notify sales management / executive of new lead
         CrmNotificationService::notifyLeadCreated($lead);
@@ -221,10 +231,51 @@ class LeadService
             'product_items' => $processed['product_items'],
         ];
 
+        // FRS 2.5 / C-03 qualification fields: only overwrite what the form actually sent,
+        // so an edit from a screen without these inputs never wipes qualification data.
+        foreach (['project_type', 'decision_timeline', 'competitor_name'] as $qualField) {
+            if (array_key_exists($qualField, $validated)) {
+                $leadData[$qualField] = $validated[$qualField] !== '' ? $validated[$qualField] : null;
+            }
+        }
+        if (array_key_exists('approx_quantity', $validated)) {
+            $leadData['approx_quantity'] = $validated['approx_quantity'] !== null && $validated['approx_quantity'] !== '' ? (int) $validated['approx_quantity'] : null;
+        }
+        if (array_key_exists('communication_opt_out', $validated)) {
+            $optOut = !empty($validated['communication_opt_out']);
+            $leadData['communication_opt_out'] = $optOut;
+            $leadData['communication_opt_out_at'] = $optOut ? ($lead->communication_opt_out_at ?: now()) : null;
+        }
+        if (array_key_exists('decision_maker_identified', $validated)) {
+            $leadData['decision_maker_identified'] = !empty($validated['decision_maker_identified']);
+        }
+
+        // FRS 2.5: expected value / expected date / owner changes keep a history trail.
+        $oldExpectedAmount = (float) $lead->expected_amount;
+        $oldExpectedDate = $lead->expected_sale_date?->toDateString();
+
         $oldOwnerId = $lead->lead_owner_id;
         $updated = $lead->update($leadData);
 
+        $lead->refresh();
+        $newExpectedAmount = (float) $lead->expected_amount;
+        $newExpectedDate = $lead->expected_sale_date?->toDateString();
+        if (abs($oldExpectedAmount - $newExpectedAmount) > 0.004) {
+            LeadHistory::logEvent($lead, 'expected_value_changed', number_format($oldExpectedAmount, 2, '.', ''), number_format($newExpectedAmount, 2, '.', ''), 'Expected value changed');
+        }
+        if ($oldExpectedDate !== $newExpectedDate) {
+            LeadHistory::logEvent($lead, 'expected_date_changed', $oldExpectedDate ?: 'None', $newExpectedDate ?: 'None', 'Expected sale date changed');
+        }
+
         if ($oldOwnerId != $lead->lead_owner_id) {
+            if (!empty($lead->lead_owner_id)) {
+                $lead->assigned_at = now();
+                $lead->first_responded_at = null;
+                $lead->response_sla_breached = false;
+                $lead->sla_escalated_at = null;
+                $lead->save();
+            }
+
             $oldOwnerName = $oldOwnerId ? (User::find($oldOwnerId)?->name ?: 'Unknown') : 'None';
             $newOwnerName = $lead->lead_owner_id ? (User::find($lead->lead_owner_id)?->name ?: 'Unknown') : 'None';
             LeadHistory::logEvent(
@@ -243,9 +294,24 @@ class LeadService
     }
 
     /**
+     * FRS 2.5 / C-04: reopening or reassigning a lead needs an explicit permission.
+     * Granted by the dedicated permission (crm.leads.reopen / crm.leads.reassign) or
+     * by tenant-wide lead update rights (managers/admins). Record-owner (own-scope)
+     * rights are deliberately not enough. Everything goes through AccessService.
+     */
+    public static function userMayManageLeadOwnership(User $user, Lead $lead, string $action): bool
+    {
+        $access = app(\App\Services\Access\AccessService::class);
+        $context = ['tenant_id' => $lead->tenant_id ?? $user->tenant_id];
+
+        return $access->allows($user, 'crm.leads.' . $action, $context)
+            || $access->allows($user, 'crm.leads.update', $context);
+    }
+
+    /**
      * Update lead status and handle customer conversion logic.
      */
-    public function updateLeadStatus(Lead $lead, string $newStatus, bool $isSystemTriggered = false): array
+    public function updateLeadStatus(Lead $lead, string $newStatus, bool $isSystemTriggered = false, array $extraData = []): array
     {
         $oldStatus = $lead->status ?: 'New';
 
@@ -258,7 +324,8 @@ class LeadService
         }
 
         // Lock Check: Once a lead is in Dealing, it cannot be changed to another status manually
-        if (strcasecmp($oldStatus, 'Dealing') === 0 && strcasecmp($newStatus, 'Dealing') !== 0 && !$isSystemTriggered) {
+        // (FRS 2.5: a deal that is going nowhere can still be closed as Lost with a structured reason.)
+        if (strcasecmp($oldStatus, 'Dealing') === 0 && strcasecmp($newStatus, 'Dealing') !== 0 && strcasecmp($newStatus, 'Lost') !== 0 && !$isSystemTriggered) {
             return [
                 'success' => false,
                 'message' => "Lead status in '{$oldStatus}' stage is locked. Status cannot be changed."
@@ -277,10 +344,33 @@ class LeadService
             ];
         }
 
+        // Reopen guard (FRS 2.5 / C-04): Reopening a Lost lead requires manager permission
+        if (strcasecmp($oldStatus, 'Lost') === 0 && strcasecmp($newStatus, 'Lost') !== 0 && !$isSystemTriggered) {
+            $user = auth()->user();
+            if (!$user || !self::userMayManageLeadOwnership($user, $lead, 'reopen')) {
+                return [
+                    'success' => false,
+                    'message' => 'Unauthorized: You do not have permission to reopen a Lost lead.'
+                ];
+            }
+        }
+
+        // Stage Gate Validation (FRS 2.5 / C-03 & BASE-05)
+        if (!$isSystemTriggered && strcasecmp($newStatus, 'Lost') !== 0) {
+            $gateResult = app(LeadStageGateService::class)->validateStageProgression($lead, $newStatus);
+            if (!$gateResult['allowed']) {
+                return [
+                    'success' => false,
+                    'message' => $gateResult['message'],
+                    'missing_fields' => $gateResult['missing_fields'] ?? [],
+                ];
+            }
+        }
+
         $updateData = ['status' => $newStatus];
         $message = "Lead status updated to {$newStatus}.";
 
-        if ($newStatus === 'Lost') {
+        if (strcasecmp($newStatus, 'Lost') === 0) {
             if ($lead->is_customer) {
                 $updateData['is_customer'] = false;
                 $customer = $lead->getCustomer();
@@ -288,38 +378,67 @@ class LeadService
                     $customer->update(['status' => 'inactive']);
                 }
             }
-            $message = 'Lead status updated to Lost.';
-        } elseif ($newStatus === 'Dealing') {
-            if (!$lead->crm_deal_id) {
-                app(\App\Domains\CRM\Repositories\LeadRepository::class)->qualifyLead($lead);
+            $updateData['lost_at'] = now();
+            if (!empty($extraData['loss_reason_id'])) {
+                $updateData['loss_reason_id'] = (int)$extraData['loss_reason_id'];
             }
-            $message = 'Lead status updated to Dealing.';
-        } elseif (strcasecmp($newStatus, 'Won') === 0) {
-            if (!$lead->crm_account_id) {
-                $acc = \App\Domains\CRM\Models\CrmAccount::where('tenant_id', $lead->tenant_id ?? 1)
-                    ->where(function($q) use ($lead) {
-                        if (!empty($lead->email)) $q->where('email', $lead->email);
-                        if (!empty($lead->company_name)) $q->orWhere('name', $lead->company_name);
-                    })->first();
-                if (!$acc) {
-                    $acc = \App\Domains\CRM\Models\CrmAccount::create([
-                        'tenant_id' => $lead->tenant_id ?? 1,
-                        'name'      => $lead->company_name ?: ($lead->contact_person ?: 'Customer Account'),
-                        'email'     => $lead->email,
-                        'phone'     => $lead->phone,
-                        'status'    => 'active',
-                        'owner_id'  => $lead->lead_owner_id ?: 1,
-                    ]);
+            if (!empty($extraData['lost_to_competitor'])) {
+                $updateData['lost_to_competitor'] = trim((string)$extraData['lost_to_competitor']);
+            }
+            if (!empty($extraData['loss_remarks'])) {
+                $updateData['loss_remarks'] = trim((string)$extraData['loss_remarks']);
+            }
+            if (!empty($extraData['nurture_followup_date'])) {
+                $updateData['nurture_followup_date'] = $extraData['nurture_followup_date'];
+            } else {
+                $lossReason = !empty($updateData['loss_reason_id']) ? \App\Domains\CRM\Models\CrmLossReason::find($updateData['loss_reason_id']) : null;
+                if ($lossReason && !empty($lossReason->follow_up_days)) {
+                    $nurtureDays = (int) $lossReason->follow_up_days;
+                } else {
+                    $tenant = \App\Models\Tenant::find($lead->tenant_id ?? 1);
+                    $settings = is_array($tenant?->settings) ? $tenant->settings : [];
+                    $nurtureDays = (int)($settings['crm_lead_policy']['default_nurture_days'] ?? 30);
                 }
-                $updateData['crm_account_id'] = $acc->id;
-                $lead->crm_account_id = $acc->id;
+                $updateData['nurture_followup_date'] = now()->addDays($nurtureDays)->toDateString();
             }
-            $updateData['is_customer'] = true;
-            $customer = $lead->getCustomer();
-            if ($customer) {
-                $customer->update(['status' => 'active']);
+            $message = 'Lead status updated to Lost.';
+        } else {
+            if (strcasecmp($oldStatus, 'Lost') === 0) {
+                $updateData['lost_at'] = null;
             }
-            $message = 'Lead marked as Won.';
+
+            if ($newStatus === 'Dealing') {
+                if (!$lead->crm_deal_id) {
+                    app(\App\Domains\CRM\Repositories\LeadRepository::class)->qualifyLead($lead);
+                }
+                $message = 'Lead status updated to Dealing.';
+            } elseif (strcasecmp($newStatus, 'Won') === 0) {
+                if (!$lead->crm_account_id) {
+                    $acc = \App\Domains\CRM\Models\CrmAccount::where('tenant_id', $lead->tenant_id ?? 1)
+                        ->where(function($q) use ($lead) {
+                            if (!empty($lead->email)) $q->where('email', $lead->email);
+                            if (!empty($lead->company_name)) $q->orWhere('name', $lead->company_name);
+                        })->first();
+                    if (!$acc) {
+                        $acc = \App\Domains\CRM\Models\CrmAccount::create([
+                            'tenant_id' => $lead->tenant_id ?? 1,
+                            'name'      => $lead->company_name ?: ($lead->contact_person ?: 'Customer Account'),
+                            'email'     => $lead->email,
+                            'phone'     => $lead->phone,
+                            'status'    => 'active',
+                            'owner_id'  => $lead->lead_owner_id ?: 1,
+                        ]);
+                    }
+                    $updateData['crm_account_id'] = $acc->id;
+                    $lead->crm_account_id = $acc->id;
+                }
+                $updateData['is_customer'] = true;
+                $customer = $lead->getCustomer();
+                if ($customer) {
+                    $customer->update(['status' => 'active']);
+                }
+                $message = 'Lead marked as Won.';
+            }
         }
 
         $oldStatus = $lead->status ?: 'New';
@@ -338,6 +457,43 @@ class LeadService
                 $lead->status,
                 "Lead stage status updated from '{$oldStatus}' to '{$lead->status}'"
             );
+
+            // FRS 2.5 / C-04: Auto-schedule future nurture follow-up task upon deal loss
+            if (strcasecmp($lead->status, 'Lost') === 0 && !empty($lead->nurture_followup_date)) {
+                try {
+                    $reasonName = $lead->lossReason?->name ?: ($lead->lost_to_competitor ?: 'Deal Closed Lost');
+                    app(\App\Domains\CRM\Repositories\LeadFollowupRepository::class)->create([
+                        'tenant_id' => $lead->tenant_id ?? (tenant_id() ?? 1),
+                        'company_id' => $lead->company_id,
+                        'branch_id' => $lead->branch_id,
+                        'lead_id' => $lead->id,
+                        'assigned_to_id' => $lead->lead_owner_id ?: (auth()->id() ?: 1),
+                        'followup_date' => Carbon::parse($lead->nurture_followup_date)->setTime(10, 0),
+                        'type' => 'Call',
+                        'title' => 'Nurture Outreach: ' . ($lead->company_name ?: $lead->contact_person),
+                        'status' => 'Pending',
+                        'notes' => 'Automated nurture reminder after loss. Reason: ' . $reasonName . ($lead->lost_to_competitor ? " | Competitor: {$lead->lost_to_competitor}" : '') . ($lead->loss_remarks ? " | Notes: {$lead->loss_remarks}" : ''),
+                    ]);
+                    app(\App\Domains\CRM\Repositories\LeadFollowupRepository::class)->syncLeadNextFollowupDate($lead);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to schedule nurture follow-up: ' . $e->getMessage());
+                }
+            }
+
+            // FRS 2.5: losing a lead that already became a deal closes that deal with the same reason.
+            if (strcasecmp($lead->status, 'Lost') === 0 && $lead->crm_deal_id) {
+                try {
+                    $deal = \App\Domains\CRM\Models\CrmDeal::find($lead->crm_deal_id);
+                    if ($deal && !in_array(strtolower((string) $deal->stage), ['lost', 'closed lost', 'won', 'closed won'], true)) {
+                        $deal->update([
+                            'stage' => 'Closed Lost',
+                            'close_reason' => $lead->lossReason?->name ?: ($lead->loss_remarks ?: 'Lost'),
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to close linked deal on lead loss: ' . $e->getMessage());
+                }
+            }
 
             CrmNotificationService::notifyLeadStatusUpdated($lead, $oldStatus, $lead->status);
         }

@@ -48,6 +48,9 @@ class VendorBill extends BaseModel
         'dispatch_order_id',
         'purchase_order_id',
         'vendor_id',
+        'vendor_branch_id',
+        'supplier_gstin',
+        'buyer_gstin',
         'bill_date',
         'due_date',
         'status', // Draft, Posted, Partially Paid, Paid, Cancelled, On Hold
@@ -61,7 +64,6 @@ class VendorBill extends BaseModel
         'tax_amount',
         'adjustment',
         'grand_total',
-        'total_amount',
         'paid_amount',
         'due_amount',
         'tds_section_id',
@@ -88,7 +90,6 @@ class VendorBill extends BaseModel
         'sgst_amount' => 'decimal:4',
         'igst_amount' => 'decimal:4',
         'grand_total' => 'decimal:4',
-        'total_amount' => 'decimal:4',
         'paid_amount' => 'decimal:4',
         'due_amount' => 'decimal:4',
         'tds_base_amount' => 'decimal:4',
@@ -113,6 +114,11 @@ class VendorBill extends BaseModel
             return (float) $this->purchaseReturns->where('status', 'Completed')->sum('total_refund_amount');
         }
         return (float) $this->purchaseReturns()->where('status', 'Completed')->sum('total_refund_amount');
+    }
+
+    public function vendorBranch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyBranch::class, 'vendor_branch_id');
     }
 
     /**

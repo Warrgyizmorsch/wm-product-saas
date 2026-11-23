@@ -141,6 +141,19 @@ class LeadFollowupService
 
         $this->followupRepo->syncLeadNextFollowupDate($lead);
 
+        // FRS 2.5 / C-01 & C-02: Record first customer response touch & last activity timestamp
+        if ($lead) {
+            $isCustomerOutreach = in_array(strtolower($followup->type), ['call', 'meeting', 'visit', 'email', 'scheduled call', 'site visit']);
+            // Only an interaction that actually happened stops the SLA clock; a merely scheduled
+            // (Pending) call/meeting is a plan, not a response (FRS 2.5 C-01, F05 ACT-02).
+            $actuallyDone = strcasecmp((string) $followup->status, 'Pending') !== 0;
+            if ($isCustomerOutreach && $actuallyDone && empty($lead->first_responded_at)) {
+                $lead->first_responded_at = now();
+            }
+            $lead->last_activity_at = now();
+            $lead->save();
+        }
+
         if ($followup->status === 'Pending') {
             CrmNotificationService::notifyMeetingScheduled($followup, auth()->id());
         }

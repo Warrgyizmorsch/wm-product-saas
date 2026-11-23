@@ -75,13 +75,102 @@
                 </div>
             @endif
 
+            @php
+                $inactiveVendorReasons = $inactiveVendorReasons ?? [];
+                $openBankChanges = $openBankChanges ?? [];
+                $initialVendorId = $selectedBill?->vendor_id ?? old('vendor_id', request('vendor_id'));
+                $initialInactiveReason = $initialVendorId ? ($inactiveVendorReasons[$initialVendorId] ?? null) : null;
+                $initialBankChange = $initialVendorId ? ($openBankChanges[$initialVendorId] ?? null) : null;
+                $initialVendorModel = $vendors->firstWhere('id', $initialVendorId);
+            @endphp
+
+            <div id="inactiveVendorWarning" class="alert alert-warning border-warning p-3 mb-4 rounded shadow-sm" @if(!$initialInactiveReason) style="display: none;" @endif>
+                <i class="feather-alert-triangle text-warning me-1.5"></i>
+                <strong>This supplier is inactive (<span id="inactiveVendorReasonText">{{ $initialInactiveReason ?? '' }}</span>).</strong>
+                You can still pay what is owed, but check that you meant to pay them.
+            </div>
+
+            {{-- FRS 2.3 / Task C-16: High-visibility warning when a bank change request is pending --}}
+            <div id="pendingBankChangeWarning" class="alert alert-danger border-danger p-3 mb-4 rounded shadow-sm" @if(!$initialBankChange) style="display: none;" @endif>
+                @if($initialBankChange)
+                <div class="d-flex align-items-start gap-2">
+                    <i class="feather-alert-octagon text-danger fs-18 mt-1 flex-shrink-0"></i>
+                    <div class="w-100">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+                            <h6 class="fw-bold text-danger mb-0">
+                                <i class="feather-lock me-1"></i>Security Alert: Bank Change Request Pending Verification (<span id="bankChangeReqId">#{{ $initialBankChange['id'] }}</span>)
+                            </h6>
+                            <span class="badge bg-danger text-white px-2 py-0.5 fs-11">Unapproved Account</span>
+                        </div>
+                        <p class="mb-2 fs-12 text-dark">
+                            A request to change this supplier's payout bank details to <strong><span id="bankChangeNewBank">{{ $initialBankChange['new_bank_name'] ?? '—' }}</span> (<span id="bankChangeNewAccount">{{ $initialBankChange['new_account_number'] ?? '—' }}</span>)</strong> is currently <strong>PENDING independent callback verification</strong>. The requested new bank details are <strong>NOT APPROVED</strong>.
+                        </p>
+                        <div class="alert alert-warning py-1.5 px-2.5 fs-11 mb-2 border-warning text-dark">
+                            <i class="feather-shield text-warning me-1"></i>
+                            <strong>Do NOT release RTGS/NEFT to any new or unconfirmed bank account.</strong> Payouts must only be disbursed to the verified active account on record, or held until the independent callback is confirmed.
+                        </div>
+                        <div class="form-check mt-1">
+                            <input class="form-check-input" type="checkbox" name="confirm_pending_bank_change" value="1" id="confirmPendingBankChange" @checked(old('confirm_pending_bank_change'))>
+                            <label class="form-check-label fs-12 fw-bold text-danger" for="confirmPendingBankChange">
+                                I acknowledge that a bank change request is pending and confirm this payout is strictly made to the VERIFIED active bank account on file.
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                @endif
+            </div>
+
+            {{-- Beneficiary Payout Details Card (Vendor Bank Master) --}}
+            <div id="beneficiaryBankCard" class="card border rounded p-3 mb-4 bg-light shadow-sm" @if(!$initialVendorModel) style="display: none;" @endif>
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                    <h6 class="fw-bold text-dark mb-0 fs-13">
+                        <i class="feather-credit-card text-primary me-1.5"></i>Beneficiary Payout Details (Vendor Bank Master)
+                    </h6>
+                    <span id="beneficiaryBankBadge" class="badge {{ $initialVendorModel && $initialVendorModel->account_number ? 'bg-soft-success text-success' : 'bg-soft-warning text-warning' }} px-2.5 py-1 fs-11 fw-bold">
+                        @if($initialVendorModel && $initialVendorModel->account_number)
+                            <i class="feather-check-circle me-1"></i>Verified Active Account
+                        @else
+                            <i class="feather-alert-triangle me-1"></i>No Bank Account On File
+                        @endif
+                    </span>
+                </div>
+                <div class="row g-2 fs-12 text-dark">
+                    <div class="col-md-4">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Beneficiary Bank</span>
+                        <strong id="beneficiaryBankName" class="text-dark fs-13">{{ $initialVendorModel?->bank_name ?: '—' }}</strong>
+                    </div>
+                    <div class="col-md-4">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Account Number</span>
+                        <strong id="beneficiaryAccountNumber" class="text-dark font-monospace fs-13">{{ $initialVendorModel?->account_number ?: '—' }}</strong>
+                    </div>
+                    <div class="col-md-4">
+                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">IFSC / Swift Code</span>
+                        <strong id="beneficiaryIfscCode" class="text-dark font-monospace fs-13">{{ $initialVendorModel?->ifsc_code ?: '—' }}</strong>
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
                     @if($selectedBill)
                         <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_vendor') }}" name="vendor_id_disabled" required="true" disabled="disabled">
                             @foreach($vendors as $vendor)
                                 @if($selectedBill->vendor_id == $vendor->id)
-                                    <option value="{{ $vendor->id }}" selected>{{ $vendor->name }}</option>
+                                    @php
+                                        $isInactiveVendor = isset($inactiveVendorReasons[$vendor->id]);
+                                        $hasBankChange = isset($openBankChanges[$vendor->id]);
+                                    @endphp
+                                    <option value="{{ $vendor->id }}" selected
+                                        data-bank-name="{{ $vendor->bank_name ?? '' }}"
+                                        data-account-number="{{ $vendor->account_number ?? '' }}"
+                                        data-ifsc-code="{{ $vendor->ifsc_code ?? '' }}"
+                                        data-has-bank-change="{{ $hasBankChange ? '1' : '0' }}"
+                                        data-bank-change-id="{{ $openBankChanges[$vendor->id]['id'] ?? '' }}"
+                                        data-bank-change-new-bank="{{ $openBankChanges[$vendor->id]['new_bank_name'] ?? '' }}"
+                                        data-bank-change-new-account="{{ $openBankChanges[$vendor->id]['new_account_number'] ?? '' }}"
+                                        @if($isInactiveVendor) data-inactive="1" data-inactive-reason="{{ $inactiveVendorReasons[$vendor->id] }}" @endif>
+                                        {{ $vendor->name }}{{ $isInactiveVendor ? ' (inactive)' : '' }}
+                                    </option>
                                 @endif
                             @endforeach
                         </x-ui.odoo-form-ui>
@@ -90,8 +179,20 @@
                         <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_vendor') }}" name="vendor_id" required="true" :errorText="$errors->first('vendor_id')">
                             <option value="">{{ __('purchase.select_vendor_placeholder') }}</option>
                             @foreach($vendors as $vendor)
-                                <option value="{{ $vendor->id }}" @selected(old('vendor_id', request('vendor_id')) == $vendor->id)>
-                                    {{ $vendor->name }}
+                                @php
+                                    $isInactiveVendor = isset($inactiveVendorReasons[$vendor->id]);
+                                    $hasBankChange = isset($openBankChanges[$vendor->id]);
+                                @endphp
+                                <option value="{{ $vendor->id }}" @selected(old('vendor_id', request('vendor_id')) == $vendor->id)
+                                    data-bank-name="{{ $vendor->bank_name ?? '' }}"
+                                    data-account-number="{{ $vendor->account_number ?? '' }}"
+                                    data-ifsc-code="{{ $vendor->ifsc_code ?? '' }}"
+                                    data-has-bank-change="{{ $hasBankChange ? '1' : '0' }}"
+                                    data-bank-change-id="{{ $openBankChanges[$vendor->id]['id'] ?? '' }}"
+                                    data-bank-change-new-bank="{{ $openBankChanges[$vendor->id]['new_bank_name'] ?? '' }}"
+                                    data-bank-change-new-account="{{ $openBankChanges[$vendor->id]['new_account_number'] ?? '' }}"
+                                    @if($isInactiveVendor) data-inactive="1" data-inactive-reason="{{ $inactiveVendorReasons[$vendor->id] }}" @endif>
+                                    {{ $vendor->name }}{{ $isInactiveVendor ? ' (inactive)' : '' }}{{ $hasBankChange ? ' ⚠️ [Bank Change Pending]' : '' }}
                                 </option>
                             @endforeach
                         </x-ui.odoo-form-ui>
@@ -268,6 +369,130 @@
                         const cashOpt = Array.from(bankSelect.options).find(opt => opt.getAttribute('data-code') === '1010' || opt.text.toLowerCase().includes('cash'));
                         if (cashOpt) {
                             bankSelect.value = cashOpt.value;
+                        }
+                    }
+                });
+            }
+
+            const vendorSelect = document.querySelector('select[name="vendor_id"], select[name="vendor_id_disabled"]');
+            const inactiveWarningEl = document.getElementById('inactiveVendorWarning');
+            const inactiveReasonEl = document.getElementById('inactiveVendorReasonText');
+            const bankChangeWarningEl = document.getElementById('pendingBankChangeWarning');
+            const bankChangeReqIdEl = document.getElementById('bankChangeReqId');
+            const bankChangeNewBankEl = document.getElementById('bankChangeNewBank');
+            const bankChangeNewAccEl = document.getElementById('bankChangeNewAccount');
+            const confirmBankChangeCheck = document.getElementById('confirmPendingBankChange');
+            const beneficiaryCardEl = document.getElementById('beneficiaryBankCard');
+            const beneficiaryBankNameEl = document.getElementById('beneficiaryBankName');
+            const beneficiaryAccNumEl = document.getElementById('beneficiaryAccountNumber');
+            const beneficiaryIfscEl = document.getElementById('beneficiaryIfscCode');
+            const beneficiaryBadgeEl = document.getElementById('beneficiaryBankBadge');
+
+            if (vendorSelect) {
+                const syncVendorDetails = function () {
+                    const opt = vendorSelect.options[vendorSelect.selectedIndex];
+                    if (!opt || !opt.value) {
+                        if (inactiveWarningEl) inactiveWarningEl.style.display = 'none';
+                        if (bankChangeWarningEl) bankChangeWarningEl.style.display = 'none';
+                        if (beneficiaryCardEl) beneficiaryCardEl.style.display = 'none';
+                        return;
+                    }
+
+                    // 1. Inactive Warning
+                    if (opt.getAttribute('data-inactive') === '1') {
+                        if (inactiveReasonEl) {
+                            inactiveReasonEl.textContent = opt.getAttribute('data-inactive-reason') || 'Not recorded';
+                        }
+                        if (inactiveWarningEl) inactiveWarningEl.style.display = 'block';
+                    } else {
+                        if (inactiveWarningEl) inactiveWarningEl.style.display = 'none';
+                    }
+
+                    // 2. Pending Bank Change Security Warning
+                    const hasBankChange = opt.getAttribute('data-has-bank-change') === '1';
+                    if (hasBankChange && bankChangeWarningEl) {
+                        const reqId = opt.getAttribute('data-bank-change-id') || '';
+                        const newBank = opt.getAttribute('data-bank-change-new-bank') || '—';
+                        const newAcc = opt.getAttribute('data-bank-change-new-account') || '—';
+                        if (!bankChangeWarningEl.innerHTML.trim() || !document.getElementById('confirmPendingBankChange')) {
+                            bankChangeWarningEl.innerHTML = `
+                                <div class="d-flex align-items-start gap-2">
+                                    <i class="feather-alert-octagon text-danger fs-18 mt-1 flex-shrink-0"></i>
+                                    <div class="w-100">
+                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+                                            <h6 class="fw-bold text-danger mb-0">
+                                                <i class="feather-lock me-1"></i>Security Alert: Bank Change Request Pending Verification (<span id="bankChangeReqId">#${reqId}</span>)
+                                            </h6>
+                                            <span class="badge bg-danger text-white px-2 py-0.5 fs-11">Unapproved Account</span>
+                                        </div>
+                                        <p class="mb-2 fs-12 text-dark">
+                                            A request to change this supplier's payout bank details to <strong><span id="bankChangeNewBank">${newBank}</span> (<span id="bankChangeNewAccount">${newAcc}</span>)</strong> is currently <strong>PENDING independent callback verification</strong>. The requested new bank details are <strong>NOT APPROVED</strong>.
+                                        </p>
+                                        <div class="alert alert-warning py-1.5 px-2.5 fs-11 mb-2 border-warning text-dark">
+                                            <i class="feather-shield text-warning me-1"></i>
+                                            <strong>Do NOT release RTGS/NEFT to any new or unconfirmed bank account.</strong> Payouts must only be disbursed to the verified active account on record, or held until the independent callback is confirmed.
+                                        </div>
+                                        <div class="form-check mt-1">
+                                            <input class="form-check-input" type="checkbox" name="confirm_pending_bank_change" value="1" id="confirmPendingBankChange">
+                                            <label class="form-check-label fs-12 fw-bold text-danger" for="confirmPendingBankChange">
+                                                I acknowledge that a bank change request is pending and confirm this payout is strictly made to the VERIFIED active bank account on file.
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            const reqIdEl = document.getElementById('bankChangeReqId');
+                            const newBankEl = document.getElementById('bankChangeNewBank');
+                            const newAccEl = document.getElementById('bankChangeNewAccount');
+                            if (reqIdEl) reqIdEl.textContent = '#' + reqId;
+                            if (newBankEl) newBankEl.textContent = newBank;
+                            if (newAccEl) newAccEl.textContent = newAcc;
+                        }
+                        bankChangeWarningEl.style.display = 'block';
+                    } else if (bankChangeWarningEl) {
+                        bankChangeWarningEl.style.display = 'none';
+                        const checkEl = document.getElementById('confirmPendingBankChange');
+                        if (checkEl) checkEl.checked = false;
+                    }
+
+                    // 3. Beneficiary Payout Bank Details
+                    if (beneficiaryCardEl) {
+                        const bankName = opt.getAttribute('data-bank-name') || '';
+                        const accNum = opt.getAttribute('data-account-number') || '';
+                        const ifsc = opt.getAttribute('data-ifsc-code') || '';
+
+                        if (beneficiaryBankNameEl) beneficiaryBankNameEl.textContent = bankName || '—';
+                        if (beneficiaryAccNumEl) beneficiaryAccNumEl.textContent = accNum || '—';
+                        if (beneficiaryIfscEl) beneficiaryIfscEl.textContent = ifsc || '—';
+
+                        if (beneficiaryBadgeEl) {
+                            if (accNum) {
+                                beneficiaryBadgeEl.className = 'badge bg-soft-success text-success px-2.5 py-1 fs-11 fw-bold';
+                                beneficiaryBadgeEl.innerHTML = '<i class="feather-check-circle me-1"></i>Verified Active Account';
+                            } else {
+                                beneficiaryBadgeEl.className = 'badge bg-soft-warning text-warning px-2.5 py-1 fs-11 fw-bold';
+                                beneficiaryBadgeEl.innerHTML = '<i class="feather-alert-triangle me-1"></i>No Bank Account On File';
+                            }
+                        }
+
+                        beneficiaryCardEl.style.display = 'block';
+                    }
+                };
+
+                vendorSelect.addEventListener('change', syncVendorDetails);
+                syncVendorDetails();
+            }
+
+            // Guard payment submit if pending bank change warning is visible and not confirmed
+            const paymentForm = document.querySelector('form.odoo-sheet');
+            if (paymentForm) {
+                paymentForm.addEventListener('submit', function (e) {
+                    if (bankChangeWarningEl && bankChangeWarningEl.style.display !== 'none') {
+                        if (confirmBankChangeCheck && !confirmBankChangeCheck.checked) {
+                            e.preventDefault();
+                            confirmBankChangeCheck.focus();
+                            alert("Security Notice: A bank change request is pending for this vendor. Please check the confirmation box acknowledging that this payout is strictly being made to the verified active account on record, not the unapproved request.");
                         }
                     }
                 });

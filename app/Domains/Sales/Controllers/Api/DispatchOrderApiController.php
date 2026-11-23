@@ -233,6 +233,12 @@ class DispatchOrderApiController extends Controller
                 'message' => "Dispatch Order {$dispatch->dispatch_number} confirmed successfully.",
                 'data'    => $dispatch->fresh(['items']),
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $msg = collect($e->errors())->flatten()->first() ?: $e->getMessage();
+            return response()->json([
+                'success' => false,
+                'message' => $msg,
+            ], 422);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
@@ -274,6 +280,12 @@ class DispatchOrderApiController extends Controller
                 'message' => "Dispatch Order {$dispatch->dispatch_number} marked as Shipped successfully.",
                 'data'    => $dispatch->fresh(['items']),
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $msg = collect($e->errors())->flatten()->first() ?: $e->getMessage();
+            return response()->json([
+                'success' => false,
+                'message' => $msg,
+            ], 422);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
@@ -536,6 +548,11 @@ class DispatchOrderApiController extends Controller
         }
 
         $this->authorize('view', $dispatch);
+
+        $guard = app(\App\Services\PartyTransactionGuard::class);
+        if ($blocked = $guard->blockedReason('customer', $dispatch->customer_id, $tenantId, 'delivery challan')) {
+            return response()->json(['success' => false, 'message' => "Cannot generate Delivery Challan: {$blocked}"], 422);
+        }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.sales.dispatches.pdf', compact('dispatch'));
         return $pdf->download("DispatchOrder_{$dispatch->dispatch_number}.pdf");

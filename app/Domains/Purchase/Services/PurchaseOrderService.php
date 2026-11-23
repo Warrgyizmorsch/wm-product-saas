@@ -6,9 +6,13 @@ use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Purchase\Models\PurchaseOrderItem;
 use App\Domains\Purchase\Repositories\PurchaseOrderRepository;
 use App\Domains\Inventory\Models\Vendor;
+use App\Domains\HRMS\Models\Branch;
 use App\Domains\HRMS\Models\Company;
 use App\Models\GstConfiguration;
+use App\Models\PartyBranch;
+use App\Services\TaxIdentityService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderService
 {
@@ -18,8 +22,12 @@ class PurchaseOrderService
 
     public function storeOrder(array $validated, int $tenantId): PurchaseOrder
     {
+        $this->assertSingleDeliveryTarget($validated);
+
         return DB::transaction(function () use ($validated, $tenantId) {
             $poNumber = $this->orderRepo->getNextPoNumber($tenantId);
+
+            $validated = $this->applyBranchAndGstSnapshots($validated, $tenantId);
 
             $calculatedSubtotal = 0;
             $calculatedItemDiscount = 0;
@@ -45,7 +53,14 @@ class PurchaseOrderService
             $gstType = $validated['gst_type'] ?? null;
 
             if (empty($gstType) && $taxType !== 'without_tax' && !empty($validated['vendor_id'])) {
-                $gstType = $this->resolveGstType((int)$validated['vendor_id'], $validated['company_id'] ?? null, $tenantId);
+                $gstType = $this->resolveGstType(
+                    (int) $validated['vendor_id'],
+                    $validated['company_id'] ?? null,
+                    $tenantId,
+                    $validated['branch_id'] ?? null,
+                    $validated['supplier_gstin'] ?? null,
+                    $validated['supplier_state_code'] ?? null
+                );
             }
             if (empty($gstType)) {
                 $gstType = 'cgst_sgst';
@@ -101,6 +116,14 @@ class PurchaseOrderService
                 'date' => $validated['date'] ?? $validated['po_date'] ?? now()->toDateString(),
                 'delivery_date' => $validated['delivery_date'] ?? $validated['expected_delivery_date'] ?? null,
                 'vendor_id' => $validated['vendor_id'],
+                'vendor_branch_id' => $validated['vendor_branch_id'] ?? null,
+                'delivery_branch_id' => $validated['delivery_branch_id'] ?? null,
+                'delivery_party_branch_id' => $validated['delivery_party_branch_id'] ?? null,
+                'site_contact_id' => $validated['site_contact_id'] ?? null,
+                'buyer_gstin' => $validated['buyer_gstin'] ?? null,
+                'buyer_state_code' => $validated['buyer_state_code'] ?? null,
+                'supplier_gstin' => $validated['supplier_gstin'] ?? null,
+                'supplier_state_code' => $validated['supplier_state_code'] ?? null,
                 'location' => $validated['location'] ?? null,
                 'reference' => $validated['reference'] ?? null,
                 'supplier_quotation_number' => $validated['supplier_quotation_number'] ?? null,
@@ -188,16 +211,38 @@ class PurchaseOrderService
 
     public function updateOrder(PurchaseOrder $order, array $validated): PurchaseOrder
     {
+        $deliveryPayload = [
+            'location' => array_key_exists('location', $validated) ? $validated['location'] : $order->location,
+            'delivery_branch_id' => array_key_exists('delivery_branch_id', $validated) ? $validated['delivery_branch_id'] : $order->delivery_branch_id,
+            'delivery_party_branch_id' => array_key_exists('delivery_party_branch_id', $validated) ? $validated['delivery_party_branch_id'] : $order->delivery_party_branch_id,
+        ];
+        $this->assertSingleDeliveryTarget($deliveryPayload);
+
         return DB::transaction(function () use ($order, $validated) {
             $discountType = $validated['discount_type'] ?? $order->discount_type ?? 'without_discount';
             $taxType = $validated['tax_type'] ?? $order->tax_type ?? 'without_tax';
             $gstType = $validated['gst_type'] ?? null;
             $vendorId = $validated['vendor_id'] ?? $order->vendor_id;
 
+            $snapshotInput = array_merge([
+                'company_id' => $order->company_id,
+                'branch_id' => $order->branch_id,
+                'vendor_id' => $vendorId,
+                'vendor_branch_id' => array_key_exists('vendor_branch_id', $validated) ? $validated['vendor_branch_id'] : $order->vendor_branch_id,
+            ], $validated);
+            $validated = $this->applyBranchAndGstSnapshots($snapshotInput, (int) $order->tenant_id);
+
             if ($taxType === 'without_tax') {
                 $gstType = $validated['gst_type'] ?? 'cgst_sgst';
             } elseif (empty($gstType) && !empty($vendorId)) {
-                $gstType = $this->resolveGstType((int)$vendorId, null, $order->tenant_id);
+                $gstType = $this->resolveGstType(
+                    (int) $vendorId,
+                    $order->company_id,
+                    $order->tenant_id,
+                    $order->branch_id,
+                    $validated['supplier_gstin'] ?? null,
+                    $validated['supplier_state_code'] ?? null
+                );
             }
 
             if (empty($gstType)) {
@@ -206,9 +251,17 @@ class PurchaseOrderService
 
             $updateData = [
                 'vendor_id' => $vendorId,
+                'vendor_branch_id' => $validated['vendor_branch_id'] ?? $order->vendor_branch_id,
+                'delivery_branch_id' => array_key_exists('delivery_branch_id', $validated) ? $validated['delivery_branch_id'] : $order->delivery_branch_id,
+                'delivery_party_branch_id' => array_key_exists('delivery_party_branch_id', $validated) ? $validated['delivery_party_branch_id'] : $order->delivery_party_branch_id,
+                'site_contact_id' => array_key_exists('site_contact_id', $validated) ? $validated['site_contact_id'] : $order->site_contact_id,
+                'buyer_gstin' => $validated['buyer_gstin'] ?? $order->buyer_gstin,
+                'buyer_state_code' => $validated['buyer_state_code'] ?? $order->buyer_state_code,
+                'supplier_gstin' => $validated['supplier_gstin'] ?? $order->supplier_gstin,
+                'supplier_state_code' => $validated['supplier_state_code'] ?? $order->supplier_state_code,
                 'date' => $validated['date'] ?? $validated['po_date'] ?? $order->date,
                 'delivery_date' => $validated['delivery_date'] ?? $validated['expected_delivery_date'] ?? $order->delivery_date,
-                'location' => $validated['location'] ?? $order->location,
+                'location' => array_key_exists('location', $validated) ? $validated['location'] : $order->location,
                 'reference' => $validated['reference'] ?? $order->reference,
                 'supplier_quotation_number' => $validated['supplier_quotation_number'] ?? $order->supplier_quotation_number,
                 'purchase_requisition_id' => $validated['purchase_requisition_id'] ?? $order->purchase_requisition_id,
@@ -475,10 +528,16 @@ class PurchaseOrderService
 
     /**
      * Resolve GST type (cgst_sgst for Intra-state, igst for Inter-state)
-     * based on active company GST number starting 2 digits vs vendor GSTIN starting 2 digits.
+     * comparing our ordering branch's effective GSTIN/state vs vendor branch's GSTIN/state.
      */
-    public function resolveGstType(Vendor|int $vendor, ?int $companyId = null, ?int $tenantId = null): string
-    {
+    public function resolveGstType(
+        Vendor|int $vendor,
+        ?int $companyId = null,
+        ?int $tenantId = null,
+        ?int $branchId = null,
+        ?string $supplierGstin = null,
+        ?string $supplierStateCode = null
+    ): string {
         if (is_numeric($vendor)) {
             $vendor = Vendor::find($vendor);
         }
@@ -487,49 +546,133 @@ class PurchaseOrderService
         }
 
         $tenantId ??= $vendor->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
+        $branchId ??= (function_exists('branch_id') ? branch_id() : null)
+            ?? (function_exists('current_branch_id') ? current_branch_id() : null);
 
-        $company = null;
-        if ($companyId) {
-            $company = Company::find($companyId);
+        $branch = $branchId ? Branch::withoutGlobalScopes()->with('company')->find($branchId) : null;
+        $company = $branch?->company;
+
+        if (!$company && $companyId) {
+            $company = Company::withoutGlobalScopes()->find($companyId);
         }
         if (!$company && function_exists('company') && company()) {
             $company = company();
         }
         if (!$company && function_exists('current_company_id') && current_company_id()) {
-            $company = Company::find(current_company_id());
+            $company = Company::withoutGlobalScopes()->find(current_company_id());
         }
         if (!$company) {
-            $company = Company::where('tenant_id', $tenantId)->first();
+            $company = Company::withoutGlobalScopes()->where('tenant_id', $tenantId)->first();
         }
 
-        $companyGst = strtoupper(trim((string) ($company?->gst_number ?? $company?->tax_number ?? $company?->gstin ?? '')));
-        if (empty($companyGst)) {
-            $gstConfig = GstConfiguration::getForCurrentContext();
+        // Buyer effective GSTIN: ordering branch -> branch GstConfig -> company -> default GstConfig
+        $buyerGstin = $branch?->gst_number ? TaxIdentityService::normalizeGstin($branch->gst_number) : null;
+        if (empty($buyerGstin)) {
+            $gstConfig = GstConfiguration::getForCurrentContext($company?->id, $branch?->id);
+            if ($gstConfig && $gstConfig->branch_id && $gstConfig->seller_gstin) {
+                $buyerGstin = TaxIdentityService::normalizeGstin($gstConfig->seller_gstin);
+            }
+        }
+        if (empty($buyerGstin)) {
+            $buyerGstin = TaxIdentityService::normalizeGstin($company?->gst_number ?? $company?->tax_number ?? $company?->gstin ?? null);
+        }
+        if (empty($buyerGstin)) {
+            $gstConfig = GstConfiguration::getForCurrentContext($company?->id, $branch?->id);
             if ($gstConfig && $gstConfig->seller_gstin) {
-                $companyGst = strtoupper(trim((string) $gstConfig->seller_gstin));
+                $buyerGstin = TaxIdentityService::normalizeGstin($gstConfig->seller_gstin);
             }
         }
 
-        $vendorGst = strtoupper(trim((string) ($vendor->gstin ?? $vendor->tax_number ?? '')));
+        $buyerStateCode = ($branch && $branch->gst_number && $branch->gst_state_code)
+            ? str_pad((string) $branch->gst_state_code, 2, '0', STR_PAD_LEFT)
+            : TaxIdentityService::extractStateCode($buyerGstin);
 
-        $cleanCompanyGst = preg_replace('/[^0-9A-Za-z]/', '', $companyGst);
-        $cleanVendorGst = preg_replace('/[^0-9A-Za-z]/', '', $vendorGst);
+        $resolvedSupplierState = $supplierStateCode
+            ? str_pad((string) $supplierStateCode, 2, '0', STR_PAD_LEFT)
+            : TaxIdentityService::extractStateCode($supplierGstin ?: ($vendor->gstin ?? $vendor->tax_number ?? null));
 
-        $companyPrefix = substr($cleanCompanyGst, 0, 2);
-        $vendorPrefix = substr($cleanVendorGst, 0, 2);
-
-        // 1. Primary rule: Compare first 2 digits of company GST and vendor GSTIN
-        if (!empty($companyPrefix) && !empty($vendorPrefix)) {
-            return ($companyPrefix === $vendorPrefix) ? 'cgst_sgst' : 'igst';
+        // 1. Primary rule: Compare 2-digit GST state codes
+        if (!empty($buyerStateCode) && !empty($resolvedSupplierState)) {
+            return ($buyerStateCode === $resolvedSupplierState) ? 'cgst_sgst' : 'igst';
         }
 
-        // 2. Fallback: Compare states if GSTINs not available
-        $companyState = strtolower(trim((string) ($company?->state ?? '')));
+        // 2. Fallback: Compare state names if GSTINs not available
+        $buyerStateName = strtolower(trim((string) (($branch && $branch->gst_number ? $branch->state : null) ?: $company?->state ?: $branch?->state ?: '')));
         $vendorState = strtolower(trim((string) ($vendor->billing_state ?? $vendor->state ?? '')));
-        if (!empty($companyState) && !empty($vendorState)) {
-            return ($companyState === $vendorState) ? 'cgst_sgst' : 'igst';
+        if (!empty($buyerStateName) && !empty($vendorState)) {
+            return ($buyerStateName === $vendorState) ? 'cgst_sgst' : 'igst';
         }
 
         return 'cgst_sgst';
+    }
+
+    /**
+     * Validate that a Purchase Order specifies exactly ONE delivery target:
+     * our warehouse (`location`), our branch (`delivery_branch_id`), or a customer site (`delivery_party_branch_id`).
+     */
+    public function assertSingleDeliveryTarget(array $validated): void
+    {
+        $hasWarehouse = ! empty(trim((string) ($validated['location'] ?? '')));
+        $hasOwnBranch = ! empty($validated['delivery_branch_id']);
+        $hasCustomerSite = ! empty($validated['delivery_party_branch_id']);
+
+        $count = ($hasWarehouse ? 1 : 0) + ($hasOwnBranch ? 1 : 0) + ($hasCustomerSite ? 1 : 0);
+
+        if ($count > 1) {
+            throw ValidationException::withMessages([
+                'delivery_target' => 'Choose exactly one delivery target on a Purchase Order: our warehouse, our branch, or a customer site (not multiple).',
+            ]);
+        }
+
+        // Enforce at-least-one target when branch delivery rules are explicitly used or branches feature is enabled
+        // while keeping legacy callers that omit location completely working only if explicitly disabled.
+        if ($count === 0 && (bool) config('party_verification.branches_enabled', true) && array_key_exists('enforce_delivery_target', $validated) && $validated['enforce_delivery_target']) {
+            throw ValidationException::withMessages([
+                'delivery_target' => 'A delivery target is required: choose our warehouse, our branch, or a customer site.',
+            ]);
+        }
+    }
+
+    /**
+     * Freeze buyer_gstin/buyer_state_code (from ordering branch_id) and supplier_gstin/supplier_state_code
+     * (from vendor_branch_id or vendor default branch) onto the PO payload.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function applyBranchAndGstSnapshots(array $validated, int $tenantId): array
+    {
+        $branchId = $validated['branch_id'] ?? current_branch_id() ?? auth()->user()?->branch_id;
+        $ownBranch = $branchId ? Branch::withoutGlobalScopes()->with('company')->find($branchId) : null;
+        $buyerOrg = billing_organization_details($ownBranch);
+
+        if (empty($validated['buyer_gstin']) && ! empty($buyerOrg['gstin'])) {
+            $validated['buyer_gstin'] = $buyerOrg['gstin'];
+        }
+        if (empty($validated['buyer_state_code']) && ! empty($buyerOrg['state_code'])) {
+            $validated['buyer_state_code'] = $buyerOrg['state_code'];
+        }
+
+        $vendor = ! empty($validated['vendor_id'])
+            ? Vendor::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($validated['vendor_id'])
+            : null;
+
+        if ($vendor) {
+            $vendorBranch = ! empty($validated['vendor_branch_id'])
+                ? PartyBranch::withoutGlobalScopes()->find($validated['vendor_branch_id'])
+                : $vendor->defaultBillingBranch();
+
+            if ($vendorBranch && empty($validated['vendor_branch_id'])) {
+                $validated['vendor_branch_id'] = $vendorBranch->id;
+            }
+
+            $supplierGstin = $vendorBranch?->effectiveGstin() ?: TaxIdentityService::normalizeGstin($vendor->gstin);
+            $supplierStateCode = $vendorBranch?->effectiveStateCode() ?: TaxIdentityService::extractStateCode($supplierGstin);
+
+            $validated['supplier_gstin'] = $validated['supplier_gstin'] ?? $supplierGstin;
+            $validated['supplier_state_code'] = $validated['supplier_state_code'] ?? $supplierStateCode;
+        }
+
+        return $validated;
     }
 }

@@ -56,6 +56,11 @@ Schedule::command('crm:send-followup-reminders')
     ->everyMinute()
     ->withoutOverlapping();
 
+// Vendor compliance documents (MSME, Form 13, ISO, agreements): expiring-soon and expired alerts
+Schedule::command('purchase:check-vendor-document-expiry')
+    ->dailyAt('07:00')
+    ->withoutOverlapping();
+
 // Inventory FEFO Expiring Batches Alert (daily morning scan)
 Schedule::command('inventory:check-expiring-batches')
     ->dailyAt('08:00')

@@ -145,6 +145,7 @@ return array (
   'sources' => 
   array (
     'Direct Inquiry' => 'Direct Inquiry',
+    'Website' => 'Website',
     'Website Form' => 'Website Form',
     'Web Search' => 'Web Search',
     'Meta Ads' => 'Meta (Facebook/Instagram) Ads',
@@ -152,11 +153,14 @@ return array (
     'TradeIndia' => 'TradeIndia',
     'Justdial' => 'Justdial',
     'Cold Call' => 'Cold Calling',
+    'Cold Calling' => 'Cold Calling',
     'Referral' => 'Client Referral',
+    'Client Referral' => 'Client Referral',
     'Employee Referral' => 'Employee Referral',
     'Partner' => 'Partner',
     'Advertisement' => 'Advertisement',
     'Trade Show' => 'Trade Show',
+    'Expo' => 'Expo / Exhibition',
     'WhatsApp Bot' => 'WhatsApp Bot',
     'WhatsApp' => 'WhatsApp',
     'Email' => 'Email',
@@ -2314,6 +2318,7 @@ return array (
   'download_pdf' => 'Download PDF',
 
   // Customer Edit Screen
+  'view_customer' => 'View Customer',
   'edit_customer' => 'Edit Customer',
   'opening_balance' => 'Opening Balance',
   'linked_to_crm_account' => 'Linked to CRM Account',

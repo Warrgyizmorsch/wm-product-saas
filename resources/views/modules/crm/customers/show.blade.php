@@ -23,12 +23,14 @@
                 {{ __('crm.create_new_invoice') }}
             </x-ui.button>
         @endif
-        @if($customer->crmAccount)
-            <x-ui.button href="{{ route('crm.accounts.show', $customer->crmAccount->id) }}" variant="secondary"
-                icon="feather-briefcase">
-                {{ __('crm.view_account') }}
-            </x-ui.button>
-        @endif
+        @can('merge', $customer)
+            @if(!$customer->isMerged())
+                <button type="button" class="btn btn-outline-warning px-3 d-inline-flex align-items-center"
+                    data-bs-toggle="modal" data-bs-target="#mergePartyModal" title="Merge this duplicate customer into another customer">
+                    <i class="feather-git-merge me-1.5"></i>Merge Customer
+                </button>
+            @endif
+        @endcan
         <a href="{{ route('crm.customers.edit', $customer) }}"
             class="btn btn-primary px-3 d-inline-flex align-items-center">
             <i class="feather-edit me-1.5"></i>{{ __('crm.edit') ?? 'Edit Customer' }}
@@ -41,6 +43,8 @@
         <x-ui.odoo-form-ui type="sheet">
 
             {{-- 1. Single Page Header: Customer Profile Info --}}
+            @include('partials.party-verification-panel', ['party' => $customer, 'type' => 'customer'])
+            @include('partials.party-status-panel', ['party' => $customer, 'type' => 'customer'])
             <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 pb-3 border-bottom mb-4">
                 <div class="d-flex align-items-start gap-3">
                     <div class="avatar-text avatar-xl bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold fs-22 shadow-sm flex-shrink-0"
@@ -57,11 +61,23 @@
                                     size="sm" />
                             @endif
 
-                            @if($customer->crmAccount)
+                            @php
+                                $crmAccounts = $customer->crmAccounts;
+                                if ($crmAccounts->isEmpty() && $customer->crmAccount) {
+                                    $crmAccounts = collect([$customer->crmAccount]);
+                                }
+                            @endphp
+                            @foreach($crmAccounts as $acc)
                                 <span class="badge bg-soft-info text-info border fs-11 px-2.5 py-1 ms-2"
-                                    title="{{ __('crm.linked_crm_account') }}">
+                                    title="{{ __('crm.linked_crm_account') }}: #{{ $acc->account_number }}">
                                     <i class="feather-building me-1.5"></i>{{ __('crm.account_colon') }}
-                                    <strong>{{ $customer->crmAccount->name }}</strong>
+                                    <strong>{{ $acc->name }}</strong>
+                                </span>
+                            @endforeach
+
+                            @if($deals->isNotEmpty())
+                                <span class="badge bg-soft-purple text-purple border fs-11 px-2.5 py-1 ms-1" style="background-color: rgba(111, 66, 193, 0.08); color: #6f42c1; border-color: rgba(111, 66, 193, 0.2) !important;" title="Active CRM Opportunities">
+                                    <i class="feather-git-branch me-1"></i>{{ $openDealsCount }} Open {{ Str::plural('Deal', $openDealsCount) }} ({{ format_currency($pipelineValue) }})
                                 </span>
                             @endif
                         </div>
@@ -184,9 +200,37 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="deals-tab" data-bs-toggle="tab"
+                            href="#deals-pane" role="tab">
+                            <i class="feather-git-branch me-1.5" style="color: #6f42c1;"></i>{{ __('crm.deals') }}
+                            <span
+                                class="badge ms-1 px-1.5 rounded-pill" style="background-color: rgba(111, 66, 193, 0.12); color: #6f42c1;">{{ $deals->count() }}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="ledger-tab" data-bs-toggle="tab"
                             href="#ledger-pane" role="tab">
                             <i class="feather-book-open me-1.5 text-warning"></i>{{ __('crm.ledger_statement') }}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="branches-tab" data-bs-toggle="tab"
+                            href="#branches-pane" role="tab">
+                            <i class="feather-map-pin me-1.5 text-primary"></i>Branches &amp; Sites
+                            <span class="badge bg-soft-primary text-primary ms-1 px-1.5 rounded-pill">{{ $customer->branches()->count() }}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="contacts-tab" data-bs-toggle="tab"
+                            href="#contacts-pane" role="tab">
+                            <i class="feather-users me-1.5 text-info"></i>Contacts
+                            <span class="badge bg-soft-info text-info ms-1 px-1.5 rounded-pill">{{ $customer->contacts()->count() }}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="history-tab" data-history-tab data-bs-toggle="tab"
+                            href="#history-pane" role="tab">
+                            <i class="feather-clock me-1.5 text-secondary"></i>Full History
                         </a>
                     </li>
                 </ul>
@@ -560,6 +604,87 @@
                     @endif
                 </div>
 
+                {{-- ================= TAB: DEALS & OPPORTUNITIES ================= --}}
+                <div class="tab-pane fade" id="deals-pane" role="tabpanel">
+                    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0">
+                                <i class="feather-git-branch me-2 text-primary"></i>{{ __('crm.linked_projects_deals') }}
+                            </h6>
+                            <span class="text-muted fs-11">Active deals, quotations pipeline and opportunities</span>
+                        </div>
+                        @if($customer->crmAccount && Route::has('crm.deals.create'))
+                            <x-ui.button href="{{ route('crm.deals.create', ['account_id' => $customer->crmAccount->id]) }}"
+                                variant="outline-primary" size="sm" icon="feather-plus">
+                                {{ __('crm.new_deal') }}
+                            </x-ui.button>
+                        @endif
+                    </div>
+
+                    @if($deals->isNotEmpty())
+                        <div class="table-responsive">
+                            <x-ui.odoo-form-ui type="table" id="dealsTable" class="mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>{{ __('crm.deal_no') ?? 'Deal #' }}</th>
+                                        <th>{{ __('crm.project_title') }}</th>
+                                        <th>{{ __('crm.stage') ?? 'Stage' }}</th>
+                                        <th class="text-end">{{ __('crm.total_value') }} ({{ active_currency_symbol() }})</th>
+                                        <th>{{ __('crm.closing_date') }}</th>
+                                        <th class="text-center">{{ __('crm.actions') ?? 'Action' }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($deals as $deal)
+                                        @php
+                                            $stageColors = [
+                                                'Qualification' => 'info',
+                                                'Needs Analysis' => 'primary',
+                                                'Proposal' => 'warning',
+                                                'Negotiation' => 'purple',
+                                                'Won' => 'success',
+                                                'Closed Won' => 'success',
+                                                'Lost' => 'danger',
+                                                'Closed Lost' => 'danger'
+                                            ];
+                                            $badgeColor = $stageColors[$deal->stage] ?? 'secondary';
+                                        @endphp
+                                        <tr>
+                                            <td class="font-monospace fw-bold text-primary">
+                                                @if(Route::has('crm.deals.show'))
+                                                    <a href="{{ route('crm.deals.show', $deal) }}" class="text-primary fw-bold">{{ $deal->deal_number }}</a>
+                                                @else
+                                                    {{ $deal->deal_number }}
+                                                @endif
+                                            </td>
+                                            <td class="fw-bold text-dark">{{ $deal->title }}</td>
+                                            <td>
+                                                <span class="badge bg-soft-{{ $badgeColor }} text-{{ $badgeColor }} border border-{{ $badgeColor }}-subtle px-2 py-0.5 fw-bold">{{ $deal->stage }}</span>
+                                            </td>
+                                            <td class="text-end fw-bold text-success">
+                                                {{ format_currency($deal->actual_value ?: $deal->estimated_value) }}
+                                            </td>
+                                            <td>{{ $deal->closing_date ? \Illuminate\Support\Carbon::parse($deal->closing_date)->format('d M Y') : '—' }}</td>
+                                            <td class="text-center">
+                                                <x-ui.action-dropdown :viewUrl="route('crm.deals.show', $deal)" />
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 px-1">
+                            <div id="dealsTable-info" class="fs-12 text-muted"></div>
+                            <div id="dealsTable-pagination"></div>
+                        </div>
+                    @else
+                        <div class="text-center py-5 text-muted border rounded">
+                            <i class="feather-git-branch display-6 text-muted opacity-50 mb-2 d-block"></i>
+                            <p class="mb-0 fs-13">{{ __('crm.no_deals_recorded') }}</p>
+                        </div>
+                    @endif
+                </div>
+
                 {{-- ================= TAB 4: LEDGER STATEMENT ================= --}}
                 <div class="tab-pane fade" id="ledger-pane" role="tabpanel">
                     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -756,9 +881,26 @@
                     @endif
                 </div>
 
+                {{-- ================= TAB 5: BRANCHES & SITES ================= --}}
+                <div class="tab-pane fade" id="branches-pane" role="tabpanel">
+                    @include('partials.party-branches-panel', ['party' => $customer, 'type' => 'customer'])
+                </div>
+
+                {{-- ================= TAB 6: CONTACTS ================= --}}
+                <div class="tab-pane fade" id="contacts-pane" role="tabpanel">
+                    @include('partials.party-contacts-panel', ['party' => $customer, 'type' => 'customer'])
+                </div>
+
+                {{-- ================= TAB 7: FULL HISTORY ================= --}}
+                <div class="tab-pane fade" id="history-pane" role="tabpanel">
+                    @include('modules.party.history', ['partyType' => 'customer', 'party' => $customer])
+                </div>
+
             </div>
         </x-ui.odoo-form-ui>
     </div>
+
+    @include('partials.party-merge-modal', ['party' => $customer, 'type' => 'customer'])
 @endsection
 
 @push('scripts')
@@ -829,6 +971,7 @@
             initTablePagination('invoicesTable', 'invoicesTable-info', 'invoicesTable-pagination', 10);
             initTablePagination('paymentsTable', 'paymentsTable-info', 'paymentsTable-pagination', 10);
             initTablePagination('ordersTable', 'ordersTable-info', 'ordersTable-pagination', 10);
+            initTablePagination('dealsTable', 'dealsTable-info', 'dealsTable-pagination', 10);
             initTablePagination('ledgerTable', 'ledgerTable-info', 'ledgerTable-pagination', 10);
         });
     </script>

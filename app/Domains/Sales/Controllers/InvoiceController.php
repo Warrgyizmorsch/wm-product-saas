@@ -379,6 +379,9 @@ class InvoiceController extends Controller
         $validated = $request->validate([
             'sales_order_id' => ['nullable', 'exists:sales_orders,id'],
             'customer_id' => ['nullable', 'exists:customers,id'],
+            'billing_branch_id' => ['nullable', 'exists:party_branches,id'],
+            'shipping_branch_id' => ['nullable', 'exists:party_branches,id'],
+            'site_contact_id' => ['nullable', 'exists:contacts,id'],
             'material_requirement_id' => ['nullable', 'exists:material_requirements,id'],
             'invoice_number' => ['required', 'string', 'max:255', $invoiceNumberRule],
             'invoice_date' => ['required', 'date'],
@@ -542,14 +545,45 @@ class InvoiceController extends Controller
                 $totalAmount = max(0, $subtotal - $discountAmount + $totalTaxAmount + $effectiveFreight + $adjustment);
             }
 
+            $billingBranchId = $validated['billing_branch_id'] ?? $salesOrder?->billing_branch_id;
+            $shippingBranchId = $validated['shipping_branch_id'] ?? $salesOrder?->shipping_branch_id;
+            $siteContactId = $validated['site_contact_id'] ?? $salesOrder?->site_contact_id;
+
+            $ownBranch = $branchId ? \App\Domains\HRMS\Models\Branch::withoutGlobalScopes()->with('company')->find($branchId) : null;
+            $sellerOrg = billing_organization_details($ownBranch);
+            $sellerGstin = $salesOrder?->seller_gstin ?: ($sellerOrg['gstin'] ?? null);
+            $sellerStateCode = $salesOrder?->seller_state_code ?: ($sellerOrg['state_code'] ?? null);
+
+            $billBranchObj = $billingBranchId ? \App\Models\PartyBranch::withoutGlobalScopes()->find($billingBranchId) : null;
+            $shipBranchObj = $shippingBranchId ? \App\Models\PartyBranch::withoutGlobalScopes()->find($shippingBranchId) : null;
+
+            $billToGstin = $salesOrder?->bill_to_gstin
+                ?: ($billBranchObj?->effectiveGstin() ?: \App\Services\TaxIdentityService::normalizeGstin($customerObj?->gstin));
+            $shipToGstin = $salesOrder?->ship_to_gstin
+                ?: ($shipBranchObj?->effectiveGstin() ?: $billToGstin);
+
+            $billState = \App\Services\TaxIdentityService::extractStateCode($billToGstin) ?: $billBranchObj?->effectiveStateCode();
+            $shipState = \App\Services\TaxIdentityService::extractStateCode($shipToGstin)
+                ?: $shipBranchObj?->effectiveStateCode();
+            $placeOfSupplyState = $salesOrder?->place_of_supply_state
+                ?: (!empty($billToGstin) ? ($billState ?: $shipState) : ($shipState ?: $billState));
+
             $invoice = Invoice::create([
                 'tenant_id' => $tenantId,
                 'company_id' => $companyId,
                 'branch_id' => $branchId,
                 'sales_order_id' => $salesOrder?->id,
                 'customer_id' => $customerId,
-                'billing_address' => !empty($validated['billing_address']) ? $validated['billing_address'] : ($salesOrder?->billing_address ?: $customerObj?->billing_address),
-                'shipping_address' => !empty($validated['shipping_address']) ? $validated['shipping_address'] : ($salesOrder?->shipping_address ?: ($customerObj?->shipping_address ?: ($salesOrder?->billing_address ?: $customerObj?->billing_address))),
+                'billing_branch_id' => $billingBranchId,
+                'shipping_branch_id' => $shippingBranchId,
+                'site_contact_id' => $siteContactId,
+                'seller_gstin' => $sellerGstin,
+                'seller_state_code' => $sellerStateCode,
+                'bill_to_gstin' => $billToGstin,
+                'ship_to_gstin' => $shipToGstin,
+                'place_of_supply_state' => $placeOfSupplyState,
+                'billing_address' => !empty($validated['billing_address']) ? $validated['billing_address'] : ($salesOrder?->billing_address ?: ($billBranchObj?->formattedAddress() ?: $customerObj?->billing_address)),
+                'shipping_address' => !empty($validated['shipping_address']) ? $validated['shipping_address'] : ($salesOrder?->shipping_address ?: ($shipBranchObj?->formattedAddress() ?: ($customerObj?->shipping_address ?: ($salesOrder?->billing_address ?: $customerObj?->billing_address)))),
                 'material_requirement_id' => $validated['material_requirement_id'] ?? null,
                 'invoice_number' => $validated['invoice_number'],
                 'invoice_date' => $validated['invoice_date'],

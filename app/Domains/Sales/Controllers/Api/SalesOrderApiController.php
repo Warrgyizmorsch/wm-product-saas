@@ -650,6 +650,14 @@ class SalesOrderApiController extends Controller
         $this->authorize('view', $order);
         $this->authorize('create', DispatchOrder::class);
 
+        $guard = app(\App\Services\PartyTransactionGuard::class);
+        if ($blocked = $guard->blockedReason('customer', $order->customer_id, $tenantId, 'dispatch')) {
+            return response()->json([
+                'success' => false,
+                'message' => $blocked,
+            ], 422);
+        }
+
         if ($order->hasOnlyServices()) {
             return response()->json([
                 'success' => false,
@@ -788,6 +796,14 @@ class SalesOrderApiController extends Controller
         }
 
         try {
+            app(\App\Services\PartyTransactionGuard::class)->assertCanTransact(
+                'customer',
+                $order->customer_id,
+                $tenantId,
+                'sales order confirmation',
+                'customer_id'
+            );
+
             app(\App\Domains\Sales\Repositories\SalesOrderRepository::class)->confirmOrder($order);
 
             return response()->json([

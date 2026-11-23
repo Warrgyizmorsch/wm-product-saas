@@ -452,8 +452,16 @@
         <tr>
             <!-- Left Box: Customer Info -->
             <td class="info-box">
+                @php
+                    $billGstin = $order->bill_to_gstin ?: $order->customer?->gstin;
+                    $shipGstin = $order->ship_to_gstin;
+                    $siteReceiver = $order->siteContact;
+                @endphp
                 <div class="box-title">BILLED TO (CUSTOMER):</div>
                 <div class="client-name">{{ $order->customer?->name ?? '—' }}</div>
+                @if($billGstin)
+                    <div class="client-contact"><strong>Bill-To GSTIN:</strong> {{ $billGstin }}</div>
+                @endif
                 @if($order->customer?->email || $order->customer?->phone)
                     <div class="client-contact">
                         @if($order->customer?->email)
@@ -470,13 +478,21 @@
 
                 @if ($order->billing_address)
                     <div class="address-block">
-                        <strong>Billing Address:</strong><br>{{ $order->billing_address }}
+                        <strong>Billing Address{{ $order->billingBranch ? ' (' . $order->billingBranch->name . ')' : '' }}:</strong><br>{{ $order->billing_address }}
                     </div>
                 @endif
 
                 @if ($order->shipping_address && $order->shipping_address !== $order->billing_address)
                     <div class="address-block">
-                        <strong>Shipping Address:</strong><br>{{ $order->shipping_address }}
+                        <strong>Shipping Address{{ $order->shippingBranch ? ' (' . $order->shippingBranch->name . ')' : '' }}:</strong><br>{{ $order->shipping_address }}
+                        @if($shipGstin && $shipGstin !== $billGstin)
+                            <br><strong>Ship-To GSTIN:</strong> {{ $shipGstin }}
+                        @endif
+                    </div>
+                @endif
+                @if($siteReceiver)
+                    <div class="address-block">
+                        <strong>Site Receiver:</strong> {{ $siteReceiver->name }}@if($siteReceiver->mobile ?: $siteReceiver->phone) ({{ $siteReceiver->mobile ?: $siteReceiver->phone }})@endif
                     </div>
                 @endif
             </td>

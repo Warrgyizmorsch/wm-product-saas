@@ -134,6 +134,24 @@ class QuotationController extends Controller
             $validated['lead_id'] = (int) $request->input('lead_id');
         }
 
+        $guard = app(\App\Services\PartyTransactionGuard::class);
+        $resolvedCustomerId = $request->input('customer_id');
+        if (!$resolvedCustomerId && $request->filled('crm_account_id')) {
+            $acc = CrmAccount::find($request->input('crm_account_id'));
+            $resolvedCustomerId = $acc?->customer_id ?? $acc?->customer?->id;
+        }
+        if (!$resolvedCustomerId && $request->filled('crm_deal_id')) {
+            $deal = CrmDeal::with(['account', 'contact'])->find($request->input('crm_deal_id'));
+            $resolvedCustomerId = $deal?->account?->customer_id ?? $deal?->account?->customer?->id;
+        }
+        if (!$resolvedCustomerId && $request->filled('lead_id')) {
+            $lead = Lead::find($request->input('lead_id'));
+            $resolvedCustomerId = $lead?->customer?->id;
+        }
+        if ($resolvedCustomerId) {
+            $guard->assertCanTransact('customer', $resolvedCustomerId, tenant_id() ?? auth()->user()?->tenant_id, 'quotation', 'customer_id');
+        }
+
         $quotation = $this->quotationService->create($validated, $request->input('items', []));
         $dealId = $validated['crm_deal_id'] ?? $request->input('crm_deal_id') ?? $quotation->crm_deal_id ?? null;
         $leadId = $validated['lead_id'] ?? $request->input('lead_id') ?? $quotation->lead_id ?? null;

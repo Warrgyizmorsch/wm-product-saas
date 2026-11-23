@@ -9,13 +9,19 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
+use App\Models\Concerns\HasPartyStatusControl;
+use App\Models\Concerns\HasPartyVerification;
 use App\Models\Concerns\NormalizesTaxIdentity;
+use App\Models\PartyBranch;
+use App\Models\PartyContact;
 use App\Models\User;
+use App\Services\PartyStructureService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Customer extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch, NormalizesTaxIdentity;
+    use HasFactory, BelongsToCompany, BelongsToBranch, NormalizesTaxIdentity, HasPartyVerification, HasPartyStatusControl;
 
     protected ?string $rbacPermission = 'crm.customers.view';
 
@@ -41,22 +47,42 @@ class Customer extends BaseModel
         'email',
         'phone',
         'gstin',
+        'pan',
+        'bank_name',
+        'account_number',
+        'ifsc_code',
         'status',
         'billing_address',
         'shipping_address',
         'opening_balance',
         'opening_balance_type',
         'opening_bills',
+        'merged_into_id',
+        'merged_at',
+        'merged_by',
     ];
 
     protected $casts = [
         'opening_balance' => 'float',
         'opening_bills' => 'array',
+        'merged_into_id' => 'integer',
+        'merged_at' => 'datetime',
+        'merged_by' => 'integer',
     ];
 
     protected static function boot()
     {
         parent::boot();
+
+        static::deleting(function (Customer $customer): void {
+            app(\App\Services\PartyDeletionGuard::class)->assertCanDelete($customer);
+
+            foreach ($customer->crmAccounts as $account) {
+                $account->delete();
+            }
+            $customer->branches()->delete();
+            $customer->contacts()->delete();
+        });
 
         static::created(function ($customer) {
             // Skip when called from deal conversion or direct account creation
@@ -85,11 +111,58 @@ class Customer extends BaseModel
                 ]);
             }
         });
+        static::saved(function (Customer $customer): void {
+            app(PartyStructureService::class)->syncPrimaryBranch($customer);
+        });
+    }
+
+    public function branches(): HasMany
+    {
+        return $this->hasMany(PartyBranch::class, 'party_id')
+            ->where('party_type', PartyBranch::PARTY_CUSTOMER);
+    }
+
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(PartyContact::class, 'party_id')
+            ->where('party_type', PartyContact::PARTY_CUSTOMER);
+    }
+
+    public function headOfficeBranch(): ?PartyBranch
+    {
+        return $this->branches()->where('is_head_office', true)->first();
+    }
+
+    public function defaultBillingBranch(): ?PartyBranch
+    {
+        return $this->branches()->activeVerified()->where('is_billing', true)->orderByDesc('is_default_billing')->orderByDesc('is_head_office')->first();
+    }
+
+    public function defaultShippingBranch(): ?PartyBranch
+    {
+        return $this->branches()->activeVerified()->where('is_shipping', true)->orderByDesc('is_default_shipping')->orderByDesc('is_head_office')->first();
     }
 
     public function crmAccount()
     {
         return $this->hasOne(CrmAccount::class, 'customer_id');
+    }
+
+    public function crmAccounts(): HasMany
+    {
+        return $this->hasMany(CrmAccount::class, 'customer_id');
+    }
+
+    public function deals()
+    {
+        return $this->hasManyThrough(
+            CrmDeal::class,
+            CrmAccount::class,
+            'customer_id',
+            'crm_account_id',
+            'id',
+            'id'
+        );
     }
 
     public function salesOrders()
@@ -115,5 +188,25 @@ class Customer extends BaseModel
         $amount = (float) ($this->opening_balance ?? 0);
 
         return ($this->opening_balance_type ?: 'debit') === 'debit' ? $amount : -$amount;
+    }
+
+    public function mergedInto()
+    {
+        return $this->belongsTo(self::class, 'merged_into_id');
+    }
+
+    public function mergedDuplicates()
+    {
+        return $this->hasMany(self::class, 'merged_into_id');
+    }
+
+    public function merger()
+    {
+        return $this->belongsTo(User::class, 'merged_by');
+    }
+
+    public function isMerged(): bool
+    {
+        return ! empty($this->merged_into_id);
     }
 }

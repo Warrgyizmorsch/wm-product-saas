@@ -38,6 +38,7 @@ class CrmDealController extends Controller
         $dateTo = $request->input('date_to');
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $lossReasons = \App\Domains\CRM\Models\CrmLossReason::getActiveReasons();
 
         $baseQuery = CrmDeal::where('tenant_id', $tenantId);
 
@@ -124,6 +125,7 @@ class CrmDealController extends Controller
         $tenantId = tenant_id() ?? 1;
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $lossReasons = \App\Domains\CRM\Models\CrmLossReason::getActiveReasons();
 
         $stages = [];
         foreach ($dealStatuses as $st) {
@@ -194,6 +196,7 @@ class CrmDealController extends Controller
         $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
         $users = \App\Models\User::orderBy('name')->get();
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $lossReasons = \App\Domains\CRM\Models\CrmLossReason::getActiveReasons();
 
         return view('modules.crm.deals.create', compact('accounts', 'contacts', 'selectedAccountId', 'products', 'users', 'dealStatuses'));
     }
@@ -205,6 +208,7 @@ class CrmDealController extends Controller
         $tenantId = tenant_id() ?? 1;
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $lossReasons = \App\Domains\CRM\Models\CrmLossReason::getActiveReasons();
         $validStages = array_unique(array_merge(
             $dealStatuses->pluck('name')->toArray(),
             ['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost', 'Closed Won', 'Closed Lost', 'New', 'Qualified']
@@ -301,6 +305,7 @@ class CrmDealController extends Controller
         $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
         $users = \App\Models\User::orderBy('name')->get();
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $lossReasons = \App\Domains\CRM\Models\CrmLossReason::getActiveReasons();
 
         $prevDeal = CrmDeal::where('tenant_id', $tenantId)->where('id', '<', $deal->id)->orderBy('id', 'desc')->first();
         $nextDeal = CrmDeal::where('tenant_id', $tenantId)->where('id', '>', $deal->id)->orderBy('id', 'asc')->first();
@@ -361,7 +366,7 @@ class CrmDealController extends Controller
             }
         }
 
-        return view('modules.crm.deals.show', compact('deal', 'nextQuotationNumber', 'products', 'users', 'prevDeal', 'nextDeal', 'activeQuotation', 'linkedLead', 'followups', 'histories', 'leadDocuments', 'prefilledDealItems', 'dealStatuses'));
+        return view('modules.crm.deals.show', compact('deal', 'nextQuotationNumber', 'products', 'users', 'prevDeal', 'nextDeal', 'activeQuotation', 'linkedLead', 'followups', 'histories', 'leadDocuments', 'prefilledDealItems', 'dealStatuses', 'lossReasons'));
     }
 
     public function edit(CrmDeal $deal): View
@@ -376,6 +381,7 @@ class CrmDealController extends Controller
         $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
         $users = \App\Models\User::orderBy('name')->get();
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $lossReasons = \App\Domains\CRM\Models\CrmLossReason::getActiveReasons();
 
         return view('modules.crm.deals.edit', compact('deal', 'accounts', 'contacts', 'products', 'users', 'dealStatuses'));
     }
@@ -387,6 +393,7 @@ class CrmDealController extends Controller
         $tenantId = tenant_id() ?? 1;
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $lossReasons = \App\Domains\CRM\Models\CrmLossReason::getActiveReasons();
         $validStages = array_unique(array_merge(
             $dealStatuses->pluck('name')->toArray(),
             ['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost', 'Closed Won', 'Closed Lost', 'New', 'Qualified']
@@ -479,14 +486,19 @@ class CrmDealController extends Controller
         $tenantId = tenant_id() ?? 1;
 
         $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $lossReasons = \App\Domains\CRM\Models\CrmLossReason::getActiveReasons();
         $validStages = array_unique(array_merge(
             $dealStatuses->pluck('name')->toArray(),
             ['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost', 'Closed Won', 'Closed Lost', 'New', 'Qualified']
         ));
 
         $validated = $request->validate([
-            'stage'        => 'required|string|in:' . implode(',', $validStages),
-            'close_reason' => 'nullable|string|max:255',
+            'stage'                 => 'required|string|in:' . implode(',', $validStages),
+            'close_reason'          => 'nullable|string|max:255',
+            'loss_reason_id'        => 'nullable|exists:crm_loss_reasons,id',
+            'lost_to_competitor'    => 'nullable|string|max:150',
+            'loss_remarks'          => 'nullable|string|max:1000',
+            'nurture_followup_date' => 'nullable|date',
         ]);
 
         $stage = $validated['stage'];
@@ -494,6 +506,20 @@ class CrmDealController extends Controller
         if ($stage === 'Closed Lost') $stage = 'Lost';
         if ($stage === 'New') $stage = 'Qualification';
         if ($stage === 'Qualified') $stage = 'Needs Analysis';
+
+        // FRS 2.5 / C-04: Structured Loss validation when marking Deal as Lost
+        $reason = null;
+        if ($stage === 'Lost') {
+            $request->validate([
+                'loss_reason_id' => 'required|exists:crm_loss_reasons,id',
+            ]);
+            $reason = \App\Domains\CRM\Models\CrmLossReason::find($request->input('loss_reason_id'));
+            if ($reason && $reason->requires_competitor) {
+                $request->validate([
+                    'lost_to_competitor' => 'required|string|max:150',
+                ]);
+            }
+        }
 
         // Lock check: Once Won, a deal cannot be moved to any other stage
         $isCurrentlyWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
@@ -549,11 +575,68 @@ class CrmDealController extends Controller
         $prob = $targetStatus ? $targetStatus->probability : ($probMap[$stage] ?? $deal->probability);
 
         $oldStage = $deal->stage ?: 'Qualification';
+        $closeReason = $validated['close_reason'] ?? $deal->close_reason;
+        if ($stage === 'Lost') {
+            $closeReason = $reason?->name ?: ($validated['loss_remarks'] ?? 'Deal Lost');
+        }
+
         $deal->update([
             'stage'        => $stage,
             'probability'  => $prob,
-            'close_reason' => $validated['close_reason'] ?? $deal->close_reason,
+            'close_reason' => $closeReason,
         ]);
+
+        if ($stage === 'Lost') {
+            $linkedLeads = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
+                ->when($deal->lead_id, fn($q) => $q->orWhere('id', $deal->lead_id))
+                ->get();
+
+            foreach ($linkedLeads as $lead) {
+                $oldStatus = $lead->status;
+                \App\Domains\CRM\Models\Lead::$allowWonTransition = true;
+                try {
+                    $lead->update([
+                        'status'                => 'Lost',
+                        'loss_reason_id'        => $request->input('loss_reason_id'),
+                        'lost_to_competitor'    => $request->input('lost_to_competitor'),
+                        'loss_remarks'          => $request->input('loss_remarks'),
+                        'nurture_followup_date' => $request->input('nurture_followup_date'),
+                        'lost_at'               => now(),
+                    ]);
+                } finally {
+                    \App\Domains\CRM\Models\Lead::$allowWonTransition = false;
+                }
+
+                if ($oldStatus !== 'Lost') {
+                    \App\Domains\CRM\Models\LeadHistory::logEvent(
+                        $lead,
+                        'status_updated',
+                        $oldStatus,
+                        'Lost',
+                        "Lead marked as Lost because associated Deal #{$deal->deal_number} was closed lost."
+                    );
+                }
+
+                if ($request->filled('nurture_followup_date')) {
+                    try {
+                        $reasonName = $reason?->name ?: 'Deal Closed Lost';
+                        app(\App\Domains\CRM\Repositories\LeadFollowupRepository::class)->create([
+                            'tenant_id'      => $lead->tenant_id ?? ($tenantId ?? 1),
+                            'company_id'     => $lead->company_id,
+                            'branch_id'      => $lead->branch_id,
+                            'lead_id'        => $lead->id,
+                            'assigned_to_id' => $lead->lead_owner_id ?: (auth()->id() ?: 1),
+                            'followup_date'  => \Carbon\Carbon::parse($request->input('nurture_followup_date'))->setTime(10, 0),
+                            'type'           => 'Call',
+                            'title'          => 'Nurture Outreach: ' . ($lead->company_name ?: $lead->contact_person),
+                            'status'         => 'Pending',
+                            'notes'          => 'Automated nurture reminder after loss. Reason: ' . $reasonName . ($request->filled('lost_to_competitor') ? " | Competitor: " . $request->input('lost_to_competitor') : '') . ($request->filled('loss_remarks') ? " | Notes: " . $request->input('loss_remarks') : ''),
+                        ]);
+                        app(\App\Domains\CRM\Repositories\LeadFollowupRepository::class)->syncLeadNextFollowupDate($lead);
+                    } catch (\Throwable $e) {}
+                }
+            }
+        }
 
         \App\Domains\CRM\Services\CrmNotificationService::notifyDealStageUpdated($deal, $oldStage, $stage);
 
@@ -862,16 +945,21 @@ class CrmDealController extends Controller
             // so we can safely store the email as-is even if another customer has the same one.
 
             // Create Customer — flag prevents boot hook from auto-creating a duplicate account
+            $verification = app(\App\Services\PartyVerificationService::class);
             Customer::$skipAccountAutoCreate = true;
-            $customer = Customer::create([
-                'tenant_id' => $tenantId,
-                'name'      => $compName,
-                'email'     => $compEmail ?: null,
-                'phone'     => $compPhone,
-                'gstin'     => $gstin,
-                'status'    => 'active',
-            ]);
-            Customer::$skipAccountAutoCreate = false;
+            try {
+                $customer = Customer::create(array_merge([
+                    'tenant_id' => $tenantId,
+                    'name'      => $compName,
+                    'email'     => $compEmail ?: null,
+                    'phone'     => $compPhone,
+                    'gstin'     => $gstin,
+                    'status'    => 'active',
+                ], $verification->pendingAttributes()));
+            } finally {
+                Customer::$skipAccountAutoCreate = false;
+            }
+            $verification->recordSubmission($customer);
 
             // Create exactly ONE CrmAccount linked to this new customer
             $newAccount = CrmAccount::create([

@@ -3,6 +3,7 @@
 namespace App\Domains\Inventory\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Domains\HRMS\Models\Branch;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Repositories\WarehouseRepository;
 use App\Exports\WarehouseExport;
@@ -23,7 +24,8 @@ class WarehouseController extends Controller
     {
         $this->authorize('viewAny', Warehouse::class);
         $warehouses = $this->warehouseRepo->getAll();
-        return view('modules.inventory.warehouses.index', compact('warehouses'));
+        $branches = Branch::query()->orderBy('name')->get();
+        return view('modules.inventory.warehouses.index', compact('warehouses', 'branches'));
     }
 
     /**
@@ -53,6 +55,7 @@ class WarehouseController extends Controller
                 'max:50',
                 Rule::unique('warehouses', 'code')->where(fn($q) => $q->where('tenant_id', $tenantId))
             ],
+            'branch_id' => 'nullable|exists:branches,id',
             'address' => 'nullable|string|max:1000',
             'is_default' => 'nullable|boolean',
         ]);
@@ -65,9 +68,12 @@ class WarehouseController extends Controller
             $isDefault = true;
         }
 
+        $branchId = $request->filled('branch_id') ? (int) $validated['branch_id'] : null;
+
         $this->warehouseRepo->create([
             'name' => $validated['name'],
             'code' => strtoupper($validated['code']),
+            'branch_id' => $branchId,
             'address' => $validated['address'] ?? null,
             'is_default' => $isDefault,
             'status' => 'active',
@@ -76,8 +82,12 @@ class WarehouseController extends Controller
         return redirect()->route('inventory.warehouses.index')->with('success', 'Warehouse created successfully.');
     }
 
-    public function update(Request $request, Warehouse $warehouse): RedirectResponse
+    public function update(Request $request, $warehouse): RedirectResponse
     {
+        if (! ($warehouse instanceof Warehouse)) {
+            $warehouse = Warehouse::withoutGlobalScopes(['branch', 'company'])->findOrFail($warehouse);
+        }
+
         $this->authorize('update', $warehouse);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
@@ -89,6 +99,7 @@ class WarehouseController extends Controller
                 'max:50',
                 Rule::unique('warehouses', 'code')->where(fn($q) => $q->where('tenant_id', $tenantId))->ignore($warehouse->id)
             ],
+            'branch_id' => 'nullable|exists:branches,id',
             'address' => 'nullable|string|max:1000',
             'is_default' => 'nullable|boolean',
             'status' => 'required|in:active,inactive',
@@ -102,6 +113,7 @@ class WarehouseController extends Controller
         $this->warehouseRepo->update($warehouse, [
             'name' => $validated['name'],
             'code' => strtoupper($validated['code']),
+            'branch_id' => $request->filled('branch_id') ? (int) $validated['branch_id'] : null,
             'address' => $validated['address'] ?? null,
             'is_default' => $isDefault,
             'status' => $validated['status'],
@@ -117,8 +129,12 @@ class WarehouseController extends Controller
         return redirect()->route('inventory.warehouses.index')->with('success', 'Warehouse updated successfully.');
     }
 
-    public function destroy(Warehouse $warehouse): RedirectResponse
+    public function destroy($warehouse): RedirectResponse
     {
+        if (! ($warehouse instanceof Warehouse)) {
+            $warehouse = Warehouse::withoutGlobalScopes(['branch', 'company'])->findOrFail($warehouse);
+        }
+
         $this->authorize('delete', $warehouse);
 
         $success = $this->warehouseRepo->delete($warehouse);

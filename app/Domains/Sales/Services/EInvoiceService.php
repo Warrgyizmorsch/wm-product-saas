@@ -65,7 +65,18 @@ class EInvoiceService
             ];
         }
 
-        $payload = $this->buildEInvoicePayload($invoice, $gstConfig);
+        try {
+            $payload = $this->buildEInvoicePayload($invoice, $gstConfig);
+        } catch (\InvalidArgumentException $e) {
+            $invoice->update([
+                'einvoice_status' => 'Failed',
+                'einvoice_error'  => $e->getMessage(),
+            ]);
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
 
         try {
             $headers = [
@@ -172,29 +183,59 @@ class EInvoiceService
     {
         $tenant = tenant();
         $customer = $invoice->customer ?: $invoice->salesOrder?->customer;
-
+        $sellerOrg = billing_organization_details($invoice);
         $comp = $invoice->company ?: company();
-        $sellerGstin = $gstConfig?->seller_gstin ?: ($comp?->gst_number ?: ($tenant?->gstin ?: ($tenant?->billing_gstin ?: '')));
-        $sellerLegalName = $comp?->legal_name ?: ($gstConfig?->legal_name ?: ($comp?->company_name ?: ($tenant?->name ?: '')));
-        $sellerTradeName = $comp?->company_name ?: ($gstConfig?->trade_name ?: ($tenant?->name ?: ''));
-        $sellerAddr1 = $comp?->address ?: ($gstConfig?->address_line1 ?: ($tenant?->billing_address ?: ''));
-        $sellerAddr2 = $gstConfig?->address_line2 ?: '';
-        $sellerLoc = $comp?->city ?: ($gstConfig?->location ?: '');
-        $sellerPin = (int)($comp?->postal_code ?: ($gstConfig?->pincode ?: 0));
-        $sellerStateCode = $gstConfig?->state_code ?: (substr($sellerGstin, 0, 2) ?: '');
-        $sellerEmail = $comp?->email ?: ($gstConfig?->contact_email ?: ($tenant?->billing_email ?: ''));
-        $sellerPhone = $comp?->phone ?: ($gstConfig?->contact_phone ?: ($tenant?->billing_phone ?: ''));
+        $ownBranch = $invoice->branch;
 
-        $buyerGstin = $customer?->gstin ?: '27AABCU9603R1ZM';
-        $buyerStateCode = substr($buyerGstin, 0, 2) ?: '27';
+        $sellerGstin = strtoupper(trim((string) (
+            $invoice->seller_gstin
+            ?: ($ownBranch?->gst_number
+            ?: ($gstConfig?->seller_gstin
+            ?: ($sellerOrg['gstin']
+            ?: ($comp?->gst_number ?: ($tenant?->gstin ?: ($tenant?->billing_gstin ?: ''))))))
+        )));
+        $sellerLegalName = $comp?->legal_name ?: ($gstConfig?->legal_name ?: ($sellerOrg['name'] ?: ($tenant?->name ?: '')));
+        $sellerTradeName = $comp?->company_name ?: ($gstConfig?->trade_name ?: ($sellerOrg['name'] ?: ($tenant?->name ?: '')));
+        $sellerAddr1 = $ownBranch?->address ?: ($comp?->address ?: ($gstConfig?->address_line1 ?: ($tenant?->billing_address ?: '')));
+        $sellerAddr2 = $gstConfig?->address_line2 ?: '';
+        $sellerLoc = $ownBranch?->city ?: ($comp?->city ?: ($gstConfig?->location ?: ''));
+        $sellerPin = (int) ($ownBranch?->postal_code ?: ($comp?->postal_code ?: ($gstConfig?->pincode ?: 0)));
+        $sellerStateCode = $invoice->seller_state_code
+            ?: ($sellerOrg['state_code'] ?: ($gstConfig?->state_code ?: (strlen($sellerGstin) >= 2 ? substr($sellerGstin, 0, 2) : '')));
+        $sellerEmail = $ownBranch?->email ?: ($comp?->email ?: ($gstConfig?->contact_email ?: ($tenant?->billing_email ?: '')));
+        $sellerPhone = $ownBranch?->phone ?: ($comp?->phone ?: ($gstConfig?->contact_phone ?: ($tenant?->billing_phone ?: '')));
+
+        $billBranch = $invoice->billingBranch ?: $invoice->salesOrder?->billingBranch;
+        $shipBranch = $invoice->shippingBranch ?: $invoice->salesOrder?->shippingBranch;
+
+        $buyerGstin = strtoupper(trim((string) (
+            $invoice->bill_to_gstin
+            ?: ($invoice->salesOrder?->bill_to_gstin
+            ?: ($billBranch?->effectiveGstin()
+            ?: ($customer?->gstin ?: '')))
+        )));
+
+        if ($buyerGstin === '') {
+            throw new \InvalidArgumentException(
+                "Cannot build B2B E-Invoice payload for {$invoice->invoice_number}: buyer GSTIN is missing. Add a verified GSTIN to the customer or billing branch."
+            );
+        }
+
+        $buyerStateCode = (strlen($buyerGstin) >= 2 ? substr($buyerGstin, 0, 2) : '')
+            ?: ($billBranch?->effectiveStateCode() ?: '');
+        $posStateCode = $invoice->place_of_supply_state
+            ?: ($invoice->salesOrder?->place_of_supply_state ?: $buyerStateCode);
         $buyerName = $customer?->name ?: 'Valued Customer';
         $buyerCompany = $customer?->company_name ?: $buyerName;
-        $buyerAddr1 = $customer?->address_line1 ?: ($invoice->salesOrder?->billing_address ? explode("\n", $invoice->salesOrder->billing_address)[0] : 'Commercial Complex, Main Road');
-        $buyerAddr2 = $customer?->address_line2 ?: 'Commercial Area';
-        $buyerLoc = $customer?->city ?: 'Mumbai';
-        $buyerPin = (int)($customer?->postal_code ?: 400001);
+        $buyerAddr1 = $billBranch?->address_line1
+            ?: ($invoice->billing_address ? explode("\n", $invoice->billing_address)[0] : ($invoice->salesOrder?->billing_address ? explode("\n", $invoice->salesOrder->billing_address)[0] : ''));
+        $buyerAddr2 = $billBranch?->address_line2 ?: '';
+        $buyerLoc = $billBranch?->city ?: ($customer?->city ?: '');
+        $buyerPin = (int) ($billBranch?->postal_code ?: ($customer?->postal_code ?: 0));
 
-        $isInterState = ($sellerStateCode !== $buyerStateCode) || ((float)$invoice->igst_amount > 0) || ($invoice->gst_type === 'igst');
+        $isInterState = ($sellerStateCode !== '' && $posStateCode !== '' && $sellerStateCode !== $posStateCode)
+            || ((float) $invoice->igst_amount > 0)
+            || ($invoice->gst_type === 'igst');
 
         $itemList = [];
         $itemIndex = 1;
@@ -252,11 +293,11 @@ class EInvoiceService
 
         $totalInvoiceVal = $totAssVal + $totCgstVal + $totSgstVal + $totIgstVal + (float)($invoice->freight_amount ?? 0) + (float)($invoice->adjustment ?? 0);
 
-        return [
+        $payload = [
             'Version' => '1.03',
             'TranDtls' => [
                 'TaxSch'      => 'GST',
-                'SupTyp'      => ($customer && !empty($customer->gstin)) ? 'B2B' : 'B2C',
+                'SupTyp'      => !empty($buyerGstin) ? 'B2B' : 'B2C',
                 'RegRev'      => 'N',
                 'IgstOnIntra' => 'N',
             ],
@@ -281,7 +322,7 @@ class EInvoiceService
                 'Gstin' => $buyerGstin,
                 'LglNm' => $buyerName,
                 'TrdNm' => $buyerCompany,
-                'Pos'   => $buyerStateCode,
+                'Pos'   => $posStateCode ?: $buyerStateCode,
                 'Addr1' => $buyerAddr1,
                 'Addr2' => $buyerAddr2,
                 'Loc'   => $buyerLoc,
@@ -300,6 +341,24 @@ class EInvoiceService
                 'TotInvVal' => round($totalInvoiceVal, 2),
             ],
         ];
+
+        $shipGstin = strtoupper(trim((string) ($invoice->ship_to_gstin ?: $invoice->salesOrder?->ship_to_gstin ?: $shipBranch?->effectiveGstin() ?: '')));
+        if ($shipBranch && (! $billBranch || $shipBranch->id !== $billBranch->id)) {
+            $shipStateCode = (strlen($shipGstin) >= 2 ? substr($shipGstin, 0, 2) : '')
+                ?: ($shipBranch->effectiveStateCode() ?: $buyerStateCode);
+            $payload['ShipDtls'] = [
+                'Gstin' => $shipGstin ?: $buyerGstin,
+                'LglNm' => $buyerName,
+                'TrdNm' => $shipBranch->name ?: $buyerCompany,
+                'Addr1' => $shipBranch->address_line1 ?: ($invoice->shipping_address ? explode("\n", $invoice->shipping_address)[0] : $buyerAddr1),
+                'Addr2' => $shipBranch->address_line2 ?: '',
+                'Loc'   => $shipBranch->city ?: $buyerLoc,
+                'Pin'   => (int) ($shipBranch->postal_code ?: $buyerPin),
+                'Stcd'  => $shipStateCode,
+            ];
+        }
+
+        return $payload;
     }
 
     /**

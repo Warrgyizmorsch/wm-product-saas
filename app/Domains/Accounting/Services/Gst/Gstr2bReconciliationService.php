@@ -64,6 +64,32 @@ class Gstr2bReconciliationService
             );
         }
 
+        // Mixed-GSTIN guard (FRS 2.3 / C-17): refuse GSTR-2B reconciliation when vendor bills
+        // in the return period carry more than one buyer GSTIN.
+        $periodStart = Carbon::createFromFormat('mY', $parsed['period'])->startOfMonth();
+        $periodEnd = $periodStart->copy()->endOfMonth();
+        $buyerGstins = VendorBill::query()
+            ->withoutGlobalScope('branch')
+            ->whereBetween('bill_date', [$periodStart->toDateString(), $periodEnd->toDateString()])
+            ->whereNotIn('status', ['Cancelled', 'Draft'])
+            ->whereNotNull('buyer_gstin')
+            ->where('buyer_gstin', '!=', '')
+            ->pluck('buyer_gstin')
+            ->map(fn ($g) => strtoupper(trim((string) $g)))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        if (count($buyerGstins) > 1) {
+            throw new InvalidArgumentException(
+                'Cannot reconcile a single GSTR-2B for period ' . $parsed['period']
+                . ': vendor bills in this period carry multiple buyer GSTINs (' . implode(', ', $buyerGstins)
+                . '). Separate per-GSTIN filing is required.'
+            );
+        }
+
         $companyId = $this->companyId();
 
         return DB::transaction(function () use ($parsed, $fileName, $userId, $companyId) {
@@ -185,16 +211,49 @@ class Gstr2bReconciliationService
         $lines = $import->lines()->get();
         $gstins = $lines->pluck('supplier_gstin')->filter()->unique()->values();
 
+        // Match supplier GSTINs against parent vendors AND vendor branches (C-17) AND frozen vendor_bills.supplier_gstin.
         $vendorIds = Vendor::query()
             ->whereIn(DB::raw('UPPER(gstin)'), $gstins->all())
             ->get(['id', 'gstin'])
             ->groupBy(fn ($v) => strtoupper(trim((string) $v->gstin)))
             ->map(fn ($g) => $g->pluck('id')->all());
 
+        if (\Illuminate\Support\Facades\Schema::hasTable('party_branches')) {
+            \App\Models\PartyBranch::query()
+                ->where('party_type', \App\Models\PartyBranch::PARTY_VENDOR)
+                ->whereIn(DB::raw('UPPER(gstin)'), $gstins->all())
+                ->get(['party_id', 'gstin'])
+                ->each(function ($pb) use (&$vendorIds) {
+                    $g = strtoupper(trim((string) $pb->gstin));
+                    $existing = $vendorIds->get($g, []);
+                    if (! in_array($pb->party_id, $existing, true)) {
+                        $existing[] = $pb->party_id;
+                        $vendorIds->put($g, $existing);
+                    }
+                });
+        }
+
         $bills = $this->billQuery($import)
-            ->whereIn('vendor_id', $vendorIds->flatten()->all() ?: [0])
+            ->with('vendorBranch')
+            ->where(function ($q) use ($vendorIds, $gstins) {
+                $flatIds = $vendorIds->flatten()->all();
+                if ($flatIds !== []) {
+                    $q->whereIn('vendor_id', $flatIds);
+                }
+                if ($gstins->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasColumn('vendor_bills', 'supplier_gstin')) {
+                    $q->orWhereIn(DB::raw('UPPER(supplier_gstin)'), $gstins->all());
+                }
+            })
             ->get();
 
+        // Group bills by effective supplier GSTIN (frozen supplier_gstin -> vendorBranch.gstin -> vendor.gstin)
+        $billsByGstin = [];
+        foreach ($bills as $b) {
+            $effGstin = strtoupper(trim((string) ($b->supplier_gstin ?: ($b->vendorBranch?->gstin ?: ($b->vendor?->gstin ?? '')))));
+            if ($effGstin !== '') {
+                $billsByGstin[$effGstin][] = $b;
+            }
+        }
         $billsByVendor = $bills->groupBy('vendor_id');
         $used = [];
 
@@ -204,8 +263,15 @@ class Gstr2bReconciliationService
         $pending = [];
 
         foreach ($invoiceLines as $line) {
-            $candidates = collect($vendorIds->get($line->supplier_gstin, []))
-                ->flatMap(fn ($id) => $billsByVendor->get($id, collect()));
+            $directCandidates = collect($billsByGstin[$line->supplier_gstin] ?? []);
+            $vendorCandidates = collect($vendorIds->get($line->supplier_gstin, []))
+                ->flatMap(fn ($id) => $billsByVendor->get($id, collect()))
+                ->filter(function (VendorBill $b) use ($line) {
+                    // Do not match a bill whose frozen supplier_gstin explicitly belongs to a different branch GSTIN
+                    $frozen = strtoupper(trim((string) ($b->supplier_gstin ?? '')));
+                    return $frozen === '' || $frozen === $line->supplier_gstin;
+                });
+            $candidates = $directCandidates->merge($vendorCandidates)->unique('id')->values();
 
             $bill = $candidates->first(fn (VendorBill $b) => ! isset($used[$b->id])
                 && $this->sameNumber($line->document_number, $this->billInvoiceNumber($b)));

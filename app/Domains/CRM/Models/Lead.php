@@ -79,7 +79,7 @@ class Lead extends Model
                 }
 
                 // Permanent lock: Once Dealing, it cannot be changed to another status manually (except to Won when authorized)
-                if ($oldStatus === 'dealing' && !in_array($newStatus, ['dealing', 'won']) && !static::$allowWonTransition) {
+                if ($oldStatus === 'dealing' && !in_array($newStatus, ['dealing', 'won', 'lost']) && !static::$allowWonTransition) {
                     throw new \InvalidArgumentException('Lead status in Dealing stage is locked. Status cannot be changed.');
                 }
 
@@ -145,6 +145,36 @@ class Lead extends Model
         'product_items',
         'status',
         'next_followup_date',
+        'has_active_next_action',
+        'last_activity_at',
+        'stale_alert_sent_at',
+        'assigned_at',
+        'first_responded_at',
+        'response_sla_minutes',
+        'response_sla_breached',
+        'sla_escalated_at',
+        'project_type',
+        'approx_quantity',
+        'decision_timeline',
+        'competitor_name',
+        'decision_maker_identified',
+        'loss_reason_id',
+        'lost_to_competitor',
+        'loss_remarks',
+        'nurture_followup_date',
+        'lost_at',
+        'is_inbound_enquiry',
+        'acknowledgement_sent_at',
+        'research_provenance',
+        'provenance',
+        'on_hold_until',
+        'hold_type',
+        'hold_reason',
+        'hold_set_at',
+        'hold_set_by',
+        'merged_into_lead_id',
+        'communication_opt_out',
+        'communication_opt_out_at',
         'is_customer',
         'documents',
         'additional_contacts',
@@ -156,6 +186,26 @@ class Lead extends Model
         'expected_sale_date' => 'date',
         'expected_amount' => 'decimal:2',
         'next_followup_date' => 'datetime',
+        'assigned_at' => 'datetime',
+        'first_responded_at' => 'datetime',
+        'response_sla_minutes' => 'integer',
+        'response_sla_breached' => 'boolean',
+        'sla_escalated_at' => 'datetime',
+        'has_active_next_action' => 'boolean',
+        'last_activity_at' => 'datetime',
+        'stale_alert_sent_at' => 'datetime',
+        'approx_quantity' => 'integer',
+        'decision_maker_identified' => 'boolean',
+        'loss_reason_id' => 'integer',
+        'nurture_followup_date' => 'date',
+        'lost_at' => 'datetime',
+        'is_inbound_enquiry' => 'boolean',
+        'acknowledgement_sent_at' => 'datetime',
+        'research_provenance' => 'array',
+        'on_hold_until' => 'date',
+        'hold_set_at' => 'datetime',
+        'communication_opt_out' => 'boolean',
+        'communication_opt_out_at' => 'datetime',
         'is_customer' => 'boolean',
         'product_ids' => 'array',
         'product_items' => 'array',
@@ -210,6 +260,14 @@ class Lead extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'lead_owner_id');
+    }
+
+    /**
+     * Get the structured loss reason for the lead (FRS 2.5 / C-04).
+     */
+    public function lossReason(): BelongsTo
+    {
+        return $this->belongsTo(CrmLossReason::class, 'loss_reason_id');
     }
 
     /**

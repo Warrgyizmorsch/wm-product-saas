@@ -38,6 +38,20 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Branching::class);
         $this->app->singleton(BranchContext::class, fn ($app) => $app->make(Branching::class));
 
+        // Party history: each module contributes a provider to the single party timeline.
+        $this->app->tag([
+            \App\Domains\CRM\Services\CustomerHistoryProvider::class,
+            \App\Domains\Sales\Services\CustomerHistoryProvider::class,
+            \App\Domains\Purchase\Services\VendorHistoryProvider::class,
+        ], 'party.history.providers');
+        $this->app->singleton(
+            \App\Domains\Party\Services\PartyHistoryService::class,
+            fn ($app) => new \App\Domains\Party\Services\PartyHistoryService(
+                $app->tagged('party.history.providers'),
+                $app->make(\App\Services\Access\AccessService::class)
+            )
+        );
+
         // Loads every module's Routes/menu.php once per request.
         $this->app->singleton(\App\Core\Navigation\MenuRegistry::class);
 
@@ -1232,6 +1246,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Models\Access\Role::class,
             \App\Domains\Access\Policies\RolePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Models\PartyBranch::class,
+            \App\Policies\PartyBranchPolicy::class
         );
 
         if ($this->app->runningInConsole()) {

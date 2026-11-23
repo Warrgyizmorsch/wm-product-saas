@@ -62,9 +62,30 @@ class CustomerPolicy
 
     public function delete(User $user, Customer $customer): bool
     {
+        if (app(\App\Services\PartyDeletionGuard::class)->hasTransactions($customer)) {
+            return false;
+        }
+
         $ownerId = $customer->crmAccount?->owner_id;
 
         return $this->access->allows($user, 'crm.customers.delete', [
+            'tenant_id'     => $customer->tenant_id,
+            'owner_id'      => $ownerId,
+            'branch_id'     => $customer->branch_id,
+            'department_id' => $user->department_id,
+            'company_id'    => $customer->company_id,
+        ]);
+    }
+
+    public function merge(User $user, Customer $customer): bool
+    {
+        if ($customer->isMerged()) {
+            return false;
+        }
+
+        $ownerId = $customer->crmAccount?->owner_id;
+
+        return $this->access->allows($user, 'crm.customers.merge', [
             'tenant_id'     => $customer->tenant_id,
             'owner_id'      => $ownerId,
             'branch_id'     => $customer->branch_id,

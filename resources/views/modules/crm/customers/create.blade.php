@@ -15,6 +15,7 @@
         <div class="col-xxl-9 col-xl-10 mx-auto">
             <form action="{{ route('crm.customers.store') }}" method="POST">
                 @csrf
+                @include('partials.party-duplicate-warning', ['checkUrl' => route('crm.customers.duplicate-check')])
 
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-transparent border-bottom py-3">
@@ -40,6 +41,14 @@
                                     <label class="form-label fw-semibold text-dark">{{ __('crm.gstin_tax_id') }}</label>
                                     <input type="text" name="gstin" class="form-control @error('gstin') is-invalid @enderror" value="{{ old('gstin') }}" placeholder="e.g. 22AAAAA0000A1Z5">
                                     @error('gstin')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold text-dark">PAN</label>
+                                    <input type="text" name="pan" class="form-control @error('pan') is-invalid @enderror" value="{{ old('pan') }}" placeholder="e.g. ABCDE1234F">
+                                    @error('pan')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
@@ -73,17 +82,24 @@
 
                                 <div class="mb-3">
                                     <label class="form-label fw-semibold text-dark">{{ __('crm.status') }} <span class="text-danger">*</span></label>
-                                    <select name="status" class="form-select @error('status') is-invalid @enderror" required>
-                                        <option value="active" @selected(old('status', 'active') === 'active')>{{ __('crm.active_account') }}</option>
-                                        <option value="inactive" @selected(old('status') === 'inactive')>{{ __('crm.inactive_account') }}</option>
-                                    </select>
+                                    @if(app(\App\Services\PartyVerificationService::class)->enabled())
+                                        <input type="hidden" name="status" value="inactive">
+                                        <div class="form-control-plaintext fs-13 text-muted border rounded px-3 py-2 bg-light">
+                                            <strong>Inactive until verified</strong> — a second authorised person must verify this customer before it becomes active.
+                                        </div>
+                                    @else
+                                        <select name="status" class="form-select @error('status') is-invalid @enderror" required>
+                                            <option value="active" @selected(old('status', 'active') === 'active')>{{ __('crm.active_account') }}</option>
+                                            <option value="inactive" @selected(old('status') === 'inactive')>{{ __('crm.inactive_account') }}</option>
+                                        </select>
+                                    @endif
                                     @error('status')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
                             </div>
 
-                            <!-- Right Column: Address Details -->
+                            <!-- Right Column: Address & Bank Details -->
                             <div class="col-md-6">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h6 class="fw-bold text-primary mb-0"><i class="feather-map-pin me-2"></i>{{ __('crm.address_information') }}</h6>
@@ -106,6 +122,33 @@
                                     @error('shipping_address')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
+                                </div>
+
+                                <div class="border-top pt-3 mt-3">
+                                    <h6 class="fw-bold text-primary mb-3"><i class="feather-credit-card me-2"></i>Bank Details</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold text-dark">Bank Name</label>
+                                        <input type="text" name="bank_name" class="form-control @error('bank_name') is-invalid @enderror" value="{{ old('bank_name') }}" placeholder="e.g. HDFC Bank">
+                                        @error('bank_name')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold text-dark">Account Number</label>
+                                            <input type="text" name="account_number" class="form-control @error('account_number') is-invalid @enderror" value="{{ old('account_number') }}" placeholder="e.g. 50100234567890" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                            @error('account_number')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold text-dark">IFSC Code</label>
+                                            <input type="text" name="ifsc_code" class="form-control @error('ifsc_code') is-invalid @enderror" value="{{ old('ifsc_code') }}" placeholder="e.g. HDFC0001234">
+                                            @error('ifsc_code')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -495,14 +495,15 @@
                                     @if ($pendingFollowup && $pendingFollowup->followup_date)
                                         @php
                                             $fDate = \Carbon\Carbon::parse($pendingFollowup->followup_date);
-                                            $isOverdue = $fDate->lt(now()->startOfDay());
-                                            $isToday = $fDate->isToday();
+                                            $isPastTime = $fDate->lt(now());
+                                            $isOverdue = $isPastTime;
+                                            $isToday = $fDate->isToday() && !$isPastTime;
                                             $isTomorrow = $fDate->isTomorrow();
 
                                             $pillClass = $isOverdue ? 'bg-danger-subtle text-danger border-danger-subtle' :
                                                 ($isToday ? 'bg-warning-subtle text-warning-emphasis border-warning-subtle' : 'bg-success-subtle text-success border-success-subtle');
 
-                                            $timeLabel = $isOverdue ? ('Overdue (' . $fDate->format('d M') . ')') :
+                                            $timeLabel = $isOverdue ? ('Overdue (' . ($fDate->isToday() ? ('Today ' . $fDate->format('h:i A')) : $fDate->format('d M')) . ')') :
                                                 ($isToday ? ('Today ' . $fDate->format('h:i A')) :
                                                     ($isTomorrow ? ('Tomorrow ' . $fDate->format('h:i A')) : $fDate->format('d M, h:i A')));
 

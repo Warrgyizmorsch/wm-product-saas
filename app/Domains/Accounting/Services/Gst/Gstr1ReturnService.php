@@ -64,6 +64,21 @@ class Gstr1ReturnService
      */
     public function seller(): array
     {
+        $branchId = current_branch_id();
+        if ($branchId && class_exists(\App\Domains\HRMS\Models\Branch::class)) {
+            $branch = \App\Domains\HRMS\Models\Branch::withoutGlobalScopes()->with('company')->find($branchId);
+            if ($branch && ! empty($branch->gst_number)) {
+                $gstin = strtoupper(trim((string) $branch->gst_number));
+
+                return [
+                    'gstin' => $gstin,
+                    'state' => $branch->gst_state_code ? str_pad((string) $branch->gst_state_code, 2, '0', STR_PAD_LEFT) : GstStates::fromGstin($gstin),
+                    'name' => $branch->company?->legal_name ?: ($branch->company?->company_name ?: $branch->name),
+                    'source' => 'Branch',
+                ];
+            }
+        }
+
         $config = GstConfiguration::getForCurrentContext();
 
         if ($config && $config->seller_gstin) {
@@ -135,15 +150,24 @@ class Gstr1ReturnService
             ->get();
 
         $documents = [];
+        $sellerGstinsInPeriod = [];
 
         foreach ($invoices as $invoice) {
             if (in_array($invoice->status, self::LIVE_INVOICE_STATUSES, true)) {
+                $invSellerGstin = strtoupper(trim((string) ($invoice->seller_gstin ?: ($seller['gstin'] ?? ''))));
+                if ($invSellerGstin !== '') {
+                    $sellerGstinsInPeriod[$invSellerGstin] = true;
+                }
                 $documents["invoice:{$invoice->id}"] = $this->analyseInvoice($invoice, $seller);
             }
         }
 
         foreach ($returns as $return) {
             if (in_array($return->status, self::LIVE_RETURN_STATUSES, true)) {
+                $retSellerGstin = strtoupper(trim((string) ($return->invoice?->seller_gstin ?: ($seller['gstin'] ?? ''))));
+                if ($retSellerGstin !== '') {
+                    $sellerGstinsInPeriod[$retSellerGstin] = true;
+                }
                 $documents["credit_note:{$return->id}"] = $this->analyseCreditNote($return, $seller);
             }
         }
@@ -205,7 +229,8 @@ class Gstr1ReturnService
             'sections' => $this->sectionTotals($reportable, $b2cs),
             'pending_count' => count($groups['pending']),
             'summary_count' => $summaryCount,
-            'blockers' => $this->blockers($seller, $fp),
+            'seller_gstins' => array_keys($sellerGstinsInPeriod),
+            'blockers' => $this->blockers($seller, $fp, array_keys($sellerGstinsInPeriod)),
         ];
     }
 
@@ -314,16 +339,30 @@ class Gstr1ReturnService
     {
         $issues = [];
         $customer = $invoice->customer;
-        $gstin = strtoupper(trim((string) $customer?->gstin));
+        // Prefer frozen bill_to_gstin on the invoice; fall back to parent customer GSTIN for legacy invoices.
+        $gstin = strtoupper(trim((string) ($invoice->bill_to_gstin ?: $customer?->gstin)));
         $registered = $gstin !== '';
         $inter = $invoice->gst_type === 'igst' || (float) $invoice->igst_amount > 0;
+
+        $docSeller = $seller;
+        if (! empty($invoice->seller_gstin)) {
+            $docSellerGstin = strtoupper(trim((string) $invoice->seller_gstin));
+            $docSeller['gstin'] = $docSellerGstin;
+            $docSeller['state'] = $invoice->seller_state_code
+                ? str_pad((string) $invoice->seller_state_code, 2, '0', STR_PAD_LEFT)
+                : (GstStates::fromGstin($docSellerGstin) ?? $seller['state']);
+        }
 
         if ($registered && ! GstStates::isValidGstin($gstin)) {
             $issues[] = "Customer GSTIN {$gstin} is not a valid GSTIN.";
         }
 
-        $pos = $this->placeOfSupply($customer, $registered ? $gstin : null, $inter, $seller);
-        $issues = array_merge($issues, $this->posIssues($pos, $inter, $seller));
+        // Prefer frozen place_of_supply_state on the invoice; fall back to legacy GSTIN/text-scan resolution.
+        $storedPos = ! empty($invoice->place_of_supply_state)
+            ? str_pad((string) $invoice->place_of_supply_state, 2, '0', STR_PAD_LEFT)
+            : null;
+        $pos = $storedPos ?: $this->placeOfSupply($customer, $registered ? $gstin : null, $inter, $docSeller);
+        $issues = array_merge($issues, $this->posIssues($pos, $inter, $docSeller));
         $issues = array_merge($issues, $this->numberIssues((string) $invoice->invoice_number, 'Invoice'));
 
         [$lines, $lineIssues] = $this->invoiceLines($invoice, $inter);
@@ -375,14 +414,23 @@ class Gstr1ReturnService
         $issues = [];
         $source = $return->invoice;
         $customer = $return->customer ?? $source?->customer;
-        $gstin = strtoupper(trim((string) $customer?->gstin));
+        $gstin = strtoupper(trim((string) ($source?->bill_to_gstin ?: $customer?->gstin)));
         $registered = $gstin !== '';
-        $sellerState = $seller['state'];
+
+        $docSeller = $seller;
+        if ($source && ! empty($source->seller_gstin)) {
+            $docSellerGstin = strtoupper(trim((string) $source->seller_gstin));
+            $docSeller['gstin'] = $docSellerGstin;
+            $docSeller['state'] = $source->seller_state_code
+                ? str_pad((string) $source->seller_state_code, 2, '0', STR_PAD_LEFT)
+                : (GstStates::fromGstin($docSellerGstin) ?? $seller['state']);
+        }
+        $sellerState = $docSeller['state'];
 
         if ($source) {
             $inter = $source->gst_type === 'igst' || (float) $source->igst_amount > 0;
         } else {
-            $guess = $this->placeOfSupply($customer, $registered ? $gstin : null, false, $seller);
+            $guess = $this->placeOfSupply($customer, $registered ? $gstin : null, false, $docSeller);
             $inter = $guess !== null && $sellerState !== null && $guess !== $sellerState;
         }
 
@@ -390,8 +438,11 @@ class Gstr1ReturnService
             $issues[] = "Customer GSTIN {$gstin} is not a valid GSTIN.";
         }
 
-        $pos = $this->placeOfSupply($customer, $registered ? $gstin : null, $inter, $seller);
-        $issues = array_merge($issues, $this->posIssues($pos, $inter, $seller));
+        $storedPos = ($source && ! empty($source->place_of_supply_state))
+            ? str_pad((string) $source->place_of_supply_state, 2, '0', STR_PAD_LEFT)
+            : null;
+        $pos = $storedPos ?: $this->placeOfSupply($customer, $registered ? $gstin : null, $inter, $docSeller);
+        $issues = array_merge($issues, $this->posIssues($pos, $inter, $docSeller));
         $issues = array_merge($issues, $this->numberIssues((string) $return->return_number, 'Credit note'));
 
         [$lines, $lineIssues] = $this->creditNoteLines($return, $source, $inter);
@@ -998,9 +1049,17 @@ class Gstr1ReturnService
     }
 
     /** @return list<string> */
-    private function blockers(array $seller, ?string $fp): array
+    private function blockers(array $seller, ?string $fp, array $sellerGstinsInPeriod = []): array
     {
         $blockers = [];
+
+        $uniqueGstins = array_values(array_unique(array_filter(array_map(fn ($g) => strtoupper(trim((string) $g)), $sellerGstinsInPeriod))));
+        if (count($uniqueGstins) > 1) {
+            sort($uniqueGstins);
+            $blockers[] = 'Cannot generate a single GSTR-1 return: documents in this period carry multiple seller GSTINs ('
+                . implode(', ', $uniqueGstins)
+                . '). Separate per-GSTIN filing is required.';
+        }
 
         if (! GstStates::isValidGstin($seller['gstin'])) {
             $blockers[] = 'Your GSTIN is missing or invalid. Set it in Platform → GST & E-Invoice Setup.';

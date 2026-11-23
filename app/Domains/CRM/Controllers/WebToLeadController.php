@@ -400,6 +400,15 @@ class WebToLeadController extends Controller
         $lead->status = 'New';
         $lead->priority = $request->input('priority', 'Medium');
         $lead->call_date = now();
+        $lead->is_inbound_enquiry = true;
+        // Communication permission: explicit refusal of consent / opt-out on the form is honoured.
+        $consent = $request->input('consent', $request->input('marketing_consent'));
+        if (($consent !== null && in_array(strtolower((string) $consent), ['0', 'no', 'false', 'off'], true))
+            || filter_var($request->input('opt_out', false), FILTER_VALIDATE_BOOLEAN)) {
+            $lead->communication_opt_out = true;
+            $lead->communication_opt_out_at = now();
+        }
+        $lead->provenance = 'web_form';
         $lead->save();
 
         // Auto-assign Lead Owner based on CRM Settings (Round-Robin / Territory Rules / Default Owner)
@@ -407,6 +416,13 @@ class WebToLeadController extends Controller
             app(\App\Domains\CRM\Services\LeadAssignmentService::class)->assignLeadOwner($lead, 'web_form', $request->all());
         } catch (\Throwable $e) {
             Log::warning('WebToLead auto assignment failed: ' . $e->getMessage());
+        }
+
+        // FRS 2.5 (Task C-05): acknowledge genuine inbound enquiries only (WhatsApp / email, once)
+        try {
+            app(\App\Domains\CRM\Services\LeadAcknowledgementService::class)->acknowledge($lead->fresh(), $tenant);
+        } catch (\Throwable $e) {
+            Log::warning('Inbound enquiry acknowledgement failed: ' . $e->getMessage());
         }
 
         // Build Custom Fields Notes summary for Timeline

@@ -13,6 +13,7 @@ use App\Domains\CRM\Models\CrmAccount;
 use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\Sales\Models\SalesOrder;
+use App\Models\PartyContact;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -107,6 +108,11 @@ class CrmDeal extends BaseModel
     }
 
     public function contact(): BelongsTo
+    {
+        return $this->belongsTo(CrmContact::class, 'crm_contact_id');
+    }
+
+    public function legacyContact(): BelongsTo
     {
         return $this->belongsTo(CrmContact::class, 'crm_contact_id');
     }

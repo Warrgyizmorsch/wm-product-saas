@@ -30,6 +30,14 @@ class Invoice extends BaseModel
         'company_id',
         'branch_id',
         'customer_id',
+        'billing_branch_id',
+        'shipping_branch_id',
+        'site_contact_id',
+        'seller_gstin',
+        'seller_state_code',
+        'bill_to_gstin',
+        'ship_to_gstin',
+        'place_of_supply_state',
         'billing_address',
         'shipping_address',
         'project_id',
@@ -105,6 +113,21 @@ class Invoice extends BaseModel
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function billingBranch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyBranch::class, 'billing_branch_id');
+    }
+
+    public function shippingBranch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyBranch::class, 'shipping_branch_id');
+    }
+
+    public function siteContact(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyContact::class, 'site_contact_id');
     }
 
     public function salesOrder(): BelongsTo

@@ -77,26 +77,94 @@
                         <div class="col-md-6 border-end">
                             <h6 class="fw-bold text-primary mb-3">{{ __('purchase.supplier_location_details') }}</h6>
 
-                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.location_warehouse') }}" name="location" id="locationSelect" required="true">
-                                <option value="">{{ __('purchase.select_warehouse') }}</option>
-                                @foreach($warehouses as $w)
-                                    <option value="{{ $w->name }}" @selected(old('location', $order->location) === $w->name)>{{ $w->name }}</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-
                             @php
-                                $activeCompany = company() ?? (current_company_id() ? \App\Domains\HRMS\Models\Company::find(current_company_id()) : null) ?? \App\Domains\HRMS\Models\Company::first();
-                                $companyGstin = strtoupper(trim((string) ($activeCompany?->gst_number ?? $activeCompany?->tax_number ?? $activeCompany?->gstin ?? '')));
-                                if (empty($companyGstin)) {
-                                    $gstConfig = \App\Models\GstConfiguration::getForCurrentContext();
-                                    if ($gstConfig && $gstConfig->seller_gstin) {
-                                        $companyGstin = strtoupper(trim((string) $gstConfig->seller_gstin));
+                                $branchesEnabled = (bool) config('party_verification.branches_enabled', true);
+                                $buyerOrg = billing_organization_details();
+                                $companyGstin = strtoupper(trim((string) ($buyerOrg['gstin'] ?? '')));
+                                $companyCleanGst = preg_replace('/[^0-9A-Za-z]/', '', $companyGstin);
+                                $companyGstPrefix = !empty($buyerOrg['state_code']) ? str_pad((string) $buyerOrg['state_code'], 2, '0', STR_PAD_LEFT) : substr($companyCleanGst, 0, 2);
+                                $companyState = strtolower(trim((string) ($buyerOrg['state_name'] ?? '')));
+                                $initialDeliveryMode = old('delivery_target_mode', ($order->delivery_party_branch_id ? 'customer_site' : 'own'));
+                                $existingCustomerId = $order->deliveryPartyBranch?->party_id;
+                                $selectedDeliveryBranchId = old('delivery_branch_id', $order->delivery_branch_id);
+                                if (empty($selectedDeliveryBranchId) && !empty($order->location)) {
+                                    $wh = $warehouses->firstWhere('name', $order->location);
+                                    if ($wh && $wh->branch_id) {
+                                        $selectedDeliveryBranchId = $wh->branch_id;
                                     }
                                 }
-                                $companyCleanGst = preg_replace('/[^0-9A-Za-z]/', '', $companyGstin);
-                                $companyGstPrefix = substr($companyCleanGst, 0, 2);
-                                $companyState = strtolower(trim((string) ($activeCompany?->state ?? '')));
                             @endphp
+
+                            @if($branchesEnabled)
+                                <div class="mb-3 border rounded-2 p-2 bg-light">
+                                    <label class="form-label fs-12 fw-bold text-dark mb-1">Delivery Target <span class="text-danger">*</span></label>
+                                    <div class="d-flex gap-3 mb-2 fs-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input delivery-mode-radio" type="radio" name="delivery_target_mode" id="delivModeOwn" value="own" @checked($initialDeliveryMode === 'own')>
+                                            <label class="form-check-label" for="delivModeOwn">Our Branch / Warehouse</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input delivery-mode-radio" type="radio" name="delivery_target_mode" id="delivModeSite" value="customer_site" @checked($initialDeliveryMode === 'customer_site')>
+                                            <label class="form-check-label" for="delivModeSite">Customer Site (Drop-Ship)</label>
+                                        </div>
+                                    </div>
+
+                                    {{-- Own Branch -> Filtered Warehouse Cascade --}}
+                                    <div id="ownDeliveryFields" class="{{ $initialDeliveryMode === 'customer_site' ? 'd-none' : '' }}">
+                                        <div class="mb-2">
+                                            <label class="form-label fs-11 fw-semibold mb-1" for="deliveryBranchFilterSelect">Delivery Branch</label>
+                                            <select id="deliveryBranchFilterSelect" class="form-select form-select-sm">
+                                                <option value="">All Branches / Shared</option>
+                                                @foreach(($ownBranches ?? []) as $ob)
+                                                    <option value="{{ $ob->id }}" @selected($selectedDeliveryBranchId == $ob->id)>{{ $ob->name }} ({{ $ob->code }})</option>
+                                                @endforeach
+                                            </select>
+                                            <input type="hidden" name="delivery_branch_id" id="deliveryBranchHidden" value="{{ old('delivery_branch_id', $order->delivery_branch_id) }}">
+                                        </div>
+                                        <div class="mb-0">
+                                            <label class="form-label fs-11 fw-semibold mb-1" for="locationSelect">Warehouse (filtered by branch)</label>
+                                            <select name="location" id="locationSelect" class="form-select form-select-sm">
+                                                <option value="">— Deliver directly to selected Branch Office —</option>
+                                                @foreach($warehouses as $w)
+                                                    <option value="{{ $w->name }}" data-branch-id="{{ $w->branch_id ?? '' }}" @selected(old('location', $order->location) == $w->name)>{{ $w->name }}{{ $w->branch ? ' (' . $w->branch->name . ')' : '' }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {{-- Customer Site Drop-Ship --}}
+                                    <div id="customerSiteDeliveryFields" class="{{ $initialDeliveryMode === 'customer_site' ? '' : 'd-none' }}">
+                                        <div class="mb-2">
+                                            <label class="form-label fs-11 fw-semibold mb-1" for="deliveryCustomerSelect">Customer</label>
+                                            <select id="deliveryCustomerSelect" class="form-select form-select-sm">
+                                                <option value="">— Select Customer —</option>
+                                                @foreach(($customers ?? []) as $cust)
+                                                    <option value="{{ $cust->id }}" @selected(old('delivery_customer_id', $existingCustomerId) == $cust->id)>{{ $cust->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label fs-11 fw-semibold mb-1" for="deliveryPartyBranchSelect">Customer Site / Branch</label>
+                                            <select name="delivery_party_branch_id" id="deliveryPartyBranchSelect" class="form-select form-select-sm" data-prefill="{{ old('delivery_party_branch_id', $order->delivery_party_branch_id) }}">
+                                                <option value="">— Select Customer Site —</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-0">
+                                            <label class="form-label fs-11 fw-semibold mb-1" for="poSiteContactSelect">Site Receiver Contact</label>
+                                            <select name="site_contact_id" id="poSiteContactSelect" class="form-select form-select-sm" data-prefill="{{ old('site_contact_id', $order->site_contact_id) }}">
+                                                <option value="">— Select Site Receiver —</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            @else
+                                <x-ui.odoo-form-ui type="select" label="{{ __('purchase.location_warehouse') }}" name="location" id="locationSelect" required="true">
+                                    <option value="">{{ __('purchase.select_warehouse') }}</option>
+                                    @foreach($warehouses as $w)
+                                        <option value="{{ $w->name }}" @selected(old('location', $order->location) === $w->name)>{{ $w->name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            @endif
 
                             <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_name') }}" name="vendor_id" id="vendorSelect" required="true" data-company-gst-prefix="{{ $companyGstPrefix }}" data-company-state="{{ $companyState }}">
                                 <option value="">{{ __('purchase.select_supplier') }}</option>
@@ -128,6 +196,13 @@
                                     </option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
+
+                            @if($branchesEnabled)
+                                <div id="vendorBranchWrapper" class="d-none mb-3">
+                                    <label class="form-label fs-12 fw-semibold mb-1" for="vendorBranchSelect">Vendor Branch / Dispatch Location</label>
+                                    <select name="vendor_branch_id" id="vendorBranchSelect" class="form-select form-select-sm" data-prefill="{{ old('vendor_branch_id', $order->vendor_branch_id) }}"></select>
+                                </div>
+                            @endif
 
                             <x-ui.odoo-form-ui type="input" label="{{ __('purchase.po_no') }}" name="po_number_dummy" value="{{ $order->purchase_order_number }}" readonly="true" />
 
@@ -670,13 +745,176 @@
                 }
             }
 
+            let loadedVendorBranches = [];
+            function loadVendorBranches(vendorId, prefillId = null) {
+                const wrapper = $('#vendorBranchWrapper');
+                if (!wrapper.length) return;
+                if (!vendorId) {
+                    wrapper.addClass('d-none');
+                    $('#vendorBranchSelect').empty();
+                    return;
+                }
+
+                const targetPrefill = prefillId !== null ? prefillId : ($('#vendorBranchSelect').data('prefill') || null);
+
+                fetch(`/purchase/vendors/${vendorId}/branches`, { headers: { 'Accept': 'application/json' } })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(payload => {
+                        if (!payload || !Array.isArray(payload.branches)) return;
+                        loadedVendorBranches = payload.branches;
+                        const sel = $('#vendorBranchSelect').empty();
+                        loadedVendorBranches.forEach(b => {
+                            const lbl = `${b.name} (${b.code})${b.gstin ? ' — ' + b.gstin : ''}`;
+                            const isSelected = targetPrefill ? (String(targetPrefill) === String(b.id)) : b.is_default_billing;
+                            sel.append(new Option(lbl, b.id, isSelected, isSelected));
+                        });
+                        if (targetPrefill) {
+                            sel.val(targetPrefill);
+                        }
+                        if (loadedVendorBranches.length >= 2 || (targetPrefill && loadedVendorBranches.length >= 1)) {
+                            wrapper.removeClass('d-none');
+                        } else {
+                            wrapper.addClass('d-none');
+                        }
+                        applyVendorBranchGst();
+                    })
+                    .catch(() => {});
+            }
+
+            function applyVendorBranchGst() {
+                const vbId = parseInt($('#vendorBranchSelect').val() || '0', 10);
+                const vb = loadedVendorBranches.find(b => b.id === vbId);
+                if (!vb) return;
+
+                const companyPrefix = ($('#vendorSelect').attr('data-company-gst-prefix') || '{{ $companyGstPrefix }}').trim().toUpperCase();
+                const supplierState = (vb.gst_state_code || '').trim().toUpperCase();
+                if (companyPrefix && supplierState) {
+                    $('#gstTypeSelect').val(companyPrefix === supplierState ? 'cgst_sgst' : 'igst').trigger('change');
+                    if ($('#taxTypeSelect').val() !== 'without_tax') {
+                        calculateAll();
+                    }
+                }
+            }
+            $('#vendorBranchSelect').on('change', applyVendorBranchGst);
+
             $('#vendorSelect').on('change select2:select', function() {
                 applyVendorGstType(false);
+                loadVendorBranches($(this).val());
             });
 
-            if ($('#vendorSelect').val() && !'{{ $order->gst_type }}') {
-                applyVendorGstType(true);
+            if ($('#vendorSelect').val()) {
+                if (!'{{ $order->gst_type }}') {
+                    applyVendorGstType(true);
+                }
+                loadVendorBranches($('#vendorSelect').val(), '{{ old('vendor_branch_id', $order->vendor_branch_id) }}');
             }
+
+            // Delivery Target: Branch -> filtered Warehouse cascade & Customer Site drop-ship
+            const allWarehouseOptions = $('#locationSelect option').clone();
+            function syncOwnDeliveryTarget() {
+                const mode = $('input[name="delivery_target_mode"]:checked').val() || 'own';
+                if (mode === 'customer_site') {
+                    $('#ownDeliveryFields').addClass('d-none');
+                    $('#customerSiteDeliveryFields').removeClass('d-none');
+                    $('#locationSelect').val('');
+                    $('#deliveryBranchHidden').val('');
+                    return;
+                }
+
+                $('#customerSiteDeliveryFields').addClass('d-none');
+                $('#ownDeliveryFields').removeClass('d-none');
+                $('#deliveryPartyBranchSelect').val('');
+                $('#poSiteContactSelect').val('');
+
+                const selectedWh = $('#locationSelect').val();
+                const selectedBr = $('#deliveryBranchFilterSelect').val();
+                // Enforce single delivery target: if a warehouse is chosen, location carries the target;
+                // if left on "Branch Office directly", delivery_branch_id carries the target.
+                $('#deliveryBranchHidden').val(selectedWh ? '' : (selectedBr || ''));
+            }
+
+            function filterWarehousesByBranch(preserveSelection = false) {
+                const brId = $('#deliveryBranchFilterSelect').val();
+                const currentWh = preserveSelection ? $('#locationSelect').val() : null;
+                const sel = $('#locationSelect').empty();
+
+                allWarehouseOptions.each(function() {
+                    const opt = $(this);
+                    const optVal = opt.val();
+                    const optBr = opt.attr('data-branch-id') || '';
+                    if (!optVal || !brId || optBr === '' || String(optBr) === String(brId)) {
+                        sel.append(opt.clone());
+                    }
+                });
+
+                if (currentWh && sel.find(`option[value="${currentWh.replace(/"/g, '\\"')}"]`).length) {
+                    sel.val(currentWh);
+                } else if (!preserveSelection) {
+                    const branchMatches = sel.find('option').filter(function() { return $(this).val() !== ''; });
+                    if (branchMatches.length === 1) {
+                        sel.val(branchMatches.first().val());
+                    } else {
+                        sel.val('');
+                    }
+                }
+                syncOwnDeliveryTarget();
+            }
+
+            $('.delivery-mode-radio').on('change', syncOwnDeliveryTarget);
+            $('#deliveryBranchFilterSelect').on('change', function() {
+                filterWarehousesByBranch(false);
+            });
+            $('#locationSelect').on('change', syncOwnDeliveryTarget);
+
+            function loadCustomerSitesAndContacts(custId, prefillBranchId = null, prefillContactId = null) {
+                const siteSel = $('#deliveryPartyBranchSelect').empty().append('<option value="">— Select Customer Site —</option>');
+                const contactSel = $('#poSiteContactSelect').empty().append('<option value="">— Select Site Receiver —</option>');
+                if (!custId) return;
+
+                const targetBranch = prefillBranchId !== null ? prefillBranchId : ($('#deliveryPartyBranchSelect').data('prefill') || null);
+                const targetContact = prefillContactId !== null ? prefillContactId : ($('#poSiteContactSelect').data('prefill') || null);
+
+                fetch(`/crm/customers/${custId}/branches`, { headers: { 'Accept': 'application/json' } })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(payload => {
+                        if (!payload) return;
+                        (payload.branches || []).forEach(b => {
+                            if (b.is_shipping || payload.branches.length === 1) {
+                                const isSel = targetBranch ? (String(targetBranch) === String(b.id)) : b.is_default_shipping;
+                                siteSel.append(new Option(`${b.name} (${b.code})${b.address ? ' — ' + b.address : ''}`, b.id, isSel, isSel));
+                            }
+                        });
+                        if (targetBranch) {
+                            siteSel.val(targetBranch);
+                        }
+
+                        (payload.contacts || []).forEach(c => {
+                            const roles = (c.roles && c.roles.length) ? ` [${c.roles.join(', ')}]` : '';
+                            const isSel = targetContact ? (String(targetContact) === String(c.id)) : false;
+                            contactSel.append(new Option(`${c.name}${roles}${c.phone ? ' (' + c.phone + ')' : ''}`, c.id, isSel, isSel));
+                        });
+                        if (targetContact) {
+                            contactSel.val(targetContact);
+                        }
+                    })
+                    .catch(() => {});
+            }
+
+            $('#deliveryCustomerSelect').on('change', function() {
+                loadCustomerSitesAndContacts($(this).val());
+            });
+
+            if ($('#deliveryBranchFilterSelect').length) {
+                filterWarehousesByBranch(true);
+            }
+
+            if ($('#deliveryCustomerSelect').val()) {
+                loadCustomerSitesAndContacts($('#deliveryCustomerSelect').val(), '{{ old('delivery_party_branch_id', $order->delivery_party_branch_id) }}', '{{ old('site_contact_id', $order->site_contact_id) }}');
+            }
+
+            $('#editPoForm').on('submit', function() {
+                syncOwnDeliveryTarget();
+            });
 
             // Handle Product Selection - prefill rate & tax (only prefill tax if item_wise_tax)
             $(document).on('change select2:select', '.product-select', function() {

@@ -36,9 +36,27 @@ class Warehouse extends BaseModel
         'is_default' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (Warehouse $warehouse): void {
+            if (array_key_exists('branch_id', $warehouse->getAttributes()) && empty($warehouse->getAttributes()['branch_id'])) {
+                $warehouse->attributes['branch_id'] = null;
+            }
+        });
+    }
+
     public function vendor(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(\App\Domains\Inventory\Models\Vendor::class, 'vendor_id');
+    }
+
+    /**
+     * Resolve route binding across branches and companies so admins can manage any warehouse.
+     */
+    public function resolveRouteBindingQuery($query, $value, $field = null)
+    {
+        return parent::resolveRouteBindingQuery($query, $value, $field)
+            ->withoutGlobalScopes(['branch', 'company']);
     }
 
     /**
@@ -86,6 +104,37 @@ class Warehouse extends BaseModel
                 'type'       => self::TYPE_STANDARD,
                 'status'     => 'active',
                 'is_default' => true,
+            ]);
+        }
+
+        return $warehouse;
+    }
+
+    /**
+     * Ensure a virtual "Direct-to-Site (Virtual)" warehouse exists for drop-ship POs
+     * delivered directly to customer sites, so GRN & 3-way matching work without
+     * inflating physical godown stock (FRS 2.3 / C-17).
+     */
+    public static function ensureDirectToSiteWarehouse(?int $tenantId = null, ?int $companyId = null): self
+    {
+        $tenantId = $tenantId ?? (tenant_id() ?? current_tenant_id() ?? 1);
+
+        $warehouse = static::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('type', self::TYPE_VIRTUAL)
+            ->where('code', 'DIRECT-SITE')
+            ->first();
+
+        if (! $warehouse) {
+            $warehouse = static::create([
+                'tenant_id' => $tenantId,
+                'company_id' => $companyId ?? (company_id() ?? current_company_id()),
+                'branch_id' => null,
+                'name' => 'Direct-to-Site (Virtual)',
+                'code' => 'DIRECT-SITE',
+                'type' => self::TYPE_VIRTUAL,
+                'status' => 'active',
+                'is_default' => false,
             ]);
         }
 

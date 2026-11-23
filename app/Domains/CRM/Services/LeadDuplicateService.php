@@ -246,4 +246,87 @@ class LeadDuplicateService
             ->orderBy('id', 'asc')
             ->first();
     }
+
+    /**
+     * Get candidate duplicate leads that can be merged into this lead.
+     * Groups detected matches (matching Phone, Email, Company Name, or GSTIN) separately from other open leads.
+     */
+    public function getMergeCandidates(Lead $lead): array
+    {
+        $tenantId = $lead->tenant_id ?? 1;
+
+        $candidates = Lead::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', '!=', $lead->id)
+            ->whereNull('deleted_at')
+            ->whereNull('merged_into_lead_id')
+            ->where('is_customer', false)
+            ->whereNull('crm_deal_id')
+            ->whereNotIn(DB::raw('LOWER(status)'), ['won', 'converted'])
+            ->select(['id', 'lead_number', 'company_name', 'contact_person', 'email', 'company_email', 'phone', 'company_phone', 'gstin', 'status'])
+            ->orderBy('id', 'desc')
+            ->take(150)
+            ->get();
+
+        $cleanPhone = !empty($lead->phone) ? preg_replace('/[^0-9]/', '', $lead->phone) : null;
+        $cleanCompPhone = !empty($lead->company_phone) ? preg_replace('/[^0-9]/', '', $lead->company_phone) : null;
+        $leadEmail = !empty($lead->email) ? strtolower(trim($lead->email)) : null;
+        $leadCompEmail = !empty($lead->company_email) ? strtolower(trim($lead->company_email)) : null;
+        $leadGstin = !empty($lead->gstin) ? strtoupper(trim($lead->gstin)) : null;
+        $leadCompany = !empty($lead->company_name) ? strtolower(trim($lead->company_name)) : null;
+
+        $matches = [];
+        $others = [];
+
+        foreach ($candidates as $c) {
+            $cPhone = !empty($c->phone) ? preg_replace('/[^0-9]/', '', $c->phone) : null;
+            $cCompPhone = !empty($c->company_phone) ? preg_replace('/[^0-9]/', '', $c->company_phone) : null;
+            $cEmail = !empty($c->email) ? strtolower(trim($c->email)) : null;
+            $cCompEmail = !empty($c->company_email) ? strtolower(trim($c->company_email)) : null;
+            $cGstin = !empty($c->gstin) ? strtoupper(trim($c->gstin)) : null;
+            $cCompany = !empty($c->company_name) ? strtolower(trim($c->company_name)) : null;
+
+            $reasons = [];
+
+            if ($leadGstin && $cGstin && $leadGstin === $cGstin) {
+                $reasons[] = 'Same GSTIN';
+            }
+            if ($leadEmail && ($leadEmail === $cEmail || $leadEmail === $cCompEmail)) {
+                $reasons[] = 'Matching Email';
+            }
+            if ($leadCompEmail && ($leadCompEmail === $cCompEmail || $leadCompEmail === $cEmail)) {
+                $reasons[] = 'Matching Email';
+            }
+            if ($cleanPhone && strlen($cleanPhone) >= 5) {
+                $sub = substr($cleanPhone, -10);
+                if (($cPhone && str_contains($cPhone, $sub)) || ($cCompPhone && str_contains($cCompPhone, $sub))) {
+                    $reasons[] = 'Matching Phone';
+                }
+            }
+            if ($cleanCompPhone && strlen($cleanCompPhone) >= 5 && empty($reasons)) {
+                $sub = substr($cleanCompPhone, -10);
+                if (($cPhone && str_contains($cPhone, $sub)) || ($cCompPhone && str_contains($cCompPhone, $sub))) {
+                    $reasons[] = 'Matching Phone';
+                }
+            }
+            if ($leadCompany && $cCompany && empty($reasons)) {
+                if ($leadCompany === $cCompany || (strlen($leadCompany) >= 4 && (str_contains($cCompany, $leadCompany) || str_contains($leadCompany, $cCompany)))) {
+                    $reasons[] = 'Matching Company';
+                }
+            }
+
+            if (!empty($reasons)) {
+                $c->match_reason = implode(', ', array_unique($reasons));
+                $matches[] = $c;
+            } else {
+                $others[] = $c;
+            }
+        }
+
+        return [
+            'matches' => collect($matches),
+            'others' => collect($others),
+            'total_candidates' => count($matches) + count($others),
+        ];
+    }
 }

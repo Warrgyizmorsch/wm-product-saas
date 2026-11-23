@@ -16,6 +16,12 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Services\PartyBankChangeService;
+use App\Services\PartyDuplicateService;
+use App\Services\PartyStatusException;
+use Illuminate\Validation\ValidationException;
+use App\Services\PartyStatusService;
+use App\Services\PartyVerificationService;
 use App\Services\TaxIdentityService;
 
 class VendorController extends Controller
@@ -108,6 +114,22 @@ class VendorController extends Controller
         return view('modules.purchase.vendors.create', compact('autoCode', 'paymentTerms'));
     }
 
+    /** Live "does this party already exist?" lookup used by the create and edit forms (FRS 2.3). */
+    public function duplicateCheck(Request $request): JsonResponse
+    {
+        // The create form needs the create right; the edit form (ignore_id) needs the edit right.
+        $this->authorizePurchase($request->integer('ignore_id') ? 'purchase.vendors.edit' : 'purchase.vendors.create');
+
+        $matches = app(PartyDuplicateService::class)->find(
+            PartyDuplicateService::VENDOR,
+            $request->only(['name', 'company_name', 'email', 'phone', 'gstin', 'pan', 'billing_address', 'address']),
+            null,
+            $request->integer('ignore_id') ?: null
+        );
+
+        return response()->json(['duplicates' => $matches]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $this->authorizePurchase('purchase.vendors.create');
@@ -155,6 +177,12 @@ class VendorController extends Controller
             'tds_section_id.required_if' => 'Pick the TDS section to deduct under.',
         ]);
 
+        // FRS 2.3: search existing vendors first; the user must confirm to create a look-alike.
+        $duplicates = app(PartyDuplicateService::class)->find(PartyDuplicateService::VENDOR, $validated, $tenantId);
+        if ($duplicates !== [] && ! $request->boolean('confirm_duplicate')) {
+            return back()->withInput()->with('duplicate_matches', $duplicates);
+        }
+
         if (empty($validated['code'])) {
             $counter = Vendor::where('tenant_id', $tenantId)->count() + 1;
             do {
@@ -175,13 +203,20 @@ class VendorController extends Controller
             ? convert_to_base((float) $validated['opening_balance'])
             : 0.00;
 
+        // FRS 2.3: a new vendor starts pending and inactive until a second person verifies it.
+        $verification = app(PartyVerificationService::class);
+        $validated = array_merge($validated, $verification->pendingAttributes());
+
         $vendor = Vendor::create($validated);
+        $verification->recordSubmission($vendor);
 
         $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return redirect()
             ->route('purchase.vendors.show', $vendor->id)
-            ->with('success', "Vendor '{$vendor->name}' created successfully.")
+            ->with('success', $vendor->isVerified()
+                ? "Vendor '{$vendor->name}' created successfully."
+                : "Vendor '{$vendor->name}' created. It stays inactive until a second person verifies its GSTIN, PAN and bank details.")
             ->with('warning', $openingWarning);
     }
 
@@ -215,6 +250,16 @@ class VendorController extends Controller
             'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
+        // FRS 2.3: the modal cannot ask for confirmation, so an existing vendor with the same
+        // GSTIN, email or mobile is refused here and the user picks that vendor instead.
+        $existing = app(PartyDuplicateService::class);
+        $identityMatches = $existing->identityMatches($existing->find(PartyDuplicateService::VENDOR, $validated, $tenantId));
+        if ($identityMatches !== [] && ! $request->boolean('confirm_duplicate')) {
+            throw ValidationException::withMessages([
+                'name' => 'This vendor may already exist: ' . $existing->summary($identityMatches) . '. Select the existing vendor instead.',
+            ]);
+        }
+
         $counter = Vendor::where('tenant_id', $tenantId)->count() + 1;
         do {
             $candidateCode = 'VEND-' . str_pad((string) $counter, 4, '0', STR_PAD_LEFT);
@@ -230,7 +275,11 @@ class VendorController extends Controller
         $validated['branch_id'] = $branchId;
         $validated['status'] = 'active';
 
+        $verification = app(PartyVerificationService::class);
+        $validated = array_merge($validated, $verification->pendingAttributes());
+
         $vendor = Vendor::create($validated);
+        $verification->recordSubmission($vendor);
 
         return response()->json([
             'id' => $vendor->id,
@@ -357,6 +406,12 @@ class VendorController extends Controller
             $vendorAdvanceCredit = max($vendorAdvanceCredit, $availableAdvance);
         }
 
+        $allProducts = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'sku', 'unit_cost', 'cost_price', 'minimum_order_qty']);
+        $vendorItems = $vendor->vendorItems()->with(['product', 'latestPriceHistory'])->get();
+        $vendorDocuments = $vendor->vendorDocuments()->latest()->get();
+        $expiredDocs = $vendor->expiredDocuments();
+        $expiringDocs = $vendor->expiringDocuments(30);
+
         return view('modules.purchase.vendors.show', compact(
             'billCount',
             'statement',
@@ -372,7 +427,12 @@ class VendorController extends Controller
             'outstandingPayable',
             'vendorAdvanceCredit',
             'overdueAmount',
-            'ledgerWithBalance'
+            'ledgerWithBalance',
+            'allProducts',
+            'vendorItems',
+            'vendorDocuments',
+            'expiredDocs',
+            'expiringDocs'
         ));
     }
 
@@ -437,19 +497,52 @@ class VendorController extends Controller
         ]);
 
         $validated['status'] = strtolower($validated['status']);
+
+        // FRS 2.3: if a name, GSTIN, PAN, email, mobile or address was changed to match another vendor, ask for confirmation
+        $duplicates = app(PartyDuplicateService::class)->findOnUpdate(PartyDuplicateService::VENDOR, $vendor, $validated, $tenantId);
+        if ($duplicates !== [] && ! $request->boolean('confirm_duplicate')) {
+            return back()->withInput()->with('duplicate_matches', $duplicates);
+        }
+
         if (array_key_exists('opening_balance', $validated)) {
             $validated['opening_balance'] = $validated['opening_balance'] !== null
                 ? convert_to_base((float) $validated['opening_balance'])
                 : 0.00;
         }
+
+        // FRS 2.3: changing GSTIN/PAN/bank details on a verified vendor sends it back to
+        // pending, and a vendor that is not verified can never be set active.
+        // Bank details of a verified vendor change only through a callback-verified request.
+        $bankChange = app(PartyBankChangeService::class);
+        [$validated, $bankAttempted] = $bankChange->stripProtectedFields($vendor, $validated);
+
+        // FRS 2.3 (C-16): a verified vendor's status changes only through the reason form,
+        // so whatever the form posts, keep the current status here.
+        if (app(PartyStatusService::class)->enabled() && $vendor->isVerified()) {
+            $validated['status'] = strtolower($vendor->status);
+        }
+
+        $verification = app(PartyVerificationService::class);
+        $wasVerified = $vendor->isVerified();
+        $blocked = $validated['status'] === 'active' ? $verification->activationBlockedMessage($vendor) : null;
+        $validated = array_merge($validated, $verification->attributesForUpdate($vendor, $validated));
+
         $vendor->update($validated);
 
         $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
+        if ($wasVerified && ! $vendor->isVerified()) {
+            $blocked = "Vendor '{$vendor->name}' tax or bank details changed, so it is inactive until a second person verifies them again.";
+        }
+
+        if ($bankAttempted !== []) {
+            $blocked = 'Bank details were not changed: they can only be changed with a bank change request that a different person approves after a callback.';
+        }
+
         return redirect()
             ->route('purchase.vendors.show', $vendor->id)
             ->with('success', "Vendor '{$vendor->name}' updated successfully.")
-            ->with('warning', $openingWarning);
+            ->with('warning', $blocked ?: $openingWarning);
     }
 
     public function toggleStatus(Request $request, Vendor $vendor): RedirectResponse
@@ -457,6 +550,44 @@ class VendorController extends Controller
         $this->authorizePurchase('purchase.vendors.edit');
 
         $newStatus = strtolower($vendor->status) === 'active' ? 'inactive' : 'active';
+
+        if ($newStatus === 'active'
+            && ($message = app(PartyVerificationService::class)->activationBlockedMessage($vendor))) {
+            return redirect()->back()->with('error', $message);
+        }
+
+        if ($newStatus === 'active') {
+            $statusService = app(PartyStatusService::class);
+
+            if ($statusService->enabled() && ! $statusService->isActive($vendor)) {
+                try {
+                    $statusService->reactivate($vendor, $request->user());
+                } catch (PartyStatusException $e) {
+                    return redirect()->back()->with('error', $e->getMessage());
+                }
+
+                return redirect()->back()->with('success', "Vendor '{$vendor->name}' marked as Active successfully.");
+            }
+        }
+
+        if ($newStatus === 'inactive') {
+            $statusService = app(PartyStatusService::class);
+            if ($statusService->enabled() && $vendor->isVerified()) {
+                $reason = $request->input('reason', $request->input('inactive_reason'));
+                $note = $request->input('note', $request->input('inactive_note'));
+                if (! $reason) {
+                    return redirect()->route('purchase.vendors.deactivate.create', $vendor)
+                        ->with('warning', 'Please provide a reason to mark the vendor as inactive.');
+                }
+                try {
+                    $statusService->deactivate($vendor, $request->user(), $reason, $note);
+                    return redirect()->back()->with('success', "Vendor '{$vendor->name}' marked as Inactive successfully.");
+                } catch (PartyStatusException $e) {
+                    return redirect()->back()->with('error', $e->getMessage());
+                }
+            }
+        }
+
         $vendor->update(['status' => $newStatus]);
 
         $statusLabel = ucfirst($newStatus);

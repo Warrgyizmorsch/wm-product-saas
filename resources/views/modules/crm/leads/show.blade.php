@@ -211,14 +211,14 @@
             return $i->status !== 'Pending' && $i->updated_at >= $todayStart && $i->updated_at <= $todayEnd;
         })->sortByDesc('updated_at');
 
-        // 2. Planned Activities (All pending scheduled for today or future)
-        $plannedActivities = $allLeadFollowups->filter(function($i) use ($todayStart) {
-            return $i->status === 'Pending' && $i->followup_date >= $todayStart;
+        // 2. Planned Activities (All pending scheduled for future)
+        $plannedActivities = $allLeadFollowups->filter(function($i) use ($now) {
+            return $i->status === 'Pending' && $i->followup_date >= $now;
         })->sortBy('followup_date');
 
-        // 3. Overdue Activities (Pending before today)
-        $overdueActivities = $allLeadFollowups->filter(function($i) use ($todayStart) {
-            return $i->status === 'Pending' && $i->followup_date < $todayStart;
+        // 3. Overdue Activities (Pending where scheduled time has passed)
+        $overdueActivities = $allLeadFollowups->filter(function($i) use ($now) {
+            return $i->status === 'Pending' && $i->followup_date < $now;
         })->sortBy('followup_date');
 
         // 4. Past Activities (First 5 loaded initially from DB, rest via infinite scroll)
@@ -817,10 +817,82 @@
         @method('PATCH')
         <input type="hidden" name="status" id="statusChangeInput">
     </form>
+
+    <!-- Loss Reason Modal (FRS Ref 2.5 / Task C-04) -->
+    <div class="modal fade" id="leadLossModal" tabindex="-1" aria-labelledby="leadLossModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="status" value="Lost">
+                    <div class="modal-header bg-soft-danger text-danger py-3 px-4 border-bottom">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="feather-alert-triangle fs-18"></i>
+                            <h6 class="modal-title fw-bold fs-14 mb-0" id="leadLossModalLabel">Mark Lead as Closed Lost</h6>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <p class="fs-12 text-muted mb-3">
+                            Per CRM governance policy, closed deals require a structured loss reason and an auto-scheduled future nurture follow-up.
+                        </p>
+                        <div class="mb-3">
+                            <label class="form-label fs-12 fw-bold text-dark">Loss Reason Category <span class="text-danger">*</span></label>
+                            <select name="loss_reason_id" id="lossReasonSelect" class="form-select form-select-sm" required onchange="toggleCompetitorField(this)">
+                                <option value="">Select structured loss reason...</option>
+                                @foreach($lossReasons ?? \App\Domains\CRM\Models\CrmLossReason::getActiveReasons() as $reason)
+                                    <option value="{{ $reason->id }}" data-competitor="{{ $reason->requires_competitor ? '1' : '0' }}">
+                                        {{ $reason->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-3" id="competitorNameField" style="display: none;">
+                            <label class="form-label fs-12 fw-bold text-dark">Competitor Won Against Us <span class="text-danger">*</span></label>
+                            <input type="text" name="lost_to_competitor" id="competitorNameInput" class="form-control form-control-sm" placeholder="e.g. Godrej, Featherlite, Local Fabricator">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fs-12 fw-bold text-dark">Variance Remarks / Loss Feedback</label>
+                            <textarea name="loss_remarks" class="form-control form-control-sm" rows="3" placeholder="Provide specific feedback (price gap, spec difference, lead time issue, or why client dropped)..."></textarea>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fs-12 fw-bold text-dark">Future Nurture Follow-up Date</label>
+                            <input type="date" name="nurture_followup_date" class="form-control form-control-sm" value="{{ now()->addDays(90)->toDateString() }}">
+                            <div class="form-text fs-11 text-muted">Auto-schedules a touchpoint task in CRM so the account is re-contacted in the future.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2 px-4 border-top">
+                        <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-sm btn-danger fw-bold">Confirm Loss & Schedule Nurture</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
+        window.toggleCompetitorField = function(select) {
+            const opt = select.options[select.selectedIndex];
+            const req = opt && opt.getAttribute('data-competitor') === '1';
+            const field = document.getElementById('competitorNameField');
+            const input = document.getElementById('competitorNameInput');
+            if (field && input) {
+                if (req) {
+                    field.style.display = 'block';
+                    input.setAttribute('required', 'required');
+                } else {
+                    field.style.display = 'none';
+                    input.removeAttribute('required');
+                }
+            }
+        };
+
         window.handleLeadStageChange = function(targetStatus) {
             const currentStatus = @json($lead->status ?: 'New');
             const isCustomer = @json((bool)$lead->is_customer);
+
+            if (targetStatus.toLowerCase() === currentStatus.toLowerCase()) return false;
 
             if (targetStatus.toLowerCase() === 'won') {
                 const msg = 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.';
@@ -873,6 +945,33 @@
                 } else if (typeof confirmAction !== 'function') {
                     alert(msg);
                 }
+                return false;
+            }
+
+            if (targetStatus.toLowerCase() === 'lost') {
+                const modalEl = document.getElementById('leadLossModal');
+                if (modalEl) {
+                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    modal.show();
+                }
+                return false;
+            }
+
+            if (targetStatus.toLowerCase() === 'dealing') {
+                confirmAction({
+                    title: 'Move Lead to Dealing?',
+                    message: 'Moving to Dealing will verify BANT qualification requirements (Contact, Scope/Qty, Amount, and Completed Interaction). Once moved, stage is locked. Proceed?',
+                    variant: 'warning',
+                    confirmText: 'Move to Dealing',
+                    cancelText: 'Cancel'
+                }, function () {
+                    const input = document.getElementById('statusChangeInput');
+                    const form = document.getElementById('statusChangeForm');
+                    if (input && form) {
+                        input.value = targetStatus;
+                        form.submit();
+                    }
+                });
                 return false;
             }
 
@@ -2249,6 +2348,20 @@
                     if (text) text.innerText = 'Show Chatter';
                 }
             } catch(e){}
+
+            // Initialize Select2 on merge lead dropdown when merge panel opens
+            $('#leadMergePanel').on('shown.bs.collapse', function () {
+                if ($.fn.select2) {
+                    var $select = $(this).find('.select2-merge-lead');
+                    if (!$select.hasClass('select2-hidden-accessible')) {
+                        $select.select2({
+                            dropdownParent: $('#leadMergePanel'),
+                            width: '100%',
+                            placeholder: '-- Select Duplicate Lead to Merge --'
+                        });
+                    }
+                }
+            });
 
             // Tab state persistence logic
             var activeTabKey = 'lead_active_tab_' + {{ $lead->id }};

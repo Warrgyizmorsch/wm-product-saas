@@ -6,13 +6,26 @@ use App\Core\Database\BaseModel;
 use App\Domains\Platform\Models\Transporter;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
+use App\Models\Concerns\GuardsPartyTransactions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DispatchOrder extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch;
+    use HasFactory, BelongsToCompany, BelongsToBranch, GuardsPartyTransactions;
+
+    protected function guardedParties(): array
+    {
+        return ['customer_id' => ['customer', 'dispatch']];
+    }
+
+    protected function guardedPartyBranches(): array
+    {
+        return [
+            'shipping_branch_id' => ['customer', 'customer_id', 'dispatch'],
+        ];
+    }
 
     protected $table = 'dispatch_orders';
 
@@ -21,6 +34,9 @@ class DispatchOrder extends BaseModel
         'company_id',
         'branch_id',
         'customer_id',
+        'shipping_branch_id',
+        'site_contact_id',
+        'ship_to_gstin',
         'transporter_id',
         'material_requirement_id',
         'sales_order_id',
@@ -87,6 +103,16 @@ class DispatchOrder extends BaseModel
         return $this->belongsTo(\App\Domains\CRM\Models\Customer::class, 'customer_id')->withDefault(function() {
             return $this->salesOrder?->customer;
         });
+    }
+
+    public function shippingBranch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyBranch::class, 'shipping_branch_id');
+    }
+
+    public function siteContact(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyContact::class, 'site_contact_id');
     }
 
     public function items(): HasMany

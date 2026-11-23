@@ -83,7 +83,26 @@ class VendorPaymentController extends Controller
             }
         }
 
-        $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
+        $statusService = app(\App\Services\PartyStatusService::class);
+        $inactiveWithDuesIds = $statusService->inactiveVendorIdsWithDues($tenantId);
+
+        $vendors = Vendor::where('tenant_id', $tenantId)
+            ->where(function ($q) use ($inactiveWithDuesIds) {
+                $q->whereRaw("lower(status) = 'active'");
+                if ($inactiveWithDuesIds !== []) {
+                    $q->orWhereIn('id', $inactiveWithDuesIds);
+                }
+            })
+            ->orderBy('name')
+            ->get();
+
+        $inactiveVendorReasons = [];
+        foreach ($vendors as $v) {
+            if (strtolower((string) $v->status) !== 'active') {
+                $inactiveVendorReasons[$v->id] = $statusService->reasonLabel($v->inactive_reason);
+            }
+        }
+
         $unpaidBills = $this->billRepo->getPaginatedBills(['status' => 'Unpaid'], 100);
 
         $bankAccounts = \App\Domains\Accounting\Models\ChartOfAccount::query()
@@ -93,8 +112,32 @@ class VendorPaymentController extends Controller
             ->orderBy('code')
             ->get(['id', 'code', 'name']);
 
+        // FRS 2.3 / Task C-16: Query open bank change requests for selectable vendors
+        // so Accounts Payable is immediately warned if an unverified bank change is pending.
+        $bankChangeService = app(\App\Services\PartyBankChangeService::class);
+        $openBankChanges = [];
+        if ($bankChangeService->enabled()) {
+            $openRequests = \App\Models\PartyBankChangeRequest::query()
+                ->where('tenant_id', $tenantId)
+                ->where('party_type', 'vendor')
+                ->where('status', \App\Models\PartyBankChangeRequest::STATUS_PENDING)
+                ->get();
+            foreach ($openRequests as $req) {
+                $openBankChanges[$req->party_id] = [
+                    'id' => $req->id,
+                    'new_bank_name' => $req->new_bank_name,
+                    'new_account_number' => $req->new_account_number,
+                    'new_ifsc_code' => $req->new_ifsc_code,
+                    'reason' => $req->reason,
+                    'requested_at' => $req->requested_at?->format('d M Y H:i'),
+                ];
+            }
+        }
+
         return view('modules.purchase.payments.create', compact(
             'vendors',
+            'inactiveVendorReasons',
+            'openBankChanges',
             'unpaidBills',
             'selectedBill',
             'availableAdvance',
@@ -124,7 +167,21 @@ class VendorPaymentController extends Controller
             'reference_number' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'auto_apply_advance' => 'nullable|boolean',
+            'confirm_pending_bank_change' => 'nullable|boolean',
         ]);
+
+        // FRS 2.3 / Task C-16: Check for open bank change requests. If an unapproved bank change
+        // is pending, require explicit confirmation that payment is strictly made to the verified account on record.
+        $targetVendor = Vendor::where('tenant_id', $tenantId)->find($validated['vendor_id']);
+        if ($targetVendor && app(\App\Services\PartyBankChangeService::class)->enabled()) {
+            $openBankChange = app(\App\Services\PartyBankChangeService::class)->openRequest($targetVendor);
+            if ($openBankChange && ! $request->boolean('confirm_pending_bank_change')) {
+                $errorMsg = "Vendor '{$targetVendor->name}' has an unapproved Bank Change Request (#{$openBankChange->id}) awaiting callback verification. Please confirm that payment is being released to the VERIFIED bank account on file ({$targetVendor->bank_name} / {$targetVendor->account_number}), not the unapproved request.";
+                return back()->withInput()
+                    ->with('error', $errorMsg)
+                    ->withErrors(['vendor_id' => $errorMsg]);
+            }
+        }
 
         if (!empty($validated['bank_account_id'])) {
             $isBankLedger = \App\Domains\Accounting\Models\ChartOfAccount::query()

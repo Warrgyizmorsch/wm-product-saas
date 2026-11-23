@@ -186,9 +186,20 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.industry_type')" name="industry_type" :value="old('industry_type', $lead->industry_type)" :placeholder="__('crm.industry_type')" />
 
+                            <h6 class="fw-bold text-primary mb-3 mt-4">Qualification (required before Dealing)</h6>
+                            <x-ui.odoo-form-ui type="input" label="Project Type" name="project_type" :value="old('project_type', $lead->project_type)" placeholder="e.g. Office fit-out, Retail counters" :errorText="$errors->first('project_type')" />
+                            <x-ui.odoo-form-ui type="input" label="Approximate Quantity" name="approx_quantity" inputType="number" :value="old('approx_quantity', $lead->approx_quantity)" placeholder="Units / workstations" :errorText="$errors->first('approx_quantity')" />
+                            <x-ui.odoo-form-ui type="input" label="Decision Timeline" name="decision_timeline" :value="old('decision_timeline', $lead->decision_timeline)" placeholder="e.g. Within 30 days" :errorText="$errors->first('decision_timeline')" />
+                            <x-ui.odoo-form-ui type="input" label="Competitor (if known)" name="competitor_name" :value="old('competitor_name', $lead->competitor_name)" :errorText="$errors->first('competitor_name')" />
+                            <div class="form-check mb-3">
+                                <input type="hidden" name="decision_maker_identified" value="0">
+                                <input class="form-check-input" type="checkbox" name="decision_maker_identified" id="decision_maker_identified" value="1" @checked(old('decision_maker_identified', $lead->decision_maker_identified))>
+                                <label class="form-check-label" for="decision_maker_identified">Decision maker / decision process identified</label>
+                            </div>
+
                             <x-ui.odoo-form-ui type="select" :label="__('crm.source')" name="source">
                                 <option value="">{{ __('crm.select_option') }}</option>
-                                @foreach (['Direct Inquiry', 'Website Form', 'Web Search', 'Meta Ads', 'IndiaMART', 'TradeIndia', 'Justdial', 'Cold Call', 'Referral', 'Employee Referral', 'Partner', 'Advertisement', 'Trade Show', 'WhatsApp Bot', 'WhatsApp', 'Email', 'Phone Call', 'Walk In', 'LinkedIn', 'Google Ads', 'Other'] as $srcOption)
+                                @foreach (['Direct Inquiry', 'Website', 'Website Form', 'Web Search', 'Meta Ads', 'IndiaMART', 'TradeIndia', 'Justdial', 'Cold Call', 'Referral', 'Employee Referral', 'Partner', 'Advertisement', 'Trade Show', 'Expo', 'WhatsApp Bot', 'WhatsApp', 'Email', 'Phone Call', 'Walk In', 'LinkedIn', 'Google Ads', 'Other'] as $srcOption)
                                     <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ \Illuminate\Support\Facades\Lang::has('crm.sources.' . $srcOption) ? __('crm.sources.' . $srcOption) : $srcOption }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>

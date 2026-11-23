@@ -34,7 +34,38 @@ class VendorPaymentApiController extends Controller
     public function meta(Request $request): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $vendors    = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'company_name', 'email', 'phone']);
+        $statusService = app(\App\Services\PartyStatusService::class);
+        $inactiveWithDuesIds = $statusService->inactiveVendorIdsWithDues($tenantId);
+
+        $bankChangeService = app(\App\Services\PartyBankChangeService::class);
+        $openBankChangeIds = [];
+        if ($bankChangeService->enabled()) {
+            $openBankChangeIds = \App\Models\PartyBankChangeRequest::query()
+                ->where('tenant_id', $tenantId)
+                ->where('party_type', 'vendor')
+                ->where('status', \App\Models\PartyBankChangeRequest::STATUS_PENDING)
+                ->pluck('id', 'party_id')
+                ->all();
+        }
+
+        $vendors = Vendor::where('tenant_id', $tenantId)
+            ->where(function ($q) use ($inactiveWithDuesIds) {
+                $q->whereRaw("lower(status) = 'active'");
+                if ($inactiveWithDuesIds !== []) {
+                    $q->orWhereIn('id', $inactiveWithDuesIds);
+                }
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'company_name', 'email', 'phone', 'bank_name', 'account_number', 'ifsc_code', 'status', 'inactive_reason'])
+            ->map(function ($v) use ($statusService, $openBankChangeIds) {
+                $isInactive = strtolower((string) $v->status) !== 'active';
+                $v->setAttribute('is_inactive', $isInactive);
+                $v->setAttribute('inactive_reason_label', $isInactive ? $statusService->reasonLabel($v->inactive_reason) : null);
+                $v->setAttribute('has_pending_bank_change', isset($openBankChangeIds[$v->id]));
+                $v->setAttribute('pending_bank_change_id', $openBankChangeIds[$v->id] ?? null);
+
+                return $v;
+            });
 
         $bankAccounts = \App\Domains\Accounting\Models\ChartOfAccount::query()
             ->where('tenant_id', $tenantId)
@@ -153,6 +184,19 @@ class VendorPaymentApiController extends Controller
             }
         }
 
+        // FRS 2.3 / Task C-16: Check for open bank change requests on the target vendor
+        $vendor = Vendor::where('tenant_id', $tenantId)->find($validated['vendor_id']);
+        if ($vendor && app(\App\Services\PartyBankChangeService::class)->enabled()) {
+            $openBankChange = app(\App\Services\PartyBankChangeService::class)->openRequest($vendor);
+            if ($openBankChange && ! $request->boolean('confirm_pending_bank_change')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Vendor '{$vendor->name}' has an unapproved Bank Change Request (#{$openBankChange->id}) awaiting callback verification. Please confirm that payment is being released strictly to the verified bank account on file ({$vendor->bank_name} / {$vendor->account_number}), not the unapproved request.",
+                    'pending_bank_change_id' => $openBankChange->id,
+                ], 422);
+            }
+        }
+
         // Normalize allocation keys for VendorPaymentService
         if (!empty($validated['allocations'])) {
             foreach ($validated['allocations'] as &$alloc) {
@@ -212,6 +256,12 @@ class VendorPaymentApiController extends Controller
                 'message' => "Vendor payment {$payment->payment_number} recorded successfully",
                 'data'    => $payment->fresh(['vendor', 'bankAccount', 'allocations.vendorBill']),
             ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'errors'  => $e->errors(),
+            ], 422);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,

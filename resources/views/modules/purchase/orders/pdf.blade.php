@@ -513,29 +513,45 @@
         <tr>
             <!-- Left Box: Supplier Details (Vendor) -->
             <td class="info-box">
+                @php
+                    $vendorBranch = $order->vendorBranch;
+                    $supplierGstin = $order->supplier_gstin ?: ($vendorBranch?->effectiveGstin() ?: ($order->vendor?->gstin ?: $order->vendor?->tax_number));
+                    $supplierAddress = ($vendorBranch && $vendorBranch->formattedAddress() !== '')
+                        ? $vendorBranch->formattedAddress()
+                        : ($order->vendor?->address ?: ($order->vendor?->billing_address ?: '—'));
+                @endphp
                 <div class="box-title">SUPPLIER DETAILS (VENDOR):</div>
                 <div class="client-name">{{ $order->vendor?->name ?? '—' }}</div>
+                @if($vendorBranch)
+                    <div style="font-size: 8.5px; color: #475569; margin-bottom: 2px;">
+                        Branch: <strong>{{ $vendorBranch->name }}</strong> ({{ $vendorBranch->code }})
+                    </div>
+                @endif
                 @if($order->vendor?->code)
                     <div style="font-size: 8.5px; color: #475569; margin-bottom: 2px;">
                         Supplier Code: <strong>{{ $order->vendor->code }}</strong>
                     </div>
                 @endif
-                @if($order->vendor?->gstin || $order->vendor?->tax_number)
+                @if($supplierGstin)
                     <div style="font-size: 8.5px; margin-bottom: 3px;">
-                        <strong>GSTIN:</strong> {{ $order->vendor?->gstin ?: $order->vendor?->tax_number }}
+                        <strong>GSTIN:</strong> {{ $supplierGstin }}
                     </div>
                 @endif
-                @if($order->vendor?->email || $order->vendor?->phone)
+                @if($vendorBranch?->email || $vendorBranch?->phone || $order->vendor?->email || $order->vendor?->phone)
+                    @php
+                        $supEmail = $vendorBranch?->email ?: $order->vendor?->email;
+                        $supPhone = $vendorBranch?->phone ?: $order->vendor?->phone;
+                    @endphp
                     <div class="client-contact">
-                        {{ $order->vendor?->email ?: '' }}
-                        @if($order->vendor?->email && $order->vendor?->phone) | @endif
-                        {{ $order->vendor?->phone ?: '' }}
+                        {{ $supEmail ?: '' }}
+                        @if($supEmail && $supPhone) | @endif
+                        {{ $supPhone ?: '' }}
                     </div>
                 @endif
 
                 <div class="address-block">
                     <strong style="color: #0f172a; display: block; margin-bottom: 2px;">Supplier Address:</strong>
-                    {{ $order->vendor?->address ?: ($order->vendor?->billing_address ?: '—') }}
+                    {{ $supplierAddress }}
                 </div>
             </td>
 
@@ -545,19 +561,38 @@
             <!-- Right Box: Order & Delivery References -->
             <td class="info-box">
                 <div class="box-title">ORDER &amp; DELIVERY REFERENCES:</div>
-                
+                @php
+                    $deliveryBranch = $order->deliveryBranch;
+                    $deliverySite = $order->deliveryPartyBranch;
+                    $siteReceiver = $order->siteContact;
+
+                    if ($deliverySite) {
+                        $deliveryLabel = ($deliverySite->parentParty()?->name ? $deliverySite->parentParty()->name . ' — ' : '') . $deliverySite->name . ' (Customer Site)';
+                        $deliveryAddrText = $deliverySite->formattedAddress() ?: '—';
+                    } elseif ($deliveryBranch) {
+                        $deliveryLabel = $deliveryBranch->name . ' (Branch)';
+                        $deliveryAddrText = implode(', ', array_filter([$deliveryBranch->address, $deliveryBranch->city, $deliveryBranch->state, $deliveryBranch->postal_code])) ?: ($buyerOrg['address'] ?? null);
+                    } else {
+                        $deliveryLabel = $order->warehouse?->name ?: ($order->location ?: 'Main Warehouse');
+                        $deliveryAddrText = $order->warehouse?->address ?: ($order->location ?: ($buyerOrg['address'] ?? null));
+                    }
+                @endphp
+
                 <div class="ref-row">
-                    <span class="ref-label">Delivery Location:</span>
-                    <span class="ref-val" style="color: #1e40af;">{{ $order->warehouse?->name ?: ($order->location ?: 'Main Warehouse') }}</span>
+                    <span class="ref-label">Delivery Target:</span>
+                    <span class="ref-val" style="color: #1e40af;">{{ $deliveryLabel }}</span>
                 </div>
 
-                @php
-                    $deliveryAddrText = $order->warehouse?->address ?: ($order->location ?: ($buyerOrg['address'] ?? null));
-                @endphp
                 @if($deliveryAddrText)
                     <div class="ref-row">
                         <span class="ref-label">Delivery Address:</span>
                         <span class="ref-val" style="font-weight: normal; color: #475569; font-size: 8.5px;">{{ $deliveryAddrText }}</span>
+                    </div>
+                @endif
+                @if($siteReceiver)
+                    <div class="ref-row">
+                        <span class="ref-label">Site Receiver:</span>
+                        <span class="ref-val" style="font-size: 8.5px;">{{ $siteReceiver->name }}@if($siteReceiver->mobile ?: $siteReceiver->phone) ({{ $siteReceiver->mobile ?: $siteReceiver->phone }})@endif</span>
                     </div>
                 @endif
 
@@ -668,6 +703,19 @@
                         </div>
                         @if($item->product?->sku)
                             <div class="item-desc">SKU: {{ $item->product->sku }}</div>
+                        @endif
+                        @php
+                            $vendorItem = ($order->vendor_id && $item->product_id)
+                                ? \App\Domains\Purchase\Models\VendorItem::where('tenant_id', $order->tenant_id)
+                                    ->where('vendor_id', $order->vendor_id)
+                                    ->where('product_id', $item->product_id)
+                                    ->first()
+                                : null;
+                        @endphp
+                        @if($vendorItem && ($vendorItem->vendor_item_code || $vendorItem->vendor_item_name))
+                            <div class="item-desc" style="color: #1e40af; font-weight: 500;">
+                                Vendor Item: {{ $vendorItem->vendor_item_code ?: '' }}{{ $vendorItem->vendor_item_code && $vendorItem->vendor_item_name ? ' — ' : '' }}{{ $vendorItem->vendor_item_name ?: '' }}
+                            </div>
                         @endif
                         @if(!empty($hsnCode) && $hsnCode !== '—')
                             <div class="item-desc">HSN: {{ $hsnCode }}</div>

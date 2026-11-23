@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use App\Domains\Inventory\Models\Vendor;
+use App\Services\PartyTransactionGuard;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +15,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class VendorPayment extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch, HasFactory;
+
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        static::creating(function (self $payment): void {
+            app(PartyTransactionGuard::class)->assertCanPayVendor($payment->vendor_id, $payment->tenant_id);
+        });
+    }
 
     protected $table = 'vendor_payments';
 

@@ -608,14 +608,16 @@
     <table class="info-boxes-table">
         <tr>
             @php
-                $customerGstin = $invoice->customer?->gstin ?: ($invoice->salesOrder?->customer?->gstin ?: null);
+                $customerGstin = $invoice->bill_to_gstin ?: ($invoice->salesOrder?->bill_to_gstin ?: ($invoice->customer?->gstin ?: ($invoice->salesOrder?->customer?->gstin ?: null)));
+                $shipGstin = $invoice->ship_to_gstin ?: $invoice->salesOrder?->ship_to_gstin;
+                $siteReceiver = $invoice->siteContact ?: $invoice->salesOrder?->siteContact;
                 $acc = $invoice->customer?->crmAccount;
                 $accAddress = $acc ? implode(', ', array_filter([$acc->street, $acc->city, $acc->state ? ($acc->state . ($acc->zip_code ? ' - ' . $acc->zip_code : '')) : $acc->zip_code, $acc->country])) : null;
                 $pdfBilling = $invoice->billing_address ?: ($invoice->salesOrder?->billing_address ?: ($invoice->customer?->billing_address ?: $accAddress));
                 $pdfShipping = $invoice->shipping_address ?: ($invoice->salesOrder?->shipping_address ?: ($invoice->customer?->shipping_address ?: null));
                 $isSameAddress = empty($pdfShipping) || trim($pdfShipping) === trim($pdfBilling);
-                $supply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class)->supplyFor($invoice->customer ?? $invoice->salesOrder?->customer);
-                $placeOfSupplyStr = $supply['pos'] ? \App\Domains\Accounting\Support\GstStates::name($supply['pos']) . ' (' . $supply['pos'] . ')' : null;
+                $posCode = $invoice->place_of_supply_state ?: ($invoice->salesOrder?->place_of_supply_state ?: app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class)->supplyFor($invoice->customer ?? $invoice->salesOrder?->customer)['pos']);
+                $placeOfSupplyStr = $posCode ? \App\Domains\Accounting\Support\GstStates::name($posCode) . ' (' . $posCode . ')' : null;
             @endphp
 
             <!-- Left Box: Billed To (Buyer) -->
@@ -647,8 +649,14 @@
                             {{ $pdfBilling ?: '—' }}
                         </td>
                         <td style="width: 50%; vertical-align: top; padding-left: 5px; font-size: 8.5px; color: #475569;">
-                            <strong style="color: #0f172a; display: block; margin-bottom: 2px;">Shipping Address:</strong>
+                            <strong style="color: #0f172a; display: block; margin-bottom: 2px;">Shipping Address{{ $invoice->shippingBranch ? ' (' . $invoice->shippingBranch->name . ')' : '' }}:</strong>
                             {{ $pdfShipping ?: ($pdfBilling ?: '—') }}
+                            @if($shipGstin && $shipGstin !== $customerGstin)
+                                <div style="margin-top: 2px;"><strong>Ship-To GSTIN:</strong> {{ $shipGstin }}</div>
+                            @endif
+                            @if($siteReceiver)
+                                <div style="margin-top: 2px;"><strong>Site Receiver:</strong> {{ $siteReceiver->name }}@if($siteReceiver->mobile ?: $siteReceiver->phone) ({{ $siteReceiver->mobile ?: $siteReceiver->phone }})@endif</div>
+                            @endif
                         </td>
                     </tr>
                 </table>

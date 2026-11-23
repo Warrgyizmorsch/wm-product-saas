@@ -5,6 +5,7 @@ namespace App\Domains\Purchase\Models;
 use App\Core\Database\BaseModel;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
+use App\Models\Concerns\GuardsPartyTransactions;
 use App\Models\User;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
@@ -15,14 +16,46 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseOrder extends BaseModel
 {
-    use BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+    use BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes, GuardsPartyTransactions;
+
+    protected function guardedParties(): array
+    {
+        return ['vendor_id' => ['vendor', 'purchase order']];
+    }
+
+    protected function guardedPartyBranches(): array
+    {
+        return [
+            'vendor_branch_id' => ['vendor', 'vendor_id', 'purchase order'],
+            'delivery_party_branch_id' => ['customer', null, 'purchase order'],
+        ];
+    }
 
     protected ?string $rbacPermission = 'purchase.orders.view';
     protected ?string $rbacOwnerColumn = 'created_by';
 
+    /**
+     * Ordering vs Receiving Branch semantics (FRS 2.3 / C-17):
+     * - `branch_id` (from BelongsToBranch) is the ordering/billing branch and source of our buyer_gstin.
+     * - `delivery_branch_id` is the receiving branch (when delivering to one of our own branches).
+     *
+     * Replace the default strict BelongsToBranch scope so a receiving branch can also see and receive
+     * POs ordered by another branch on its behalf.
+     */
     protected static function boot()
     {
         parent::boot();
+
+        static::addGlobalScope('branch', function (\Illuminate\Database\Eloquent\Builder $builder): void {
+            $branchId = branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
+            if ($branchId !== null) {
+                $table = $builder->getModel()->getTable();
+                $builder->where(function (\Illuminate\Database\Eloquent\Builder $q) use ($table, $branchId) {
+                    $q->where("{$table}.branch_id", $branchId)
+                        ->orWhere("{$table}.delivery_branch_id", $branchId);
+                });
+            }
+        });
 
         static::saving(function ($po) {
             if ($po->vendor_id && $po->vendor && (int) $po->vendor->tenant_id !== (int) $po->tenant_id) {
@@ -41,6 +74,14 @@ class PurchaseOrder extends BaseModel
         'purchase_requisition_id',
         'source_type',
         'vendor_id',
+        'vendor_branch_id',
+        'delivery_branch_id',
+        'delivery_party_branch_id',
+        'site_contact_id',
+        'buyer_gstin',
+        'buyer_state_code',
+        'supplier_gstin',
+        'supplier_state_code',
         'location',
         'reference',
         'supplier_quotation_number',
@@ -231,6 +272,26 @@ class PurchaseOrder extends BaseModel
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class, 'vendor_id');
+    }
+
+    public function vendorBranch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyBranch::class, 'vendor_branch_id');
+    }
+
+    public function deliveryBranch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\HRMS\Models\Branch::class, 'delivery_branch_id');
+    }
+
+    public function deliveryPartyBranch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyBranch::class, 'delivery_party_branch_id');
+    }
+
+    public function siteContact(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyContact::class, 'site_contact_id');
     }
 
     public function requisition(): BelongsTo

@@ -76,6 +76,10 @@ class DispatchOrderRepository
                 if ($mr->salesOrder && $mr->salesOrder->hasOnlyServices()) {
                     return false;
                 }
+                $cust = $mr->salesOrder?->customer;
+                if ($cust && (strtolower((string)$cust->status) !== 'active' || !$cust->isVerified())) {
+                    return false;
+                }
                 return $mr->items->filter(fn($item) => $item->product && !$item->product->isService())->isNotEmpty();
             })
             ->take($limit)
@@ -98,6 +102,10 @@ class DispatchOrderRepository
         ->get()
         ->filter(function ($mr) {
             if ($mr->salesOrder && $mr->salesOrder->hasOnlyServices()) {
+                return false;
+            }
+            $cust = $mr->salesOrder?->customer;
+            if ($cust && (strtolower((string)$cust->status) !== 'active' || !$cust->isVerified())) {
                 return false;
             }
             return $mr->items->filter(fn($item) => $item->product && !$item->product->isService())->isNotEmpty();

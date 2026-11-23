@@ -15,6 +15,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Models\PartyContact;
+use App\Services\PartyStructureService;
 use App\Services\TaxIdentityService;
 
 class CrmAccountController extends Controller
@@ -94,20 +96,25 @@ class CrmAccountController extends Controller
         $compiledAddress = !empty($addressParts) ? implode(', ', $addressParts) : null;
 
         if (!$customer) {
+            $verification = app(\App\Services\PartyVerificationService::class);
             Customer::$skipAccountAutoCreate = true;
-            $customer = Customer::create([
-                'tenant_id' => $tenantId,
-                'name' => $validated['name'],
-                'email' => $validated['email'] ?? null,
-                'phone' => $validated['phone'] ?? null,
-                'gstin' => $validated['gstin'] ?? null,
-                'billing_address' => $compiledAddress,
-                'shipping_address' => $compiledAddress,
-                'opening_balance' => $openingBalance,
-                'opening_balance_type' => $validated['opening_balance_type'] ?? 'debit',
-                'status' => 'active',
-            ]);
-            Customer::$skipAccountAutoCreate = false;
+            try {
+                $customer = Customer::create(array_merge([
+                    'tenant_id' => $tenantId,
+                    'name' => $validated['name'],
+                    'email' => $validated['email'] ?? null,
+                    'phone' => $validated['phone'] ?? null,
+                    'gstin' => $validated['gstin'] ?? null,
+                    'billing_address' => $compiledAddress,
+                    'shipping_address' => $compiledAddress,
+                    'opening_balance' => $openingBalance,
+                    'opening_balance_type' => $validated['opening_balance_type'] ?? 'debit',
+                    'status' => 'active',
+                ], $verification->pendingAttributes()));
+            } finally {
+                Customer::$skipAccountAutoCreate = false;
+            }
+            $verification->recordSubmission($customer);
         }
 
         $openingWarning = $customer
@@ -137,21 +144,27 @@ class CrmAccountController extends Controller
             'owner_id' => $validated['owner_id'] ?? (auth()->id() ?: 1),
         ]);
 
-        // 3. Create Primary Contact if name provided
+        // 3. Create Primary Contact if name provided (in unified contacts table)
         $contact = null;
         if (!empty($validated['contact_name'])) {
-            $contact = CrmContact::create([
-                'tenant_id' => $tenantId,
-                'crm_account_id' => $account->id,
-                'name' => $validated['contact_name'],
-                'designation' => $validated['designation'] ?? null,
-                'role' => $validated['role'] ?? 'Purchase Decision Maker',
-                'email' => $validated['contact_email'] ?? $validated['email'] ?? null,
-                'phone' => $validated['contact_phone'] ?? $validated['phone'] ?? null,
-                'mobile' => $validated['contact_phone'] ?? null,
-                'is_primary' => true,
-                'status' => 'active',
-            ]);
+            $contact = app(PartyStructureService::class)->createContact(
+                PartyContact::PARTY_CUSTOMER,
+                (int) $customer->id,
+                [
+                    'company_id' => $account->company_id,
+                    'branch_id' => $account->branch_id,
+                    'name' => $validated['contact_name'],
+                    'designation' => $validated['designation'] ?? null,
+                    'role' => $validated['role'] ?? 'Decision Maker',
+                    'email' => $validated['contact_email'] ?? $validated['email'] ?? null,
+                    'phone' => $validated['contact_phone'] ?? $validated['phone'] ?? null,
+                    'mobile' => $validated['contact_phone'] ?? null,
+                    'is_primary' => true,
+                    'status' => 'active',
+                ],
+                [],
+                (int) $tenantId
+            );
         }
 
         if ($request->ajax() || $request->wantsJson()) {
@@ -172,12 +185,34 @@ class CrmAccountController extends Controller
             ]);
         }
 
+        if ($customer) {
+            return redirect()->route('crm.customers.show', $customer)->with('success', 'Account created successfully.');
+        }
+
         return redirect()->route('crm.accounts.show', $account)->with('success', 'Account created successfully.');
     }
 
-    public function show(CrmAccount $account): View
+    public function show(CrmAccount $account): View|RedirectResponse
     {
         $this->authorize('view', $account);
+
+        if ($account->customer_id) {
+            return redirect()->route('crm.customers.show', $account->customer_id);
+        }
+
+        if (!empty($account->email) || !empty($account->phone)) {
+            $customer = Customer::withoutGlobalScopes()
+                ->where('tenant_id', $account->tenant_id)
+                ->where(function ($q) use ($account) {
+                    if (!empty($account->email)) $q->where('email', $account->email);
+                    if (!empty($account->phone)) $q->orWhere('phone', $account->phone);
+                })->first();
+
+            if ($customer) {
+                $account->update(['customer_id' => $customer->id]);
+                return redirect()->route('crm.customers.show', $customer->id);
+            }
+        }
 
         $account->load(['contacts', 'deals.quotations', 'quotations', 'customer', 'owner']);
 
@@ -330,33 +365,34 @@ class CrmAccountController extends Controller
 
         $account->update($validated);
 
-        // Sync Primary Contact
+        // Sync Primary Contact (unified contacts table)
         if (!empty($validated['contact_name']) || !empty($validated['contact_email']) || !empty($validated['contact_phone'])) {
+            $structure = app(PartyStructureService::class);
             $primaryContact = $account->primaryContact;
-            if ($primaryContact) {
-                $primaryContact->update([
+            if ($primaryContact instanceof PartyContact) {
+                $structure->updateContact($primaryContact, [
                     'name' => $validated['contact_name'] ?? $primaryContact->name,
                     'designation' => $validated['designation'] ?? null,
-                    'role' => $validated['role'] ?? 'Purchase Decision Maker',
+                    'role' => $validated['role'] ?? 'Decision Maker',
                     'email' => $validated['contact_email'] ?? null,
                     'phone' => $validated['contact_phone'] ?? null,
                     'mobile' => $validated['contact_phone'] ?? null,
                 ]);
             } else {
-                CrmContact::create([
-                    'tenant_id' => $tenantId,
+                $partyType = $account->customer_id ? PartyContact::PARTY_CUSTOMER : PartyContact::PARTY_CRM_ACCOUNT;
+                $partyId = (int) ($account->customer_id ?: $account->id);
+                $structure->createContact($partyType, $partyId, [
                     'company_id' => $account->company_id,
                     'branch_id' => $account->branch_id,
-                    'crm_account_id' => $account->id,
-                    'name' => $validated['contact_name'],
+                    'name' => $validated['contact_name'] ?: $account->name,
                     'designation' => $validated['designation'] ?? null,
-                    'role' => $validated['role'] ?? 'Purchase Decision Maker',
+                    'role' => $validated['role'] ?? 'Decision Maker',
                     'email' => $validated['contact_email'] ?? null,
                     'phone' => $validated['contact_phone'] ?? null,
                     'mobile' => $validated['contact_phone'] ?? null,
                     'is_primary' => true,
                     'status' => 'active',
-                ]);
+                ], [], (int) $tenantId);
             }
         }
 
@@ -425,28 +461,37 @@ class CrmAccountController extends Controller
             'name' => 'required|string|max:255',
             'designation' => 'nullable|string|max:255',
             'role' => 'nullable|string|max:100',
+            'role_ids' => 'nullable|array',
+            'role_ids.*' => 'integer|exists:contact_roles,id',
+            'party_branch_id' => 'nullable|integer|exists:party_branches,id',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|regex:/^[0-9]+$/|max:20',
             'mobile' => 'nullable|string|regex:/^[0-9]+$/|max:20',
             'is_primary' => 'nullable|boolean',
         ], $this->getAccountValidationMessages());
 
-        if (!empty($validated['is_primary'])) {
-            CrmContact::where('crm_account_id', $account->id)->update(['is_primary' => false]);
-        }
+        $partyType = $account->customer_id ? PartyContact::PARTY_CUSTOMER : PartyContact::PARTY_CRM_ACCOUNT;
+        $partyId = (int) ($account->customer_id ?: $account->id);
 
-        CrmContact::create([
-            'tenant_id' => $tenantId,
-            'crm_account_id' => $account->id,
-            'name' => $validated['name'],
-            'designation' => $validated['designation'] ?? null,
-            'role' => $validated['role'] ?? 'Purchase Decision Maker',
-            'email' => $validated['email'] ?? null,
-            'phone' => $validated['phone'] ?? null,
-            'mobile' => $validated['mobile'] ?? null,
-            'is_primary' => !empty($validated['is_primary']),
-            'status' => 'active',
-        ]);
+        app(PartyStructureService::class)->createContact(
+            $partyType,
+            $partyId,
+            [
+                'company_id' => $account->company_id,
+                'branch_id' => $account->branch_id,
+                'party_branch_id' => $validated['party_branch_id'] ?? null,
+                'name' => $validated['name'],
+                'designation' => $validated['designation'] ?? null,
+                'role' => $validated['role'] ?? 'Decision Maker',
+                'email' => $validated['email'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'mobile' => $validated['mobile'] ?? null,
+                'is_primary' => !empty($validated['is_primary']),
+                'status' => 'active',
+            ],
+            $validated['role_ids'] ?? [],
+            (int) $tenantId
+        );
 
         return redirect()->route('crm.accounts.show', $account)->with('success', 'Contact added successfully.');
     }
@@ -455,13 +500,25 @@ class CrmAccountController extends Controller
     {
         $this->authorize('view', $account);
 
-        $contacts = CrmContact::where('crm_account_id', $account->id)
+        $contacts = $account->contacts()
+            ->with('roles')
             ->orderBy('name')
-            ->get(['id', 'name', 'designation', 'role', 'email', 'phone']);
+            ->get()
+            ->map(fn (PartyContact $c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'designation' => $c->designation,
+                'role' => $c->role,
+                'roles' => $c->roles->pluck('name')->values()->all(),
+                'email' => $c->email,
+                'phone' => $c->phone,
+                'mobile' => $c->mobile,
+                'party_branch_id' => $c->party_branch_id,
+            ]);
 
         return response()->json([
             'success' => true,
-            'contacts' => $contacts
+            'contacts' => $contacts,
         ]);
     }
 
@@ -477,6 +534,9 @@ class CrmAccountController extends Controller
             'name' => 'required|string|max:255',
             'designation' => 'nullable|string|max:255',
             'role' => 'nullable|string|max:100',
+            'role_ids' => 'nullable|array',
+            'role_ids.*' => 'integer|exists:contact_roles,id',
+            'party_branch_id' => 'nullable|integer|exists:party_branches,id',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|regex:/^[0-9]+$/|max:20',
             'mobile' => 'nullable|string|regex:/^[0-9]+$/|max:20',
@@ -485,36 +545,54 @@ class CrmAccountController extends Controller
         $account = CrmAccount::where('tenant_id', $tenantId)->findOrFail($validated['crm_account_id']);
         $this->authorize('update', $account);
 
-        $contact = CrmContact::create([
-            'tenant_id' => $tenantId,
-            'crm_account_id' => $account->id,
-            'name' => $validated['name'],
-            'designation' => $validated['designation'] ?? null,
-            'role' => $validated['role'] ?? 'Primary Contact',
-            'email' => $validated['email'] ?? null,
-            'phone' => $validated['phone'] ?? null,
-            'mobile' => $validated['mobile'] ?? $validated['phone'] ?? null,
-            'is_primary' => true,
-            'status' => 'active',
-        ]);
+        $partyType = $account->customer_id ? PartyContact::PARTY_CUSTOMER : PartyContact::PARTY_CRM_ACCOUNT;
+        $partyId = (int) ($account->customer_id ?: $account->id);
+        $structure = app(PartyStructureService::class);
+
+        $contact = $structure->createContact(
+            $partyType,
+            $partyId,
+            [
+                'company_id' => $account->company_id,
+                'branch_id' => $account->branch_id,
+                'party_branch_id' => $validated['party_branch_id'] ?? null,
+                'name' => $validated['name'],
+                'designation' => $validated['designation'] ?? null,
+                'role' => $validated['role'] ?? 'Decision Maker',
+                'email' => $validated['email'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'mobile' => $validated['mobile'] ?? $validated['phone'] ?? null,
+                'is_primary' => true,
+                'status' => 'active',
+            ],
+            $validated['role_ids'] ?? [],
+            (int) $tenantId
+        );
 
         $additional = $request->input('additional_contacts', []);
         if (is_array($additional)) {
             foreach ($additional as $add) {
-                if (empty($add['name']))
+                if (empty($add['name'])) {
                     continue;
-                CrmContact::create([
-                    'tenant_id' => $tenantId,
-                    'crm_account_id' => $account->id,
-                    'name' => $add['name'],
-                    'designation' => $add['designation'] ?? null,
-                    'role' => 'Additional Contact',
-                    'email' => $add['email'] ?? null,
-                    'phone' => $add['phone'] ?? null,
-                    'mobile' => $add['phone'] ?? null,
-                    'is_primary' => false,
-                    'status' => 'active',
-                ]);
+                }
+                $structure->createContact(
+                    $partyType,
+                    $partyId,
+                    [
+                        'company_id' => $account->company_id,
+                        'branch_id' => $account->branch_id,
+                        'name' => $add['name'],
+                        'designation' => $add['designation'] ?? null,
+                        'role' => $add['role'] ?? 'End User',
+                        'email' => $add['email'] ?? null,
+                        'phone' => $add['phone'] ?? null,
+                        'mobile' => $add['phone'] ?? null,
+                        'is_primary' => false,
+                        'status' => 'active',
+                    ],
+                    [],
+                    (int) $tenantId
+                );
             }
         }
 
@@ -525,13 +603,18 @@ class CrmAccountController extends Controller
             'success' => true,
             'id' => $contact->id,
             'name' => $displayText,
-            'message' => 'Contact Person created successfully for ' . $account->name . '!'
+            'message' => 'Contact Person created successfully for ' . $account->name . '!',
         ]);
     }
 
     public function destroy(CrmAccount $account): RedirectResponse
     {
         $this->authorize('delete', $account);
+
+        $guard = app(\App\Services\PartyDeletionGuard::class);
+        if ($guard->hasTransactions($account)) {
+            return redirect()->back()->with('error', $guard->blockedReason($account));
+        }
 
         $account->delete();
         return redirect()->route('crm.accounts.index')->with('success', 'Account deleted successfully.');

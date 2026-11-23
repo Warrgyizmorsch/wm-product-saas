@@ -9,7 +9,7 @@ class WarehouseRepository
 {
     public function getAll(): Collection
     {
-        return Warehouse::query()->latest()->get();
+        return Warehouse::withoutGlobalScope('branch')->with('branch')->latest()->get();
     }
 
     public function getActive(): Collection
@@ -19,7 +19,7 @@ class WarehouseRepository
 
     public function find(int $id): ?Warehouse
     {
-        return Warehouse::find($id);
+        return Warehouse::withoutGlobalScope('branch')->find($id);
     }
 
     public function create(array $data): Warehouse

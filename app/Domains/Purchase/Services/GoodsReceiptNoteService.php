@@ -25,9 +25,25 @@ class GoodsReceiptNoteService
             $grnNumber = $this->grnRepo->getNextGrnNumber($tenantId);
 
             $poId = $validated['purchase_order_id'] ?? null;
-            $po = $poId ? PurchaseOrder::find($poId) : null;
+            $po = $poId ? PurchaseOrder::withoutGlobalScope('branch')->find($poId) : null;
             $vendorId = $validated['vendor_id'] ?? $po?->vendor_id;
-            $warehouseId = $validated['warehouse_id'] ?? $po?->warehouse_id ?? Warehouse::where('tenant_id', $tenantId)->first()?->id;
+
+            $warehouseId = $validated['warehouse_id'] ?? null;
+            if (! $warehouseId && $po) {
+                if ($po->delivery_party_branch_id) {
+                    // Direct-to-customer-site drop-ship: receive against virtual Direct-to-Site warehouse
+                    $warehouseId = Warehouse::ensureDirectToSiteWarehouse($tenantId, $po->company_id)->id;
+                } elseif ($po->warehouse) {
+                    $warehouseId = $po->warehouse->id;
+                } elseif ($po->delivery_branch_id) {
+                    $warehouseId = Warehouse::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('branch_id', $po->delivery_branch_id)
+                        ->orderByDesc('is_default')
+                        ->value('id');
+                }
+            }
+            $warehouseId = $warehouseId ?? Warehouse::where('tenant_id', $tenantId)->first()?->id;
 
             $transporterId = $validated['transporter_id'] ?? null;
             $transporterName = $validated['transporter_name'] ?? null;

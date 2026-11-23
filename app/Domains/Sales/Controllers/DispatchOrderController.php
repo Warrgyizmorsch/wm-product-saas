@@ -79,6 +79,12 @@ class DispatchOrderController extends Controller
                 return redirect()->route('sales.dispatches.index')
                     ->with('error', 'Sales Order must be Confirmed before creating a Dispatch Order.');
             }
+            if ($prefillSalesOrder) {
+                $guard = app(\App\Services\PartyTransactionGuard::class);
+                if ($blocked = $guard->blockedReason('customer', $prefillSalesOrder->customer_id, $prefillSalesOrder->tenant_id, 'dispatch')) {
+                    return redirect()->route('sales.dispatches.index')->with('error', $blocked);
+                }
+            }
             if ($prefillSalesOrder && $prefillSalesOrder->hasOnlyServices()) {
                 return redirect()->route('sales.orders.show', $prefillSalesOrder->id)
                     ->with('info', "Sales Order {$prefillSalesOrder->sales_order_number} contains only service items. Services do not require physical dispatch or shipping and can be directly invoiced.");
@@ -94,6 +100,12 @@ class DispatchOrderController extends Controller
                     ->with('error', 'Sales Order must be Confirmed before creating a Dispatch Order.');
             }
             $prefillSalesOrder = $mr?->salesOrder;
+            if ($prefillSalesOrder) {
+                $guard = app(\App\Services\PartyTransactionGuard::class);
+                if ($blocked = $guard->blockedReason('customer', $prefillSalesOrder->customer_id, $prefillSalesOrder->tenant_id, 'dispatch')) {
+                    return redirect()->route('sales.dispatches.index')->with('error', $blocked);
+                }
+            }
             $soId = $prefillSalesOrder?->id;
         }
 
@@ -116,7 +128,16 @@ class DispatchOrderController extends Controller
         ->latest()
         ->get();
 
-        $customers    = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $customers = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->when(config('party_verification.enabled', true), function ($q) {
+                $q->where(function ($sub) {
+                    $sub->whereNull('verification_status')
+                        ->orWhere('verification_status', \App\Domains\CRM\Models\Customer::VERIFICATION_VERIFIED);
+                });
+            })
+            ->orderBy('name')
+            ->get();
         $products     = Product::where('tenant_id', $tenantId)->with(['uom'])->orderBy('name')->get();
 
         $formattedWarehouses = $warehouses->map(fn ($w) => ['id' => $w->id, 'name' => $w->name])->values()->all();
@@ -256,6 +277,8 @@ class DispatchOrderController extends Controller
             'material_requirement_id' => ['nullable', 'exists:material_requirements,id'],
             'invoice_id'              => ['nullable', 'exists:invoices,id'],
             'customer_id'             => ['nullable', 'exists:customers,id'],
+            'shipping_branch_id'      => ['nullable', 'exists:party_branches,id'],
+            'site_contact_id'         => ['nullable', 'exists:contacts,id'],
             'transporter_id'          => ['nullable', 'exists:transporters,id'],
             'carrier'                 => ['nullable', 'string', 'max:255'],
             'tracking_number'         => ['nullable', 'string', 'max:255'],
@@ -305,6 +328,9 @@ class DispatchOrderController extends Controller
             $dispatch = $this->dispatchService->createDispatchOrder($validated, Auth::id() ?? 1);
             \App\Domains\Sales\Services\SalesNotificationService::notifyDispatchCreated($dispatch);
             return redirect()->route('sales.dispatches.index')->with('success', "Dispatch Order {$dispatch->dispatch_number} created successfully.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $msg = collect($e->errors())->flatten()->first() ?: $e->getMessage();
+            return redirect()->back()->withInput()->withErrors($e->errors())->with('error', $msg);
         } catch (Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
@@ -373,6 +399,11 @@ class DispatchOrderController extends Controller
         $dispatch = $this->dispatchRepo->find($id);
         if (!$dispatch) abort(404);
         $this->authorize('view', $dispatch);
+
+        $guard = app(\App\Services\PartyTransactionGuard::class);
+        if ($blocked = $guard->blockedReason('customer', $dispatch->customer_id, $dispatch->tenant_id, 'delivery challan')) {
+            return redirect()->back()->with('error', "Cannot generate Delivery Challan: {$blocked}");
+        }
 
         return view('modules.sales.dispatches.pdf', compact('dispatch'));
     }

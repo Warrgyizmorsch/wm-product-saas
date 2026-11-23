@@ -1091,13 +1091,15 @@ class ProductApiController extends Controller
 
             if ($vendor) return $vendor->id;
 
-            $newVendor = Vendor::create([
+            $verification = app(\App\Services\PartyVerificationService::class);
+            $newVendor = Vendor::create(array_merge([
                 'tenant_id'    => $tenantId,
                 'name'         => $vendorName,
                 'company_name' => $vendorName,
                 'email'        => $vendorEmail,
                 'status'       => 'active',
-            ]);
+            ], $verification->pendingAttributes()));
+            $verification->recordSubmission($newVendor);
 
             return $newVendor->id;
         }

@@ -61,6 +61,26 @@
                         @endforeach
                     </x-ui.odoo-form-ui>
 
+                    @php
+                        $branchesEnabled = (bool) config('party_verification.branches_enabled', true);
+                    @endphp
+                    @if($branchesEnabled)
+                        <div id="customerBranchControls" class="d-none border rounded-2 p-2 mb-3 bg-light">
+                            <div class="mb-2">
+                                <label class="form-label fs-12 fw-semibold mb-1" for="billingBranchSelect">Bill-To Branch</label>
+                                <select name="billing_branch_id" id="billingBranchSelect" class="form-select form-select-sm"></select>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label fs-12 fw-semibold mb-1" for="shippingBranchSelect">Ship-To Branch / Site</label>
+                                <select name="shipping_branch_id" id="shippingBranchSelect" class="form-select form-select-sm"></select>
+                            </div>
+                            <div class="mb-0">
+                                <label class="form-label fs-12 fw-semibold mb-1" for="siteContactSelect">Site Contact / Receiver</label>
+                                <select name="site_contact_id" id="siteContactSelect" class="form-select form-select-sm"></select>
+                            </div>
+                        </div>
+                    @endif
+
                     <x-ui.odoo-form-ui type="select" :label="__('crm.quotation_ref')" name="quotation_id" id="quotationSelect">
                         <option value="">{{ __('crm.select_quotation_ref') }}</option>
                         @foreach ($quotations as $q)
@@ -653,9 +673,105 @@
                 }
             }
 
+            let loadedBranches = [];
+            const initialBillingBranchId = {{ (int) old('billing_branch_id', $order->billing_branch_id ?? 0) }};
+            const initialShippingBranchId = {{ (int) old('shipping_branch_id', $order->shipping_branch_id ?? 0) }};
+            const initialSiteContactId = {{ (int) old('site_contact_id', $order->site_contact_id ?? 0) }};
+
+            function loadCustomerBranches(custId, isInitial = false) {
+                const container = $('#customerBranchControls');
+                if (!container.length) return;
+                if (!custId || custId === '__ADD_NEW__') {
+                    container.addClass('d-none');
+                    $('#billingBranchSelect, #shippingBranchSelect, #siteContactSelect').empty();
+                    return;
+                }
+
+                fetch(`/crm/customers/${custId}/branches`, { headers: { 'Accept': 'application/json' } })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(payload => {
+                        if (!payload || !Array.isArray(payload.branches)) return;
+                        loadedBranches = payload.branches;
+                        const billSel = $('#billingBranchSelect').empty();
+                        const shipSel = $('#shippingBranchSelect').empty();
+                        const contactSel = $('#siteContactSelect').empty().append('<option value="">— Select Site Contact —</option>');
+
+                        const billBranches = loadedBranches.filter(b => b.is_billing);
+                        const shipBranches = loadedBranches.filter(b => b.is_shipping);
+                        const useBill = billBranches.length ? billBranches : loadedBranches;
+                        const useShip = shipBranches.length ? shipBranches : loadedBranches;
+
+                        useBill.forEach(b => {
+                            const lbl = `${b.name} (${b.code})${b.gstin ? ' — ' + b.gstin : ''}`;
+                            const isSelected = isInitial
+                                ? (b.id === initialBillingBranchId || (!initialBillingBranchId && b.is_default_billing))
+                                : b.is_default_billing;
+                            billSel.append(new Option(lbl, b.id, isSelected, isSelected));
+                        });
+                        useShip.forEach(b => {
+                            const lbl = `${b.name} (${b.code})${b.gstin ? ' — ' + b.gstin : ''}`;
+                            const isSelected = isInitial
+                                ? (b.id === initialShippingBranchId || (!initialShippingBranchId && b.is_default_shipping))
+                                : b.is_default_shipping;
+                            shipSel.append(new Option(lbl, b.id, isSelected, isSelected));
+                        });
+                        (payload.contacts || []).forEach(c => {
+                            const roles = (c.roles && c.roles.length) ? ` [${c.roles.join(', ')}]` : '';
+                            const isSelected = isInitial && c.id === initialSiteContactId;
+                            contactSel.append(new Option(`${c.name}${roles}${c.phone ? ' (' + c.phone + ')' : ''}`, c.id, isSelected, isSelected));
+                        });
+
+                        if (loadedBranches.length >= 2) {
+                            container.removeClass('d-none');
+                        } else {
+                            container.addClass('d-none');
+                        }
+
+                        if (!isInitial) {
+                            applySelectedBranchDetails();
+                        }
+                    })
+                    .catch(() => {});
+            }
+
+            function applySelectedBranchDetails() {
+                const billId = parseInt($('#billingBranchSelect').val() || '0', 10);
+                const shipId = parseInt($('#shippingBranchSelect').val() || '0', 10);
+                const billBranch = loadedBranches.find(b => b.id === billId);
+                const shipBranch = loadedBranches.find(b => b.id === shipId);
+
+                if (billBranch && billBranch.address) {
+                    $('textarea[name="billing_address"]').val(billBranch.address);
+                }
+                if (shipBranch && shipBranch.address) {
+                    $('textarea[name="shipping_address"]').val(shipBranch.address);
+                }
+
+                const companyPrefix = ($('#customerSelect').attr('data-company-gst-prefix') || '{{ $companyGstPrefix }}').trim().toUpperCase();
+                // IGST Sec 10(1)(b): Bill-To state for B2B when Bill-To has GSTIN, else Ship-To state
+                const targetState = (billBranch && billBranch.effective_gstin)
+                    ? (billBranch.gst_state_code || '')
+                    : ((shipBranch && shipBranch.gst_state_code) || (billBranch && billBranch.gst_state_code) || '');
+
+                if (companyPrefix && targetState) {
+                    $('#gstTypeSelect').val(companyPrefix === targetState ? 'cgst_sgst' : 'igst').trigger('change');
+                    if ($('#taxTypeSelect').val() !== 'without_tax') {
+                        calculateTotals();
+                    }
+                }
+            }
+
+            $('#billingBranchSelect, #shippingBranchSelect').on('change', applySelectedBranchDetails);
+
             $('#customerSelect').on('change select2:select', function() {
                 applyCustomerGstAndAddress(false);
+                loadCustomerBranches($(this).val(), false);
             });
+
+            if ($('#customerSelect').val()) {
+                applyCustomerGstAndAddress(true);
+                loadCustomerBranches($('#customerSelect').val(), true);
+            }
 
             function addRow(item = null) {
                 const selectedId = item ? (item.product_id || '') : '';

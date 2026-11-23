@@ -5,7 +5,17 @@
 @section('breadcrumb', __('crm.customers_sidebar'))
 
 @section('page-actions')
+    @php
+        $partyVerification = app(\App\Services\PartyVerificationService::class);
+        $canVerifyCustomers = $partyVerification->enabled() && $partyVerification->canVerify(auth()->user(), new \App\Domains\CRM\Models\Customer(['tenant_id' => auth()->user()?->tenant_id]));
+    @endphp
     <div class="d-flex align-items-center gap-2">
+        @if($canVerifyCustomers)
+            <a href="{{ route('crm.customers.verification.index') }}" class="btn btn-outline-warning btn-sm fw-semibold d-inline-flex align-items-center gap-1.5">
+                <i class="feather-shield"></i>
+                <span>Pending Verification</span>
+            </a>
+        @endif
         <x-ui.import-export-dropdown 
             type="customers" 
             :can-import="false" 
@@ -115,11 +125,7 @@
                         <tr>
                             <td class="ps-3">
                                 <div>
-                                    @php
-                                        $accId = $customer->crmAccount?->id;
-                                        $accRoute = $accId ? route('crm.accounts.show', $accId) : route('crm.customers.show', $customer);
-                                    @endphp
-                                    <a href="{{ $accRoute }}" class="fw-bold text-dark hover-primary d-block">{{ $customer->name }}</a>
+                                    <a href="{{ route('crm.customers.show', $customer) }}" class="fw-bold text-dark hover-primary d-block">{{ $customer->name }}</a>
                                     @if($customer->gstin)
                                         <span class="fs-10 font-monospace text-muted">GST: {{ $customer->gstin }}</span>
                                     @endif
@@ -140,17 +146,28 @@
                                 @endif
                             </td>
                             <td>
-                                @if (strtolower($customer->status) === 'active')
+                                @php
+                                    $partyVerification = $partyVerification ?? app(\App\Services\PartyVerificationService::class);
+                                    $partyStatus = $partyStatus ?? app(\App\Services\PartyStatusService::class);
+                                @endphp
+                                @if ($partyVerification->enabled() && ! $customer->isVerified())
+                                    <span class="badge {{ $customer->isReturnedForCorrection() ? 'bg-soft-danger text-danger' : 'bg-soft-warning text-warning' }} fs-11">
+                                        {{ $customer->verificationLabel() }}
+                                    </span>
+                                @elseif (strtolower($customer->status) === 'active')
                                     <x-ui.status-badge status="active" label="Active" size="sm" />
                                 @else
                                     <x-ui.status-badge status="inactive" label="Inactive" size="sm" />
+                                    @if($partyStatus->enabled() && $customer->inactive_reason)
+                                        <div class="fs-10 text-muted mt-1">{{ $partyStatus->reasonLabel($customer->inactive_reason) }}</div>
+                                    @endif
                                 @endif
                             </td>
                             <td class="text-end pe-3">
                                 <x-ui.action-dropdown align="end">
                                     <x-slot:extraActions>
-                                        <a href="{{ $accRoute }}" class="btn btn-xs btn-soft-primary fw-bold text-nowrap px-2 py-1 fs-11" style="height: 28px; line-height: 20px; display: inline-flex; align-items: center;">
-                                            {{ __('crm.view_account') }}
+                                        <a href="{{ route('crm.customers.show', $customer) }}" class="btn btn-xs btn-soft-primary fw-bold text-nowrap px-2 py-1 fs-11" style="height: 28px; line-height: 20px; display: inline-flex; align-items: center;">
+                                            {{ \Illuminate\Support\Facades\Lang::has('crm.view_customer') ? __('crm.view_customer') : 'View Customer' }}
                                         </a>
                                     </x-slot:extraActions>
 
@@ -160,18 +177,43 @@
                                             <i class="feather-edit me-2 text-primary"></i>{{ __('crm.edit') ?? 'Edit Customer' }}
                                         </a>
                                     </li>
-                                    @if (strtolower($customer->status) === 'active')
+                                    @endcan
+
+                                    @if ($partyVerification->enabled() && ! $customer->isVerified() && $partyVerification->canVerify(auth()->user(), $customer) && ! $partyVerification->isMaker(auth()->user(), $customer))
                                         <li>
-                                            <a href="{{ route('crm.customers.toggleStatus', [$customer, 'status' => 'inactive']) }}" class="dropdown-item py-1.5 text-danger">
-                                                <i class="feather-user-x me-2 text-danger"></i>{{ __('crm.mark_as_inactive') }}
+                                            <a href="{{ route('crm.customers.show', $customer) }}" class="dropdown-item py-1.5 text-warning fw-semibold">
+                                                <i class="feather-shield me-2 text-warning"></i>Review &amp; Verify
                                             </a>
                                         </li>
-                                    @else
-                                        <li>
-                                            <a href="{{ route('crm.customers.toggleStatus', [$customer, 'status' => 'active']) }}" class="dropdown-item py-1.5 text-success">
-                                                <i class="feather-user-check me-2 text-success"></i>{{ __('crm.mark_as_active') }}
-                                            </a>
-                                        </li>
+                                    @endif
+
+                                    @can('update', $customer)
+                                    @if (! ($partyVerification->enabled() && ! $customer->isVerified()))
+                                        @if (strtolower($customer->status) === 'active')
+                                            <li>
+                                                @if ($partyStatus->enabled())
+                                                    <a href="{{ route('crm.customers.deactivate.create', $customer) }}" class="dropdown-item py-1.5 text-danger">
+                                                        <i class="feather-user-x me-2 text-danger"></i>Make inactive
+                                                    </a>
+                                                @else
+                                                    <a href="{{ route('crm.customers.toggleStatus', [$customer, 'status' => 'inactive']) }}" class="dropdown-item py-1.5 text-danger">
+                                                        <i class="feather-user-x me-2 text-danger"></i>{{ __('crm.mark_as_inactive') }}
+                                                    </a>
+                                                @endif
+                                            </li>
+                                        @else
+                                            <li>
+                                                @if ($partyStatus->enabled() && $customer->isInactiveForRisk())
+                                                    <a href="{{ route('crm.customers.reactivate.create', $customer) }}" class="dropdown-item py-1.5 text-success">
+                                                        <i class="feather-user-check me-2 text-success"></i>Reactivate
+                                                    </a>
+                                                @else
+                                                    <a href="{{ route('crm.customers.toggleStatus', [$customer, 'status' => 'active']) }}" class="dropdown-item py-1.5 text-success">
+                                                        <i class="feather-user-check me-2 text-success"></i>{{ __('crm.mark_as_active') }}
+                                                    </a>
+                                                @endif
+                                            </li>
+                                        @endif
                                     @endif
                                     @endcan
                                 </x-ui.action-dropdown>

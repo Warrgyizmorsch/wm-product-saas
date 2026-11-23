@@ -45,6 +45,28 @@ class LeadFollowupRepository
             ->first();
 
         $lead->next_followup_date = $nextPending ? $nextPending->followup_date : null;
+        $lead->has_active_next_action = ($nextPending !== null);
+        if ($nextPending) {
+            $lead->stale_alert_sent_at = null;
+        }
+
+        // FRS 2.5 / C-01: a real (non-pending, connected) customer interaction stops the response clock,
+        // whichever screen completed it (log note, update, meeting status).
+        if (empty($lead->first_responded_at)) {
+            $done = $lead->followups()
+                ->whereIn('status', ['Completed', 'Connected'])
+                ->whereIn('type', ['Call', 'Email', 'Meeting', 'Demo', 'Visit'])
+                ->orderBy('updated_at', 'asc')
+                ->first();
+            if ($done) {
+                $lead->first_responded_at = $done->updated_at ?: now();
+            }
+        }
         $lead->save();
+
+        // FRS 2.5: an open, owned lead (not on hold) never ends up without a dated next action.
+        if (!$nextPending) {
+            app(\App\Domains\CRM\Services\LeadNextActionService::class)->ensureNextAction($lead->fresh());
+        }
     }
 }

@@ -5,7 +5,30 @@
 @section('breadcrumb', __('purchase.supply_chain_purchase_vendors'))
 
 @section('page-actions')
-    <div class="d-flex align-items-center gap-2">
+    @php
+        $partyVerification = app(\App\Services\PartyVerificationService::class);
+        $partyBankChange = app(\App\Services\PartyBankChangeService::class);
+        $sampleVendor = new \App\Domains\Inventory\Models\Vendor(['tenant_id' => auth()->user()?->tenant_id]);
+        $canVerifyVendors = $partyVerification->enabled() && $partyVerification->canVerify(auth()->user(), $sampleVendor);
+        $canApproveBankChanges = $partyBankChange->enabled() && $partyBankChange->canApprove(auth()->user(), $sampleVendor);
+        $openBankChangeCount = $canApproveBankChanges ? \App\Models\PartyBankChangeRequest::query()->where('party_type', 'vendor')->where('status', 'pending')->count() : 0;
+    @endphp
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        @if($canVerifyVendors)
+            <a href="{{ route('purchase.vendors.verification.index') }}" class="btn btn-outline-warning btn-sm fw-semibold d-inline-flex align-items-center gap-1.5">
+                <i class="feather-shield"></i>
+                <span>Pending Verification</span>
+            </a>
+        @endif
+        @if($canApproveBankChanges)
+            <a href="{{ route('purchase.vendors.bank-changes.index') }}" class="btn btn-outline-info btn-sm fw-semibold d-inline-flex align-items-center gap-1.5">
+                <i class="feather-credit-card"></i>
+                <span>Bank Change Requests</span>
+                @if($openBankChangeCount > 0)
+                    <span class="badge bg-info text-white">{{ $openBankChangeCount }}</span>
+                @endif
+            </a>
+        @endif
         <x-ui.import-export-dropdown 
             type="vendors" 
             :can-import="false" 
@@ -178,10 +201,21 @@
                                 @endif
                             </td>
                             <td>
-                                @if (strtolower($vendor->status) === 'active')
+                                @php
+                                    $partyVerification = $partyVerification ?? app(\App\Services\PartyVerificationService::class);
+                                    $partyStatus = $partyStatus ?? app(\App\Services\PartyStatusService::class);
+                                @endphp
+                                @if ($partyVerification->enabled() && ! $vendor->isVerified())
+                                    <span class="badge {{ $vendor->isReturnedForCorrection() ? 'bg-soft-danger text-danger' : 'bg-soft-warning text-warning' }} fs-11">
+                                        {{ $vendor->verificationLabel() }}
+                                    </span>
+                                @elseif (strtolower($vendor->status) === 'active')
                                     <x-ui.status-badge status="active" :label="__('purchase.active')" size="sm" />
                                 @else
                                     <x-ui.status-badge status="inactive" :label="__('purchase.inactive')" size="sm" />
+                                    @if($partyStatus->enabled() && $vendor->inactive_reason)
+                                        <div class="fs-10 text-muted mt-1">{{ $partyStatus->reasonLabel($vendor->inactive_reason) }}</div>
+                                    @endif
                                 @endif
                             </td>
                             <td class="text-end pe-3">
@@ -191,16 +225,39 @@
                                             <i class="feather-edit-2 me-2 text-primary"></i>{{ __('purchase.edit_supplier') }}
                                         </a>
                                     </li>
-                                    <li><hr class="dropdown-divider my-1"></li>
-                                    <li>
-                                        <form action="{{ route('purchase.vendors.toggle-status', $vendor) }}" method="POST">
-                                            @csrf
-                                            <button type="submit" class="dropdown-item fs-12 py-1.5 text-{{ strtolower($vendor->status) === 'active' ? 'danger' : 'success' }}">
-                                                <i class="feather-{{ strtolower($vendor->status) === 'active' ? 'user-x' : 'check-circle' }} me-2"></i>
-                                                {{ strtolower($vendor->status) === 'active' ? __('purchase.mark_as_inactive') : __('purchase.mark_as_active') }}
-                                            </button>
-                                        </form>
-                                    </li>
+                                    @if ($partyVerification->enabled() && ! $vendor->isVerified() && $partyVerification->canVerify(auth()->user(), $vendor) && ! $partyVerification->isMaker(auth()->user(), $vendor))
+                                        <li>
+                                            <a href="{{ route('purchase.vendors.show', $vendor) }}" class="dropdown-item fs-12 py-1.5 text-warning fw-semibold">
+                                                <i class="feather-shield me-2 text-warning"></i>Review &amp; Verify
+                                            </a>
+                                        </li>
+                                    @endif
+                                    @if (! ($partyVerification->enabled() && ! $vendor->isVerified()))
+                                        <li><hr class="dropdown-divider my-1"></li>
+                                        @if ($partyStatus->enabled())
+                                            <li>
+                                                @if (strtolower($vendor->status) === 'active')
+                                                    <a href="{{ route('purchase.vendors.deactivate.create', $vendor->id) }}" class="dropdown-item fs-12 py-1.5 text-danger">
+                                                        <i class="feather-user-x me-2 text-danger"></i>Make inactive
+                                                    </a>
+                                                @else
+                                                    <a href="{{ route('purchase.vendors.reactivate.create', $vendor->id) }}" class="dropdown-item fs-12 py-1.5 text-success">
+                                                        <i class="feather-check-circle me-2 text-success"></i>Reactivate
+                                                    </a>
+                                                @endif
+                                            </li>
+                                        @else
+                                            <li>
+                                                <form action="{{ route('purchase.vendors.toggle-status', $vendor) }}" method="POST">
+                                                    @csrf
+                                                    <button type="submit" class="dropdown-item fs-12 py-1.5 text-{{ strtolower($vendor->status) === 'active' ? 'danger' : 'success' }}">
+                                                        <i class="feather-{{ strtolower($vendor->status) === 'active' ? 'user-x' : 'check-circle' }} me-2"></i>
+                                                        {{ strtolower($vendor->status) === 'active' ? __('purchase.mark_as_inactive') : __('purchase.mark_as_active') }}
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
+                                    @endif
                                 </x-ui.action-dropdown>
                             </td>
                         </tr>

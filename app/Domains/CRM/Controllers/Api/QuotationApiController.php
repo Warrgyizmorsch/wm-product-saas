@@ -115,6 +115,23 @@ class QuotationApiController extends Controller
             $validated['quotation_number'] = $this->quotationService->getNextQuotationNumber();
         }
 
+        $resolvedCustomerId = $validated['customer_id'] ?? null;
+        if (!$resolvedCustomerId && !empty($validated['crm_account_id'])) {
+            $acc = \App\Domains\CRM\Models\CrmAccount::find($validated['crm_account_id']);
+            $resolvedCustomerId = $acc?->customer_id ?? $acc?->customer?->id;
+        }
+        if (!$resolvedCustomerId && !empty($validated['crm_deal_id'])) {
+            $deal = \App\Domains\CRM\Models\CrmDeal::with(['account', 'contact'])->find($validated['crm_deal_id']);
+            $resolvedCustomerId = $deal?->account?->customer_id ?? $deal?->account?->customer?->id;
+        }
+        if (!$resolvedCustomerId && !empty($validated['lead_id'])) {
+            $lead = \App\Domains\CRM\Models\Lead::find($validated['lead_id']);
+            $resolvedCustomerId = $lead?->customer?->id;
+        }
+        if ($resolvedCustomerId) {
+            app(\App\Services\PartyTransactionGuard::class)->assertCanTransact('customer', $resolvedCustomerId, $tenantId, 'quotation', 'customer_id');
+        }
+
         $quotation = $this->quotationService->create($validated, $validated['items']);
 
         return response()->json([

@@ -6,6 +6,7 @@ use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
+use App\Models\Concerns\GuardsPartyTransactions;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DeliveryChallan extends Model
 {
-    use SoftDeletes, BelongsToCompany, BelongsToBranch;
+    use SoftDeletes, BelongsToCompany, BelongsToBranch, GuardsPartyTransactions;
+
+    protected function guardedParties(): array
+    {
+        return ['vendor_id' => ['vendor', 'delivery challan']];
+    }
 
     protected $table = 'delivery_challans';
 

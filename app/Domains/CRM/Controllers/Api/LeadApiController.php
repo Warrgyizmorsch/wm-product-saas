@@ -635,7 +635,12 @@ class LeadApiController extends Controller
         $productIds   = $data['product_ids']   ?? ($data['products']['product_ids'] ?? null);
         $productItems = $data['product_items'] ?? ($data['products']['product_items'] ?? null);
 
+        // FRS 2.5 / F04: imports and API intake are not inbound enquiries; researched prospects stay labelled.
+        $isResearched = strcasecmp((string) ($data['source'] ?? ''), 'research') === 0;
+
         return new Lead([
+            'provenance'          => $isResearched ? 'researched' : 'api_import',
+            'is_inbound_enquiry'  => false,
             'tenant_id'           => $tenantId,
             'company_id'          => $companyId,
             'branch_id'           => $branchId,
@@ -711,6 +716,7 @@ class LeadApiController extends Controller
             [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
             $lead = $this->buildLead($validator->validated(), $tenantId, $companyId, $branchId);
             $lead->save();
+            app(\App\Domains\CRM\Services\LeadNextActionService::class)->ensureNextAction($lead->fresh());
 
             return response()->json([
                 'success' => true,
@@ -773,6 +779,7 @@ class LeadApiController extends Controller
             try {
                 $lead = $this->buildLead($rowValidator->validated(), $tenantId, $companyId, $branchId);
                 $lead->save();
+                app(\App\Domains\CRM\Services\LeadNextActionService::class)->ensureNextAction($lead->fresh());
                 $created[] = [
                     'row'         => $index + 1,
                     'id'          => $lead->id,
@@ -913,6 +920,10 @@ class LeadApiController extends Controller
         $validator = Validator::make($request->all(), [
             'status_id' => ['nullable', 'integer'],
             'status'    => ['nullable', 'string'],
+            'loss_reason_id' => ['nullable', 'integer', 'exists:crm_loss_reasons,id'],
+            'lost_to_competitor' => ['nullable', 'string', 'max:150'],
+            'loss_remarks' => ['nullable', 'string', 'max:1000'],
+            'nurture_followup_date' => ['nullable', 'date'],
         ]);
 
         if ($validator->fails()) {
@@ -940,7 +951,7 @@ class LeadApiController extends Controller
             ], 422);
         }
 
-        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+        if (in_array(strtolower($lead->status), ['dealing', 'won']) && !(strtolower($lead->status) === 'dealing' && strcasecmp((string) ($newStatus ?? ''), 'Lost') === 0)) {
             return response()->json([
                 'success' => false,
                 'message' => "Lead status in '{$lead->status}' stage is locked.",
@@ -954,8 +965,19 @@ class LeadApiController extends Controller
             ], 422);
         }
 
+        // FRS 2.5 / C-04: the API enforces the same structured loss capture as the web screen.
+        if (strcasecmp($newStatus, 'Lost') === 0) {
+            $reason = $request->filled('loss_reason_id') ? \App\Domains\CRM\Models\CrmLossReason::find($request->input('loss_reason_id')) : null;
+            if (!$reason) {
+                return response()->json(['success' => false, 'message' => 'loss_reason_id is required to mark a lead as Lost.', 'errors' => ['loss_reason_id' => ['A loss reason is required.']]], 422);
+            }
+            if ($reason->requires_competitor && !$request->filled('lost_to_competitor')) {
+                return response()->json(['success' => false, 'message' => 'lost_to_competitor is required for this loss reason.', 'errors' => ['lost_to_competitor' => ['Competitor name is required.']]], 422);
+            }
+        }
+
         $leadService = app(\App\Domains\CRM\Services\LeadService::class);
-        $result = $leadService->updateLeadStatus($lead, $newStatus);
+        $result = $leadService->updateLeadStatus($lead, $newStatus, false, $request->only(['loss_reason_id', 'lost_to_competitor', 'loss_remarks', 'nurture_followup_date']));
 
         if (!$result['success']) {
             return response()->json([
@@ -1045,20 +1067,24 @@ class LeadApiController extends Controller
 
         $result = DB::transaction(function () use ($lead, $validated, $dealTitle, $dealAmount, $tenantId, $companyId, $branchId) {
             // 1. Create or Find Customer
+            $verification = app(\App\Services\PartyVerificationService::class);
             $customer = Customer::firstOrCreate(
                 [
                     'tenant_id' => $tenantId,
                     'email'     => $lead->email ?: ($lead->company_email ?: "lead_{$lead->id}@placeholder.com")
                 ],
-                [
+                array_merge([
                     'company_id'   => $companyId,
                     'branch_id'    => $branchId,
                     'name'         => $lead->name ?: ($lead->company_name ?: 'Valued Client'),
                     'company_name' => $lead->company_name,
                     'phone'        => $lead->phone ?: $lead->company_phone,
                     'status'       => 'active',
-                ]
+                ], $verification->pendingAttributes())
             );
+            if ($customer->wasRecentlyCreated) {
+                $verification->recordSubmission($customer);
+            }
 
             // 2. Create or Find CrmAccount
             $account = CrmAccount::firstOrCreate(

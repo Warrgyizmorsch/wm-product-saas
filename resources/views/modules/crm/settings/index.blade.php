@@ -52,6 +52,24 @@
                 'icon' => 'feather-map-pin',
                 'active' => in_array($activeTab, ['field-visit', 'field_visit', 'tab-field-visit']),
             ],
+            [
+                'id' => 'tab-lead-sla-policy',
+                'label' => 'Response SLA & Inactivity Policy',
+                'icon' => 'feather-clock',
+                'active' => in_array($activeTab, ['lead-sla-policy', 'lead_sla_policy', 'tab-lead-sla-policy']),
+            ],
+            [
+                'id' => 'tab-contact-roles',
+                'label' => 'Contact Roles',
+                'icon' => 'feather-tag',
+                'active' => in_array($activeTab, ['contact-roles', 'contact_roles', 'tab-contact-roles']),
+            ],
+            [
+                'id' => 'tab-loss-reasons',
+                'label' => 'Loss Reasons',
+                'icon' => 'feather-x-circle',
+                'active' => in_array($activeTab, ['loss-reasons', 'loss_reasons', 'tab-loss-reasons']),
+            ],
         ];
     @endphp
 
@@ -171,6 +189,55 @@
                                             </option>
                                         @endforeach
                                     </select>
+                                </div>
+
+                                <!-- FRS 2.5 step 3: routing rules -->
+                                <div class="border rounded-3 p-3 mb-4">
+                                    <h6 class="fw-bold text-dark fs-13 mb-1"><i class="feather-git-branch me-1 text-primary"></i>Routing Rules (territory, segment, product, source, workload)</h6>
+                                    <p class="text-muted fs-12 mb-3">The first matching rule picks the owner from its pool. Rules run before the mode above; leave empty to use the mode only.</p>
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input" type="checkbox" name="prefer_account_owner" id="prefer_account_owner" value="1" @checked(!empty($leadAssignmentConfig['prefer_account_owner']))>
+                                        <label class="form-check-label fs-13 fw-semibold" for="prefer_account_owner">Route a lead from an existing account to that account's owner</label>
+                                    </div>
+                                    <div id="assignmentRules">
+                                        @foreach((array) ($leadAssignmentConfig['rules'] ?? []) as $ri => $rule)
+                                            <div class="assignment-rule border rounded p-2 mb-2 bg-light">
+                                                <div class="row g-2">
+                                                    <div class="col-md-3"><input class="form-control form-control-sm" name="rules[{{ $ri }}][name]" placeholder="Rule name" value="{{ $rule['name'] ?? '' }}"></div>
+                                                    <div class="col-md-3"><input class="form-control form-control-sm" name="rules[{{ $ri }}][territory]" placeholder="Territory (state/city/country)" value="{{ $rule['territory'] ?? '' }}"></div>
+                                                    <div class="col-md-2"><input class="form-control form-control-sm" name="rules[{{ $ri }}][segment]" placeholder="Segment" value="{{ $rule['segment'] ?? '' }}"></div>
+                                                    <div class="col-md-2"><input class="form-control form-control-sm" name="rules[{{ $ri }}][source]" placeholder="Source" value="{{ $rule['source'] ?? '' }}"></div>
+                                                    <div class="col-md-2"><input class="form-control form-control-sm" name="rules[{{ $ri }}][product]" placeholder="Product keyword" value="{{ $rule['product'] ?? '' }}"></div>
+                                                    <div class="col-md-3"><select class="form-select form-select-sm" name="rules[{{ $ri }}][strategy]">
+                                                        @foreach(['least_loaded' => 'Least open leads (workload)', 'round_robin' => 'Round-robin', 'first' => 'First in pool'] as $sv => $sl)
+                                                            <option value="{{ $sv }}" @selected(($rule['strategy'] ?? 'least_loaded') === $sv)>{{ $sl }}</option>
+                                                        @endforeach
+                                                    </select></div>
+                                                    <div class="col-md-7"><select class="form-select form-select-sm" name="rules[{{ $ri }}][owner_ids][]" multiple size="3">
+                                                        @foreach($users as $u)
+                                                            <option value="{{ $u->id }}" @selected(in_array($u->id, (array) ($rule['owner_ids'] ?? [])))>{{ $u->name }}</option>
+                                                        @endforeach
+                                                    </select></div>
+                                                    <div class="col-md-2 text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-rule">Remove</button></div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="addAssignmentRule">+ Add rule</button>
+                                    <template id="assignmentRuleTpl">
+                                        <div class="assignment-rule border rounded p-2 mb-2 bg-light">
+                                            <div class="row g-2">
+                                                <div class="col-md-3"><input class="form-control form-control-sm" name="rules[__I__][name]" placeholder="Rule name"></div>
+                                                <div class="col-md-3"><input class="form-control form-control-sm" name="rules[__I__][territory]" placeholder="Territory (state/city/country)"></div>
+                                                <div class="col-md-2"><input class="form-control form-control-sm" name="rules[__I__][segment]" placeholder="Segment"></div>
+                                                <div class="col-md-2"><input class="form-control form-control-sm" name="rules[__I__][source]" placeholder="Source"></div>
+                                                <div class="col-md-2"><input class="form-control form-control-sm" name="rules[__I__][product]" placeholder="Product keyword"></div>
+                                                <div class="col-md-3"><select class="form-select form-select-sm" name="rules[__I__][strategy]"><option value="least_loaded">Least open leads (workload)</option><option value="round_robin">Round-robin</option><option value="first">First in pool</option></select></div>
+                                                <div class="col-md-7"><select class="form-select form-select-sm" name="rules[__I__][owner_ids][]" multiple size="3">@foreach($users as $u)<option value="{{ $u->id }}">{{ $u->name }}</option>@endforeach</select></div>
+                                                <div class="col-md-2 text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-rule">Remove</button></div>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
 
                                 <!-- Multi-Channel Execution Triggers -->
@@ -462,6 +529,417 @@
                 </div>
             </div>
         </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: CONTACT ROLES (FRS 2.3 / C-17)      -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade @if(in_array($activeTab, ['contact-roles', 'contact_roles', 'tab-contact-roles'])) show active @endif" id="tab-contact-roles" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-header bg-white py-3 border-bottom">
+                            <h6 class="fw-bold mb-0 text-dark"><i class="feather-tag me-2 text-primary"></i>Customer &amp; Vendor Contact Roles</h6>
+                            <span class="text-muted fs-12">Roles assigned to customer and vendor contacts (a single contact can carry multiple roles).</span>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0 fs-13">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Role Name</th>
+                                            <th>Type</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse(($contactRoles ?? []) as $role)
+                                            <tr>
+                                                <td class="fw-semibold">{{ $role->name }}</td>
+                                                <td>
+                                                    @if($role->is_system)
+                                                        <span class="badge bg-soft-primary text-primary fs-11">System Default</span>
+                                                    @else
+                                                        <span class="badge bg-soft-success text-success fs-11">Custom</span>
+                                                    @endif
+                                                </td>
+                                                <td class="text-end">
+                                                    @if(! $role->is_system)
+                                                        <form method="POST" action="{{ route('crm.settings.contact-roles.destroy', $role->id) }}" class="d-inline" onsubmit="return confirm('Delete custom role {{ addslashes($role->name) }}?');">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="btn btn-xs btn-outline-danger"><i class="feather-trash-2"></i> Delete</button>
+                                                        </form>
+                                                    @else
+                                                        <span class="text-muted fs-11">Protected</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr><td colspan="3" class="text-center text-muted py-4">No contact roles configured.</td></tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-header bg-white py-3 border-bottom">
+                            <h6 class="fw-bold mb-0 text-dark"><i class="feather-plus me-2 text-primary"></i>Add Custom Role</h6>
+                        </div>
+                        <div class="card-body p-4">
+                            <form method="POST" action="{{ route('crm.settings.contact-roles.store') }}">
+                                @csrf
+                                <div class="mb-3">
+                                    <label class="form-label fs-12 fw-semibold">Role Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control form-control-sm" maxlength="100" required placeholder="e.g. Facility Manager">
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-primary w-100">Add Contact Role</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- ========================================== -->
+        <!-- TAB 5: LEAD RESPONSE SLA & STALE POLICY   -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade @if(in_array($activeTab, ['lead-sla-policy', 'lead_sla_policy', 'tab-lead-sla-policy'])) show active @endif" id="tab-lead-sla-policy" role="tabpanel">
+            <form action="{{ route('crm.settings.update-lead-sla-policy') }}" method="POST">
+                @csrf
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <!-- SLA Configuration Card -->
+                        <div class="card border-0 shadow-sm rounded-3 mb-4">
+                            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-dark">
+                                        <i class="feather-clock me-2 text-primary"></i>First Response SLA Clock (FRS Ref 2.5 / C-01)
+                                    </h6>
+                                    <span class="text-muted fs-12">Tracks time between lead assignment and first customer interaction. Overdue touches escalate to the Sales Manager.</span>
+                                </div>
+                                <span class="badge bg-soft-info text-info font-monospace fs-11">SLA Engine</span>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fs-13 fw-semibold text-dark">
+                                            First Response SLA Window (Minutes) <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="input-group">
+                                            <input type="number" name="response_sla_minutes" class="form-control" value="{{ $leadSlaPolicy['response_sla_minutes'] ?? 60 }}" min="5" max="1440" required>
+                                            <span class="input-group-text fs-12">Minutes</span>
+                                        </div>
+                                        <div class="form-text fs-11 text-muted">Default is 60 minutes. Once exceeded without an interaction, the lead is flagged as SLA Breached.</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fs-13 fw-semibold text-dark">Default Loss Nurture Horizon (Days) <span class="text-danger">*</span></label>
+                                        <div class="input-group">
+                                            <input type="number" name="default_nurture_days" class="form-control" value="{{ $leadSlaPolicy['default_nurture_days'] ?? 90 }}" min="7" max="365" required>
+                                            <span class="input-group-text fs-12">Days</span>
+                                        </div>
+                                        <div class="form-text fs-11 text-muted">Auto-schedules a nurture outreach task when a lead is marked Closed Lost.</div>
+                                    </div>
+                                </div>
+
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" name="sla_working_hours_only" id="sla_working_hours_only" value="1" @checked(!empty($leadSlaPolicy['sla_working_hours_only']))>
+                                    <label class="form-check-label fw-semibold text-dark fs-13" for="sla_working_hours_only">
+                                        Count SLA Only During Business Working Hours (9:00 AM - 7:00 PM)
+                                    </label>
+                                    <div class="form-text fs-11 text-muted">Pauses the SLA response clock overnight and on weekends.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stale Lead & Inactivity Policy Card -->
+                        <div class="card border-0 shadow-sm rounded-3 mb-4">
+                            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-dark">
+                                        <i class="feather-alert-circle me-2 text-warning"></i>Next-Action Mandate & Stale Lead Alerts (C-02)
+                                    </h6>
+                                    <span class="text-muted fs-12">Monitors open leads without an active scheduled next action or with overdue activity.</span>
+                                </div>
+                                <span class="badge bg-soft-warning text-warning font-monospace fs-11">Governance</span>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fs-13 fw-semibold text-dark">
+                                            Stale Inactivity Window (Days) <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="input-group">
+                                            <input type="number" name="stale_lead_days" class="form-control" value="{{ $leadSlaPolicy['stale_lead_days'] ?? 3 }}" min="1" max="90" required>
+                                            <span class="input-group-text fs-12">Days</span>
+                                        </div>
+                                        <div class="form-text fs-11 text-muted">Leads with no scheduled next action or zero interactions for this duration alert the owner and manager.</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fs-13 fw-semibold text-dark">
+                                            Repeated Alert Cadence (Days) <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="input-group">
+                                            <input type="number" name="stale_alert_cadence_days" class="form-control" value="{{ $leadSlaPolicy['stale_alert_cadence_days'] ?? 2 }}" min="1" max="30" required>
+                                            <span class="input-group-text fs-12">Days</span>
+                                        </div>
+                                        <div class="form-text fs-11 text-muted">Repeat notification cadence while an open lead remains uncontacted/stale.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Inbound Enquiry Auto-Acknowledgment Card -->
+                        <div class="card border-0 shadow-sm rounded-3 mb-4">
+                            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-dark">
+                                        <i class="feather-send me-2 text-success"></i>Inbound Enquiry Auto-Acknowledgment (C-05)
+                                    </h6>
+                                    <span class="text-muted fs-12">Immediate greeting and confirmation sent to prospective clients upon form submission.</span>
+                                </div>
+                                <span class="badge bg-soft-success text-success font-monospace fs-11">Inbound Channel</span>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" name="auto_ack_inbound" id="auto_ack_inbound" value="1" @checked(!empty($leadSlaPolicy['auto_ack_inbound']))>
+                                    <label class="form-check-label fw-semibold text-dark fs-13" for="auto_ack_inbound">
+                                        Enable Instant Acknowledgment on Web & Inbound Form Submissions
+                                    </label>
+                                    <div class="form-text fs-11 text-muted">Fires exclusively for real inbound inquiries. Suppressed for cold / AI-researched prospect imports.</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold fs-13">Acknowledgement message template</label>
+                                    <textarea name="ack_template" rows="3" class="form-control fs-13" maxlength="600" placeholder="Hi {name}, thank you for contacting {brand}! We have received your enquiry. {owner} will connect with you shortly.">{{ old('ack_template', $leadSlaPolicy['ack_template'] ?? '') }}</textarea>
+                                    <div class="form-text fs-11 text-muted">Placeholders: {name}, {brand}, {owner}, {company}. Never sent to prospects flagged Do-not-contact, or to imported / researched / API leads.</div>
+                                    <input type="text" name="ack_subject" class="form-control fs-13 mt-2" maxlength="150" placeholder="Email subject (optional)" value="{{ old('ack_subject', $leadSlaPolicy['ack_subject'] ?? '') }}">
+                                </div>
+
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="auto_ack_whatsapp" id="auto_ack_whatsapp" value="1" @checked(!empty($leadSlaPolicy['auto_ack_whatsapp']))>
+                                    <label class="form-check-label fw-semibold text-dark fs-13" for="auto_ack_whatsapp">
+                                        Send Instant WhatsApp Greeting When Customer Phone is Provided
+                                    </label>
+                                    <div class="form-text fs-11 text-muted">Uses tenant WhatsApp Business gateway to confirm receipt and provide executive details.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-end">
+                            <button type="submit" class="btn btn-primary px-4 py-2 fw-semibold">
+                                <i class="feather-save me-1"></i>Save SLA & Inactivity Policy
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm rounded-3 bg-light">
+                            <div class="card-header bg-transparent py-3 border-bottom">
+                                <h6 class="fw-bold mb-0 text-dark">
+                                    <i class="feather-info me-2 text-primary"></i>FRS Ref 2.5 Compliance
+                                </h6>
+                            </div>
+                            <div class="card-body p-3 fs-12 text-muted">
+                                <ul class="list-unstyled mb-0 d-flex flex-column gap-2">
+                                    <li><i class="feather-check text-success me-1"></i><strong>Response SLA:</strong> Clock starts on lead assignment; stops at first customer touch.</li>
+                                    <li><i class="feather-check text-success me-1"></i><strong>Next Action Rule:</strong> Open leads require an accountable owner and due date.</li>
+                                    <li><i class="feather-check text-success me-1"></i><strong>Stage Gating:</strong> Moving to Dealing requires verified BANT qualification.</li>
+                                    <li><i class="feather-check text-success me-1"></i><strong>Loss Capture:</strong> Mandatory structured reason and future nurture reminder.</li>
+                                    <li><i class="feather-check text-success me-1"></i><strong>Manufacturing Isolation (BASE-05):</strong> CRM Won never creates production demand.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 6: LOSS REASONS (FRS 2.5 / C-04)       -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade @if(in_array($activeTab, ['loss-reasons', 'loss_reasons', 'tab-loss-reasons'])) show active @endif" id="tab-loss-reasons" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark">
+                                    <i class="feather-x-circle me-2 text-danger"></i>Structured Loss Reasons Master
+                                </h6>
+                                <span class="text-muted fs-12">Standardized reasons enforced when marking Leads or Deals as Closed Lost, with auto-nurture cadence.</span>
+                            </div>
+                            <span class="badge bg-soft-danger text-danger fs-11 font-monospace">FRS Ref 2.5 / C-04</span>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0 fs-13">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Reason Name</th>
+                                            <th>Competitor Required</th>
+                                            <th>Nurture Cadence</th>
+                                            <th>Scope</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse(($lossReasons ?? []) as $reason)
+                                            <tr>
+                                                <td class="fw-semibold">
+                                                    <div class="text-dark">{{ $reason->name }}</div>
+                                                    <span class="text-muted fs-11 font-monospace">{{ $reason->code ?: '—' }}</span>
+                                                </td>
+                                                <td>
+                                                    @if($reason->requires_competitor)
+                                                        <span class="badge bg-soft-warning text-warning fs-11"><i class="feather-alert-triangle me-1"></i>Yes</span>
+                                                    @else
+                                                        <span class="text-muted fs-12">No</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-light text-dark border fs-11">
+                                                        <i class="feather-calendar me-1 text-primary"></i>{{ $reason->follow_up_days ?? 30 }} Days
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    @if(empty($reason->tenant_id))
+                                                        <span class="badge bg-soft-primary text-primary fs-11">System Default</span>
+                                                    @else
+                                                        <span class="badge bg-soft-success text-success fs-11">Custom Tenant</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <form method="POST" action="{{ route('crm.settings.loss-reasons.toggle', $reason->id) }}" class="d-inline">
+                                                        @csrf
+                                                        <button type="submit" class="badge border-0 cursor-pointer @if($reason->is_active) bg-soft-success text-success @else bg-soft-secondary text-muted @endif fs-11" title="Click to toggle status">
+                                                            <i class="feather-{{ $reason->is_active ? 'check-circle' : 'slash' }} me-1"></i>{{ $reason->is_active ? 'Active' : 'Inactive' }}
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                                <td class="text-end">
+                                                    <div class="d-inline-flex gap-1">
+                                                        <!-- Edit Button (Modal) -->
+                                                        <button type="button" class="btn btn-xs btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editLossReasonModal{{ $reason->id }}" title="Edit Reason">
+                                                            <i class="feather-edit-2"></i>
+                                                        </button>
+
+                                                        @if(!empty($reason->tenant_id))
+                                                            <form method="POST" action="{{ route('crm.settings.loss-reasons.destroy', $reason->id) }}" class="d-inline" onsubmit="return confirm('Delete loss reason {{ addslashes($reason->name) }}?');">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" class="btn btn-xs btn-outline-danger" title="Delete Reason">
+                                                                    <i class="feather-trash-2"></i>
+                                                                </button>
+                                                            </form>
+                                                        @endif
+                                                    </div>
+
+                                                    <!-- Edit Modal -->
+                                                    <div class="modal fade" id="editLossReasonModal{{ $reason->id }}" tabindex="-1" aria-hidden="true" style="text-align: left;">
+                                                        <div class="modal-dialog modal-dialog-centered">
+                                                            <div class="modal-content border-0 shadow">
+                                                                <form method="POST" action="{{ route('crm.settings.loss-reasons.update', $reason->id) }}">
+                                                                    @csrf
+                                                                    @method('PUT')
+                                                                    <div class="modal-header border-bottom py-3">
+                                                                        <h6 class="modal-title fw-bold text-dark"><i class="feather-edit me-2 text-primary"></i>Edit Loss Reason</h6>
+                                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                    </div>
+                                                                    <div class="modal-body p-4 fs-13">
+                                                                        <div class="mb-3">
+                                                                            <label class="form-label fw-semibold text-dark">Reason Name <span class="text-danger">*</span></label>
+                                                                            <input type="text" name="name" class="form-control form-control-sm" value="{{ $reason->name }}" required maxlength="150">
+                                                                        </div>
+                                                                        <div class="mb-3">
+                                                                            <label class="form-label fw-semibold text-dark">Follow-up Days (Nurture)</label>
+                                                                            <div class="input-group input-group-sm">
+                                                                                <input type="number" name="follow_up_days" class="form-control" value="{{ $reason->follow_up_days ?? 30 }}" min="1" max="365">
+                                                                                <span class="input-group-text">Days</span>
+                                                                            </div>
+                                                                            <div class="form-text fs-11 text-muted">Auto-schedules nurture task after this many days.</div>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input class="form-check-input" type="checkbox" name="requires_competitor" id="edit_req_comp_{{ $reason->id }}" value="1" @checked($reason->requires_competitor)>
+                                                                            <label class="form-check-label fw-semibold text-dark" for="edit_req_comp_{{ $reason->id }}">
+                                                                                Mandatory Competitor Name
+                                                                            </label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-2">
+                                                                            <input class="form-check-input" type="checkbox" name="is_active" id="edit_is_active_{{ $reason->id }}" value="1" @checked($reason->is_active)>
+                                                                            <label class="form-check-label fw-semibold text-dark" for="edit_is_active_{{ $reason->id }}">
+                                                                                Active
+                                                                            </label>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="modal-footer border-top py-2 bg-light">
+                                                                        <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
+                                                                        <button type="submit" class="btn btn-sm btn-primary">Save Changes</button>
+                                                                    </div>
+                                                                </form>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="6" class="text-center text-muted py-4">No loss reasons configured.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Card: Add New Loss Reason -->
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-header bg-white py-3 border-bottom">
+                            <h6 class="fw-bold mb-0 text-dark"><i class="feather-plus me-2 text-primary"></i>Add Loss Reason</h6>
+                            <span class="text-muted fs-12">Create a new structured reason for Closed Lost deals.</span>
+                        </div>
+                        <div class="card-body p-4">
+                            <form method="POST" action="{{ route('crm.settings.loss-reasons.store') }}">
+                                @csrf
+                                <div class="mb-3">
+                                    <label class="form-label fs-12 fw-semibold text-dark">Reason Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control form-control-sm" maxlength="150" required placeholder="e.g. Price Too High">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fs-12 fw-semibold text-dark">Follow-up Days (Nurture)</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" name="follow_up_days" class="form-control" value="30" min="1" max="365">
+                                        <span class="input-group-text fs-11">Days</span>
+                                    </div>
+                                    <div class="form-text fs-11 text-muted">Auto-schedules a nurture reminder after these many days.</div>
+                                </div>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" name="requires_competitor" id="new_req_comp" value="1">
+                                    <label class="form-check-label fs-12 fw-semibold text-dark" for="new_req_comp">
+                                        Competitor Name Required
+                                    </label>
+                                    <div class="form-text fs-11 text-muted">Mandates entering competitor name when this reason is selected.</div>
+                                </div>
+                                <div class="form-check form-switch mb-4">
+                                    <input class="form-check-input" type="checkbox" name="is_active" id="new_is_active" value="1" checked>
+                                    <label class="form-check-label fs-12 fw-semibold text-dark" for="new_is_active">
+                                        Is Active
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-primary w-100 fw-semibold">
+                                    <i class="feather-save me-1"></i>Save Reason
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 @endsection
@@ -525,6 +1003,21 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     modeRadios.forEach(r => r.addEventListener('change', updateModeVisibility));
+
+    // FRS 2.5 routing rules editor
+    (function () {
+        const wrap = document.getElementById('assignmentRules');
+        const tpl = document.getElementById('assignmentRuleTpl');
+        const addBtn = document.getElementById('addAssignmentRule');
+        if (!wrap || !tpl || !addBtn) return;
+        let idx = wrap.querySelectorAll('.assignment-rule').length + 100;
+        addBtn.addEventListener('click', () => {
+            wrap.insertAdjacentHTML('beforeend', tpl.innerHTML.replaceAll('__I__', String(idx++)));
+        });
+        wrap.addEventListener('click', e => {
+            if (e.target.classList.contains('remove-rule')) e.target.closest('.assignment-rule').remove();
+        });
+    })();
 
     // Custom card click
     document.querySelectorAll('.custom-option-card').forEach(card => {

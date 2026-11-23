@@ -437,6 +437,26 @@
                                     <strong class="text-dark font-monospace">{{ $payment->vendor->gstin }}</strong>
                                 </div>
                             @endif
+
+                            {{-- FRS 2.3 / Task C-16: Beneficiary Bank Master audit trail --}}
+                            <div class="mt-2 pt-2 border-top">
+                                <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-1" style="letter-spacing: 0.5px;">Beneficiary Payout Account:</span>
+                                <div class="d-flex align-items-center mb-1">
+                                    <i class="feather-credit-card me-2 text-muted fs-12" style="width: 16px;"></i>
+                                    <span class="text-muted me-1">Bank:</span>
+                                    <strong class="text-dark">{{ $payment->vendor?->bank_name ?: '—' }}</strong>
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <i class="feather-file-text me-2 text-muted fs-12" style="width: 16px;"></i>
+                                    <span class="text-muted me-1">Account No:</span>
+                                    <strong class="text-dark font-monospace">{{ $payment->vendor?->account_number ?: '—' }}</strong>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <i class="feather-shield me-2 text-muted fs-12" style="width: 16px;"></i>
+                                    <span class="text-muted me-1">IFSC Code:</span>
+                                    <strong class="text-dark font-monospace">{{ $payment->vendor?->ifsc_code ?: '—' }}</strong>
+                                </div>
+                            </div>
                         </div>
 
                         @php

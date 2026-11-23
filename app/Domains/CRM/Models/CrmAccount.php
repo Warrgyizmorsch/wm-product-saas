@@ -16,6 +16,8 @@ use App\Domains\CRM\Models\Quotation;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
 use App\Models\Concerns\NormalizesTaxIdentity;
+use App\Models\PartyContact;
+use App\Services\PartyStructureService;
 
 class CrmAccount extends BaseModel
 {
@@ -30,12 +32,25 @@ class CrmAccount extends BaseModel
     {
         parent::boot();
 
+        static::deleting(function (CrmAccount $account): void {
+            app(\App\Services\PartyDeletionGuard::class)->assertCanDelete($account);
+        });
+
         static::creating(function ($account) {
             if (empty($account->account_number)) {
                 $account->account_number = 'ACC-' . date('Y') . '-' . str_pad((string)(static::whereYear('created_at', date('Y'))->count() + 1), 4, '0', STR_PAD_LEFT);
             }
             if (empty($account->owner_id) && auth()->check()) {
                 $account->owner_id = auth()->id();
+            }
+        });
+
+        static::saved(function (CrmAccount $account): void {
+            if ($account->customer_id && $account->wasChanged('customer_id')) {
+                $customer = Customer::withoutGlobalScopes()->find($account->customer_id);
+                if ($customer) {
+                    app(PartyStructureService::class)->migrateAccountContactsToCustomer($account, $customer);
+                }
             }
         });
     }
@@ -79,12 +94,31 @@ class CrmAccount extends BaseModel
 
     public function contacts(): HasMany
     {
-        return $this->hasMany(CrmContact::class, 'crm_account_id');
+        if ($this->customer_id) {
+            return $this->hasMany(PartyContact::class, 'party_id', 'customer_id')
+                ->where('party_type', PartyContact::PARTY_CUSTOMER);
+        }
+
+        return $this->hasMany(PartyContact::class, 'party_id', 'id')
+            ->where('party_type', PartyContact::PARTY_CRM_ACCOUNT);
     }
 
     public function primaryContact()
     {
-        return $this->hasOne(CrmContact::class, 'crm_account_id')->where('is_primary', true);
+        if ($this->customer_id) {
+            return $this->hasOne(PartyContact::class, 'party_id', 'customer_id')
+                ->where('party_type', PartyContact::PARTY_CUSTOMER)
+                ->where('is_primary', true);
+        }
+
+        return $this->hasOne(PartyContact::class, 'party_id', 'id')
+            ->where('party_type', PartyContact::PARTY_CRM_ACCOUNT)
+            ->where('is_primary', true);
+    }
+
+    public function legacyContacts(): HasMany
+    {
+        return $this->hasMany(CrmContact::class, 'crm_account_id');
     }
 
     public function deals(): HasMany

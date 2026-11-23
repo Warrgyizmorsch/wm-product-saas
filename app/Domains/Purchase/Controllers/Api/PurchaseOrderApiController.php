@@ -550,6 +550,14 @@ class PurchaseOrderApiController extends Controller
             ], 422);
         }
 
+        $guard = app(\App\Services\PartyTransactionGuard::class);
+        if ($blocked = $guard->blockedReason('vendor', $order->vendor_id, $tenantId, 'purchase order approval')) {
+            return response()->json([
+                'success' => false,
+                'message' => $blocked,
+            ], 422);
+        }
+
         $order->update([
             'status'      => 'Approved',
             'approved_by' => auth()->id() ?? 1,

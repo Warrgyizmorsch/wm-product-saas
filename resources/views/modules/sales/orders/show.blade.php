@@ -381,16 +381,27 @@
             @endforeach
         </div>
 
+        @php
+            $isCustBlocked = $order->customer && (strtolower((string)$order->customer->status) !== 'active' || !$order->customer->isVerified());
+            $custBlockedReason = $isCustBlocked ? app(\App\Services\PartyTransactionGuard::class)->blockedReason('customer', $order->customer_id, $order->tenant_id, 'sales order') : null;
+        @endphp
+
         <!-- Primary Action Buttons -->
         @if ($order->status === 'Draft')
-            <form action="{{ route('sales.orders.confirm', $order->id) }}" method="POST" class="d-inline d-print-none"
-                id="confirmSoForm">
-                @csrf
-                <button type="button" class="btn btn-sm btn-success fw-bold px-3 shadow-2xs"
-                    onclick="confirmAction({ title: '{{ __('crm.confirm_order') }}', message: 'Confirm Sales Order {{ $order->sales_order_number }}?', variant: 'success', confirmText: '{{ __('crm.confirm') }}' }, function() { document.getElementById('confirmSoForm').submit(); })">
-                    <i class="feather-check-circle me-1.5"></i>{{ __('crm.confirm_order') ?? 'Confirm Order' }}
+            @if ($isCustBlocked)
+                <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-3 shadow-2xs disabled" style="cursor: not-allowed; opacity: 0.7;" title="{{ $custBlockedReason }}">
+                    <i class="feather-slash me-1.5"></i>Confirmation Blocked (Hold)
                 </button>
-            </form>
+            @else
+                <form action="{{ route('sales.orders.confirm', $order->id) }}" method="POST" class="d-inline d-print-none"
+                    id="confirmSoForm">
+                    @csrf
+                    <button type="button" class="btn btn-sm btn-success fw-bold px-3 shadow-2xs"
+                        onclick="confirmAction({ title: '{{ __('crm.confirm_order') }}', message: 'Confirm Sales Order {{ $order->sales_order_number }}?', variant: 'success', confirmText: '{{ __('crm.confirm') }}' }, function() { document.getElementById('confirmSoForm').submit(); })">
+                        <i class="feather-check-circle me-1.5"></i>{{ __('crm.confirm_order') ?? 'Confirm Order' }}
+                    </button>
+                </form>
+            @endif
 
             <a href="{{ route('sales.orders.edit', $order->id) }}"
                 class="btn btn-sm btn-light border fw-semibold px-2.5 d-print-none">
@@ -479,6 +490,16 @@
 
     @if (isset($errors) && $errors->any())
         <x-ui.toast :auto="true" type="error" title="{{ $errors->first() }}" />
+    @endif
+
+    @if ($isCustBlocked)
+        <div class="alert alert-danger border-danger py-2.5 px-3 fs-13 mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2 shadow-sm">
+            <div>
+                <i class="feather-alert-octagon text-danger me-1.5 fs-16"></i>
+                <strong>Financial Hold Guard:</strong> {{ $custBlockedReason }} Order confirmation, material release, and factory dispatches are locked.
+            </div>
+            <span class="badge bg-danger text-white fs-11">FINANCIAL HOLD</span>
+        </div>
     @endif
 
     @php

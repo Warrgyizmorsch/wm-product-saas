@@ -12,6 +12,12 @@
         <a href="{{ route('purchase.vendors.edit', $vendor->id) }}" class="btn btn-light border" title="{{ __('purchase.edit_vendor_details') }}">
             <i class="feather-edit-2 me-1"></i>{{ __('purchase.edit') }}
         </a>
+        @if(!$vendor->isMerged() && app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'purchase.vendors.merge', ['tenant_id' => $vendor->tenant_id]))
+            <button type="button" class="btn btn-outline-warning px-3 d-inline-flex align-items-center"
+                data-bs-toggle="modal" data-bs-target="#mergePartyModal" title="Merge this duplicate vendor into another vendor">
+                <i class="feather-git-merge me-1.5"></i>Merge Vendor
+            </button>
+        @endif
         @if(Route::has('purchase.orders.create'))
             <x-ui.button href="{{ route('purchase.orders.create', ['vendor_id' => $vendor->id]) }}" variant="primary" icon="feather-plus">
                 {{ __('purchase.create_po') }}
@@ -35,6 +41,10 @@
         <x-ui.odoo-form-ui type="sheet">
 
             {{-- 1. Single Page Header: Vendor Profile Info --}}
+            @include('partials.party-verification-panel', ['party' => $vendor, 'type' => 'vendor'])
+            @include('partials.vendor-bank-change-panel', ['vendor' => $vendor])
+            @include('partials.party-status-panel', ['party' => $vendor, 'type' => 'vendor'])
+            @include('partials.vendor-document-alert-banner')
             <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 pb-3 border-bottom mb-4">
                 <div class="d-flex align-items-start gap-3">
                     <div class="avatar-text avatar-xl bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold fs-22 shadow-sm flex-shrink-0" style="width: 56px; height: 56px;">
@@ -161,6 +171,30 @@
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link fw-bold fs-13 text-primary" id="ledger-tab" data-bs-toggle="tab" data-bs-target="#ledger-pane" type="button" role="tab"><i class="feather-book me-1.5"></i>{{ __('purchase.vendor_ledger_statement') }}</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold fs-13" id="branches-tab" data-bs-toggle="tab" data-bs-target="#branches-pane" type="button" role="tab"><i class="feather-map-pin me-1.5 text-primary"></i>Branches &amp; Sites ({{ $vendor->branches()->count() }})</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold fs-13" id="contacts-tab" data-bs-toggle="tab" data-bs-target="#contacts-pane" type="button" role="tab"><i class="feather-users me-1.5 text-info"></i>Contacts ({{ $vendor->contacts()->count() }})</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold fs-13" id="history-tab" data-history-tab data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab"><i class="feather-clock me-1.5 text-secondary"></i>Full History</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold fs-13 text-success" id="items-tab" data-bs-toggle="tab" data-bs-target="#items-pane" type="button" role="tab">
+                        <i class="feather-package me-1.5"></i>Supplied Items ({{ $vendorItems->count() }})
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold fs-13 text-warning" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-pane" type="button" role="tab">
+                        <i class="feather-file-check me-1.5"></i>Compliance &amp; Docs ({{ $vendorDocuments->count() }})
+                        @if($expiredDocs->isNotEmpty())
+                            <span class="badge bg-danger ms-1 px-1.5 py-0.5 fs-10">{{ $expiredDocs->count() }}!</span>
+                        @elseif($expiringDocs->isNotEmpty())
+                            <span class="badge bg-warning text-dark ms-1 px-1.5 py-0.5 fs-10">{{ $expiringDocs->count() }}</span>
+                        @endif
+                    </button>
                 </li>
             </ul>
 
@@ -617,8 +651,35 @@
                     @endif
                 </div>
 
+                {{-- TAB 7: BRANCHES & SITES --}}
+                <div class="tab-pane fade" id="branches-pane" role="tabpanel">
+                    @include('partials.party-branches-panel', ['party' => $vendor, 'type' => 'vendor'])
+                </div>
+
+                {{-- TAB 8: CONTACTS --}}
+                <div class="tab-pane fade" id="contacts-pane" role="tabpanel">
+                    @include('partials.party-contacts-panel', ['party' => $vendor, 'type' => 'vendor'])
+                </div>
+
+                {{-- FULL HISTORY (FRS 2.3: opening a party shows its full history) --}}
+                <div class="tab-pane fade" id="history-pane" role="tabpanel">
+                    @include('modules.party.history', ['partyType' => 'vendor', 'party' => $vendor])
+                </div>
+
+                {{-- TAB 9: SUPPLIED ITEMS & CONTRACTED PRICING (FRS 2.3 / Task C-19) --}}
+                <div class="tab-pane fade" id="items-pane" role="tabpanel">
+                    @include('partials.vendor-items-panel')
+                </div>
+
+                {{-- TAB 10: COMPLIANCE & STATUTORY DOCUMENTS (FRS 2.3 / Task C-19) --}}
+                <div class="tab-pane fade" id="documents-pane" role="tabpanel">
+                    @include('partials.vendor-documents-panel')
+                </div>
+
             </div>
         </x-ui.odoo-form-ui>
     </div>
+
+    @include('partials.party-merge-modal', ['party' => $vendor, 'type' => 'vendor'])
 @endsection
 

@@ -327,6 +327,19 @@ class VendorBillService
                 ];
             }
 
+            $sourcePo = $po ?: $grn?->purchaseOrder;
+            $vendorBranchId = $validated['vendor_branch_id'] ?? $sourcePo?->vendor_branch_id;
+            $supplierGstin = $sourcePo?->supplier_gstin;
+            if (! $supplierGstin && $vendorBranchId) {
+                $supplierGstin = \App\Models\PartyBranch::withoutGlobalScopes()->find($vendorBranchId)?->effectiveGstin();
+            }
+            if (! $supplierGstin && $vendorId) {
+                $supplierGstin = \App\Services\TaxIdentityService::normalizeGstin(
+                    \App\Domains\Inventory\Models\Vendor::withoutGlobalScopes()->where('id', $vendorId)->value('gstin')
+                );
+            }
+            $buyerGstin = $sourcePo?->buyer_gstin ?: (billing_organization_details($sourcePo)['gstin'] ?? null);
+
             $bill = $this->billRepo->create([
                 'tenant_id'                    => $tenantId,
                 'bill_number'                  => $billNumber,
@@ -346,6 +359,9 @@ class VendorBillService
                 'goods_receipt_note_id'        => $grn?->id,
                 'purchase_order_id'            => $po?->id,
                 'vendor_id'                    => $vendorId,
+                'vendor_branch_id'             => $vendorBranchId,
+                'supplier_gstin'               => $supplierGstin,
+                'buyer_gstin'                  => $buyerGstin,
                 'bill_date'                    => $validated['bill_date'],
                 'due_date'                     => $validated['due_date'],
                 'status'                       => 'Unpaid',

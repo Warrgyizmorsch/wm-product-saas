@@ -15,6 +15,7 @@ return [
         'children' => [
             ['label' => 'crm.leads', 'default' => 'Leads', 'route' => 'crm.leads.index', 'permission' => 'crm.leads.view'],
             ['label' => 'crm.deals_sidebar', 'default' => 'Deals (Pipeline)', 'route' => 'crm.deals.index', 'permission' => 'crm.deals.view'],
+            ['label' => 'crm.lead_reports_sidebar', 'default' => 'Lead Reports', 'route' => 'crm.reports.leads', 'permission' => 'crm.leads.view'],
             ['label' => 'crm.my_meetings_sidebar', 'default' => 'My Meetings', 'route' => 'crm.meetings.index', 'permission' => ['crm.deals.view', 'crm.leads.view']],
             ['label' => 'crm.accounts_sidebar', 'default' => 'Accounts (Companies)', 'route' => 'crm.accounts.index', 'permission' => 'crm.customers.view'],
             ['label' => 'crm.customers_sidebar', 'default' => 'Customers', 'route' => 'crm.customers.index', 'permission' => 'crm.customers.view'],

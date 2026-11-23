@@ -587,7 +587,31 @@ if (! function_exists('billing_organization_details')) {
      */
     function billing_organization_details(?object $model = null): array
     {
+        $isBranchModel = class_exists(\App\Domains\HRMS\Models\Branch::class)
+            && ($model instanceof \App\Domains\HRMS\Models\Branch);
+
+        $warehouse = (! $isBranchModel && $model && method_exists($model, 'warehouse')) ? $model->warehouse : null;
+        $branch = $isBranchModel
+            ? $model
+            : (($model && method_exists($model, 'branch')) ? $model->branch : null);
+
+        if (! $branch && $warehouse && method_exists($warehouse, 'branch')) {
+            $branch = $warehouse->branch;
+        }
+        if (! $branch && ! $model && function_exists('branch')) {
+            $branch = branch();
+        }
+        if (! $branch && ! $model && function_exists('current_branch_id') && current_branch_id() && class_exists(\App\Domains\HRMS\Models\Branch::class)) {
+            $branch = \App\Domains\HRMS\Models\Branch::withoutGlobalScopes()->find(current_branch_id());
+        }
+
         $comp = ($model && method_exists($model, 'company')) ? $model->company : null;
+        if (! $comp && $branch && method_exists($branch, 'company')) {
+            $comp = $branch->company;
+        }
+        if (! $comp && $warehouse && method_exists($warehouse, 'company')) {
+            $comp = $warehouse->company;
+        }
         $comp = $comp ?: company();
         if (! $comp && class_exists(\App\Domains\HRMS\Models\Company::class)) {
             $comp = \App\Domains\HRMS\Models\Company::withoutGlobalScopes()
@@ -596,52 +620,75 @@ if (! function_exists('billing_organization_details')) {
                 ->first();
         }
 
-        $warehouse = ($model && method_exists($model, 'warehouse')) ? $model->warehouse : null;
-        $branch = ($model && method_exists($model, 'branch')) ? $model->branch : null;
-        if (! $branch && $warehouse && method_exists($warehouse, 'branch')) {
-            $branch = $warehouse->branch;
-        }
-        if (! $comp && $warehouse && method_exists($warehouse, 'company')) {
-            $comp = $warehouse->company;
-        }
         $tenant = tenant();
+        $tenantId = $comp?->tenant_id ?? $branch?->tenant_id ?? $tenant?->id ?? 1;
 
-        $gstConfig = null;
+        $branchGstConfig = null;
+        $defaultGstConfig = null;
         if (class_exists(\App\Models\GstConfiguration::class)) {
-            $gstQuery = \App\Models\GstConfiguration::query()
-                ->where('tenant_id', $tenant?->id ?? 1)
+            $baseGst = \App\Models\GstConfiguration::query()
+                ->where('tenant_id', $tenantId)
                 ->where('is_active', true);
+
+            if ($branch?->id) {
+                $branchGstConfig = (clone $baseGst)
+                    ->where('branch_id', $branch->id)
+                    ->orderByDesc('is_default')
+                    ->first();
+            }
+
+            $defaultQuery = (clone $baseGst)->whereNull('branch_id');
             if ($comp?->id) {
-                $gstQuery->where(function ($q) use ($comp) {
+                $defaultQuery->where(function ($q) use ($comp) {
                     $q->where('company_id', $comp->id)->orWhereNull('company_id');
                 });
             }
-            $gstConfig = $gstQuery->orderByDesc('is_default')->first();
+            $defaultGstConfig = $defaultQuery->orderByDesc('is_default')->first()
+                ?: (clone $baseGst)->orderByDesc('is_default')->first();
         }
+
+        $gstConfig = $branchGstConfig ?: $defaultGstConfig;
+
+        // Frozen document snapshot takes precedence when present (SO/Invoice seller_gstin, PO buyer_gstin).
+        $frozenGstin = null;
+        $frozenStateCode = null;
+        if ($model && ! $isBranchModel) {
+            if (! empty($model->seller_gstin)) {
+                $frozenGstin = strtoupper(trim((string) $model->seller_gstin));
+                $frozenStateCode = ! empty($model->seller_state_code) ? (string) $model->seller_state_code : null;
+            } elseif (! empty($model->buyer_gstin)) {
+                $frozenGstin = strtoupper(trim((string) $model->buyer_gstin));
+                $frozenStateCode = ! empty($model->buyer_state_code) ? (string) $model->buyer_state_code : null;
+            }
+        }
+
+        $branchOwnGstin = ! empty($branch?->gst_number) ? strtoupper(trim((string) $branch->gst_number)) : null;
+        $branchConfigGstin = ! empty($branchGstConfig?->seller_gstin) ? strtoupper(trim((string) $branchGstConfig->seller_gstin)) : null;
+        $branchHasOwnGstin = ($branchOwnGstin !== null) || ($branchConfigGstin !== null);
 
         // 1. Organization Name
         $name = $comp?->legal_name
             ?: ($comp?->company_name
             ?: ($tenant?->billing_name ?: ($tenant?->name ?: '')));
 
-        // 2. Address Line
-        $addrLine = $warehouse?->address
-            ?: ($branch?->address
+        // 2. Address Line (prefer Branch billing address before delivery warehouse)
+        $addrLine = $branch?->address
             ?: ($comp?->address
+            ?: ($warehouse?->address
             ?: ($gstConfig?->address_line1
             ?: ($tenant?->billing_address ?: ''))));
 
         $city = $branch?->city
             ?: ($comp?->city
-            ?: ($gstConfig?->city ?: ''));
+            ?: ($gstConfig?->location ?: ($gstConfig?->city ?: '')));
 
         $pincode = $branch?->postal_code
             ?: ($comp?->postal_code
             ?: ($gstConfig?->pincode ?: ''));
 
-        $state = $comp?->state
-            ?: ($branch?->state
-            ?: ($tenant?->billing_state ?: ''));
+        $state = $branchHasOwnGstin
+            ? ($branch?->state ?: ($comp?->state ?: ($tenant?->billing_state ?: '')))
+            : ($comp?->state ?: ($branch?->state ?: ($tenant?->billing_state ?: '')));
 
         $country = $branch?->country
             ?: ($comp?->country ?: null);
@@ -654,24 +701,35 @@ if (! function_exists('billing_organization_details')) {
             ? implode(', ', $parts)
             : null;
 
-        // 3. GSTIN & State
-        $gstin = $comp?->gst_number
-            ?: ($gstConfig?->seller_gstin
-            ?: ($tenant?->billing_gstin ?: null));
+        // 3. GSTIN & State:
+        //    frozen doc snapshot -> branch->gst_number -> branch GstConfiguration -> comp->gst_number -> default GstConfiguration -> tenant
+        $gstin = $frozenGstin
+            ?: ($branchOwnGstin
+            ?: ($branchConfigGstin
+            ?: ($comp?->gst_number
+            ?: ($defaultGstConfig?->seller_gstin
+            ?: ($tenant?->billing_gstin ?: null)))));
 
-        $stateCode = ($gstin && strlen($gstin) >= 2 && is_numeric(substr($gstin, 0, 2)))
-            ? substr($gstin, 0, 2)
-            : ($gstConfig?->state_code ?: null);
+        if ($gstin) {
+            $gstin = strtoupper(trim((string) $gstin));
+        }
 
-        $stateName = $comp?->state ?: ($branch?->state ?: ($tenant?->billing_state ?: ($stateCode ? \App\Domains\Accounting\Support\GstStates::name($stateCode) : null)));
+        $stateCode = $frozenStateCode
+            ?: ($branchHasOwnGstin && ! empty($branch?->gst_state_code) ? str_pad((string) $branch->gst_state_code, 2, '0', STR_PAD_LEFT) : null)
+            ?: (($gstin && strlen($gstin) >= 2 && is_numeric(substr($gstin, 0, 2))) ? substr($gstin, 0, 2) : null)
+            ?: ($gstConfig?->state_code ?: null);
+
+        $stateName = $branchHasOwnGstin
+            ? ($branch?->state ?: ($stateCode ? \App\Domains\Accounting\Support\GstStates::name($stateCode) : ($comp?->state ?: ($tenant?->billing_state ?: null))))
+            : ($comp?->state ?: ($branch?->state ?: ($tenant?->billing_state ?: ($stateCode ? \App\Domains\Accounting\Support\GstStates::name($stateCode) : null))));
 
         // 4. Contact Email & Phone
-        $email = $comp?->email
-            ?: ($branch?->email
+        $email = $branch?->email
+            ?: ($comp?->email
             ?: ($gstConfig?->contact_email ?: ($tenant?->billing_email ?: null)));
 
-        $phone = $comp?->phone
-            ?: ($branch?->phone
+        $phone = $branch?->phone
+            ?: ($comp?->phone
             ?: ($gstConfig?->contact_phone ?: ($tenant?->billing_phone ?: null)));
 
         return [

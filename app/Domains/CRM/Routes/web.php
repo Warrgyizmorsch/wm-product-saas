@@ -1,10 +1,15 @@
 <?php
 
 use App\Domains\CRM\Controllers\CustomerController;
+use App\Domains\CRM\Controllers\CustomerBranchController;
+use App\Domains\CRM\Controllers\CustomerStatusController;
+use App\Domains\CRM\Controllers\CustomerVerificationController;
+use App\Domains\CRM\Controllers\ContactRoleController;
 use App\Domains\CRM\Controllers\CrmAccountController;
 use App\Domains\CRM\Controllers\CrmDealController;
 use App\Domains\CRM\Controllers\DealActivityController;
 use App\Domains\CRM\Controllers\LeadController;
+use App\Domains\CRM\Controllers\LeadReportController;
 use App\Domains\CRM\Controllers\LeadFollowupController;
 use App\Domains\CRM\Controllers\LeadActivityController;
 use App\Domains\CRM\Controllers\LeadStatusController;
@@ -32,7 +37,15 @@ Route::prefix('crm')
         Route::get('settings', [CrmSettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/quotation-approval-policy', [CrmSettingsController::class, 'updateQuotationApprovalPolicy'])->name('settings.update-quotation-approval-policy');
         Route::post('settings/lead-assignment', [CrmSettingsController::class, 'updateLeadAssignment'])->name('settings.update-lead-assignment');
+        Route::post('settings/lead-sla-policy', [CrmSettingsController::class, 'updateLeadSlaPolicy'])->name('settings.update-lead-sla-policy');
         Route::post('settings/field-visit-verification', [CrmSettingsController::class, 'updateFieldVisitVerification'])->name('settings.update-field-visit-verification');
+        Route::post('settings/contact-roles', [ContactRoleController::class, 'store'])->name('settings.contact-roles.store');
+        Route::delete('settings/contact-roles/{contactRole}', [ContactRoleController::class, 'destroy'])->name('settings.contact-roles.destroy');
+        // Loss Reasons Routes (Task C-04)
+        Route::post('settings/loss-reasons', [CrmSettingsController::class, 'storeLossReason'])->name('settings.loss-reasons.store');
+        Route::put('settings/loss-reasons/{lossReason}', [CrmSettingsController::class, 'updateLossReason'])->name('settings.loss-reasons.update');
+        Route::delete('settings/loss-reasons/{lossReason}', [CrmSettingsController::class, 'destroyLossReason'])->name('settings.loss-reasons.destroy');
+        Route::post('settings/loss-reasons/{lossReason}/toggle', [CrmSettingsController::class, 'toggleLossReasonStatus'])->name('settings.loss-reasons.toggle');
         // CRM Masters Routes
         Route::prefix('masters')->as('masters.')->group(function (): void {
             Route::get('lead-statuses', [LeadStatusController::class, 'index'])->name('lead-statuses.index');
@@ -167,6 +180,10 @@ Route::prefix('crm')
             ->name('leads.update');
         Route::patch('leads/{lead}/status', [LeadController::class, 'updateStatus'])
             ->name('leads.updateStatus');
+        Route::get('reports/leads', [LeadReportController::class, 'index'])->name('reports.leads');
+        Route::post('leads/{lead}/hold', [LeadController::class, 'hold'])->name('leads.hold');
+        Route::post('leads/{lead}/hold/resume', [LeadController::class, 'resumeHold'])->name('leads.hold.resume');
+        Route::post('leads/{lead}/merge', [LeadController::class, 'merge'])->name('leads.merge');
         Route::patch('leads/{lead}/priority', [LeadController::class, 'updatePriority'])
             ->name('leads.updatePriority');
         Route::patch('leads/{lead}/owner', [LeadController::class, 'updateOwner'])
@@ -209,12 +226,16 @@ Route::prefix('crm')
             ->name('customers.index');
         Route::get('customers/export', [CustomerController::class, 'export'])
             ->name('customers.export');
+        Route::get('customers/verification', [CustomerVerificationController::class, 'index'])
+            ->name('customers.verification.index');
         Route::get('customers/create', [CustomerController::class, 'create'])
             ->name('customers.create');
         Route::post('customers', [CustomerController::class, 'store'])
             ->name('customers.store');
         Route::post('customers/quick-create', [CustomerController::class, 'quickCreate'])
             ->name('customers.quick-create');
+        Route::get('customers/duplicate-check', [CustomerController::class, 'duplicateCheck'])
+            ->name('customers.duplicate-check');
         Route::get('customers/{customer}', [CustomerController::class, 'show'])
             ->name('customers.show');
         Route::get('customers/{customer}/edit', [CustomerController::class, 'edit'])
@@ -225,6 +246,48 @@ Route::prefix('crm')
             ->name('customers.updateStatus');
         Route::get('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus'])
             ->name('customers.toggleStatus');
+        Route::post('customers/{customer}/verify', [CustomerVerificationController::class, 'verify'])
+            ->name('customers.verify');
+        Route::post('customers/{customer}/verification/return', [CustomerVerificationController::class, 'returnForCorrection'])
+            ->name('customers.verification.return');
+        Route::post('customers/{customer}/verification/resubmit', [CustomerVerificationController::class, 'resubmit'])
+            ->name('customers.verification.resubmit');
+        Route::get('customers/{customer}/deactivate', [CustomerStatusController::class, 'deactivateForm'])
+            ->name('customers.deactivate.create');
+        Route::post('customers/{customer}/deactivate', [CustomerStatusController::class, 'deactivate'])
+            ->name('customers.deactivate.store');
+        Route::get('customers/{customer}/reactivate', [CustomerStatusController::class, 'reactivateForm'])
+            ->name('customers.reactivate.create');
+        Route::post('customers/{customer}/reactivate', [CustomerStatusController::class, 'reactivate'])
+            ->name('customers.reactivate.store');
+        // Party Merge Tool (FRS 2.3 / Task C-18)
+        Route::get('customers/{customer}/merge-preview', [\App\Domains\CRM\Controllers\CustomerMergeController::class, 'preview'])
+            ->name('customers.merge.preview');
+        Route::post('customers/{customer}/merge', [\App\Domains\CRM\Controllers\CustomerMergeController::class, 'merge'])
+            ->name('customers.merge.store');
+        // Multi-branch & unified contacts (FRS 2.3 / C-17)
+        Route::get('customers/{customer}/branches', [CustomerBranchController::class, 'index'])
+            ->name('customers.branches.index');
+        Route::post('customers/{customer}/branches', [CustomerBranchController::class, 'store'])
+            ->name('customers.branches.store');
+        Route::put('customers/{customer}/branches/{partyBranch}', [CustomerBranchController::class, 'update'])
+            ->name('customers.branches.update');
+        Route::post('customers/{customer}/branches/{partyBranch}/deactivate', [CustomerBranchController::class, 'deactivate'])
+            ->name('customers.branches.deactivate');
+        Route::post('customers/{customer}/branches/{partyBranch}/activate', [CustomerBranchController::class, 'activate'])
+            ->name('customers.branches.activate');
+        Route::post('customers/{customer}/branches/{partyBranch}/verify', [CustomerBranchController::class, 'verify'])
+            ->name('customers.branches.verify');
+        Route::post('customers/{customer}/branches/{partyBranch}/verification/return', [CustomerBranchController::class, 'returnForCorrection'])
+            ->name('customers.branches.verification.return');
+        Route::post('customers/{customer}/branches/{partyBranch}/verification/resubmit', [CustomerBranchController::class, 'resubmit'])
+            ->name('customers.branches.verification.resubmit');
+        Route::post('customers/{customer}/contacts', [CustomerBranchController::class, 'storeContact'])
+            ->name('customers.contacts.store');
+        Route::put('customers/{customer}/contacts/{contact}', [CustomerBranchController::class, 'updateContact'])
+            ->name('customers.contacts.update');
+        Route::delete('customers/{customer}/contacts/{contact}', [CustomerBranchController::class, 'destroyContact'])
+            ->name('customers.contacts.destroy');
 
         Route::get('approvals/quotations', [QuotationController::class, 'approvalsIndex'])->name('approvals.quotations.index');
         Route::get('quotations', [QuotationController::class, 'index'])->name('quotations.index');

@@ -535,6 +535,8 @@ class LeadImportMapperService
                     } else {
                         $currentCount++;
                         $leadPayload['lead_number'] = 'LD-' . $year . '-' . str_pad((string)$currentCount, 4, '0', STR_PAD_LEFT);
+                        $leadPayload['provenance'] = $leadPayload['provenance'] ?? 'import';
+                        $leadPayload['is_inbound_enquiry'] = false; // imports are not inbound enquiries (FRS 2.5 / F04)
                         $createdLead = Lead::create($leadPayload);
 
                         if (empty($createdLead->lead_owner_id)) {
@@ -543,6 +545,11 @@ class LeadImportMapperService
                             } catch (\Throwable $e) {
                                 // Silent fallback
                             }
+                        }
+                        try {
+                            app(\App\Domains\CRM\Services\LeadNextActionService::class)->ensureNextAction($createdLead->fresh());
+                        } catch (\Throwable $e) {
+                            // next action is re-checked by the stale scanner
                         }
                         
                         // Register in memory map

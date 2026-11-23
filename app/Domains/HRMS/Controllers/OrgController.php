@@ -214,6 +214,8 @@ class OrgController extends Controller
             'business_unit_id' => 'required_without:company_id|nullable|exists:business_units,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
+            'gst_number' => ['nullable', 'string', 'max:20', new \App\Rules\ValidGstin()],
+            'is_head_office' => 'nullable|boolean',
             'city' => 'nullable|max:100',
             'state' => 'nullable|max:100',
             'country' => 'nullable|max:100',
@@ -233,6 +235,9 @@ class OrgController extends Controller
         } else {
             $validated['company_id'] = $request->company_id;
         }
+        $validated['gst_number'] = \App\Services\TaxIdentityService::normalizeGstin($validated['gst_number'] ?? null);
+        $validated['gst_state_code'] = \App\Services\TaxIdentityService::extractStateCode($validated['gst_number']);
+        $validated['is_head_office'] = $request->boolean('is_head_office');
         $validated['timezone'] = $validated['timezone'] ?? $validated['time_zone'] ?? null;
         unset($validated['time_zone']);
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -251,6 +256,8 @@ class OrgController extends Controller
             'business_unit_id' => 'required_without:company_id|nullable|exists:business_units,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
+            'gst_number' => ['nullable', 'string', 'max:20', new \App\Rules\ValidGstin()],
+            'is_head_office' => 'nullable|boolean',
             'city' => 'nullable|max:100',
             'state' => 'nullable|max:100',
             'country' => 'nullable|max:100',
@@ -270,6 +277,9 @@ class OrgController extends Controller
         } else {
             $validated['company_id'] = $request->company_id;
         }
+        $validated['gst_number'] = \App\Services\TaxIdentityService::normalizeGstin($validated['gst_number'] ?? null);
+        $validated['gst_state_code'] = \App\Services\TaxIdentityService::extractStateCode($validated['gst_number']);
+        $validated['is_head_office'] = $request->boolean('is_head_office');
         $validated['timezone'] = $validated['timezone'] ?? $validated['time_zone'] ?? null;
         unset($validated['time_zone']);
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);

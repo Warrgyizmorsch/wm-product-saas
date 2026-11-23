@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use App\Services\PartyDuplicateService;
 use App\Services\TaxIdentityService;
 
 class CustomerApiController extends Controller
@@ -119,6 +120,10 @@ class CustomerApiController extends Controller
             'email'            => ['nullable', 'email', 'max:255'],
             'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin'            => TaxIdentityService::gstinRules(false),
+            'pan'              => TaxIdentityService::panRules(false),
+            'bank_name'        => ['nullable', 'string', 'max:150'],
+            'account_number'   => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
+            'ifsc_code'        => ['nullable', 'string', 'max:30'],
             'status'           => ['nullable', 'in:active,inactive,blocked'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
@@ -140,7 +145,19 @@ class CustomerApiController extends Controller
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
         $validated = $validator->validated();
 
-        $customer = Customer::create([
+        // FRS 2.3: possible duplicates are reported (409) until the caller re-sends with confirm_duplicate=true.
+        $duplicates = app(PartyDuplicateService::class)->find(PartyDuplicateService::CUSTOMER, $validated, $tenantId);
+        if ($duplicates !== [] && ! $request->boolean('confirm_duplicate')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Possible duplicate customer: ' . app(PartyDuplicateService::class)->summary($duplicates)
+                    . '. Re-send with confirm_duplicate=true to create it anyway.',
+                'duplicates' => $duplicates,
+            ], 409);
+        }
+
+        $verification = app(\App\Services\PartyVerificationService::class);
+        $customer = Customer::create(array_merge([
             'tenant_id'        => $tenantId,
             'company_id'       => $companyId,
             'branch_id'        => $branchId,
@@ -149,12 +166,17 @@ class CustomerApiController extends Controller
             'email'            => $validated['email'] ?? null,
             'phone'            => $validated['phone'] ?? null,
             'gstin'            => $validated['gstin'] ?? null,
+            'pan'              => $validated['pan'] ?? null,
+            'bank_name'        => $validated['bank_name'] ?? null,
+            'account_number'   => $validated['account_number'] ?? null,
+            'ifsc_code'        => $validated['ifsc_code'] ?? null,
             'status'           => $validated['status'] ?? 'active',
             'billing_address'  => $validated['billing_address'] ?? null,
             'shipping_address' => $validated['shipping_address'] ?? null,
             'opening_balance'  => $validated['opening_balance'] ?? 0.00,
             'opening_balance_type' => $validated['opening_balance_type'] ?? 'debit',
-        ]);
+        ], $verification->pendingAttributes()));
+        $verification->recordSubmission($customer);
 
         // Previously saved on the customer only, never posted to the ledger.
         $openingWarning = app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer);
@@ -270,6 +292,10 @@ class CustomerApiController extends Controller
             'email'            => ['nullable', 'email', 'max:255'],
             'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin'            => TaxIdentityService::gstinRules(false),
+            'pan'              => TaxIdentityService::panRules(false),
+            'bank_name'        => ['nullable', 'string', 'max:150'],
+            'account_number'   => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
+            'ifsc_code'        => ['nullable', 'string', 'max:30'],
             'status'           => ['nullable', 'in:active,inactive,blocked'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
@@ -288,14 +314,46 @@ class CustomerApiController extends Controller
             ], 422);
         }
 
-        $customer->update($validator->validated());
+        $data = $validator->validated();
+
+        // FRS 2.3: same rule as the web edit form: a changed name, GSTIN, PAN, email, mobile or address
+        // that matches another customer is reported (409) until the caller re-sends with confirm_duplicate=true.
+        $finder = app(PartyDuplicateService::class);
+        $duplicates = $finder->findOnUpdate(PartyDuplicateService::CUSTOMER, $customer, $data, $tenantId);
+        if ($duplicates !== [] && ! $request->boolean('confirm_duplicate')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Possible duplicate customer: ' . $finder->summary($duplicates)
+                    . '. Re-send with confirm_duplicate=true to save it anyway.',
+                'duplicates' => $duplicates,
+            ], 409);
+        }
+
+        $warnings = [];
+        $verification = app(\App\Services\PartyVerificationService::class);
+        if (array_key_exists('status', $data) && $verification->enabled()) {
+            $requestedStatus = strtolower((string) $data['status']);
+            if ($requestedStatus === 'active' && ($blocked = $verification->activationBlockedMessage($customer))) {
+                return response()->json(['success' => false, 'message' => $blocked], 422);
+            }
+            if ($customer->isVerified() && $requestedStatus !== strtolower((string) $customer->status)) {
+                unset($data['status']);
+                $warnings[] = 'Status of a verified customer must be changed through the deactivate or reactivate action.';
+            }
+        }
+
+        $data = array_merge($data, $verification->attributesForUpdate($customer, $data));
+        $customer->update($data);
 
         $openingWarning = app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer->fresh());
+        if ($openingWarning) {
+            $warnings[] = $openingWarning;
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Customer updated successfully',
-            'warning' => $openingWarning,
+            'warning' => $warnings !== [] ? implode(' ', $warnings) : null,
             'data'    => $customer->fresh(),
         ]);
     }
@@ -326,13 +384,25 @@ class CustomerApiController extends Controller
             ], 403);
         }
 
-        // Check active orders or pending balances
-        $hasInvoices = Invoice::where('tenant_id', $tenantId)->where('customer_id', $id)->exists();
-        if ($hasInvoices) {
-            $customer->update(['status' => 'inactive']);
+        // FRS 2.3: Parties linked to transactions are never hard-deleted.
+        $guard = app(\App\Services\PartyDeletionGuard::class);
+        if ($guard->hasTransactions($customer)) {
+            $statusService = app(\App\Services\PartyStatusService::class);
+            $user = auth()->user() ?? \App\Models\User::where('tenant_id', $tenantId)->first();
+            if ($statusService->enabled() && $customer->isVerified() && $statusService->isActive($customer) && $user) {
+                try {
+                    $statusService->deactivate($customer, $user, 'business_closed', 'Customer has transaction records; deactivated upon deletion attempt.');
+                } catch (\Throwable) {
+                    $customer->update(['status' => 'inactive', 'inactive_reason' => 'business_closed']);
+                }
+            } else {
+                $customer->update(['status' => 'inactive', 'inactive_reason' => 'business_closed']);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Customer has transaction records; status changed to inactive.',
+                'summary' => $guard->transactionSummary($customer),
             ]);
         }
 

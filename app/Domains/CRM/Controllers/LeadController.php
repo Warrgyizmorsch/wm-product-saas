@@ -140,7 +140,9 @@ class LeadController extends Controller
             ];
         }
 
-        return view('modules.crm.leads.kanban', compact('kanbanData', 'statuses'));
+        $lossReasons = \App\Domains\CRM\Models\CrmLossReason::getActiveReasons();
+
+        return view('modules.crm.leads.kanban', compact('kanbanData', 'statuses', 'lossReasons'));
     }
 
     public function checkDuplicate(Request $request): JsonResponse
@@ -477,9 +479,10 @@ class LeadController extends Controller
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
         $nextQuotationNumber = $this->quotationService->getNextQuotationNumber();
         $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses();
+        $lossReasons = \App\Domains\CRM\Models\CrmLossReason::getActiveReasons();
 
         return view('modules.crm.leads.show', array_merge(
-            compact('lead', 'users', 'products', 'nextQuotationNumber', 'leadStatuses'),
+            compact('lead', 'users', 'products', 'nextQuotationNumber', 'leadStatuses', 'lossReasons'),
             $details
         ));
     }
@@ -563,6 +566,17 @@ class LeadController extends Controller
         }
         $validated = $request->validate($this->getLeadValidationRules($request), $this->getLeadValidationMessages());
 
+        // FRS 2.5: changing the owner is a reassignment and needs permission; an open lead keeps an owner.
+        $requestedOwner = $validated['lead_owner_id'] ?? null;
+        if ($requestedOwner != $lead->lead_owner_id) {
+            if (empty($requestedOwner)) {
+                return redirect()->back()->withInput()->withErrors(['lead_owner_id' => 'An open lead must have an accountable owner.']);
+            }
+            if (!\App\Domains\CRM\Services\LeadService::userMayManageLeadOwnership($request->user(), $lead, 'reassign')) {
+                return redirect()->back()->withInput()->withErrors(['lead_owner_id' => 'You do not have permission to reassign this lead.']);
+            }
+        }
+
         $this->leadService->updateLead($lead, $validated, $request->input('items', []), $request->input('product_ids', []));
         return redirect()->route('crm.leads.show', $lead)->with('success', 'Lead successfully updated in Database!');
     }
@@ -580,7 +594,7 @@ class LeadController extends Controller
             return redirect()->back()->withErrors(['status' => $msg])->with('error', $msg);
         }
 
-        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+        if (in_array(strtolower($lead->status), ['dealing', 'won']) && !(strtolower($lead->status) === 'dealing' && strcasecmp($targetStatus, 'Lost') === 0)) {
             if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
                 return response()->json(['success' => false, 'message' => "Lead status in '{$lead->status}' stage is locked."], 422);
             }
@@ -590,13 +604,31 @@ class LeadController extends Controller
         $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost', 'Converted'], $dbStatuses)));
         $validated = $request->validate(['status' => 'required|string|in:' . $allowedStatuses]);
 
-        $res = $this->leadService->updateLeadStatus($lead, $validated['status']);
+        // FRS 2.5 / C-04: Structured Loss validation
+        if (strcasecmp($targetStatus, 'Lost') === 0) {
+            $lossRules = [
+                'loss_reason_id' => 'required|exists:crm_loss_reasons,id',
+                'lost_to_competitor' => 'nullable|string|max:150',
+                'loss_remarks' => 'nullable|string|max:1000',
+                'nurture_followup_date' => 'nullable|date',
+            ];
+            if ($request->filled('loss_reason_id')) {
+                $reason = \App\Domains\CRM\Models\CrmLossReason::find($request->input('loss_reason_id'));
+                if ($reason && $reason->requires_competitor) {
+                    $lossRules['lost_to_competitor'] = 'required|string|max:150';
+                }
+            }
+            $request->validate($lossRules);
+        }
+
+        $res = $this->leadService->updateLeadStatus($lead, $validated['status'], false, $request->all());
 
         if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
             if (!$res['success']) {
                 return response()->json([
                     'success' => false,
-                    'message' => $res['message']
+                    'message' => $res['message'],
+                    'missing_fields' => $res['missing_fields'] ?? [],
                 ], 422);
             }
             return response()->json([
@@ -643,6 +675,17 @@ class LeadController extends Controller
         ]);
 
         $ownerId = $validated['lead_owner_id'] ?? null;
+
+        // FRS 2.5: an open lead keeps an accountable owner and reassigning needs permission.
+        if ($ownerId != $lead->lead_owner_id) {
+            if (empty($ownerId)) {
+                return $this->ownershipError($request, 'An open lead must have an accountable owner.');
+            }
+            if (!\App\Domains\CRM\Services\LeadService::userMayManageLeadOwnership($request->user(), $lead, 'reassign')) {
+                return $this->ownershipError($request, 'You do not have permission to reassign this lead.', 403);
+            }
+        }
+
         $this->leadRepo->updateOwner($lead, $ownerId);
 
         // Also sync owner on linked Deal if converted
@@ -685,7 +728,8 @@ class LeadController extends Controller
         $validated = $request->validate([
             'lead_ids' => 'required|array|min:1',
             'lead_ids.*' => 'required|integer|exists:leads,id',
-            'lead_owner_id' => 'nullable|exists:users,id',
+            // FRS 2.5: an open lead must always keep an accountable owner.
+            'lead_owner_id' => 'required|exists:users,id',
             'note' => 'nullable|string|max:500',
         ]);
 
@@ -697,6 +741,13 @@ class LeadController extends Controller
         $leads = Lead::where('tenant_id', $tenantId)
             ->whereIn('id', $validated['lead_ids'])
             ->get();
+
+        // FRS 2.5: reassigning needs the reassign permission (or tenant-wide lead rights); history is kept.
+        foreach ($leads as $candidate) {
+            if (!\App\Domains\CRM\Services\LeadService::userMayManageLeadOwnership($request->user(), $candidate, 'reassign')) {
+                abort(403, 'You do not have permission to reassign leads.');
+            }
+        }
 
         $updatedCount = 0;
         foreach ($leads as $lead) {
@@ -828,6 +879,17 @@ class LeadController extends Controller
             'requirement' => 'nullable|string',
             'expected_amount' => 'nullable|numeric|min:0',
             'expected_sale_date' => 'nullable|date',
+            'decision_timeline' => 'nullable|string|max:50',
+            'project_type' => 'nullable|string|max:100',
+            'approx_quantity' => 'nullable|integer|min:0',
+            'competitor_name' => 'nullable|string|max:150',
+            'decision_maker_identified' => 'nullable|boolean',
+            'communication_opt_out' => 'nullable|boolean',
+            'loss_reason_id' => 'nullable|exists:crm_loss_reasons,id',
+            'lost_to_competitor' => 'nullable|string|max:150',
+            'loss_remarks' => 'nullable|string',
+            'nurture_followup_date' => 'nullable|date',
+            'response_sla_minutes' => 'nullable|integer|min:1',
             'source' => 'nullable|string|max:255',
             'priority' => 'nullable|string|max:255',
             'segment' => 'nullable|string|max:255',
@@ -873,5 +935,74 @@ class LeadController extends Controller
             'items.*.quantity.min' => 'Minimum quantity 1 is required.',
             'items.*.quantity.numeric' => 'Minimum quantity 1 is required.',
         ];
+    }
+    private function ownershipError(Request $request, string $message, int $status = 422)
+    {
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['success' => false, 'message' => $message], $status);
+        }
+
+        return redirect()->back()->withErrors(['lead_owner_id' => $message]);
+    }
+
+    /**
+     * FRS 2.5: documented hold / customer-requested pause / internal clarification with a review date.
+     */
+    public function hold(Request $request, Lead $lead)
+    {
+        $this->authorize('update', $lead);
+        $validated = $request->validate([
+            'hold_type' => 'required|string|in:' . implode(',', array_keys(\App\Domains\CRM\Services\LeadHoldService::TYPES)),
+            'hold_reason' => 'required|string|max:500',
+            'review_date' => 'required|date|after_or_equal:today',
+        ]);
+
+        try {
+            app(\App\Domains\CRM\Services\LeadHoldService::class)
+                ->placeOnHold($lead, $validated['hold_type'], $validated['hold_reason'], $validated['review_date'], $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $e->getMessage()], 422)
+                : redirect()->back()->withErrors(['hold_reason' => $e->getMessage()]);
+        }
+
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Lead placed on hold.'])
+            : redirect()->back()->with('success', 'Lead placed on hold until ' . $validated['review_date'] . '.');
+    }
+
+    public function resumeHold(Request $request, Lead $lead)
+    {
+        $this->authorize('update', $lead);
+        app(\App\Domains\CRM\Services\LeadHoldService::class)->resume($lead, $request->input('note'));
+
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Hold ended.'])
+            : redirect()->back()->with('success', 'Hold ended; normal follow-up resumes.');
+    }
+
+    /**
+     * FRS 2.5 step 2: merge a duplicate lead into this one, keeping every interaction.
+     */
+    public function merge(Request $request, Lead $lead)
+    {
+        $this->authorize('update', $lead);
+        $validated = $request->validate(['source_lead_id' => 'required|integer|exists:leads,id']);
+
+        if (!\App\Domains\CRM\Services\LeadService::userMayManageLeadOwnership($request->user(), $lead, 'merge')) {
+            abort(403, 'You do not have permission to merge leads.');
+        }
+
+        $source = Lead::where('tenant_id', $lead->tenant_id)->findOrFail($validated['source_lead_id']);
+
+        try {
+            app(\App\Domains\CRM\Services\LeadMergeService::class)->merge($lead, $source, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $e->getMessage()], 422)
+                : redirect()->back()->withErrors(['source_lead_id' => $e->getMessage()]);
+        }
+
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Leads merged.'])
+            : redirect()->route('crm.leads.show', $lead)->with('success', 'Duplicate lead merged. All its activity is now on this lead.');
     }
 }

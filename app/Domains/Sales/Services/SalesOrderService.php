@@ -9,8 +9,11 @@ use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Customer;
+use App\Domains\HRMS\Models\Branch;
 use App\Domains\HRMS\Models\Company;
 use App\Models\GstConfiguration;
+use App\Models\PartyBranch;
+use App\Services\TaxIdentityService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -88,9 +91,19 @@ class SalesOrderService
             $taxType = $data['tax_type'] ?? 'item_wise_tax';
             $orderTaxRate = floatval($data['order_tax_rate'] ?? 0);
 
+            // Resolve & freeze party branches + GSTIN snapshots (FRS 2.3 / C-17)
+            $data = $this->applyBranchAndGstSnapshots($data);
+
             // Auto-resolve gst_type if empty and tax_type is not without_tax
             if (empty($data['gst_type']) && $taxType !== 'without_tax' && !empty($data['customer_id'])) {
-                $data['gst_type'] = $this->resolveGstType((int)$data['customer_id'], $data['company_id'] ?? null, $data['tenant_id'] ?? null);
+                $data['gst_type'] = $this->resolveGstType(
+                    (int) $data['customer_id'],
+                    $data['company_id'] ?? null,
+                    $data['tenant_id'] ?? null,
+                    $data['branch_id'] ?? null,
+                    $data['place_of_supply_state'] ?? null,
+                    $data['bill_to_gstin'] ?? null
+                );
             }
 
             $subtotal = 0;
@@ -256,6 +269,13 @@ class SalesOrderService
         }
 
         return DB::transaction(function () use ($salesOrder, $data, $items) {
+            $data = $this->applyBranchAndGstSnapshots(array_merge([
+                'tenant_id' => $salesOrder->tenant_id,
+                'company_id' => $salesOrder->company_id,
+                'branch_id' => $salesOrder->branch_id,
+                'customer_id' => $salesOrder->customer_id,
+            ], $data));
+
             $taxMode = $data['tax_mode'] ?? $salesOrder->tax_mode ?? 'exclusive';
             $discountType = $data['discount_type'] ?? $salesOrder->discount_type ?? 'item_wise';
             $taxType = $data['tax_type'] ?? $salesOrder->tax_type ?? 'item_wise_tax';
@@ -265,7 +285,14 @@ class SalesOrderService
             if (empty($data['gst_type']) && $taxType !== 'without_tax') {
                 $customerId = $data['customer_id'] ?? $salesOrder->customer_id;
                 if ($customerId) {
-                    $data['gst_type'] = $this->resolveGstType((int)$customerId, $data['company_id'] ?? $salesOrder->company_id, $data['tenant_id'] ?? $salesOrder->tenant_id);
+                    $data['gst_type'] = $this->resolveGstType(
+                        (int) $customerId,
+                        $data['company_id'] ?? $salesOrder->company_id,
+                        $data['tenant_id'] ?? $salesOrder->tenant_id,
+                        $data['branch_id'] ?? $salesOrder->branch_id,
+                        $data['place_of_supply_state'] ?? null,
+                        $data['bill_to_gstin'] ?? null
+                    );
                 }
             }
 
@@ -406,10 +433,16 @@ class SalesOrderService
 
     /**
      * Resolve GST type (cgst_sgst for Intra-state, igst for Inter-state)
-     * based on active company GST number starting 2 digits vs customer GSTIN starting 2 digits.
+     * comparing our active branch's effective GSTIN/state vs customer's Place of Supply / Bill-To GSTIN.
      */
-    public function resolveGstType(Customer|int $customer, ?int $companyId = null, ?int $tenantId = null): string
-    {
+    public function resolveGstType(
+        Customer|int $customer,
+        ?int $companyId = null,
+        ?int $tenantId = null,
+        ?int $branchId = null,
+        ?string $placeOfSupplyState = null,
+        ?string $billToGstin = null
+    ): string {
         if (is_numeric($customer)) {
             $customer = Customer::find($customer);
         }
@@ -418,50 +451,139 @@ class SalesOrderService
         }
 
         $tenantId ??= $customer->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
+        $branchId ??= (function_exists('branch_id') ? branch_id() : null)
+            ?? (function_exists('current_branch_id') ? current_branch_id() : null);
 
-        $company = null;
-        if ($companyId) {
-            $company = Company::find($companyId);
+        $branch = $branchId ? Branch::withoutGlobalScopes()->with('company')->find($branchId) : null;
+        $company = $branch?->company;
+
+        if (!$company && $companyId) {
+            $company = Company::withoutGlobalScopes()->find($companyId);
         }
         if (!$company && function_exists('company') && company()) {
             $company = company();
         }
         if (!$company && function_exists('current_company_id') && current_company_id()) {
-            $company = Company::find(current_company_id());
+            $company = Company::withoutGlobalScopes()->find(current_company_id());
         }
         if (!$company) {
-            $company = Company::where('tenant_id', $tenantId)->first();
+            $company = Company::withoutGlobalScopes()->where('tenant_id', $tenantId)->first();
         }
 
-        // Active company GST number (or tax_number / gstin / GstConfiguration seller_gstin)
-        $companyGst = strtoupper(trim((string) ($company?->gst_number ?? $company?->tax_number ?? $company?->gstin ?? '')));
-        if (empty($companyGst)) {
-            $gstConfig = GstConfiguration::getForCurrentContext();
+        // Seller effective GSTIN: active branch GSTIN -> branch GstConfig -> company GSTIN -> default GstConfig
+        $sellerGstin = $branch?->gst_number ? TaxIdentityService::normalizeGstin($branch->gst_number) : null;
+        if (empty($sellerGstin)) {
+            $gstConfig = GstConfiguration::getForCurrentContext($company?->id, $branch?->id);
+            if ($gstConfig && $gstConfig->branch_id && $gstConfig->seller_gstin) {
+                $sellerGstin = TaxIdentityService::normalizeGstin($gstConfig->seller_gstin);
+            }
+        }
+        if (empty($sellerGstin)) {
+            $sellerGstin = TaxIdentityService::normalizeGstin($company?->gst_number ?? $company?->tax_number ?? $company?->gstin ?? null);
+        }
+        if (empty($sellerGstin)) {
+            $gstConfig = GstConfiguration::getForCurrentContext($company?->id, $branch?->id);
             if ($gstConfig && $gstConfig->seller_gstin) {
-                $companyGst = strtoupper(trim((string) $gstConfig->seller_gstin));
+                $sellerGstin = TaxIdentityService::normalizeGstin($gstConfig->seller_gstin);
             }
         }
 
-        $customerGst = strtoupper(trim((string) ($customer->gstin ?? $customer->tax_number ?? '')));
+        $sellerStateCode = ($branch && $branch->gst_number && $branch->gst_state_code)
+            ? str_pad((string) $branch->gst_state_code, 2, '0', STR_PAD_LEFT)
+            : TaxIdentityService::extractStateCode($sellerGstin);
 
-        $cleanCompanyGst = preg_replace('/[^0-9A-Za-z]/', '', $companyGst);
-        $cleanCustomerGst = preg_replace('/[^0-9A-Za-z]/', '', $customerGst);
+        $targetStateCode = $placeOfSupplyState
+            ? str_pad((string) $placeOfSupplyState, 2, '0', STR_PAD_LEFT)
+            : TaxIdentityService::extractStateCode($billToGstin ?: ($customer->gstin ?? null));
 
-        $companyPrefix = substr($cleanCompanyGst, 0, 2);
-        $customerPrefix = substr($cleanCustomerGst, 0, 2);
-
-        // 1. Primary rule: Compare first 2 digits of company GST and customer GSTIN
-        if (!empty($companyPrefix) && !empty($customerPrefix)) {
-            return ($companyPrefix === $customerPrefix) ? 'cgst_sgst' : 'igst';
+        // 1. Primary rule: Compare 2-digit state codes
+        if (!empty($sellerStateCode) && !empty($targetStateCode)) {
+            return ($sellerStateCode === $targetStateCode) ? 'cgst_sgst' : 'igst';
         }
 
-        // 2. Fallback: Compare state names if GST numbers are not available
-        $companyState = strtolower(trim((string) ($company?->state ?? '')));
+        // 2. Fallback: Compare state names if GSTINs / state codes are not available
+        $sellerStateName = strtolower(trim((string) (($branch && $branch->gst_number ? $branch->state : null) ?: $company?->state ?: $branch?->state ?: '')));
         $customerState = strtolower(trim((string) ($customer->billing_state ?? $customer->state ?? '')));
-        if (!empty($companyState) && !empty($customerState)) {
-            return ($companyState === $customerState) ? 'cgst_sgst' : 'igst';
+        if (!empty($sellerStateName) && !empty($customerState)) {
+            return ($sellerStateName === $customerState) ? 'cgst_sgst' : 'igst';
         }
 
         return 'cgst_sgst';
+    }
+
+    /**
+     * Resolve and freeze seller_gstin, bill_to_gstin, ship_to_gstin, place_of_supply_state
+     * and branch addresses onto SalesOrder data at creation/update time.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function applyBranchAndGstSnapshots(array $data): array
+    {
+        $tenantId = $data['tenant_id'] ?? tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $branchId = $data['branch_id'] ?? (function_exists('branch_id') ? branch_id() : null) ?? (function_exists('current_branch_id') ? current_branch_id() : null);
+        $companyId = $data['company_id'] ?? (function_exists('company_id') ? company_id() : null) ?? (function_exists('current_company_id') ? current_company_id() : null);
+
+        $ownBranch = $branchId ? Branch::withoutGlobalScopes()->with('company')->find($branchId) : null;
+        $org = billing_organization_details($ownBranch);
+
+        if (empty($data['seller_gstin']) && !empty($org['gstin'])) {
+            $data['seller_gstin'] = $org['gstin'];
+        }
+        if (empty($data['seller_state_code']) && !empty($org['state_code'])) {
+            $data['seller_state_code'] = $org['state_code'];
+        }
+
+        $customer = !empty($data['customer_id']) ? Customer::withoutGlobalScopes()->find($data['customer_id']) : null;
+        if (!$customer) {
+            return $data;
+        }
+
+        $billBranch = !empty($data['billing_branch_id'])
+            ? PartyBranch::withoutGlobalScopes()->find($data['billing_branch_id'])
+            : $customer->defaultBillingBranch();
+        $shipBranch = !empty($data['shipping_branch_id'])
+            ? PartyBranch::withoutGlobalScopes()->find($data['shipping_branch_id'])
+            : $customer->defaultShippingBranch();
+
+        if ($billBranch && empty($data['billing_branch_id'])) {
+            $data['billing_branch_id'] = $billBranch->id;
+        }
+        if ($shipBranch && empty($data['shipping_branch_id'])) {
+            $data['shipping_branch_id'] = $shipBranch->id;
+        }
+
+        if ($billBranch && empty($data['billing_address'])) {
+            $formatted = $billBranch->formattedAddress();
+            if ($formatted !== '') {
+                $data['billing_address'] = $formatted;
+            }
+        }
+        if ($shipBranch && empty($data['shipping_address'])) {
+            $formatted = $shipBranch->formattedAddress();
+            if ($formatted !== '') {
+                $data['shipping_address'] = $formatted;
+            }
+        }
+
+        $billGstin = $billBranch?->effectiveGstin() ?: TaxIdentityService::normalizeGstin($customer->gstin);
+        $shipGstin = $shipBranch?->effectiveGstin() ?: $billGstin;
+
+        $data['bill_to_gstin'] = $data['bill_to_gstin'] ?? $billGstin;
+        $data['ship_to_gstin'] = $data['ship_to_gstin'] ?? $shipGstin;
+
+        // Place of Supply (IGST Sec 10(1)(b)): Bill-To GSTIN state for B2B; Ship-To state when unregistered/B2C.
+        $billState = TaxIdentityService::extractStateCode($data['bill_to_gstin']) ?: $billBranch?->effectiveStateCode();
+        $shipState = TaxIdentityService::extractStateCode($data['ship_to_gstin'])
+            ?: $shipBranch?->effectiveStateCode()
+            ?: \App\Domains\Accounting\Support\GstStates::findInText($data['shipping_address'] ?? null);
+
+        if (empty($data['place_of_supply_state'])) {
+            $data['place_of_supply_state'] = !empty($data['bill_to_gstin'])
+                ? ($billState ?: $shipState)
+                : ($shipState ?: $billState);
+        }
+
+        return $data;
     }
 }

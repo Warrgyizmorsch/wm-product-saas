@@ -177,6 +177,26 @@ class DispatchOrderService
         $finalMrId = $req?->id ?? $mrId;
         $tenantId = require_tenant_id();
 
+        // Financial Hold & Party Transaction Guard check
+        $resolvedCustomerId = $validated['customer_id'] ?? null;
+        if (!$resolvedCustomerId && !empty($validated['invoice_id'])) {
+            $sourceInv = \App\Domains\Sales\Models\Invoice::find($validated['invoice_id']);
+            $resolvedCustomerId = $sourceInv?->customer_id;
+        }
+        if (!$resolvedCustomerId && $finalSalesOrderId) {
+            $sourceSo = \App\Domains\Sales\Models\SalesOrder::find($finalSalesOrderId);
+            $resolvedCustomerId = $sourceSo?->customer_id;
+        }
+        if ($resolvedCustomerId) {
+            app(\App\Services\PartyTransactionGuard::class)->assertCanTransact(
+                'customer',
+                $resolvedCustomerId,
+                $tenantId,
+                'dispatch',
+                'customer_id'
+            );
+        }
+
         if ($finalSalesOrderId) {
             $so = \App\Domains\Sales\Models\SalesOrder::find($finalSalesOrderId);
             if ($so && !in_array($so->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])) {
@@ -268,12 +288,37 @@ class DispatchOrderService
             }
         } while ($checkGpQuery->exists());
 
+        $sourceInvoice = !empty($validated['invoice_id'])
+            ? \App\Domains\Sales\Models\Invoice::find($validated['invoice_id'])
+            : null;
+        $sourceSo = $req?->salesOrder ?: ($finalSalesOrderId ? \App\Domains\Sales\Models\SalesOrder::find($finalSalesOrderId) : null);
+
+        $shippingBranchId = $validated['shipping_branch_id']
+            ?? $sourceInvoice?->shipping_branch_id
+            ?? $sourceSo?->shipping_branch_id;
+        $siteContactId = $validated['site_contact_id']
+            ?? $sourceInvoice?->site_contact_id
+            ?? $sourceSo?->site_contact_id;
+        $shipToGstin = $sourceInvoice?->ship_to_gstin
+            ?? $sourceSo?->ship_to_gstin;
+        if (!$shipToGstin && $shippingBranchId) {
+            $shipBranchObj = \App\Models\PartyBranch::withoutGlobalScopes()->find($shippingBranchId);
+            $shipToGstin = $shipBranchObj?->effectiveGstin();
+        }
+        $resolvedShippingAddress = $validated['shipping_address']
+            ?? $sourceInvoice?->shipping_address
+            ?? $sourceSo?->shipping_address
+            ?? null;
+
         // 4. Prepare data & save via repository inside transaction
         $dispatchData = [
             'tenant_id' => $tenantId,
             'company_id' => $companyId,
             'branch_id' => $branchId,
-            'customer_id' => $validated['customer_id'] ?? ($req?->salesOrder?->customer_id),
+            'customer_id' => $validated['customer_id'] ?? ($sourceInvoice?->customer_id ?? $sourceSo?->customer_id),
+            'shipping_branch_id' => $shippingBranchId,
+            'site_contact_id' => $siteContactId,
+            'ship_to_gstin' => $shipToGstin,
             'transporter_id' => $validated['transporter_id'] ?? null,
             'material_requirement_id' => $finalMrId,
             'sales_order_id' => $finalSalesOrderId,
@@ -289,7 +334,7 @@ class DispatchOrderService
             'lr_date' => $validated['lr_date'] ?? null,
             'freight_terms' => $validated['freight_terms'] ?? $req?->salesOrder?->freight_terms ?? 'To Pay',
             'freight_amount' => isset($validated['freight_amount']) ? convert_to_base((float)$validated['freight_amount']) : ($req?->salesOrder?->freight_amount ?? 0.00),
-            'shipping_address' => $validated['shipping_address'] ?? null,
+            'shipping_address' => $resolvedShippingAddress,
             'total_packages' => $validated['total_packages'] ?? null,
             'gross_weight' => $validated['gross_weight'] ?? null,
             'net_weight' => $validated['net_weight'] ?? null,
@@ -509,6 +554,14 @@ class DispatchOrderService
             throw new Exception('Only Pending Dispatch Orders can be confirmed.');
         }
 
+        app(\App\Services\PartyTransactionGuard::class)->assertCanTransact(
+            'customer',
+            $dispatch->customer_id,
+            $dispatch->tenant_id,
+            'dispatch confirmation',
+            'customer_id'
+        );
+
         return DB::transaction(function () use ($dispatch) {
             foreach ($dispatch->items as $item) {
                 $item->update(['status' => 'Confirmed']);
@@ -533,6 +586,14 @@ class DispatchOrderService
         if (!in_array($dispatch->status, ['Confirmed', 'Pending'])) {
             throw new Exception('Only Confirmed or Pending Dispatch Orders can be shipped.');
         }
+
+        app(\App\Services\PartyTransactionGuard::class)->assertCanTransact(
+            'customer',
+            $dispatch->customer_id,
+            $dispatch->tenant_id,
+            'dispatch shipping / outward release',
+            'customer_id'
+        );
 
         // Auto confirm & reserve if called on a pending dispatch
         if ($dispatch->status === 'Pending') {

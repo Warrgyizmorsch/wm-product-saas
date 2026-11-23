@@ -93,12 +93,13 @@
                     <thead class="table-light">
                         <tr>
                             <th style="width: 45px;">{{ __('hrms.org.tbl_hash') }}</th>
-                            <th style="width: 26%;">{{ __('hrms.org.tbl_branch_name') }}</th>
-                            <th style="width: 15%;">{{ __('hrms.org.tbl_code') }}</th>
-                            <th style="width: 24%;">{{ __('hrms.org.tbl_bu') }}</th>
-                            <th style="width: 19%;">{{ __('hrms.employees.lbl_manager') }}</th>
-                            <th style="width: 95px; white-space: nowrap;">{{ __('hrms.org.tbl_status') }}</th>
-                            <th style="width: 110px; white-space: nowrap;" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
+                            <th style="width: 22%;">{{ __('hrms.org.tbl_branch_name') }}</th>
+                            <th style="width: 12%;">{{ __('hrms.org.tbl_code') }}</th>
+                            <th style="width: 16%;">GSTIN</th>
+                            <th style="width: 18%;">{{ __('hrms.org.tbl_bu') }}</th>
+                            <th style="width: 15%;">{{ __('hrms.employees.lbl_manager') }}</th>
+                            <th style="width: 90px; white-space: nowrap;">{{ __('hrms.org.tbl_status') }}</th>
+                            <th style="width: 105px; white-space: nowrap;" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
                         </tr>
                     </thead>
                     <tbody id="branchesTableBody">
@@ -111,9 +112,19 @@
                             <td>{{ $branches->firstItem() + $loop->index }}</td>
                             <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
                                 <span class="fw-bold text-dark">{{ $br->name }}</span>
+                                @if($br->is_head_office)
+                                    <span class="badge bg-soft-primary text-primary ms-1 fs-10">Head Office</span>
+                                @endif
                             </td>
                             <td style="word-break: break-word; overflow-wrap: anywhere;">
                                 <code style="word-break: break-all; white-space: normal;">{{ $br->code }}</code>
+                            </td>
+                            <td style="word-break: break-word; overflow-wrap: anywhere;">
+                                @if($br->gst_number)
+                                    <span class="font-monospace fw-semibold text-primary fs-12">{{ $br->gst_number }}</span>
+                                @else
+                                    <span class="text-muted fs-12">Same as Company</span>
+                                @endif
                             </td>
                             <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
                                 {{ $buName }}
@@ -155,7 +166,7 @@
                         @endforeach
                         @if($branches->isEmpty())
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="8" class="text-center py-5 text-muted">
                                 {{ __('hrms.org.empty_branch') }}
                             </td>
                         </tr>
@@ -209,6 +220,20 @@
             
             let codeEl = document.getElementById('modal_view_branch_code');
             if (codeEl) codeEl.innerText = branch.code;
+
+            let gstinEl = document.getElementById('modal_view_branch_gstin');
+            if (gstinEl) {
+                gstinEl.innerText = branch.gst_number
+                    ? branch.gst_number
+                    : ((branch.company && branch.company.gst_number) ? branch.company.gst_number + ' (Same as Company)' : 'Same as Company');
+            }
+
+            let hoEl = document.getElementById('modal_view_branch_head_office');
+            if (hoEl) {
+                hoEl.innerHTML = (branch.is_head_office === true || branch.is_head_office === 1 || branch.is_head_office === '1')
+                    ? '<span class="badge bg-soft-primary text-primary fw-bold fs-12">Head Office</span>'
+                    : '<span class="text-muted fs-12">No</span>';
+            }
             
             let managerEl = document.getElementById('modal_view_branch_manager');
             if (managerEl) managerEl.innerText = (branch.manager) ? (branch.manager.first_name + ' ' + branch.manager.last_name) : 'N/A';
@@ -261,6 +286,14 @@
             
             let codeEl = document.getElementById('edit_branch_code');
             if (codeEl) codeEl.value = branch.code || '';
+
+            let gstEl = document.getElementById('edit_branch_gst_number');
+            if (gstEl) gstEl.value = branch.gst_number || '';
+
+            let hoCheck = document.getElementById('edit_branch_is_head_office');
+            if (hoCheck) {
+                hoCheck.checked = (branch.is_head_office === true || branch.is_head_office === 1 || branch.is_head_office === '1');
+            }
             
             let buEl = document.getElementById('edit_branch_bu_id');
             if (buEl) {
@@ -474,6 +507,8 @@
                         <div class="p-3 border rounded-3 bg-light-soft" style="background-color: #f8fafc;">
                             <span class="fs-11 fw-semibold text-muted text-uppercase d-block mb-2 text-primary">{{ __('hrms.org.overview') }}</span>
                             <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.branch_code') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_code"></span></div>
+                            <div class="mb-2"><strong class="fs-12 text-muted">GSTIN:</strong> <span class="fs-13 text-primary fw-bold font-monospace" id="modal_view_branch_gstin"></span></div>
+                            <div class="mb-2"><strong class="fs-12 text-muted">Head Office:</strong> <span id="modal_view_branch_head_office"></span></div>
                             <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.manager') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_manager"></span></div>
                             <div class="mb-0"><strong class="fs-12 text-muted">{{ __('hrms.org.status') }}:</strong> <span id="modal_view_branch_status"></span></div>
                         </div>

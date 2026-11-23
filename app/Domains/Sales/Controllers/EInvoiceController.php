@@ -25,6 +25,13 @@ class EInvoiceController extends Controller
         $invoice = Invoice::findOrFail($id);
         $this->authorize('update', $invoice);
 
+        if ($blocked = app(\App\Services\PartyTransactionGuard::class)->blockedReason('customer', $invoice->customer_id, $invoice->tenant_id, 'e-invoice')) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $blocked], 422);
+            }
+            return redirect()->back()->with('error', $blocked);
+        }
+
         if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void'])) {
             $msg = 'Cannot generate E-Invoice for a cancelled invoice.';
             if ($request->wantsJson() || $request->ajax()) {
@@ -33,7 +40,19 @@ class EInvoiceController extends Controller
             return redirect()->back()->with('error', $msg);
         }
 
-        $result = $this->eInvoiceService->generate($invoice);
+        try {
+            $result = $this->eInvoiceService->generate($invoice);
+        } catch (\InvalidArgumentException $e) {
+            $result = [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        } catch (\Throwable $e) {
+            $result = [
+                'success' => false,
+                'message' => 'Failed to generate E-Invoice: ' . $e->getMessage(),
+            ];
+        }
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json($result, $result['success'] ? 200 : 422);
@@ -77,6 +96,13 @@ class EInvoiceController extends Controller
     {
         $invoice = Invoice::findOrFail($id);
         $this->authorize('update', $invoice);
+
+        if ($blocked = app(\App\Services\PartyTransactionGuard::class)->blockedReason('customer', $invoice->customer_id, $invoice->tenant_id, 'e-way bill')) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $blocked], 422);
+            }
+            return redirect()->back()->with('error', $blocked);
+        }
 
         if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void'])) {
             $msg = 'Cannot generate E-Way Bill for a cancelled invoice.';
@@ -142,7 +168,13 @@ class EInvoiceController extends Controller
         $invoice = Invoice::with(['items.product', 'customer', 'salesOrder.customer'])->findOrFail($id);
         $this->authorize('view', $invoice);
 
-        $jsonData = $this->eInvoiceService->buildNicGeppJson($invoice);
+        try {
+            $jsonData = $this->eInvoiceService->buildNicGeppJson($invoice);
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', 'Failed to export NIC JSON: ' . $e->getMessage());
+        }
         $jsonString = json_encode($jsonData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         $filename = 'EInvoice_' . str_replace(['/', '\\', ' '], '_', $invoice->invoice_number) . '_NIC.json';

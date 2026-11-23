@@ -1527,12 +1527,27 @@
                     $isDealWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
                     $hasCustomer = !empty($deal->account?->customer_id) && $isDealWon;
                     $acceptedQuote = $deal->quotations->firstWhere('status', 'Accepted') ?: ($deal->quotations->firstWhere('status', 'Converted') ?: $activeQuotation);
+                    $dealCustomer = $deal->account?->customer ?? ($deal->contact?->name ? \App\Domains\CRM\Models\Customer::where('tenant_id', $deal->tenant_id)->where('name', $deal->contact->name)->first() : null);
+                    $isCustBlocked = $dealCustomer && (strtolower($dealCustomer->status) !== 'active' || !$dealCustomer->isVerified());
+                    $custBlockedReason = $isCustBlocked ? app(\App\Services\PartyTransactionGuard::class)->blockedReason('customer', $dealCustomer->id, $deal->tenant_id, 'quotation') : null;
                 @endphp
 
+                @if($isCustBlocked)
+                    <span class="badge bg-soft-danger text-danger border border-danger-subtle fw-bold px-2 py-1 fs-11 me-1" title="{{ $custBlockedReason }}">
+                        <i class="feather-alert-octagon me-1"></i> Customer on Hold ({{ app(\App\Services\PartyStatusService::class)->reasonLabel($dealCustomer->inactive_reason) }})
+                    </span>
+                @endif
+
                 @if($deal->quotations->isEmpty())
-                    <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-file-plus me-1"></i> + {{ __('crm.new_quotation') }}
-                    </a>
+                    @if($isCustBlocked)
+                        <button type="button" class="btn btn-xs btn-outline-danger fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center disabled" style="font-size: 11px; cursor: not-allowed; opacity: 0.7;" title="{{ $custBlockedReason }}">
+                            <i class="feather-slash me-1"></i> Quotation Blocked
+                        </button>
+                    @else
+                        <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                            <i class="feather-file-plus me-1"></i> + {{ __('crm.new_quotation') }}
+                        </a>
+                    @endif
                 @endif
 
                 @if($hasAcceptedQuotation && !$hasCustomer)
@@ -1551,9 +1566,15 @@
                                 <i class="feather-shopping-bag me-1"></i> View Sales Order ({{ $acceptedQuote->salesOrder->sales_order_number }})
                             </a>
                         @elseif(in_array($acceptedQuote->status, ['Accepted', 'Won']))
-                            <a href="{{ route('sales.orders.create', ['quotation_id' => $acceptedQuote->id]) }}" class="btn btn-xs btn-success fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
-                                <i class="feather-shopping-cart me-1"></i> {{ __('crm.convert_to_sales_order') }}
-                            </a>
+                            @if($isCustBlocked)
+                                <button type="button" class="btn btn-xs btn-outline-danger fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center disabled" style="font-size: 11px; cursor: not-allowed; opacity: 0.7;" title="{{ $custBlockedReason }}">
+                                    <i class="feather-slash me-1"></i> Order Blocked (Hold)
+                                </button>
+                            @else
+                                <a href="{{ route('sales.orders.create', ['quotation_id' => $acceptedQuote->id]) }}" class="btn btn-xs btn-success fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                                    <i class="feather-shopping-cart me-1"></i> {{ __('crm.convert_to_sales_order') }}
+                                </a>
+                            @endif
                         @endif
                     @endif
                 @endif
@@ -2257,7 +2278,17 @@
                     <!-- ==================== TAB 2: QUOTATIONS & PROPOSALS PANE ==================== -->
                     <div class="tab-pane fade {{ $isQuotationTabActive ? 'show active' : '' }}" id="quotations-pane" role="tabpanel">
                         
-                        @if (request()->has('create_quotation') || old('form_type') === 'quotation_create')
+                        @if ($isCustBlocked)
+                            <div class="alert alert-danger py-2.5 px-3 fs-13 mb-3 border-danger d-flex align-items-center justify-content-between flex-wrap gap-2 shadow-sm">
+                                <div>
+                                    <i class="feather-alert-octagon text-danger me-1.5 fs-16"></i>
+                                    <strong>Financial Hold Guard:</strong> Customer '{{ $dealCustomer->name }}' is on financial hold / inactive ({{ app(\App\Services\PartyStatusService::class)->reasonLabel($dealCustomer->inactive_reason) }}). New quotations are blocked.
+                                </div>
+                                <span class="badge bg-danger text-white fs-11">ON HOLD</span>
+                            </div>
+                        @endif
+
+                        @if ((request()->has('create_quotation') || old('form_type') === 'quotation_create') && !$isCustBlocked)
                             <!-- CREATE QUOTATION INLINE FORM -->
                             <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotations">
                                 <div class="card-body p-4">
@@ -2964,9 +2995,15 @@
                                     <h5 class="fw-bold text-dark fs-14">{{ __('crm.no_quotation_created_yet') }}</h5>
                                     <p class="text-muted fs-12 mb-3">{{ __('crm.create_quotation_desc') }}</p>
                                     <div class="d-flex justify-content-center">
-                                        <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-sm btn-success fw-bold px-4 py-2 d-inline-flex align-items-center justify-content-center shadow-xs" style="width: auto !important; max-width: fit-content !important;">
-                                            <i class="feather-plus me-1.5 fs-13"></i>{{ __('crm.create_quotation_now') }}
-                                        </a>
+                                        @if ($isCustBlocked)
+                                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-4 py-2 d-inline-flex align-items-center justify-content-center disabled" style="cursor: not-allowed; opacity: 0.7;" title="{{ $custBlockedReason }}">
+                                                <i class="feather-slash me-1.5 fs-13"></i>Quotation Blocked (Customer on Hold)
+                                            </button>
+                                        @else
+                                            <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-sm btn-success fw-bold px-4 py-2 d-inline-flex align-items-center justify-content-center shadow-xs" style="width: auto !important; max-width: fit-content !important;">
+                                                <i class="feather-plus me-1.5 fs-13"></i>{{ __('crm.create_quotation_now') }}
+                                            </a>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -4025,6 +4062,17 @@
                 alert('This deal is already Won and locked. Its stage cannot be changed.');
                 return false;
             @endif
+
+            var stgLower = (stage || '').toLowerCase();
+            if (stgLower === 'lost' || stgLower === 'closed lost') {
+                var lostModalEl = document.getElementById('dealMarkAsLostModal');
+                if (lostModalEl) {
+                    var lostModal = bootstrap.Modal.getOrCreateInstance(lostModalEl);
+                    lostModal.show();
+                    return false;
+                }
+            }
+
             var form = $('#dealStageForm');
             if (form.length) {
                 $('#dealStageInput').val(stage);
@@ -4311,6 +4359,94 @@
             });
         });
 
+    </script>
+
+    <!-- ==================== DEAL MARK AS LOST MODAL ==================== -->
+    <x-ui.modal id="dealMarkAsLostModal" title="<i class='feather-x-circle text-danger me-1.5'></i>Mark Deal as Lost" size="md" :centered="true" :showFooter="false">
+        <form action="{{ route('crm.deals.updateStage', $deal) }}" method="POST" id="dealMarkLostForm">
+            @csrf
+            @method('PATCH')
+            <input type="hidden" name="stage" value="Lost">
+
+            <div class="alert alert-soft-warning border-warning-subtle d-flex align-items-center gap-2 mb-3 py-2 px-3 fs-12">
+                <i class="feather-alert-triangle text-warning fs-16 flex-shrink-0"></i>
+                <div>
+                    Marking this deal as <strong>Lost</strong> will close the deal and update associated lead history.
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">
+                    Loss Reason <span class="text-danger">*</span>
+                </label>
+                <select name="loss_reason_id" id="dealLossReasonSelect" class="form-select fs-12" required>
+                    <option value="">-- Select Reason --</option>
+                    @foreach($lossReasons ?? \App\Domains\CRM\Models\CrmLossReason::getActiveReasons() as $reason)
+                        <option value="{{ $reason->id }}" 
+                                data-requires-competitor="{{ $reason->requires_competitor ? '1' : '0' }}" 
+                                data-followup-days="{{ $reason->follow_up_days ?? 0 }}">
+                            {{ $reason->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="mb-3" id="dealCompetitorFieldWrapper" style="display: none;">
+                <label class="form-label fw-bold fs-12 text-dark">
+                    Lost to Competitor <span class="text-danger" id="dealCompetitorStar" style="display: none;">*</span>
+                </label>
+                <input type="text" name="lost_to_competitor" id="dealLostToCompetitor" class="form-control fs-12" placeholder="e.g. Acme Corp">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">
+                    Nurture Follow-up Date <span class="text-muted fw-normal fs-11">(Auto-remind to reconnect)</span>
+                </label>
+                <input type="date" name="nurture_followup_date" id="dealNurtureFollowupDate" class="form-control fs-12">
+                <span class="fs-10 text-muted mt-1 d-block">A future follow-up outreach activity will be scheduled automatically on this date.</span>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">
+                    Remarks / Loss Notes
+                </label>
+                <textarea name="loss_remarks" class="form-control fs-12" rows="3" placeholder="Explain what caused this deal to be lost..."></textarea>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+                <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-sm btn-danger fw-bold px-3 d-inline-flex align-items-center gap-1">
+                    <i class="feather-check-circle fs-12"></i> Confirm Deal Lost
+                </button>
+            </div>
+        </form>
+    </x-ui.modal>
+
+    <script>
+        $(document).on('change', '#dealLossReasonSelect', function() {
+            var selectedOpt = $(this).find(':selected');
+            var requiresCompetitor = selectedOpt.data('requires-competitor') == '1';
+            var followupDays = parseInt(selectedOpt.data('followup-days')) || 0;
+
+            if (requiresCompetitor) {
+                $('#dealCompetitorFieldWrapper').show();
+                $('#dealCompetitorStar').show();
+                $('#dealLostToCompetitor').attr('required', 'required');
+            } else {
+                $('#dealCompetitorFieldWrapper').show();
+                $('#dealCompetitorStar').hide();
+                $('#dealLostToCompetitor').removeAttr('required');
+            }
+
+            if (followupDays > 0) {
+                var d = new Date();
+                d.setDate(d.getDate() + followupDays);
+                var yyyy = d.getFullYear();
+                var mm = String(d.getMonth() + 1).padStart(2, '0');
+                var dd = String(d.getDate()).padStart(2, '0');
+                $('#dealNurtureFollowupDate').val(yyyy + '-' + mm + '-' + dd);
+            }
+        });
     </script>
 
     <!-- AI EMAIL DRAFT MODAL WITH COMMON RADIO COMPONENT TONE SELECTOR -->

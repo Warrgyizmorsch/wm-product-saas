@@ -164,12 +164,12 @@
                                        data-account-name="{{ e($acc->name) }}">
                             </td>
                             <td class="font-monospace fw-bold">
-                                <a href="{{ route('crm.accounts.show', $acc) }}" class="text-primary hover-underline">
+                                <a href="{{ $acc->customer_id ? route('crm.customers.show', $acc->customer_id) : route('crm.accounts.show', $acc) }}" class="text-primary hover-underline">
                                     {{ $acc->account_number }}
                                 </a>
                             </td>
                             <td>
-                                <a href="{{ route('crm.accounts.show', $acc) }}" class="fw-bold text-dark text-decoration-none hover-primary d-block">
+                                <a href="{{ $acc->customer_id ? route('crm.customers.show', $acc->customer_id) : route('crm.accounts.show', $acc) }}" class="fw-bold text-dark text-decoration-none hover-primary d-block">
                                     {{ $acc->name }}
                                 </a>
                                 @if($acc->industry_type)
@@ -262,7 +262,7 @@
                                 {{ format_currency($acc->lifetime_revenue) }}
                             </td>
                             <td class="text-end pe-3">
-                                <x-ui.action-dropdown :viewUrl="route('crm.accounts.show', $acc)">
+                                <x-ui.action-dropdown :viewUrl="$acc->customer_id ? route('crm.customers.show', $acc->customer_id) : route('crm.accounts.show', $acc)">
                                     @can('update', $acc)
                                     {{-- Assign / Change Account Manager --}}
                                     <li>

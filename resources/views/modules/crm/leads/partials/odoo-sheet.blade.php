@@ -96,15 +96,15 @@
                             </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui type="select" :label="__('crm.priority')" name="priority">
-                                @foreach (['Low', 'Medium', 'High'] as $prioOption)
-                                    <option value="{{ $prioOption }}" @selected(old('priority', $lead->priority) === $prioOption)>{{ __('crm.priorities.' . $prioOption) }}</option>
+                                @foreach (['Low', 'Medium', 'High', 'Urgent'] as $prioOption)
+                                    <option value="{{ $prioOption }}" @selected(old('priority', $lead->priority) === $prioOption)>{{ \Illuminate\Support\Facades\Lang::has('crm.priorities.' . $prioOption) ? __('crm.priorities.' . $prioOption) : $prioOption }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui type="select" :label="__('crm.lead_source')" name="source">
                                 <option value="">{{ __('crm.select_an_option') }}</option>
-                                @foreach (['Website', 'Referral', 'Cold Call', 'Expo', 'Other'] as $srcOption)
-                                    <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ __('crm.sources.' . $srcOption) ?? $srcOption }}</option>
+                                @foreach (['Direct Inquiry', 'Website', 'Website Form', 'Web Search', 'Meta Ads', 'IndiaMART', 'TradeIndia', 'Justdial', 'Cold Call', 'Referral', 'Employee Referral', 'Partner', 'Advertisement', 'Trade Show', 'Expo', 'WhatsApp Bot', 'WhatsApp', 'Email', 'Phone Call', 'Walk In', 'LinkedIn', 'Google Ads', 'Other'] as $srcOption)
+                                    <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ \Illuminate\Support\Facades\Lang::has('crm.sources.' . $srcOption) ? __('crm.sources.' . $srcOption) : $srcOption }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
@@ -112,8 +112,8 @@
 
                             <x-ui.odoo-form-ui type="select" :label="__('crm.segment')" name="segment" :errorText="$errors->first('segment')">
                                 <option value="">{{ __('crm.select_an_option') }}</option>
-                                @foreach (['SMB', 'Mid-Market', 'Enterprise'] as $segOption)
-                                    <option value="{{ $segOption }}" @selected(old('segment', $lead->segment) === $segOption)>{{ __('crm.segments.' . $segOption) ?? $segOption }}</option>
+                                @foreach (['SME', 'SMB', 'Mid-Market', 'Enterprise'] as $segOption)
+                                    <option value="{{ $segOption }}" @selected(old('segment', $lead->segment) === $segOption)>{{ \Illuminate\Support\Facades\Lang::has('crm.segments.' . $segOption) ? __('crm.segments.' . $segOption) : $segOption }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
@@ -315,7 +315,21 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.expected_revenue_label') . ' (' . active_currency_symbol() . ')'" name="expected_amount" inputType="number" :value="old('expected_amount', isset($lead) && $lead->expected_amount ? round(convert_from_base($lead->expected_amount), 2) : '')" min="0" step="0.01" :placeholder="__('crm.expected_revenue_label')" :errorText="$errors->first('expected_amount')" />
                             <x-ui.odoo-form-ui type="input" :label="__('crm.expected_sale_date')" name="expected_sale_date" inputType="date" :value="old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '')" :errorText="$errors->first('expected_sale_date')" />
-                        </div>
+                            <h6 class="fw-bold text-primary mb-2 mt-3 fs-12">Qualification (required before Dealing)</h6>
+                            <x-ui.odoo-form-ui type="input" label="Project Type" name="project_type" :value="old('project_type', $lead->project_type)" :errorText="$errors->first('project_type')" />
+                            <x-ui.odoo-form-ui type="input" label="Approximate Quantity" name="approx_quantity" inputType="number" :value="old('approx_quantity', $lead->approx_quantity)" :errorText="$errors->first('approx_quantity')" />
+                            <x-ui.odoo-form-ui type="input" label="Decision Timeline" name="decision_timeline" :value="old('decision_timeline', $lead->decision_timeline)" :errorText="$errors->first('decision_timeline')" />
+                            <x-ui.odoo-form-ui type="input" label="Competitor (if known)" name="competitor_name" :value="old('competitor_name', $lead->competitor_name)" :errorText="$errors->first('competitor_name')" />
+                            <div class="form-check mb-2">
+                                <input type="hidden" name="decision_maker_identified" value="0">
+                                <input class="form-check-input" type="checkbox" name="decision_maker_identified" id="edit_decision_maker_identified" value="1" @checked(old('decision_maker_identified', $lead->decision_maker_identified))>
+                                <label class="form-check-label fs-12" for="edit_decision_maker_identified">Decision maker / decision process identified</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input type="hidden" name="communication_opt_out" value="0">
+                                <input class="form-check-input" type="checkbox" name="communication_opt_out" id="edit_communication_opt_out" value="1" @checked(old('communication_opt_out', $lead->communication_opt_out))>
+                                <label class="form-check-label fs-12" for="edit_communication_opt_out">Do not contact (opted out / no consent) - blocks automatic acknowledgements</label>
+                            </div>                        </div>
                     </div>
                 </form>
             </div>
@@ -344,6 +358,17 @@
 
                 <!-- Right: Action Buttons & Odoo Smart Buttons -->
                 <div class="d-flex align-items-center gap-2 flex-wrap">
+                    @if($lead->status === 'Lost')
+                        <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline m-0 p-0" onsubmit="return confirm('Reopen this lost lead back to active pipeline?');">
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="status" value="Qualified">
+                            <x-ui.button type="submit" variant="warning" size="xs" icon="feather-rotate-ccw">
+                                Reopen Lead
+                            </x-ui.button>
+                        </form>
+                    @endif
+
                     @if($lead->crm_deal_id)
                         <x-ui.button href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" variant="primary" size="xs" icon="feather-git-branch" title="Open Deal Pipeline">
                             {{ __('crm.view_deal') ?? 'View Deal' }}
@@ -378,7 +403,7 @@
             </div>
 
             <!-- Key Metrics Row (Expected Revenue, Priority Stars, Expected Closing Date) -->
-            <div class="row g-3 p-3 rounded-3 mb-4 border lead-metrics-row" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
+            <div class="row g-3 p-3 rounded-3 mb-3 border lead-metrics-row" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
                 <div class="col-12 col-sm-4 lead-metric-col border-end">
                     <div class="text-muted fs-11 text-uppercase fw-semibold mb-1">{{ __('crm.expected_revenue_label') }}</div>
                     <div class="fs-18 fw-extrabold text-dark">{{ format_currency($lead->expected_amount ?? 0) }}</div>
@@ -411,6 +436,199 @@
                 </div>
             </div>
 
+            <!-- SLA & Next Action Governance Banner (FRS Ref 2.5) -->
+            @php
+                $now = now();
+                $isClosed = in_array(strtolower($lead->status ?? ''), ['won', 'lost', 'converted']);
+                $hasActiveAction = (bool)($lead->has_active_next_action);
+                $firstRespondedAt = $lead->first_responded_at;
+                $assignedAt = $lead->assigned_at;
+                $onHold = \App\Domains\CRM\Services\LeadNextActionService::isOnHold($lead);
+
+                // Tenant SLA Policy settings
+                $tenant = \App\Models\Tenant::find($lead->tenant_id ?? 1);
+                $settings = is_array($tenant?->settings) ? $tenant->settings : [];
+                $policy = $settings['crm_lead_policy'] ?? [];
+                $slaMinutes = (int)($lead->response_sla_minutes ?: ($policy['response_sla_minutes'] ?? 60));
+
+                $isSlaBreached = (bool)($lead->response_sla_breached);
+                $elapsedMinutes = 0;
+                $remainingMinutes = null;
+
+                if ($assignedAt && !$firstRespondedAt && !$isClosed && !$onHold) {
+                    $assignedTime = \Carbon\Carbon::parse($assignedAt);
+                    $elapsedMinutes = !empty($policy['sla_working_hours_only'])
+                        ? \App\Domains\CRM\Services\CrmFollowupReminderService::workingMinutesBetween($assignedTime, $now, $policy)
+                        : (int)$assignedTime->diffInMinutes($now, false);
+
+                    if ($elapsedMinutes >= $slaMinutes) {
+                        $isSlaBreached = true;
+                        if (!$lead->response_sla_breached) {
+                            try { $lead->update(['response_sla_breached' => true]); } catch (\Throwable $e) {}
+                        }
+                    } else {
+                        $remainingMinutes = max(1, $slaMinutes - $elapsedMinutes);
+                    }
+                }
+            @endphp
+            <div class="p-2.5 px-3 rounded-3 mb-4 border d-flex align-items-center justify-content-between flex-wrap gap-2 fs-12" style="background-color: #f8fafc;">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <!-- Response SLA Indicator -->
+                    <div class="d-flex align-items-center gap-1.5">
+                        <span class="text-muted fs-11 text-uppercase fw-bold"><i class="feather-clock me-1 text-primary"></i>Response SLA:</span>
+                        @if($firstRespondedAt)
+                            <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11 fw-semibold">
+                                <i class="feather-check-circle me-1"></i>Responded ({{ $firstRespondedAt->diffForHumans($assignedAt, true) }})
+                            </span>
+                        @elseif($onHold)
+                            <span class="badge bg-soft-warning text-warning px-2 py-0.5 fs-11 fw-semibold">
+                                <i class="feather-pause-circle me-1"></i>Paused (On Hold)
+                            </span>
+                        @elseif($isSlaBreached)
+                            <span class="badge bg-soft-danger text-danger px-2 py-0.5 fs-11 fw-bold">
+                                <i class="feather-alert-triangle me-1"></i>SLA Breached (Overdue{{ $elapsedMinutes > $slaMinutes ? ' by ' . ($elapsedMinutes - $slaMinutes) . 'm' : '' }})
+                            </span>
+                        @elseif($assignedAt)
+                            <span class="badge bg-soft-warning text-warning px-2 py-0.5 fs-11 fw-semibold">
+                                <i class="feather-clock me-1"></i>Clock Running ({{ $remainingMinutes ?? $slaMinutes }}m left)
+                            </span>
+                        @else
+                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11">Unassigned</span>
+                        @endif
+                    </div>
+
+                    <!-- Next Action Indicator -->
+                    <div class="d-flex align-items-center gap-1.5 border-start ps-3">
+                        <span class="text-muted fs-11 text-uppercase fw-bold"><i class="feather-calendar me-1 text-info"></i>Next Action:</span>
+                        @if($lead->next_followup_date && $lead->next_followup_date > $now)
+                            <span class="badge bg-soft-info text-info px-2 py-0.5 fs-11 fw-semibold">
+                                📅 {{ $lead->next_followup_date->format('d M, h:i A') }}
+                            </span>
+                        @elseif($lead->next_followup_date)
+                            <span class="badge bg-soft-danger text-danger px-2 py-0.5 fs-11 fw-bold">
+                                ⚠️ Overdue ({{ $lead->next_followup_date->format('d M, h:i A') }})
+                            </span>
+                        @elseif(!$isClosed)
+                            <span class="badge bg-soft-danger text-danger px-2 py-0.5 fs-11 fw-bold">
+                                ⚠️ Action Required (C-02 Mandate)
+                            </span>
+                        @else
+                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11">Closed</span>
+                        @endif
+                    </div>
+
+                    @if($lead->status === 'Lost')
+                        <div class="d-flex align-items-center gap-1.5 border-start ps-3">
+                            <span class="text-muted fs-11 text-uppercase fw-bold"><i class="feather-x-circle me-1 text-danger"></i>Loss Reason:</span>
+                            <span class="badge bg-soft-danger text-danger px-2 py-0.5 fs-11">
+                                {{ $lead->lossReason?->name ?: ($lead->lost_to_competitor ? 'Lost to ' . $lead->lost_to_competitor : 'Closed Lost') }}
+                            </span>
+                            @if($lead->nurture_followup_date)
+                                <span class="text-muted fs-11">(Nurture: {{ \Carbon\Carbon::parse($lead->nurture_followup_date)->format('d M, Y') }})</span>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+
+                @if(!$isClosed)
+                    <button type="button" class="btn btn-xs btn-outline-primary fw-bold btn-open-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#leadFollowupOffcanvas">
+                        <i class="feather-plus me-1"></i>Schedule Next Action
+                    </button>
+                @endif
+            </div>
+
+            {{-- FRS 2.5: hold / customer pause, merge duplicates, do-not-contact --}}
+            @php
+                $onHold = \App\Domains\CRM\Services\LeadNextActionService::isOnHold($lead);
+                $canGovern = !$isClosed && \App\Domains\CRM\Services\LeadService::userMayManageLeadOwnership(auth()->user(), $lead, 'merge');
+            @endphp
+            @if($onHold)
+                <div class="alert alert-warning py-2 px-3 fs-12 d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <strong>On hold</strong> ({{ \App\Domains\CRM\Services\LeadHoldService::TYPES[$lead->hold_type] ?? $lead->hold_type }}) until {{ $lead->on_hold_until->format('d M Y') }}:
+                        {{ $lead->hold_reason }}. No outreach is forced and SLA / stale alerts are paused.
+                    </div>
+                    <form method="POST" action="{{ route('crm.leads.hold.resume', $lead) }}">
+                        @csrf
+                        <button class="btn btn-xs btn-outline-dark">End hold</button>
+                    </form>
+                </div>
+            @endif
+            @if($lead->communication_opt_out)
+                <div class="alert alert-danger py-1 px-3 fs-12 mb-3">Do not contact: this prospect opted out; no automatic acknowledgement or outreach template will be sent.</div>
+            @endif
+            @if(!$isClosed)
+                @php
+                    $dupService = app(\App\Domains\CRM\Services\LeadDuplicateService::class);
+                    $mergeData = $dupService->getMergeCandidates($lead);
+                    $matchedCandidates = $mergeData['matches'];
+                @endphp
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @if(!$onHold)
+                        <button type="button" class="btn btn-xs btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#leadHoldPanel"><i class="feather-pause me-1"></i>Put on hold</button>
+                    @endif
+                    @if($canGovern && $matchedCandidates->isNotEmpty())
+                        <button type="button" class="btn btn-xs btn-outline-danger" data-bs-toggle="collapse" data-bs-target="#leadMergePanel">
+                            <i class="feather-git-merge me-1"></i>Merge duplicate
+                            <span class="badge bg-danger text-white ms-1 rounded-pill fs-10">{{ $matchedCandidates->count() }}</span>
+                        </button>
+                    @endif
+                </div>
+                <div class="collapse mb-3" id="leadHoldPanel">
+                    <form method="POST" action="{{ route('crm.leads.hold', $lead) }}" class="border rounded p-3 bg-light">
+                        @csrf
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <select name="hold_type" class="form-select form-select-sm" required>
+                                    @foreach(\App\Domains\CRM\Services\LeadHoldService::TYPES as $tv => $tl)
+                                        <option value="{{ $tv }}">{{ $tl }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3"><input type="date" name="review_date" class="form-control form-control-sm" min="{{ now()->toDateString() }}" required></div>
+                            <div class="col-md-5"><input type="text" name="hold_reason" class="form-control form-control-sm" maxlength="500" placeholder="Reason (required)" required></div>
+                        </div>
+                        <div class="form-text fs-11">The review date becomes the dated next action; the lead stays visible and is reviewed on that day.</div>
+                        <button class="btn btn-sm btn-primary mt-2">Save hold</button>
+                    </form>
+                </div>
+                @if($canGovern && $matchedCandidates->isNotEmpty())
+                    <div class="collapse mb-3" id="leadMergePanel">
+                        <form method="POST" action="{{ route('crm.leads.merge', $lead) }}" class="border border-danger-subtle rounded p-3 bg-light shadow-2xs" onsubmit="return confirm('Merge the selected duplicate lead into this one? All its activities, call logs, quotations, documents, contacts and notes will be transferred here, and the duplicate will be retired. Proceed?');">
+                            @csrf
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-8 col-lg-9">
+                                    <label class="form-label fs-12 fw-bold text-dark d-flex align-items-center justify-content-between mb-1">
+                                        <span><i class="feather-git-merge me-1 text-danger"></i>Select Duplicate Lead to Merge into This Lead <span class="text-danger">*</span></span>
+                                        <span class="badge bg-soft-danger text-danger fs-10 fw-bold"><i class="feather-alert-triangle me-1"></i>{{ $matchedCandidates->count() }} Duplicate(s) Detected</span>
+                                    </label>
+                                    <select name="source_lead_id" class="form-select form-select-sm select2-merge-lead" required style="font-size: 12px;">
+                                        <option value="">-- Select Duplicate Lead to Merge --</option>
+                                        @foreach($matchedCandidates as $c)
+                                            @php
+                                                $cNum = $c->lead_number ?: ('LD-' . str_pad($c->id, 4, '0', STR_PAD_LEFT));
+                                                $cName = $c->company_name ?: ($c->contact_person ?: 'Lead #' . $c->id);
+                                                $cPhone = $c->phone ?: $c->company_phone;
+                                            @endphp
+                                            <option value="{{ $c->id }}" class="fw-bold text-danger">
+                                                [{{ $c->match_reason }}] {{ $cNum }} — {{ $cName }} {{ $cPhone ? "({$cPhone})" : "" }} [Stage: {{ $c->status ?: 'New' }}]
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-4 col-lg-3">
+                                    <button type="submit" class="btn btn-sm btn-danger fw-bold w-100" style="padding-top: 6px; padding-bottom: 6px;">
+                                        <i class="feather-git-merge me-1"></i>Confirm & Merge
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-text fs-11 text-muted mt-2">
+                                <i class="feather-info me-1 text-info"></i>All follow-ups, history, documents, contacts, and quotations will be safely moved to this lead. A Won, converted, or deal-linked lead cannot be merged away.
+                            </div>
+                        </form>
+                    </div>
+                @endif
+            @endif
             <!-- 2-Column Fields Grid -->
             <div class="row g-4 fs-13 text-dark pb-3 border-bottom">
                 <!-- Left Column -->

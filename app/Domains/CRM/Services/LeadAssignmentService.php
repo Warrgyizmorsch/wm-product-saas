@@ -23,6 +23,9 @@ class LeadAssignmentService
             'apply_on_web_forms' => true,
             'apply_on_api_imports' => true,
             'apply_on_manual_create' => false,
+            // FRS 2.5 step 3: territory / segment / product / source / workload / account-owner routing
+            'prefer_account_owner' => false,
+            'rules' => [],
         ];
     }
 
@@ -86,7 +89,18 @@ class LeadAssignmentService
         $assignedOwnerId = null;
         $reason = '';
 
+        // Rule based routing (account owner first, then the first matching rule) overrides the base mode.
+        $routed = $this->resolveByRules($lead, $tenant, $config);
+        if ($routed !== null) {
+            $mode = '__routed';
+        }
+
         switch ($mode) {
+            case '__routed':
+                $assignedOwnerId = $routed['owner_id'];
+                $reason = $routed['reason'];
+                break;
+
             case 'unassigned':
                 $assignedOwnerId = null;
                 $reason = 'Assigned to Unassigned Pool (Self-Claim Mode)';
@@ -122,6 +136,17 @@ class LeadAssignmentService
         // Apply owner to lead
         $oldOwnerId = $lead->lead_owner_id;
         $lead->lead_owner_id = $assignedOwnerId;
+
+        // FRS 2.5 / C-01: Start Response-Time SLA Clock on assignment
+        if ($assignedOwnerId !== null) {
+            $lead->assigned_at = now();
+            $leadPolicy = $settings['crm_lead_policy'] ?? [];
+            $slaMinutes = (int)($leadPolicy['response_sla_minutes'] ?? 60);
+            $lead->response_sla_minutes = $slaMinutes > 0 ? $slaMinutes : 60;
+            $lead->response_sla_breached = false;
+            $lead->sla_escalated_at = null;
+        }
+
         $lead->save();
 
         // Log to Lead History if changed or initially assigned
@@ -151,11 +176,154 @@ class LeadAssignmentService
             }
         }
 
+        if ($assignedOwnerId !== null) {
+            app(LeadNextActionService::class)->ensureNextAction($lead->fresh());
+        }
+
         return [
             'assigned' => $assignedOwnerId !== null,
             'owner_id' => $assignedOwnerId,
             'reason' => $reason,
         ];
+    }
+
+    /**
+     * FRS 2.5 step 3: route a lead by account owner and by configured rules.
+     * A rule may filter on territory (state / city / country), segment, source and product keyword,
+     * and picks its owner from a pool by workload (fewest open leads), round-robin or first.
+     *
+     * @return array{owner_id:int, reason:string}|null
+     */
+    private function resolveByRules(Lead $lead, Tenant $tenant, array $config): ?array
+    {
+        // 1. Existing account owner (a returning company stays with its account manager)
+        if (!empty($config['prefer_account_owner'])) {
+            $account = $this->findExistingAccount($lead);
+            if ($account && !empty($account->owner_id) && User::where('tenant_id', $tenant->id)->where('id', $account->owner_id)->exists()) {
+                return ['owner_id' => (int) $account->owner_id, 'reason' => "Account Owner of {$account->name}"];
+            }
+        }
+
+        // 2. Configured rules, first match wins
+        foreach ((array) ($config['rules'] ?? []) as $index => $rule) {
+            if (!is_array($rule) || (isset($rule['active']) && !$rule['active'])) {
+                continue;
+            }
+            if (!$this->ruleMatches($lead, $rule)) {
+                continue;
+            }
+            $pool = array_values(array_filter(array_map('intval', (array) ($rule['owner_ids'] ?? []))));
+            $validIds = $pool ? User::where('tenant_id', $tenant->id)->whereIn('id', $pool)->pluck('id')->map(fn ($i) => (int) $i)->all() : [];
+            $pool = array_values(array_intersect($pool, $validIds));
+            if (empty($pool)) {
+                continue;
+            }
+
+            $strategy = $rule['strategy'] ?? 'least_loaded';
+            if ($strategy === 'round_robin') {
+                $last = $rule['last_user_id'] ?? null;
+                $pos = $last ? array_search((int) $last, $pool, true) : false;
+                $ownerId = $pool[$pos === false ? 0 : (($pos + 1) % count($pool))];
+                $this->persistRuleCursor($tenant, $index, $ownerId);
+            } elseif ($strategy === 'first') {
+                $ownerId = $pool[0];
+            } else {
+                $ownerId = $this->leastLoadedOwner($tenant->id, $pool);
+            }
+
+            $label = $rule['name'] ?? ('Rule #' . ($index + 1));
+            return ['owner_id' => $ownerId, 'reason' => "Assignment rule '{$label}' ({$strategy})"];
+        }
+
+        return null;
+    }
+
+    private function ruleMatches(Lead $lead, array $rule): bool
+    {
+        $eq = fn ($a, $b) => strcasecmp(trim((string) $a), trim((string) $b)) === 0;
+
+        if (!empty($rule['territory'])) {
+            $t = (string) $rule['territory'];
+            if (!$eq($lead->state, $t) && !$eq($lead->city, $t) && !$eq($lead->country, $t)) {
+                return false;
+            }
+        }
+        if (!empty($rule['segment']) && !$eq($lead->segment, $rule['segment'])) {
+            return false;
+        }
+        if (!empty($rule['source']) && !$eq($lead->source, $rule['source'])) {
+            return false;
+        }
+        if (!empty($rule['product'])) {
+            $needle = mb_strtolower((string) $rule['product']);
+            $haystack = mb_strtolower((string) $lead->requirement);
+            foreach ((array) ($lead->product_items ?? []) as $item) {
+                $haystack .= ' ' . mb_strtolower((string) (is_array($item) ? ($item['name'] ?? $item['product_name'] ?? '') : $item));
+            }
+            if (!str_contains($haystack, $needle)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function leastLoadedOwner(int $tenantId, array $pool): int
+    {
+        $counts = Lead::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('lead_owner_id', $pool)
+            ->whereNotIn('status', ['Won', 'Lost', 'Converted'])
+            ->whereNull('deleted_at')
+            ->selectRaw('lead_owner_id, COUNT(*) as c')
+            ->groupBy('lead_owner_id')
+            ->pluck('c', 'lead_owner_id');
+
+        $best = $pool[0];
+        $bestCount = PHP_INT_MAX;
+        foreach ($pool as $id) {
+            $c = (int) ($counts[$id] ?? 0);
+            if ($c < $bestCount) {
+                $best = $id;
+                $bestCount = $c;
+            }
+        }
+
+        return (int) $best;
+    }
+
+    private function findExistingAccount(Lead $lead): ?\App\Domains\CRM\Models\CrmAccount
+    {
+        $query = \App\Domains\CRM\Models\CrmAccount::where('tenant_id', $lead->tenant_id);
+        $query->where(function ($q) use ($lead) {
+            $any = false;
+            if (!empty($lead->email)) {
+                $q->where('email', $lead->email);
+                $any = true;
+            }
+            if (!empty($lead->company_name) && strcasecmp((string) $lead->company_name, 'Individual Customer') !== 0) {
+                $any ? $q->orWhere('name', $lead->company_name) : $q->where('name', $lead->company_name);
+                $any = true;
+            }
+            if (!$any) {
+                $q->whereRaw('1 = 0');
+            }
+        });
+
+        return $query->first();
+    }
+
+    private function persistRuleCursor(Tenant $tenant, int|string $index, int $ownerId): void
+    {
+        try {
+            $settings = is_array($tenant->settings) ? $tenant->settings : [];
+            if (isset($settings['lead_assignment']['rules'][$index])) {
+                $settings['lead_assignment']['rules'][$index]['last_user_id'] = $ownerId;
+                $tenant->update(['settings' => $settings]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to persist assignment rule cursor: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -222,6 +390,13 @@ class LeadAssignmentService
         }
         if (!empty($config['default_owner_id'])) {
             $lead->lead_owner_id = (int)$config['default_owner_id'];
+            $lead->assigned_at = now();
+            $tenantSettings = is_array(Tenant::find($lead->tenant_id)?->settings) ? Tenant::find($lead->tenant_id)->settings : [];
+            $leadPolicy = $tenantSettings['crm_lead_policy'] ?? [];
+            $slaMinutes = (int)($leadPolicy['response_sla_minutes'] ?? 60);
+            $lead->response_sla_minutes = $slaMinutes > 0 ? $slaMinutes : 60;
+            $lead->response_sla_breached = false;
+            $lead->sla_escalated_at = null;
             $lead->save();
             return ['assigned' => true, 'owner_id' => $lead->lead_owner_id, 'reason' => 'Default Fallback Owner'];
         }

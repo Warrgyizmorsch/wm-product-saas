@@ -8,8 +8,14 @@ use App\Domains\Purchase\Controllers\GoodsReceiptNoteController;
 use App\Domains\Purchase\Controllers\PurchaseAdvancePaymentController;
 use App\Domains\Purchase\Controllers\VendorBillController;
 use App\Domains\Purchase\Controllers\BillMatchingController;
+use App\Domains\Purchase\Controllers\VendorBankChangeController;
+use App\Domains\Purchase\Controllers\VendorBranchController;
 use App\Domains\Purchase\Controllers\VendorPaymentController;
+use App\Domains\Purchase\Controllers\VendorStatusController;
+use App\Domains\Purchase\Controllers\VendorVerificationController;
 use App\Domains\Purchase\Controllers\PurchaseReturnController;
+use App\Domains\Purchase\Controllers\VendorDocumentController;
+use App\Domains\Purchase\Controllers\VendorItemController;
 
 use App\Domains\Purchase\Controllers\LandedCostController;
 
@@ -86,8 +92,52 @@ Route::prefix('purchase')
 
         // Vendor / Supplier Management Routes
         Route::get('vendors/export', [\App\Domains\Purchase\Controllers\VendorController::class, 'export'])->name('vendors.export');
+        Route::get('vendors/duplicate-check', [\App\Domains\Purchase\Controllers\VendorController::class, 'duplicateCheck'])->name('vendors.duplicate-check');
+        Route::get('vendors/verification', [VendorVerificationController::class, 'index'])->name('vendors.verification.index');
+        Route::get('vendors/bank-changes', [VendorBankChangeController::class, 'index'])->name('vendors.bank-changes.index');
+        Route::get('vendors/bank-changes/{bankChange}', [VendorBankChangeController::class, 'show'])->name('vendors.bank-changes.show');
+        Route::post('vendors/bank-changes/{bankChange}/approve', [VendorBankChangeController::class, 'approve'])->name('vendors.bank-changes.approve');
+        Route::post('vendors/bank-changes/{bankChange}/reject', [VendorBankChangeController::class, 'reject'])->name('vendors.bank-changes.reject');
+        Route::post('vendors/bank-changes/{bankChange}/cancel', [VendorBankChangeController::class, 'cancel'])->name('vendors.bank-changes.cancel');
         Route::post('vendors/quick-create', [\App\Domains\Purchase\Controllers\VendorController::class, 'quickCreate'])->name('vendors.quick-create');
         Route::post('vendors/{vendor}/toggle-status', [\App\Domains\Purchase\Controllers\VendorController::class, 'toggleStatus'])->name('vendors.toggle-status');
+        Route::post('vendors/{vendor}/verify', [VendorVerificationController::class, 'verify'])->name('vendors.verify');
+        Route::post('vendors/{vendor}/verification/return', [VendorVerificationController::class, 'returnForCorrection'])->name('vendors.verification.return');
+        Route::post('vendors/{vendor}/verification/resubmit', [VendorVerificationController::class, 'resubmit'])->name('vendors.verification.resubmit');
+        Route::get('vendors/{vendor}/bank-changes/create', [VendorBankChangeController::class, 'create'])->name('vendors.bank-changes.create');
+        Route::post('vendors/{vendor}/bank-changes', [VendorBankChangeController::class, 'store'])->name('vendors.bank-changes.store');
+        Route::get('vendors/{vendor}/deactivate', [VendorStatusController::class, 'deactivateForm'])->name('vendors.deactivate.create');
+        Route::post('vendors/{vendor}/deactivate', [VendorStatusController::class, 'deactivate'])->name('vendors.deactivate.store');
+        Route::get('vendors/{vendor}/reactivate', [VendorStatusController::class, 'reactivateForm'])->name('vendors.reactivate.create');
+        Route::post('vendors/{vendor}/reactivate', [VendorStatusController::class, 'reactivate'])->name('vendors.reactivate.store');
+        // Party Merge Tool (FRS 2.3 / Task C-18)
+        Route::get('vendors/{vendor}/merge-preview', [\App\Domains\Purchase\Controllers\VendorMergeController::class, 'preview'])->name('vendors.merge.preview');
+        Route::post('vendors/{vendor}/merge', [\App\Domains\Purchase\Controllers\VendorMergeController::class, 'merge'])->name('vendors.merge.store');
+        // Multi-branch & unified vendor contacts (FRS 2.3 / C-17)
+        Route::get('vendors/{vendor}/branches', [VendorBranchController::class, 'index'])->name('vendors.branches.index');
+        Route::post('vendors/{vendor}/branches', [VendorBranchController::class, 'store'])->name('vendors.branches.store');
+        Route::put('vendors/{vendor}/branches/{partyBranch}', [VendorBranchController::class, 'update'])->name('vendors.branches.update');
+        Route::post('vendors/{vendor}/branches/{partyBranch}/deactivate', [VendorBranchController::class, 'deactivate'])->name('vendors.branches.deactivate');
+        Route::post('vendors/{vendor}/branches/{partyBranch}/activate', [VendorBranchController::class, 'activate'])->name('vendors.branches.activate');
+        Route::post('vendors/{vendor}/branches/{partyBranch}/verify', [VendorBranchController::class, 'verify'])->name('vendors.branches.verify');
+        Route::post('vendors/{vendor}/branches/{partyBranch}/verification/return', [VendorBranchController::class, 'returnForCorrection'])->name('vendors.branches.verification.return');
+        Route::post('vendors/{vendor}/branches/{partyBranch}/verification/resubmit', [VendorBranchController::class, 'resubmit'])->name('vendors.branches.verification.resubmit');
+        Route::post('vendors/{vendor}/contacts', [VendorBranchController::class, 'storeContact'])->name('vendors.contacts.store');
+        Route::put('vendors/{vendor}/contacts/{contact}', [VendorBranchController::class, 'updateContact'])->name('vendors.contacts.update');
+        Route::delete('vendors/{vendor}/contacts/{contact}', [VendorBranchController::class, 'destroyContact'])->name('vendors.contacts.destroy');
+
+        // Vendor Supplied Items Catalog, MOQ, Lead Time & Price History (FRS 2.3 / Task C-19)
+        Route::get('vendors/{vendor}/items/lookup', [VendorItemController::class, 'lookup'])->name('vendors.items.lookup');
+        Route::post('vendors/{vendor}/items', [VendorItemController::class, 'store'])->name('vendors.items.store');
+        Route::put('vendors/{vendor}/items/{vendorItem}', [VendorItemController::class, 'update'])->name('vendors.items.update');
+        Route::delete('vendors/{vendor}/items/{vendorItem}', [VendorItemController::class, 'destroy'])->name('vendors.items.destroy');
+        Route::get('vendors/{vendor}/items/{vendorItem}/price-history', [VendorItemController::class, 'priceHistory'])->name('vendors.items.price-history');
+
+        // Vendor Compliance & Statutory Documents Expiry Tracker (FRS 2.3 / Task C-19)
+        Route::post('vendors/{vendor}/documents', [VendorDocumentController::class, 'store'])->name('vendors.documents.store');
+        Route::get('vendors/{vendor}/documents/{document}/download', [VendorDocumentController::class, 'download'])->name('vendors.documents.download');
+        Route::delete('vendors/{vendor}/documents/{document}', [VendorDocumentController::class, 'destroy'])->name('vendors.documents.destroy');
+
         Route::resource('vendors', \App\Domains\Purchase\Controllers\VendorController::class);
     });
 

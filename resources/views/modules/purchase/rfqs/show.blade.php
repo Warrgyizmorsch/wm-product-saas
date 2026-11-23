@@ -325,6 +325,13 @@
                             }
                         </style>
 
+                        @php
+                            $vendorItemMap = \App\Domains\Purchase\Models\VendorItem::where('tenant_id', $rfq->tenant_id)
+                                ->whereIn('vendor_id', $rfq->rfqVendors->pluck('vendor_id'))
+                                ->whereIn('product_id', $rfq->items->pluck('product_id'))
+                                ->get()->keyBy(fn ($vi) => $vi->vendor_id . '-' . $vi->product_id);
+                        @endphp
+
                         <!-- ===================== MOBILE VENDOR CARDS VIEW (No Horizontal Scroll) ===================== -->
                         <div class="d-block d-md-none mb-4">
                             <!-- Vendor Navigation Pills -->
@@ -451,6 +458,7 @@
                                                             $mobOrderInfo = $orderedItemsMap[$item->product_id] ?? null;
                                                             $mobIsOrdered = $mobOrderInfo['is_fully_ordered'] ?? false;
                                                             $mobPos = $mobOrderInfo['orders'] ?? [];
+                                                            $vItemMob = $vendorItemMap->get($rv->vendor_id . '-' . $item->product_id);
                                                         @endphp
                                                         <div class="p-2.5 mb-2.5 border rounded bg-white fs-12 shadow-xs">
                                                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-1 mb-1">
@@ -459,6 +467,22 @@
                                                                     <span class="badge bg-soft-success text-success fs-10 fw-bold"><i class="feather-check-circle me-0.5"></i>{{ __('purchase.status_ordered') }}</span>
                                                                 @endif
                                                             </div>
+                                                            @if($vItemMob)
+                                                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-1 fs-11 text-muted mb-2 px-2 py-1 bg-light rounded border">
+                                                                    @if($vItemMob->vendor_item_code)
+                                                                        <span title="{{ $vItemMob->vendor_item_name }}">Part: <strong class="text-primary">{{ $vItemMob->vendor_item_code }}</strong></span>
+                                                                    @endif
+                                                                    @if($vItemMob->unit_price !== null)
+                                                                        <span title="Agreed / Last Purchase Rate">Last: <strong class="text-success">{{ format_currency($vItemMob->unit_price) }}</strong></span>
+                                                                    @endif
+                                                                    @if($vItemMob->moq > 1)
+                                                                        <span>MOQ: <strong class="text-dark">{{ (float)$vItemMob->moq }}</strong></span>
+                                                                    @endif
+                                                                    @if($vItemMob->lead_time_days > 0)
+                                                                        <span>Lead: <strong class="text-primary">{{ $vItemMob->lead_time_days }}d</strong></span>
+                                                                    @endif
+                                                                </div>
+                                                            @endif
                                                             <div class="text-muted fs-11 mb-2">
                                                                 {{ __('purchase.required_qty') }}: <strong class="text-dark">{{ (float)$item->quantity }} {{ $item->product?->uom?->name ?? 'Pcs' }}</strong>
                                                                 @if(!empty($mobPos))
@@ -588,6 +612,12 @@
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    @php
+                                        $vendorItemMap = \App\Domains\Purchase\Models\VendorItem::where('tenant_id', $rfq->tenant_id)
+                                            ->whereIn('vendor_id', $rfq->rfqVendors->pluck('vendor_id'))
+                                            ->whereIn('product_id', $rfq->items->pluck('product_id'))
+                                            ->get()->keyBy(fn ($vi) => $vi->vendor_id . '-' . $vi->product_id);
+                                    @endphp
                                     @foreach($rfq->items as $index => $item)
                                         @php
                                             $expectedDate = $rfq->requisition?->requisition_date ? $rfq->requisition->requisition_date->format('d-M-Y') : $rfq->rfq_date->format('d-M-Y');
@@ -664,8 +694,25 @@
                                                     $quotedRate = $quote ? round(convert_from_base((float)$quote->rate), 2) : '';
                                                 @endphp
                                                 @if($isMapped)
+                                                    @php
+                                                        $vItem = $vendorItemMap->get($rv->vendor_id . '-' . $item->product_id);
+                                                    @endphp
                                                     <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                        <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][rate]" id="dt_rate_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-rate-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.01" min="0" value="{{ $quotedRate }}" placeholder="0.00" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
+                                                        <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][rate]" id="dt_rate_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-rate-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.01" min="0" value="{{ $quotedRate }}" placeholder="{{ $vItem && $vItem->unit_price !== null ? number_format(convert_from_base($vItem->unit_price), 2, '.', '') : '0.00' }}" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}" data-last-rate="{{ $vItem && $vItem->unit_price !== null ? round(convert_from_base((float)$vItem->unit_price), 2) : '' }}">
+                                                        @if($vItem && ($vItem->vendor_item_code || $vItem->unit_price !== null))
+                                                            <div class="d-flex align-items-center justify-content-between fs-10 text-muted px-1 mt-0.5 text-truncate">
+                                                                @if($vItem->vendor_item_code)
+                                                                    <span class="text-truncate" title="{{ $vItem->vendor_item_name ?: $vItem->vendor_item_code }}">
+                                                                        Part: <strong class="text-primary">{{ $vItem->vendor_item_code }}</strong>
+                                                                    </span>
+                                                                @endif
+                                                                @if($vItem->unit_price !== null)
+                                                                    <span title="Vendor Last / Agreed Contract Rate" class="ms-auto font-monospace">
+                                                                        Last: <strong class="text-success">{{ format_currency($vItem->unit_price) }}</strong>
+                                                                    </span>
+                                                                @endif
+                                                            </div>
+                                                        @endif
                                                     </td>
                                                 @else
                                                     <td class="border-start p-2 text-center text-muted align-middle bg-light" style="width: 220px; min-width: 220px; max-width: 220px; background-color: #f8fafc !important; vertical-align: middle;" rowspan="5">
@@ -689,6 +736,15 @@
                                                     @endphp
                                                     <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
                                                         <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][quantity]" id="dt_qty_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-qty-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.0001" min="0" value="{{ $quotedQty }}" placeholder="0.00" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
+                                                        @php
+                                                            $vItemRow = $vendorItemMap->get($rv->vendor_id . '-' . $item->product_id);
+                                                        @endphp
+                                                        @if($vItemRow)
+                                                            <div class="d-flex align-items-center justify-content-between fs-10 text-muted px-1 mt-0.5">
+                                                                <span title="Vendor Minimum Order Quantity">MOQ: <strong class="{{ $quotedQty < $vItemRow->moq ? 'text-warning' : 'text-dark' }}">{{ (float)$vItemRow->moq }}</strong></span>
+                                                                <span title="Vendor Lead Time">Lead: <strong class="text-primary">{{ $vItemRow->lead_time_days }}d</strong></span>
+                                                            </div>
+                                                        @endif
                                                     </td>
                                                 @endif
                                             @endforeach
@@ -1121,7 +1177,10 @@
                 items.each(function() {
                     const productId = $(this).attr('data-product-id');
                     const rateInput = $(`.vendor-rate-input[data-vendor="${rfqVendorId}"][data-product="${productId}"]`);
-                    const rateVal = rateInput.length ? (parseFloat(rateInput.val()) || 0) : 0;
+                    let rateVal = rateInput.length ? (parseFloat(rateInput.val()) || 0) : 0;
+                    if (!rateVal && rateInput.attr('data-last-rate')) {
+                        rateVal = parseFloat(rateInput.attr('data-last-rate')) || 0;
+                    }
                     const qtyInput = $(`.vendor-qty-input[data-vendor="${rfqVendorId}"][data-product="${productId}"]`);
                     const qtyVal = qtyInput.length ? (parseFloat(qtyInput.val()) || 0) : (parseFloat($(this).attr('data-req-qty')) || 1);
 

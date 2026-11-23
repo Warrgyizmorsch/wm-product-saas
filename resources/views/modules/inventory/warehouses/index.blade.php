@@ -68,6 +68,7 @@
                             <tr>
                                 <th class="ps-4">{{ __('inventory.code') }}</th>
                                 <th>{{ __('inventory.name') }}</th>
+                                <th>Branch</th>
                                 <th>{{ __('inventory.address') }}</th>
                                 <th>{{ __('inventory.default') }}</th>
                                 <th>{{ __('inventory.status') }}</th>
@@ -81,6 +82,9 @@
                                         {{ $warehouse->code }}
                                     </td>
                                     <td class="fw-bold">{{ $warehouse->name }}</td>
+                                    <td class="text-muted">
+                                        {{ $warehouse->branch?->name ?? 'Shared (All Branches)' }}
+                                    </td>
                                     <td class="text-muted text-truncate" style="max-width: 200px;" title="{{ $warehouse->address }}">
                                         {{ $warehouse->address ?: '—' }}
                                     </td>
@@ -104,6 +108,7 @@
                                                     data-id="{{ $warehouse->id }}"
                                                     data-name="{{ $warehouse->name }}"
                                                     data-code="{{ $warehouse->code }}"
+                                                    data-branch-id="{{ $warehouse->branch_id ?? '' }}"
                                                     data-address="{{ $warehouse->address }}"
                                                     data-is-default="{{ $warehouse->is_default ? '1' : '0' }}"
                                                     data-status="{{ $warehouse->status }}" />
@@ -118,7 +123,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center py-4 text-muted">
+                                    <td colspan="7" class="text-center py-4 text-muted">
                                         <i class="feather-info me-2"></i>{{ __('inventory.no_warehouses_configured') }}
                                     </td>
                                 </tr>
@@ -141,6 +146,17 @@
 
                     <!-- Code -->
                     <x-ui.input :label="__('inventory.warehouse_code')" name="code" id="whCode" required="true" :placeholder="__('inventory.placeholder_wh_code')" />
+
+                    <!-- Branch -->
+                    <div class="mb-3">
+                        <label for="whBranchId" class="form-label fs-12 fw-semibold">Branch</label>
+                        <select name="branch_id" id="whBranchId" class="form-select form-select-sm">
+                            <option value="">Shared (All Branches)</option>
+                            @foreach(($branches ?? []) as $br)
+                                <option value="{{ $br->id }}" @selected(old('branch_id') == $br->id)>{{ $br->name }} ({{ $br->code }})</option>
+                            @endforeach
+                        </select>
+                    </div>
 
                     <!-- Status (Visible only during Edit) -->
                     <div id="statusField" style="display: none;">
@@ -186,6 +202,7 @@
                 const id = $(this).data('id');
                 const name = $(this).data('name');
                 const code = $(this).data('code');
+                const branchId = $(this).data('branch-id');
                 const address = $(this).data('address');
                 const isDefault = $(this).data('is-default');
                 const status = $(this).data('status');
@@ -194,12 +211,14 @@
                 $('#warehouseFormCard').find('.card-title').html('<i class="feather-edit me-2 text-primary"></i>' + transEditWarehouse);
                 
                 // Update Form Action and Method
-                $('#warehouseForm').attr('action', `{{ url('inventory/warehouses') }}/${id}`);
+                const updateUrl = "{{ route('inventory.warehouses.update', ':id') }}";
+                $('#warehouseForm').attr('action', updateUrl.replace(':id', id));
                 $('#methodContainer').html('@method("PUT")');
 
                 // Populate Fields
                 $('#whName').val(name);
                 $('#whCode').val(code);
+                $('#whBranchId').val(branchId || '');
                 $('#whAddress').val(address);
                 $('#whDefault').prop('checked', isDefault == 1);
                 $('#whStatus').val(status);

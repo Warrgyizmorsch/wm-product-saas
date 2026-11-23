@@ -280,6 +280,16 @@ class LeadRepository
         $oldOwnerId = $lead->lead_owner_id;
         $updated = $lead->update(['lead_owner_id' => $ownerId]);
 
+        // FRS 2.5 / C-01: a new owner gets a fresh response-time clock.
+        if ($oldOwnerId != $ownerId && !empty($ownerId)) {
+            $lead->update([
+                'assigned_at' => now(),
+                'first_responded_at' => null,
+                'response_sla_breached' => false,
+                'sla_escalated_at' => null,
+            ]);
+        }
+
         if ($oldOwnerId != $ownerId) {
             $oldOwnerName = $oldOwnerId ? (User::find($oldOwnerId)?->name ?: 'Unknown') : 'None';
             $newOwnerName = $ownerId ? (User::find($ownerId)?->name ?: 'Unknown') : 'None';

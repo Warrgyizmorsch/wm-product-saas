@@ -7,6 +7,11 @@ use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Purchase\Models\VendorBill;
 use App\Domains\Purchase\Models\VendorPayment;
+use App\Services\PartyBankChangeService;
+use App\Services\PartyDuplicateService;
+use App\Services\PartyStatusException;
+use App\Services\PartyStatusService;
+use App\Services\PartyVerificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -133,7 +138,21 @@ class VendorApiController extends Controller
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
         $validated = $validator->validated();
 
-        $vendor = Vendor::create([
+        // FRS 2.3: possible duplicates are reported (409) until the caller re-sends with confirm_duplicate=true.
+        $duplicates = app(PartyDuplicateService::class)->find(PartyDuplicateService::VENDOR, $validated, $tenantId);
+        if ($duplicates !== [] && ! $request->boolean('confirm_duplicate')) {
+            return $this->duplicateResponse($duplicates);
+        }
+
+        $status = $validated['status'] ?? 'active';
+        $inactiveReason = null;
+        if (strtolower((string) $status) === 'blocked') {
+            $status = 'inactive';
+            $inactiveReason = 'compliance_issue';
+        }
+
+        $verification = app(PartyVerificationService::class);
+        $vendor = Vendor::create(array_merge([
             'tenant_id' => $tenantId,
             'company_id' => $companyId,
             'branch_id' => $branchId,
@@ -143,7 +162,8 @@ class VendorApiController extends Controller
             'phone' => $validated['phone'] ?? null,
             'gstin' => $validated['gstin'] ?? null,
             'pan' => $validated['pan'] ?? null,
-            'status' => $validated['status'] ?? 'active',
+            'status' => $status,
+            'inactive_reason' => $inactiveReason,
             'address' => $validated['address'] ?? null,
             'billing_address' => $validated['billing_address'] ?? null,
             'shipping_address' => $validated['shipping_address'] ?? null,
@@ -153,7 +173,8 @@ class VendorApiController extends Controller
             'opening_balance' => isset($validated['opening_balance']) ? convert_to_base((float) $validated['opening_balance']) : 0.00,
             'opening_balance_type' => $validated['opening_balance_type'] ?? 'credit',
             'payment_terms' => $validated['payment_terms'] ?? null,
-        ]);
+        ], $verification->pendingAttributes()));
+        $verification->recordSubmission($vendor);
 
         $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
@@ -228,7 +249,7 @@ class VendorApiController extends Controller
      */
     public function update(Request $request, int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveTenantContext();
+        [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
         $vendor = Vendor::where('tenant_id', $tenantId)->find($id);
 
         if (!$vendor) {
@@ -275,19 +296,50 @@ class VendorApiController extends Controller
         }
 
         $data = $validator->validated();
+
+        // FRS 2.3: same rule as the web edit form: a changed name, GSTIN, PAN, email, mobile or address
+        // that matches another vendor is reported (409) until the caller re-sends with confirm_duplicate=true.
+        $duplicates = app(PartyDuplicateService::class)->findOnUpdate(PartyDuplicateService::VENDOR, $vendor, $data, $tenantId);
+        if ($duplicates !== [] && ! $request->boolean('confirm_duplicate')) {
+            return $this->duplicateResponse($duplicates, 'save it');
+        }
+
         if (array_key_exists('opening_balance', $data)) {
             $data['opening_balance'] = $data['opening_balance'] !== null
                 ? convert_to_base((float) $data['opening_balance'])
                 : 0.00;
         }
+
+        $warnings = [];
+        [$data, $bankAttempted] = app(PartyBankChangeService::class)->stripProtectedFields($vendor, $data);
+        if ($bankAttempted !== []) {
+            $warnings[] = 'Bank details are locked and were not changed. Raise a callback-verified bank change request instead.';
+        }
+
+        $verification = app(PartyVerificationService::class);
+        if (array_key_exists('status', $data) && $verification->enabled()) {
+            $requestedStatus = strtolower((string) $data['status']);
+            if ($requestedStatus === 'active' && ($blocked = $verification->activationBlockedMessage($vendor))) {
+                return response()->json(['success' => false, 'message' => $blocked], 422);
+            }
+            if ($vendor->isVerified() && $requestedStatus !== strtolower((string) $vendor->status)) {
+                unset($data['status']);
+                $warnings[] = 'Status of a verified vendor must be changed through the deactivate or reactivate action.';
+            }
+        }
+
+        $data = array_merge($data, $verification->attributesForUpdate($vendor, $data));
         $vendor->update($data);
 
         $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
+        if ($openingWarning) {
+            $warnings[] = $openingWarning;
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor updated successfully',
-            'warning' => $openingWarning,
+            'warning' => $warnings !== [] ? implode(' ', $warnings) : null,
             'data' => $vendor->fresh(),
         ]);
     }
@@ -307,12 +359,24 @@ class VendorApiController extends Controller
             ], 404);
         }
 
-        $hasOrders = PurchaseOrder::where('tenant_id', $tenantId)->where('vendor_id', $id)->exists();
-        if ($hasOrders) {
-            $vendor->update(['status' => 'inactive']);
+        // FRS 2.3: Parties linked to transactions are never hard-deleted.
+        $guard = app(\App\Services\PartyDeletionGuard::class);
+        if ($guard->hasTransactions($vendor)) {
+            $statusService = app(\App\Services\PartyStatusService::class);
+            $user = auth()->user() ?? \App\Models\User::where('tenant_id', $tenantId)->first();
+            if ($statusService->enabled() && $vendor->isVerified() && $statusService->isActive($vendor) && $user) {
+                try {
+                    $statusService->deactivate($vendor, $user, 'business_closed', 'Vendor has transaction records; deactivated upon deletion attempt.');
+                } catch (\Throwable) {
+                    $vendor->update(['status' => 'inactive', 'inactive_reason' => 'business_closed']);
+                }
+            } else {
+                $vendor->update(['status' => 'inactive', 'inactive_reason' => 'business_closed']);
+            }
             return response()->json([
                 'success' => true,
                 'message' => 'Vendor has order records; status set to inactive.',
+                'summary' => $guard->transactionSummary($vendor),
             ]);
         }
 
@@ -354,7 +418,15 @@ class VendorApiController extends Controller
 
         $validated = $validator->validated();
 
-        $vendor = Vendor::create([
+        // FRS 2.3: quick-create only stops on the same GSTIN, email or mobile (not on a similar name).
+        $finder = app(PartyDuplicateService::class);
+        $identityMatches = $finder->identityMatches($finder->find(PartyDuplicateService::VENDOR, $validated, $tenantId));
+        if ($identityMatches !== [] && ! $request->boolean('confirm_duplicate')) {
+            return $this->duplicateResponse($identityMatches);
+        }
+
+        $verification = app(PartyVerificationService::class);
+        $vendor = Vendor::create(array_merge([
             'tenant_id' => $tenantId,
             'company_id' => $companyId,
             'branch_id' => $branchId,
@@ -364,13 +436,24 @@ class VendorApiController extends Controller
             'email' => $validated['email'] ?? null,
             'gstin' => $validated['gstin'] ?? null,
             'status' => 'active',
-        ]);
+        ], $verification->pendingAttributes()));
+        $verification->recordSubmission($vendor);
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor quick-created successfully',
             'data' => $vendor,
         ], 201);
+    }
+
+    private function duplicateResponse(array $duplicates, string $action = 'create it'): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Possible duplicate vendor: ' . app(PartyDuplicateService::class)->summary($duplicates)
+                . ". Re-send with confirm_duplicate=true to {$action} anyway.",
+            'duplicates' => $duplicates,
+        ], 409);
     }
 
     /**
@@ -388,13 +471,34 @@ class VendorApiController extends Controller
             ], 404);
         }
 
-        $vendor->status = $vendor->status === 'active' ? 'inactive' : 'active';
-        $vendor->save();
+        $target = strtolower((string) $vendor->status) === 'active' ? 'inactive' : 'active';
+
+        if ($target === 'active' && ($blocked = app(PartyVerificationService::class)->activationBlockedMessage($vendor))) {
+            return response()->json([
+                'success' => false,
+                'message' => $blocked,
+            ], 422);
+        }
+
+        $statusService = app(PartyStatusService::class);
+        if ($target === 'active' && $statusService->enabled() && ! $statusService->isActive($vendor)) {
+            try {
+                $statusService->reactivate($vendor, auth()->user());
+            } catch (PartyStatusException $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+        } else {
+            $vendor->status = $target;
+            $vendor->save();
+        }
 
         return response()->json([
             'success' => true,
             'message' => "Vendor status toggled to {$vendor->status}",
-            'data' => $vendor,
+            'data' => $vendor->fresh(),
         ]);
     }
 

@@ -79,10 +79,24 @@ class SalesOrderController extends Controller
 
                     return redirect($convertUrl)->with('warning', 'Please convert this quotation/deal to a customer before creating a Sales Order.');
                 }
+
+                $guard = app(\App\Services\PartyTransactionGuard::class);
+                if ($blocked = $guard->blockedReason('customer', $prefillCustomer->id, $prefillQuotation->tenant_id, 'sales order')) {
+                    return redirect()->route('sales.orders.index')->with('error', $blocked);
+                }
             }
         }
 
-        $customers = Customer::query()->orderBy('name')->get();
+        $customers = Customer::query()
+            ->where('status', 'active')
+            ->when(config('party_verification.enabled', true), function ($q) {
+                $q->where(function ($sub) {
+                    $sub->whereNull('verification_status')
+                        ->orWhere('verification_status', Customer::VERIFICATION_VERIFIED);
+                });
+            })
+            ->orderBy('name')
+            ->get();
         $products = Product::query()->where('status', 'active')->get();
         $salesReps = User::query()->orderBy('name')->get();
 
@@ -92,7 +106,12 @@ class SalesOrderController extends Controller
             ->whereDoesntHave('salesOrder')
             ->latest()
             ->get()
-            ->filter(fn($q) => !empty($q->customer));
+            ->filter(function ($q) {
+                if (empty($q->customer)) {
+                    return false;
+                }
+                return strtolower((string) $q->customer->status) === 'active' && $q->customer->isVerified();
+            });
 
         $warehouses = Warehouse::query()->orderBy('name')->get();
         $paymentTerms = PaymentTerm::query()->where('is_active', true)->orderBy('due_days')->get();
@@ -115,6 +134,9 @@ class SalesOrderController extends Controller
 
         $validated = $request->validate([
             'customer_id' => ['required', 'exists:customers,id'],
+            'billing_branch_id' => ['nullable', 'exists:party_branches,id'],
+            'shipping_branch_id' => ['nullable', 'exists:party_branches,id'],
+            'site_contact_id' => ['nullable', 'exists:contacts,id'],
             'quotation_id' => ['nullable', 'exists:quotations,id'],
             'sales_person_id' => ['nullable', 'exists:users,id'],
             'sales_order_number' => ['required', 'string', 'max:255'],
@@ -210,7 +232,20 @@ class SalesOrderController extends Controller
 
         $this->authorize('update', $order);
 
-        $customers = Customer::query()->orderBy('name')->get();
+        $customers = Customer::query()
+            ->where(function ($q) use ($order) {
+                $q->where(function ($activeQ) {
+                    $activeQ->where('status', 'active')
+                        ->when(config('party_verification.enabled', true), function ($sub) {
+                            $sub->where(function ($v) {
+                                $v->whereNull('verification_status')
+                                    ->orWhere('verification_status', Customer::VERIFICATION_VERIFIED);
+                            });
+                        });
+                })->orWhere('id', $order->customer_id);
+            })
+            ->orderBy('name')
+            ->get();
         $products = Product::query()->where('status', 'active')->get();
         $salesReps = User::query()->orderBy('name')->get();
         $quotations = Quotation::query()->where('is_current', true)->whereIn('status', ['Approved', 'Accepted'])->latest()->get();
@@ -239,6 +274,9 @@ class SalesOrderController extends Controller
 
         $validated = $request->validate([
             'customer_id' => ['required', 'exists:customers,id'],
+            'billing_branch_id' => ['nullable', 'exists:party_branches,id'],
+            'shipping_branch_id' => ['nullable', 'exists:party_branches,id'],
+            'site_contact_id' => ['nullable', 'exists:contacts,id'],
             'quotation_id' => ['nullable', 'exists:quotations,id'],
             'sales_person_id' => ['nullable', 'exists:users,id'],
             'sales_order_number' => ['required', 'string', 'max:255'],
@@ -289,9 +327,17 @@ class SalesOrderController extends Controller
             abort(404, 'Sales Order not found.');
         $this->authorize('confirm', $order);
 
-        if ($order->status !== 'Draft') {
+        if (strcasecmp($order->status, 'Draft') !== 0) {
             return back()->withErrors(['status' => 'Only Draft Sales Orders can be confirmed.']);
         }
+
+        app(\App\Services\PartyTransactionGuard::class)->assertCanTransact(
+            'customer',
+            $order->customer_id,
+            $order->tenant_id,
+            'sales order confirmation',
+            'customer_id'
+        );
 
         $isServiceOnly = $order->hasOnlyServices();
         $nextRequirementNumber = $isServiceOnly ? '' : $this->materialRequirementService->getNextRequirementNumber();

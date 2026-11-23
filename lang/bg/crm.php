@@ -2308,6 +2308,7 @@ return array (
   'download_pdf' => 'Изтегляне на PDF',
 
   // Customer Edit Screen
+  'view_customer' => 'Преглед на клиент',
   'edit_customer' => 'Редактиране на клиент',
   'opening_balance' => 'Начално салдо',
   'linked_to_crm_account' => 'Свързан с CRM профил',

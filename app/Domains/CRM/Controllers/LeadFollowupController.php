@@ -39,6 +39,29 @@ class LeadFollowupController extends Controller
 
         $actionMode = $request->input('action_mode', 'log_note');
 
+        // FRS 2.5 (Task C-02): Next-action mandate: no open lead without owner, active next action, and due date
+        $isOpenLead = !in_array(strtolower((string)($lead->status ?? '')), ['won', 'lost', 'converted']);
+        if ($actionMode !== 'schedule' && $isOpenLead) {
+            $hasPendingFutureActivity = $lead->followups()
+                ->where('status', 'Pending')
+                ->where('followup_date', '>=', now())
+                ->exists();
+
+            if (!$hasPendingFutureActivity && empty($request->input('next_followup_date'))) {
+                $msg = 'Per CRM policy (FRS Ref 2.5), an open lead cannot be left without an accountable next action and due date. Please specify the next follow-up date.';
+                if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $msg,
+                        'errors' => ['next_followup_date' => [$msg]]
+                    ], 422);
+                }
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['next_followup_date' => $msg]);
+            }
+        }
+
         if (!empty($validated['lead_status'])) {
             $lead->status = $validated['lead_status'];
         }
@@ -229,6 +252,19 @@ class LeadFollowupController extends Controller
             $this->authorize('update', $followup->lead);
         }
 
+        // FRS 2.5: the only remaining next action of an open lead cannot simply be removed.
+        $lead = $followup->lead;
+        if ($lead && strcasecmp((string) $followup->status, 'Pending') === 0
+            && \App\Domains\CRM\Services\LeadNextActionService::isOpen($lead)
+            && !\App\Domains\CRM\Services\LeadNextActionService::isOnHold($lead)
+            && $lead->followups()->where('status', 'Pending')->where('id', '!=', $followup->id)->doesntExist()) {
+            $msg = 'This is the only next action of an open lead (FRS 2.5). Schedule the replacement activity or put the lead on hold before removing it.';
+            if (request()->wantsJson() || request()->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->withErrors(['followup' => $msg]);
+        }
+
         $this->followupService->deleteFollowup($followup);
 
         return redirect()->back()->with('success', 'Follow-up successfully deleted!');
@@ -253,6 +289,29 @@ class LeadFollowupController extends Controller
         ]);
 
         $actionMode = $request->input('action_mode', 'log_note');
+
+        // FRS 2.5 (Task C-02): Next-action mandate: no open deal without owner, active next action, and due date
+        $isOpenDeal = !in_array(strtolower((string)($deal->stage ?? '')), ['won', 'lost', 'closed won', 'closed lost']);
+        if ($actionMode !== 'schedule' && $isOpenDeal) {
+            $hasPendingFutureDealActivity = $deal->followups()
+                ->where('status', 'Pending')
+                ->where('followup_date', '>=', now())
+                ->exists();
+
+            if (!$hasPendingFutureDealActivity && empty($request->input('next_followup_date'))) {
+                $msg = 'Per CRM policy (FRS Ref 2.5), an active deal cannot be left without an accountable next action and due date. Please specify the next follow-up date.';
+                if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $msg,
+                        'errors' => ['next_followup_date' => [$msg]]
+                    ], 422);
+                }
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['next_followup_date' => $msg]);
+            }
+        }
 
         if (!empty($validated['stage'])) {
             $isCurrentlyWon = in_array(strtolower((string) $deal->stage), ['won', 'closed won']);

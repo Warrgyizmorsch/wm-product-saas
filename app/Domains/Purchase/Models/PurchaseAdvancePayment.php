@@ -5,6 +5,7 @@ namespace App\Domains\Purchase\Models;
 use App\Core\Database\BaseModel;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
+use App\Models\Concerns\GuardsPartyTransactions;
 use App\Models\User;
 use App\Domains\Inventory\Models\Vendor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +13,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PurchaseAdvancePayment extends BaseModel
 {
-    use BelongsToCompany, BelongsToBranch, HasFactory;
+    use BelongsToCompany, BelongsToBranch, HasFactory, GuardsPartyTransactions;
+
+    protected function guardedParties(): array
+    {
+        return ['vendor_id' => ['vendor', 'advance payment']];
+    }
 
     protected $table = 'purchase_advance_payments';
 

@@ -51,23 +51,41 @@
             @endforeach
         </div>
 
+        @php
+            $dispatchCust = $dispatch->customer ?: $dispatch->salesOrder?->customer;
+            $isCustBlocked = $dispatchCust && (strtolower((string)$dispatchCust->status) !== 'active' || !$dispatchCust->isVerified());
+            $custBlockedReason = $isCustBlocked ? app(\App\Services\PartyTransactionGuard::class)->blockedReason('customer', $dispatchCust->id, $dispatch->tenant_id, 'dispatch') : null;
+        @endphp
+
         {{-- Primary Action Button --}}
         @if ($dispatch->status === 'Pending')
-            <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchForm" class="d-inline">
-                @csrf
-                <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
-                <button type="button" class="btn btn-sm btn-success fw-semibold px-2.5 py-1 fs-12 text-nowrap shadow-2xs" onclick="confirmAction({ title: '{{ __('crm.confirm_dispatch_order') }}', message: '{{ __('crm.confirm_dispatch') }} {{ $dispatch->dispatch_number }}?', variant: 'success', confirmText: '{{ __('crm.confirm') }}' }, function() { document.getElementById('confirmDispatchForm').submit(); })">
-                    <i class="feather-check-circle me-1"></i> {{ __('crm.confirm_do') }}
+            @if ($isCustBlocked)
+                <button type="button" class="btn btn-sm btn-outline-danger fw-semibold px-2.5 py-1 fs-12 text-nowrap disabled" title="{{ $custBlockedReason }}" style="cursor: not-allowed; opacity: 0.7;">
+                    <i class="feather-slash me-1"></i> Confirm Locked (Hold)
                 </button>
-            </form>
+            @else
+                <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchForm" class="d-inline">
+                    @csrf
+                    <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
+                    <button type="button" class="btn btn-sm btn-success fw-semibold px-2.5 py-1 fs-12 text-nowrap shadow-2xs" onclick="confirmAction({ title: '{{ __('crm.confirm_dispatch_order') }}', message: '{{ __('crm.confirm_dispatch') }} {{ $dispatch->dispatch_number }}?', variant: 'success', confirmText: '{{ __('crm.confirm') }}' }, function() { document.getElementById('confirmDispatchForm').submit(); })">
+                        <i class="feather-check-circle me-1"></i> {{ __('crm.confirm_do') }}
+                    </button>
+                </form>
+            @endif
         @elseif ($dispatch->status === 'Confirmed')
-            <form action="{{ route('sales.dispatches.ship', $dispatch->id) }}" method="POST" id="shipDispatchForm" class="d-inline">
-                @csrf
-                <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
-                <button type="button" class="btn btn-sm btn-primary fw-semibold px-2.5 py-1 fs-12 text-nowrap shadow-2xs" onclick="confirmAction({ title: '{{ __('crm.ship_outward') }}', message: '{{ __('crm.ship_outward') }} {{ $dispatch->dispatch_number }}?', variant: 'primary', confirmText: '{{ __('crm.ship_outward') }}' }, function() { document.getElementById('shipDispatchForm').submit(); })">
-                    <i class="feather-truck me-1"></i> {{ __('crm.ship_outward') }}
+            @if ($isCustBlocked)
+                <button type="button" class="btn btn-sm btn-outline-danger fw-semibold px-2.5 py-1 fs-12 text-nowrap disabled" title="{{ $custBlockedReason }}" style="cursor: not-allowed; opacity: 0.7;">
+                    <i class="feather-slash me-1"></i> Shipping Locked (Hold)
                 </button>
-            </form>
+            @else
+                <form action="{{ route('sales.dispatches.ship', $dispatch->id) }}" method="POST" id="shipDispatchForm" class="d-inline">
+                    @csrf
+                    <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
+                    <button type="button" class="btn btn-sm btn-primary fw-semibold px-2.5 py-1 fs-12 text-nowrap shadow-2xs" onclick="confirmAction({ title: '{{ __('crm.ship_outward') }}', message: '{{ __('crm.ship_outward') }} {{ $dispatch->dispatch_number }}?', variant: 'primary', confirmText: '{{ __('crm.ship_outward') }}' }, function() { document.getElementById('shipDispatchForm').submit(); })">
+                        <i class="feather-truck me-1"></i> {{ __('crm.ship_outward') }}
+                    </button>
+                </form>
+            @endif
         @elseif (in_array($dispatch->status, ['Shipped', 'Dispatched']))
             <button type="button" class="btn btn-sm btn-success fw-semibold px-2.5 py-1 fs-12 text-nowrap shadow-2xs" data-bs-toggle="modal" data-bs-target="#uploadPodModal">
                 <i class="feather-check-square me-1"></i> {{ __('crm.mark_delivered_pod') }}
@@ -81,9 +99,15 @@
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow-sm fs-13" aria-labelledby="doMoreActionsDropdown">
                 <li>
-                    <a href="{{ route('sales.dispatches.download-challan', $dispatch->id) }}" target="_blank" class="dropdown-item py-1.5">
-                        <i class="feather-file-text me-2 text-danger"></i>{{ __('crm.challan_pdf') ?? 'Delivery Challan PDF' }}
-                    </a>
+                    @if ($isCustBlocked)
+                        <a href="javascript:void(0)" class="dropdown-item py-1.5 text-muted disabled" title="{{ $custBlockedReason }}" style="cursor: not-allowed; opacity: 0.6;">
+                            <i class="feather-file-text me-2 text-muted"></i><span class="text-decoration-line-through">Delivery Challan PDF</span> <span class="badge bg-danger ms-1 fs-9">HOLD</span>
+                        </a>
+                    @else
+                        <a href="{{ route('sales.dispatches.download-challan', $dispatch->id) }}" target="_blank" class="dropdown-item py-1.5">
+                            <i class="feather-file-text me-2 text-danger"></i>{{ __('crm.challan_pdf') ?? 'Delivery Challan PDF' }}
+                        </a>
+                    @endif
                 </li>
                 <li>
                     <a href="javascript:void(0)" onclick="window.print()" class="dropdown-item py-1.5">
@@ -118,6 +142,16 @@
 @section('content')
     <div class="erp-single-panel bg-white p-4 rounded-3 border shadow-sm">
         <x-ui.odoo-form-ui type="sheet">
+
+            @if ($isCustBlocked)
+                <div class="alert alert-danger border-danger py-2.5 px-3 fs-13 mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2 shadow-sm">
+                    <div>
+                        <i class="feather-alert-octagon text-danger me-1.5 fs-16"></i>
+                        <strong>Financial Hold Guard (Iron Gate):</strong> {{ $custBlockedReason }} Factory dispatch, outward vehicle gate pass, and delivery challans are strictly locked.
+                    </div>
+                    <span class="badge bg-danger text-white fs-11">FINANCIAL HOLD</span>
+                </div>
+            @endif
 
             {{-- 1. Single Page Header: Dispatch Document Title & Status --}}
             <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 pb-3 border-bottom mb-4">

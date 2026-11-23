@@ -6,6 +6,7 @@ use App\Core\Database\BaseModel;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\Concerns\GuardsPartyTransactions;
 use App\Models\User;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Quotation;
@@ -20,7 +21,20 @@ use Illuminate\Database\Eloquent\Builder;
 
 class SalesOrder extends BaseModel
 {
-    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes, GuardsPartyTransactions;
+
+    protected function guardedParties(): array
+    {
+        return ['customer_id' => ['customer', 'sales order']];
+    }
+
+    protected function guardedPartyBranches(): array
+    {
+        return [
+            'billing_branch_id' => ['customer', 'customer_id', 'sales order'],
+            'shipping_branch_id' => ['customer', 'customer_id', 'sales order'],
+        ];
+    }
 
     protected ?string $rbacPermission = 'sales.orders.view';
 
@@ -59,6 +73,14 @@ class SalesOrder extends BaseModel
         'company_id',
         'branch_id',
         'customer_id',
+        'billing_branch_id',
+        'shipping_branch_id',
+        'site_contact_id',
+        'seller_gstin',
+        'seller_state_code',
+        'bill_to_gstin',
+        'ship_to_gstin',
+        'place_of_supply_state',
         'quotation_id',
         'sales_order_number',
         'order_date',
@@ -120,6 +142,21 @@ class SalesOrder extends BaseModel
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function billingBranch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyBranch::class, 'billing_branch_id');
+    }
+
+    public function shippingBranch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyBranch::class, 'shipping_branch_id');
+    }
+
+    public function siteContact(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PartyContact::class, 'site_contact_id');
     }
 
     public function quotation(): BelongsTo

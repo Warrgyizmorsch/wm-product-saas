@@ -6,12 +6,23 @@ use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Vendor;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
+use App\Models\Concerns\GuardsPartyTransactions;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PurchaseRfqVendor extends BaseModel
 {
-    use BelongsToCompany, BelongsToBranch;
+    use BelongsToCompany, BelongsToBranch, GuardsPartyTransactions;
+
+    protected function guardedParties(): array
+    {
+        return ['vendor_id' => ['vendor', 'RFQ']];
+    }
+
+    protected function guardedPartyBranches(): array
+    {
+        return ['vendor_branch_id' => ['vendor', 'vendor_id', 'RFQ']];
+    }
 
     protected $table = 'purchase_rfq_vendors';
 
@@ -21,6 +32,7 @@ class PurchaseRfqVendor extends BaseModel
         'branch_id',
         'purchase_rfq_id',
         'vendor_id',
+        'vendor_branch_id',
         'token',
         'delivery_date',
         'validity_date',

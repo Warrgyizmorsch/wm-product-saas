@@ -145,6 +145,7 @@ return array (
   'sources' => 
   array (
     'Direct Inquiry' => 'प्रत्यक्ष पूछताछ (Direct Inquiry)',
+    'Website' => 'वेबसाइट (Website)',
     'Website Form' => 'वेबसाइट फॉर्म (Website Form)',
     'Web Search' => 'वेब खोज (Web Search)',
     'Meta Ads' => 'मेटा (फेसबुक/इंस्टाग्राम) विज्ञापन',
@@ -152,11 +153,14 @@ return array (
     'TradeIndia' => 'ट्रेडइंडिया (TradeIndia)',
     'Justdial' => 'जस्टडायल (Justdial)',
     'Cold Call' => 'कोल्ड कॉलिंग (Cold Calling)',
+    'Cold Calling' => 'कोल्ड कॉलिंग (Cold Calling)',
     'Referral' => 'क्लाइंट रेफरल (Client Referral)',
+    'Client Referral' => 'क्लाइंट रेफरल (Client Referral)',
     'Employee Referral' => 'कर्मचारी रेफरल (Employee Referral)',
     'Partner' => 'साझेदार (Partner)',
     'Advertisement' => 'विज्ञापन (Advertisement)',
     'Trade Show' => 'ट्रेड शो (Trade Show)',
+    'Expo' => 'एक्सपो / प्रदर्शनी (Expo)',
     'WhatsApp Bot' => 'व्हाट्सएप बॉट (WhatsApp Bot)',
     'WhatsApp' => 'व्हाट्सएप (WhatsApp)',
     'Email' => 'ईमेल (Email)',
@@ -2313,6 +2317,7 @@ return array (
   'download_pdf' => 'PDF डाउनलोड करें',
 
   // Customer Edit Screen
+  'view_customer' => 'ग्राहक देखें',
   'edit_customer' => 'ग्राहक संपादित करें',
   'opening_balance' => 'प्रारंभिक शेष',
   'linked_to_crm_account' => 'सीआरएम खाते से लिंक',

@@ -13,6 +13,22 @@
         <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.branch_code') }}" name="code" id="{{ $prefix }}_code" :required="true" placeholder="{{ __('hrms.org.branch_code') }}" :errorText="$errors->first('code')" />
     </div>
     <div class="col-md-6">
+        <x-ui.odoo-form-ui type="input" label="GSTIN (Optional)" name="gst_number" id="{{ $prefix }}_gst_number" maxlength="20" placeholder="Leave blank to use Company GSTIN" :errorText="$errors->first('gst_number')" style="text-transform: uppercase;" />
+    </div>
+    <div class="col-md-6 d-flex align-items-center">
+        <div class="form-check form-switch mt-2">
+            <input type="hidden" name="is_head_office" value="0">
+            <input class="form-check-input" type="checkbox" name="is_head_office" value="1" id="{{ $prefix }}_is_head_office" @checked(old('is_head_office'))>
+            <label class="form-check-label fw-semibold fs-13" for="{{ $prefix }}_is_head_office">
+                Head Office Branch
+                <span class="d-block text-muted fs-11 fw-normal">Only one head-office branch is allowed per company.</span>
+            </label>
+            @if($errors->first('is_head_office'))
+                <div class="invalid-feedback d-block fs-11">{{ $errors->first('is_head_office') }}</div>
+            @endif
+        </div>
+    </div>
+    <div class="col-md-6">
         <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_company') }}" name="company_id" id="{{ $prefix }}_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
             <option value="">{{ __('hrms.org.select_company_required') }}</option>
             @foreach(($companiesList ?? $companies) as $company)

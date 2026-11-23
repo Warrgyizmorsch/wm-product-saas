@@ -186,6 +186,12 @@
                                         </tr>
                                     </thead>
                                     <tbody>
+                                    @php
+                                        $vendorItemMap = \App\Domains\Purchase\Models\VendorItem::where('tenant_id', $rfq->tenant_id)
+                                            ->where('vendor_id', $vendor->id)
+                                            ->whereIn('product_id', $rfq->items->pluck('product_id'))
+                                            ->get()->keyBy('product_id');
+                                    @endphp
                                     @foreach($rfq->items as $index => $item)
                                             @php
                                                 $quoteRate = $existingRates->get($item->product_id);
@@ -195,9 +201,22 @@
                                                 <td>
                                                     <input type="hidden" name="rates[{{ $index }}][product_id]" value="{{ $item->product_id }}">
                                                     <div class="fw-bold text-dark">{{ $item->product?->name }}</div>
+                                                    @php
+                                                        $vItem = $vendorItemMap->get($item->product_id);
+                                                    @endphp
                                                     <div class="d-flex flex-column gap-0.5 mt-1">
                                                         <small class="text-muted">SKU: {{ $item->product?->sku ?: '—' }}</small>
-                                                        <small class="text-primary fs-11 fw-semibold">
+                                                        @if($vItem && ($vItem->vendor_item_code || $vItem->vendor_item_name))
+                                                            <small class="text-primary fw-semibold">Your Part: {{ $vItem->vendor_item_code ?: '' }}{{ $vItem->vendor_item_code && $vItem->vendor_item_name ? ' — ' : '' }}{{ $vItem->vendor_item_name ?: '' }}</small>
+                                                        @endif
+                                                        @if($vItem && ($vItem->moq > 1 || $vItem->lead_time_days > 0 || $vItem->unit_price !== null))
+                                                            <small class="text-muted fs-11">
+                                                                @if($vItem->moq > 1) Agreed MOQ: <strong>{{ (float)$vItem->moq }}</strong> @endif
+                                                                @if($vItem->lead_time_days > 0) @if($vItem->moq > 1) &bull; @endif Lead Time: <strong>{{ $vItem->lead_time_days }} days</strong> @endif
+                                                                @if($vItem->unit_price !== null) @if($vItem->moq > 1 || $vItem->lead_time_days > 0) &bull; @endif Last Rate: <strong class="text-success">{{ format_currency($vItem->unit_price) }}</strong> @endif
+                                                            </small>
+                                                        @endif
+                                                        <small class="text-secondary fs-11 fw-semibold">
                                                             <i data-feather="calendar" class="me-1" style="width:12px; height:12px;"></i>{{ __('purchase.expected') }} {{ $rfq->requisition?->requisition_date ? $rfq->requisition->requisition_date->format('d-M-Y') : $rfq->rfq_date->format('d-M-Y') }}
                                                         </small>
                                                     </div>
@@ -214,9 +233,12 @@
                                                 <td>
                                                     <div class="input-group">
                                                         <span class="input-group-text bg-light text-muted" style="font-size: 10px; padding: 2px 6px;">{{ $currency }}</span>
-                                                        <input type="number" name="rates[{{ $index }}][rate]" class="form-control text-end font-monospace" style="font-size:13px;" step="0.01" min="0" value="{{ old("rates.{$index}.rate", $quoteRate ? round(convert_from_base((float)$quoteRate->rate), 2) : '') }}" required placeholder="0.00">
+                                                        <input type="number" name="rates[{{ $index }}][rate]" class="form-control text-end font-monospace" style="font-size:13px;" step="0.01" min="0" value="{{ old("rates.{$index}.rate", $quoteRate ? round(convert_from_base((float)$quoteRate->rate), 2) : '') }}" required placeholder="{{ $vItem && $vItem->unit_price !== null ? number_format(convert_from_base($vItem->unit_price), 2, '.', '') : '0.00' }}">
                                                         <span class="input-group-text bg-light text-muted" style="font-size: 10px; padding: 2px 6px; min-width: 45px; justify-content: center;">/ {{ $uomName }}</span>
                                                     </div>
+                                                    @if($vItem && $vItem->unit_price !== null)
+                                                        <small class="text-muted d-block fs-10 text-end mt-0.5">Last Rate: <strong class="text-success">{{ format_currency($vItem->unit_price) }}</strong></small>
+                                                    @endif
                                                 </td>
                                                 <td>
                                                     <input type="date" name="rates[{{ $index }}][delivery_date]" class="form-control" value="{{ old("rates.{$index}.delivery_date", $quoteRate && $quoteRate->delivery_date ? $quoteRate->delivery_date->format('Y-m-d') : '') }}">

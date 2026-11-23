@@ -826,18 +826,23 @@ class CrmDealApiController extends Controller
         $compPhone = $account?->phone ?: ($deal->contact?->phone ?: ($leadObj?->company_phone ?: $leadObj?->phone));
         $gstin     = $account?->gstin ?: ($leadObj?->gstin);
 
+        $verification = app(\App\Services\PartyVerificationService::class);
         Customer::$skipAccountAutoCreate = true;
-        $customer = Customer::create([
-            'tenant_id'  => $tenantId,
-            'company_id' => $companyId,
-            'branch_id'  => $branchId,
-            'name'       => $compName,
-            'email'      => $compEmail ?: null,
-            'phone'      => $compPhone,
-            'gstin'      => $gstin,
-            'status'     => 'active',
-        ]);
-        Customer::$skipAccountAutoCreate = false;
+        try {
+            $customer = Customer::create(array_merge([
+                'tenant_id'  => $tenantId,
+                'company_id' => $companyId,
+                'branch_id'  => $branchId,
+                'name'       => $compName,
+                'email'      => $compEmail ?: null,
+                'phone'      => $compPhone,
+                'gstin'      => $gstin,
+                'status'     => 'active',
+            ], $verification->pendingAttributes()));
+        } finally {
+            Customer::$skipAccountAutoCreate = false;
+        }
+        $verification->recordSubmission($customer);
 
         $newAccount = CrmAccount::create([
             'tenant_id'   => $tenantId,

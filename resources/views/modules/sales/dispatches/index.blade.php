@@ -200,6 +200,17 @@
                                         @elseif ($so->customer?->email)
                                             <span class="text-muted fs-11"><i class="feather-mail me-1 fs-10"></i>{{ $so->customer->email }}</span>
                                         @endif
+                                        @php
+                                            $isCustBlocked = $so->customer && (strtolower((string)$so->customer->status) !== 'active' || !$so->customer->isVerified());
+                                            $custBlockedReason = $isCustBlocked ? app(\App\Services\PartyTransactionGuard::class)->blockedReason('customer', $so->customer_id, $so->tenant_id, 'dispatch') : null;
+                                        @endphp
+                                        @if ($isCustBlocked)
+                                            <div class="mt-1">
+                                                <span class="badge bg-soft-danger text-danger border border-danger-subtle fs-10 fw-bold d-inline-flex align-items-center gap-1" title="{{ $custBlockedReason }}">
+                                                    <i class="feather-alert-octagon fs-9"></i> Financial Hold ({{ app(\App\Services\PartyStatusService::class)->reasonLabel($so->customer?->inactive_reason) }})
+                                                </span>
+                                            </div>
+                                        @endif
                                     </td>
 
                                     {{-- Items Breakdown & Stock Status --}}
@@ -257,11 +268,20 @@
                                     {{-- Actions --}}
                                     <td class="text-end pe-3">
                                         <div class="hstack gap-1 justify-content-end align-items-center">
-                                            <a href="{{ route('sales.dispatches.create', ['sales_order_id' => $so->id]) }}" 
-                                               class="btn btn-sm btn-primary text-nowrap fs-11 fw-bold px-2.5 py-1"
-                                               title="{{ __('crm.dispatch_now') }}">
-                                                <i class="feather-truck me-1 fs-11"></i>{{ __('crm.dispatch_now') }}
-                                            </a>
+                                            @if ($isCustBlocked)
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-danger text-nowrap fs-11 fw-bold px-2.5 py-1 disabled" 
+                                                        title="{{ $custBlockedReason }}"
+                                                        style="cursor: not-allowed; opacity: 0.75;">
+                                                    <i class="feather-slash me-1 fs-11"></i>On Hold (Blocked)
+                                                </button>
+                                            @else
+                                                <a href="{{ route('sales.dispatches.create', ['sales_order_id' => $so->id]) }}" 
+                                                   class="btn btn-sm btn-primary text-nowrap fs-11 fw-bold px-2.5 py-1"
+                                                   title="{{ __('crm.dispatch_now') }}">
+                                                    <i class="feather-truck me-1 fs-11"></i>{{ __('crm.dispatch_now') }}
+                                                </a>
+                                            @endif
 
                                             @php
                                                 $relatedDispatches = $so->dispatches ?? collect();
