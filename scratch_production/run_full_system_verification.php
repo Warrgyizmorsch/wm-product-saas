@@ -24,17 +24,17 @@ use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Services\ProductionOrderEngineeringService;
 use App\Models\User;
-use Database\Seeders\NonWovenDemoMasterDataSeeder;
+use Database\Seeders\NonWovenPlantSeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
-$tenantId = 1;
-$branchId = 3;
-$companyId = 1;
+$tenantId = (int) (\App\Models\Tenant::where('slug', config('tenancy.local_fallback_slug'))->value('id') ?: 1);
+$companyId = (int) DB::table('companies')->where('tenant_id', $tenantId)->orderBy('id')->value('id');
+$branchId = (int) DB::table('branches')->where('tenant_id', $tenantId)->where('code', NonWovenPlantSeeder::DEMO_BRANCH_CODE)->value('id');
 
-$data = NonWovenDemoMasterDataSeeder::loadData();
+$data = NonWovenPlantSeeder::loadData();
 $expectedProductCodes = array_column($data['products'] ?? [], 'code');
 $expectedBomNumbers = array_column($data['production_boms'] ?? [], 'bom_number');
 $expectedRoutingNumbers = array_column($data['production_routings'] ?? [], 'routing_number');
@@ -76,11 +76,11 @@ $prodCount = DB::table('products')->where('tenant_id', $tenantId)->whereIn('sku'
 $expectedProdTotal = count($expectedProductCodes);
 assertCheck("Non-woven demo products seeded (tenant-wide, branch_id null)", $prodCount === $expectedProdTotal, "Found {$prodCount}/{$expectedProdTotal} expected products");
 
-// 1.3b Currency Conversion check (PP Granules RM-PP unit_cost is USD 1.20, not raw INR 102)
+// 1.3b Currency check: the base currency is INR (config/currency.php), so RM-PP is stored as 102, not divided by 85
 $ppGranules = DB::table('products')->where('tenant_id', $tenantId)->where('sku', 'RM-PP')->first();
 $ppUnitCost = (float) ($ppGranules->unit_cost ?? 0);
-$ppCostConverted = abs($ppUnitCost - 1.2000) < 0.01;
-assertCheck("Product unit_cost converted to base USD (RM-PP)", $ppCostConverted, "Stored unit_cost: \${$ppUnitCost} (expected ~\$1.20, not ₹102)");
+$ppCostConverted = abs($ppUnitCost - 102.0) < 0.01;
+assertCheck("Product unit_cost stored in base INR (RM-PP = 102)", $ppCostConverted, "Stored unit_cost: {$ppUnitCost} (expected 102, the base currency is INR)");
 
 // 1.4 Opening Stock in Branch 3
 $expectedStockCount = count($data['opening_stock'] ?? []);
@@ -190,7 +190,8 @@ $bomCount = DB::table('production_boms')
     ->count();
 assertCheck("BOMs seeded with approved status and approver", $bomCount === $expectedBomCount, "Found {$bomCount}/{$expectedBomCount} approved BOMs");
 
-$expectedBomItemCount = count($data['production_bom_items'] ?? []);
+// Tier 1 is derived from the allocations: one row per material per BOM
+$expectedBomItemCount = count(array_unique(array_map(fn ($r) => $r['bom_number'] . '|' . $r['material_code'], $data['production_routing_operation_materials'] ?? [])));
 $bomItemCount = DB::table('production_bom_items')
     ->join('production_boms', 'production_bom_items.bom_id', '=', 'production_boms.id')
     ->where('production_boms.tenant_id', $tenantId)
@@ -230,6 +231,23 @@ $altReplacementsValid = RoutingOperationMaterial::withoutGlobalScopes()
     ->where('is_alternative', true)
     ->where('replaces_routing_material_id', $primaryAllocation?->id)
     ->count();
+// 1.12 Units, money and Tier-1 roles (what the UI shows)
+$uomOf = fn ($sku) => DB::table('uoms')->where('id', DB::table('products')->where('tenant_id', $tenantId)->where('sku', $sku)->value('uom_id'))->value('code');
+assertCheck("Units of measure: rolls and raw granules in Kg, bags / masks / cartons / labels in Pcs",
+    $uomOf('RM-PP') === 'Kg' && $uomOf('SFG-ROLL-50-WHT') === 'Kg' && $uomOf('FG-BAG-DCUT') === 'Pcs' && $uomOf('FG-MASK-3PLY') === 'Pcs' && $uomOf('RM-CORE-TUBE') === 'Pcs' && $uomOf('RM-LABEL-ROLL') === 'Pcs',
+    'RM-PP ' . $uomOf('RM-PP') . ', roll ' . $uomOf('SFG-ROLL-50-WHT') . ', bag ' . $uomOf('FG-BAG-DCUT') . ', core tube ' . $uomOf('RM-CORE-TUBE'));
+$unitsTenant = DB::table('products')->join('uoms', 'uoms.id', '=', 'products.uom_id')->where('products.tenant_id', $tenantId)->whereIn('products.sku', $expectedProductCodes)->where('uoms.tenant_id', '!=', $tenantId)->count();
+assertCheck("No product points at another tenant's unit of measure", $unitsTenant === 0, "{$unitsTenant} products point at a foreign unit");
+$bomBase = fn ($n) => DB::table('uoms')->where('id', DB::table('production_boms')->where('tenant_id', $tenantId)->where('bom_number', $n)->value('base_uom_id'))->value('code');
+assertCheck("BOM base units: roll BOMs in Kg, bag and mask BOMs in Pcs", $bomBase('BOM-ROLL-50-WHT') === 'Kg' && $bomBase('BOM-SLIT-50-20IN') === 'Kg' && $bomBase('BOM-BAG-DCUT') === 'Pcs' && $bomBase('BOM-MASK-3PLY') === 'Pcs');
+$wcOverhead = (float) DB::table('production_work_centers')->where('tenant_id', $tenantId)->where('code', 'NW-WC-EXT')->value('overhead_cost');
+assertCheck("Work-centre overhead stored in base INR (NW-WC-EXT = 2550 a day)", abs($wcOverhead - 2550.0) < 0.01, "Stored {$wcOverhead}");
+$bagRoles = DB::table('production_bom_items')->join('products', 'products.id', '=', 'production_bom_items.material_id')->where('production_bom_items.bom_id', $bagBom?->id)->pluck('production_bom_items.allocation_role', 'products.sku')->all();
+assertCheck("Bag BOM master list: jumbo roll primary, the two slit rolls alternative", ($bagRoles['SFG-ROLL-50-WHT'] ?? '') === 'primary' && ($bagRoles['SFG-SLIT-50-50IN'] ?? '') === 'alternative' && ($bagRoles['SFG-SLIT-50-20IN'] ?? '') === 'alternative', json_encode($bagRoles));
+$badRomUnit = DB::table('production_routing_operation_materials as m')->join('products as p', 'p.id', '=', 'm.material_id')->join('production_boms as b', 'b.id', '=', 'm.bom_id')->where('b.tenant_id', $tenantId)->whereIn('b.bom_number', $expectedBomNumbers)->whereColumn('m.uom_id', '!=', 'p.uom_id')->count();
+assertCheck("Every BOM allocation uses the unit of its material", $badRomUnit === 0, "{$badRomUnit} allocations differ from their product's unit");
+$demoEmpNoDept = DB::table('employees')->where('tenant_id', $tenantId)->where('employee_id', 'like', 'NW-EMP-%')->where(fn ($q) => $q->whereNull('department_id')->orWhereNull('designation_id'))->count();
+assertCheck("Demo employees have a department and a designation", $demoEmpNoDept === 0, "{$demoEmpNoDept} without");
 assertCheck("D-Cut Bag BOM alternative materials linked to primary", $altCount === 2 && $altReplacementsValid === 2, "2 alternatives linked to primary allocation #{$primaryAllocation?->id}");
 
 echo PHP_EOL;
