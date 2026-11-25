@@ -394,7 +394,7 @@
                         </td>
                         <td class="text-end">
                             <x-ui.action-dropdown :viewUrl="route('production.orders.show', $order->id)">
-                                @if($order->isDraft())
+                                @if($order->isDraft() && !$order->materialsRequestedAndReserved())
                                     <li>
                                         <a href="{{ route('production.orders.edit', $order->id) }}" class="dropdown-item">
                                             <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('production.edit_draft') }}

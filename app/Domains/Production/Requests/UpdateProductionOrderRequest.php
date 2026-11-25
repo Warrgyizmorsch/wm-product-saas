@@ -2,24 +2,10 @@
 
 namespace App\Domains\Production\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
-
-class UpdateProductionOrderRequest extends FormRequest
+/**
+ * M-34: the Edit screen is the Add form, so saving it is checked exactly like creating — product, sales request, BOM / routing
+ * blocking checks, operation / material choices, project links, quantity and dates. (The REST API keeps its own request class.)
+ */
+class UpdateProductionOrderRequest extends StoreProductionOrderRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
-
-    public function rules(): array
-    {
-        return [
-            'quantity_ordered' => 'required|numeric|min:0.0001',
-            'production_mode'  => 'nullable|string|in:standard,batch,serial,batch_and_serial',
-            'production_model' => 'nullable|string|in:pure_manufacturing,subcontract_complete,subcontract_company_material,hybrid',
-            'start_date'       => 'required|date',
-            'end_date'         => 'required|date|after_or_equal:start_date',
-            'description'      => 'nullable|string|max:1000',
-        ];
-    }
 }

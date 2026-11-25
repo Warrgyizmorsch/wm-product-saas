@@ -628,3 +628,63 @@ The "Request material from the store" form (UR-11) is no longer on the Material 
 6. **Not involved:** the MRP Shortage screen (`MrpShortageService`) works from Sales Material Requirements, not from production orders.
 
 Gaps seen (user decides): no automatic PR and no purchase status on the order line; the request modal hides store stock / shortage; the store's shortage button is not type-aware (a manufactured semi whose stock part vanished could get a PR).
+
+## 17. The Edit screen is the Add form (M-34, 2026-11-25) — Applied (code written), not tested, not Verified
+
+**The user's words (M-34):** "now let this edit form be able to edit everything, It will have all the features as ADD form".
+
+**What was built**
+* **One form for Add and Edit.** The whole Add screen (sales request, product, BOM / routing, mode, quantity, dates, remarks, sales / project links, the Tab 1 "operations and materials" choices, the Tab 2 roll-up with shortages, the child-BOM pop-up) now lives in `orders/partials/order-form.blade.php` (+ `order-form-styles` / `order-form-scripts`). `create.blade.php` and `edit.blade.php` are thin pages that include it, so a later change is made once. Add behaves as before.
+* **Edit fills the form from the saved order.** `ProductionOrderController::edit` hands over the same things Add gets: the sales requests (including the one already linked to this order), the products, the sales order, the project links, and the Tab 1 choices saved on the order's own operations (`$editOps`, `$editMats`) so the workspace opens with them ticked. A blue note at the top shows the BOM / Routing / number of operations saved now and what saving does.
+* **Saving checks exactly like Add.** `UpdateProductionOrderRequest` now extends `StoreProductionOrderRequest` (product, request, BOM / routing blocking checks, selection completeness, project / company / branch checks, quantity, dates). The REST API keeps its own request class and the old `update()`.
+* **Service `ProductionOrderService::updateDraft`** (the web Edit only; the shared parts of `createDirect` were moved into `resolveOrderEngineering()` and `persistOrderPlan()` — Add uses the same two):
+  * only a **Draft** order can be edited (a Locked order says so).
+  * **Only header fields changed** (dates, mode, remarks, sales / project links) → saved; the plan is NOT touched, so what the user set on the operations ("Produce all here") stays.
+  * **Product, BOM, routing, quantity or the operation / material choices changed** → the operations, links and material plan are deleted and built again exactly as Add builds them (fresh stock snapshot, merges start again). Order number, status, branch, company stay.
+  * Blocked with a clear message once **material was issued**, a **schedule** exists, or **subcontract purchasing** was raised for an external operation.
+  * A still-**pending store request of the old plan** (the automatic slip that drafts made before M-23 still carry — orders ORD-…05 / 06 / 07) is **cancelled** when the plan changes and the success message says so; the user sends a new request by hand. A request the store already worked on blocks the change. "Ad-hoc" extra requests are left alone.
+  * **Sales request:** taking it off frees it (back to draft) and clears the order's sales-order links; picking another links it (product, quantity and sales links then come from the request, as on Add). While a request stays linked its product cannot be changed.
+  * An "Order Updated" event is written to the order's timeline.
+* **Engineering endpoint** (`getEngineeringStatus`) takes an optional `order_id` from the Edit screen and then checks the `update` right of that order instead of `create`.
+* New keys (`lang/en/production.php`): `edit_saved_plan_title`, `edit_saved_operations`, `edit_rebuild_notice`, `order_updated_plan_rebuilt`, `order_updated_plan_kept`, `order_updated_slips_cancelled`.
+
+**Where to check:** Production → Orders → a Draft order → Edit. (1) The page looks like Add with the order filled in and the Tab 1 / Tab 2 workspace below. (2) Save with nothing changed, or only remarks / dates → "updated", plan unchanged. (3) Change the quantity, or switch an alternative operation / material in Tab 1, or the product → "operations and the material plan were rebuilt"; check the Operations / Material status tabs. (4) On ORD-2026-000007 (has an automatic pending slip) change the quantity → the message names the cancelled MR-… slip.
+
+**Read-only check done (nothing written):** for the four draft orders (#6..#9) the choices saved on the level-1 operations equal what the form posts by default, so an unchanged Save keeps the plan. Only `php -l` and Blade compile lint were run — nothing was opened in the browser and no test was run.
+
+**Limits (for the review):** the BOM and Routing are re-read from the product (the newest active BOM), exactly as on Add — if the product got a newer BOM since the order was made, saving moves the order to it and rebuilds the plan. A rebuild resets what was set on the old operations (merges, manual machine / work-center changes). Only `lang/en` has the new texts.
+
+### Follow-up (M-35, 2026-11-25) — no editing once material is requested AND reserved — Applied (code written), not tested, not Verified
+**The user's words (M-35):** "If a material acquisition is made and is also if it's also being reserved, then also the production order cannot be edited."
+
+* **Rule:** an order is not editable when material has been **requested** from the store (a requisition slip of the order that is not cancelled / rejected) **and** the store has **reserved or issued** it (any reservation line with reserved > 0 or issued > 0). This is on top of the existing rule (Locked / released / later statuses cannot be edited).
+* **Where:** `ProductionOrder::materialsRequestedAndReserved()` and `ProductionOrder::editBlockReason()` (one place). Used by the Edit screen (`ProductionOrderController::edit` redirects to the order with the reason), the save (`ProductionOrderService::updateDraft` and the older `update()` that the API uses throw the reason), and the buttons: the Edit item on the order page is replaced by a lock note ("Material is requested and reserved — this order can no longer be edited.", key `edit_blocked_material_reserved`) and the Edit item of the orders list is hidden.
+* **Read-only check:** the four draft orders (#6..#9) are not blocked today — ORD-…05 / 06 / 07 have a pending store request but nothing is reserved; ORD-…08 has none. The first time the store reserves against such a request, Edit closes for it.
+* **Not changed:** Delete of a draft is untouched (you asked only about editing); a request that is pending but NOT reserved still allows editing (it is cancelled when the plan changes, section 17).
+
+### Follow-up (M-36, 2026-11-25) — Delete follows the same rule as Edit; delete cancels, then soft-deletes the material request(s) — Applied (code written), not tested, not Verified
+**The user's words (M-36):** "delete and edit will be same, only thing is delete will cancel then soft delete the MR"
+
+* **Same rule as Edit:** a draft order can be deleted unless it is Locked / frozen, or material is requested from the store **and** reserved (`ProductionOrder::editBlockReason('deleted')` — the one place; `ProductionOrderService::delete` throws its reason). On the order page the Edit **and** Delete items are both replaced by the lock note + Cancel when blocked.
+* **What delete now does to the material request(s) (MR):** every MR (requisition slip) of the order — including "ad-hoc" ones — is **cancelled** (status `cancelled`) and then **soft-deleted** (slip and its lines get `deleted_at`; they stay in the table for history and disappear from every list, the store's included). Requisition numbers are not reused. Only a request the store has not started (`pending`) can go; one the store already worked on, or one a **purchase requisition** was raised from, blocks the delete with a clear message (cancel that purchase requisition first) — otherwise a purchase document would be left behind.
+* **Also on delete:** the sales request the order came from (if any) is freed again (back to draft, no order) so a new order can be made from it — until now a deleted order left it stuck. The order itself was already soft-deleted; reservations / operations behave as before. The delete confirmation text now says the MR(s) are cancelled and removed (`confirm_delete_draft`).
+* **MIGRATION REQUIRED:** `database/migrations/2026_11_25_130000_add_soft_deletes_to_production_requisition_slips.php` adds `deleted_at` to `production_requisition_slips` and `production_requisition_slip_items`; both models got `SoftDeletes`. Run `php artisan migrate` before opening any screen that reads store requests — until then those queries fail on the missing column.
+* **Where to check:** a Draft order with a pending store request (ORD-2026-000005 / 06 / 07) → Delete → the MR-… slip disappears from the store's Material Requests and from the order; a draft with no MR deletes as before; an order whose request has reserved stock shows no Edit / Delete.
+
+### Follow-up (M-37, 2026-11-25) — Edit also soft-deletes the old MR when the plan changes — Applied (code written), not tested, not Verified
+**The user's words (M-37):** "also, edit will delete the old MR also when the Product, quantity, BOM, routing or Tab 1 choices changed"
+
+* When Edit rebuilds the plan (product, quantity, BOM, routing or the Tab 1 operation / material choices changed — section 17), the old **pending** store request (MR) of the order is now **cancelled and soft-deleted** (slip + its lines get `deleted_at`), the same as on Delete (M-36). Before this it was only cancelled. The success message says "…were cancelled and removed because the plan changed — select the materials and send a new request", and the blue note on the Edit screen says the same.
+* Same limits as before: a request the store already worked on, or one a purchase requisition was raised from, blocks the change; "ad-hoc" extra requests are independent of the plan and are NOT touched; saving with only header changes (dates, mode, remarks, links) leaves the MR and the plan alone.
+* Needs the M-36 migration (`php artisan migrate`) — the soft delete uses its `deleted_at` columns.
+* Code: `ProductionOrderService::cancelPendingSlips(..., $softDelete = true)` called from `updateDraft`.
+
+### Open question (M-38, 2026-11-25) — the purchase requisition (PR) raised against an old MR — findings only, nothing changed
+**The user's words (M-38):** "and what about the PR raised against that old MR"
+
+* **Today (as coded in M-36 / M-37):** if the store raised a PR from the MR (Sales → Material Requests → "Raise purchase requisition": a Draft PR, `source_type material_request`, `source_id` = slip id, one PR per item for the shortage quantity), the Delete and the Edit plan-rebuild are **blocked** with "A purchase requisition was raised from store request MR-…, so …. Cancel that purchase requisition first." No PR is touched.
+* **It is live:** read-only check — one PR exists: **PR-2026-000001 (Draft)** raised from **MR-2026-000005**, which belongs to the draft order **ORD-2026-000005**. So that order cannot be deleted or have its plan changed until the PR is rejected in Purchase.
+* **The Purchase module's own rules:** statuses are Draft / Approved / Partially Ordered / Ordered / Cancelled; only a **Draft** PR can be approved or rejected (rejecting = status `Cancelled` + a reason); PRs have no soft delete.
+* **Options put to the user:** (A) keep blocking (safest, nothing automatic); (B) when a Draft PR hangs on the old MR, cancel it automatically (status `Cancelled`, reason "Store request MR-… was removed because production order … was changed / deleted"), keep it visible as Cancelled for the audit trail, and keep blocking when the PR is already Approved / Partially Ordered / Ordered; (C) B plus a soft delete of the PR (needs a Purchase-module migration — not recommended, a Cancelled PR is the module's own way to retire one).
+
+**Decision (M-39, 2026-11-25): option A — keep blocking.** The user answered "A". Nothing changes in the code: a PR raised from an old MR keeps blocking both Delete and the plan-rebuild in Edit (message "A purchase requisition was raised from store request MR-…, so … Cancel that purchase requisition first."); no PR is cancelled or touched automatically. To free ORD-2026-000005 the user rejects PR-2026-000001 in Purchase first.

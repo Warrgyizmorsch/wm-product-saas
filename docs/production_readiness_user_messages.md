@@ -184,3 +184,27 @@ New messages about this work are added at the bottom, newest last. Times are as 
 
 > okay no issues, everything is fine for now, let this be it.
 
+## M-34 — 2026-11-25 12:27 UTC
+
+> now let this edit form be able to edit everything, It will have all the features as ADD form
+
+## M-35 — 2026-11-25 12:46 UTC
+
+> Just make sure a final few changes. If a material acquisition is made and is also if it's also being reserved, then also the production order cannot be edited.
+
+## M-36 — 2026-11-25 12:51 UTC
+
+> delete and edit will be same, only thing is delete will cancel then soft delete the MR
+
+## M-37 — 2026-11-25 12:57 UTC
+
+> also, edit will delete the old MR also when the Product, quantity, BOM, routing or Tab 1 choices changed
+
+## M-38 — 2026-11-25 12:59 UTC
+
+> and what about the PR raised against that old MR
+
+## M-39 — 2026-11-25 13:01 UTC
+
+> A
+

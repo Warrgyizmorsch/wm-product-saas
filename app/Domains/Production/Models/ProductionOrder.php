@@ -381,6 +381,45 @@ class ProductionOrder extends BaseModel
         ]);
     }
 
+    /**
+     * M-35: material has been requested from the store (a requisition slip that is not cancelled / rejected) AND the store has reserved
+     * it for this order (or already issued it) — from then on the order cannot be edited any more, whatever its status.
+     */
+    public function materialsRequestedAndReserved(): bool
+    {
+        $requested = $this->requisitionSlips()
+            ->whereNotIn('status', ['cancelled', 'Cancelled', 'rejected', 'Rejected'])
+            ->exists();
+        if (!$requested) {
+            return false;
+        }
+
+        return $this->reservations()
+            ->where(fn ($q) => $q->where('quantity_reserved', '>', 0)->orWhere('quantity_issued', '>', 0))
+            ->exists();
+    }
+
+    /**
+     * Why this order cannot be edited (M-36: or deleted — the two rules are the same) right now; null = it can. One place for the Edit
+     * screen, the save, the delete, the API and the buttons.
+     *
+     * @param string $action 'edited' or 'deleted' — only used to word the message
+     */
+    public function editBlockReason(string $action = 'edited'): ?string
+    {
+        if ($this->isLocked()) {
+            return "This order is locked (a material request was sent): it can no longer be {$action} — only cancelled or released.";
+        }
+        if ($this->isFrozen()) {
+            return "Frozen Production Orders cannot be {$action}.";
+        }
+        if ($this->materialsRequestedAndReserved()) {
+            return "Material has been requested from the store and is reserved for this order, so it can no longer be {$action}.";
+        }
+
+        return null;
+    }
+
     // ── Production Model Helpers ──
 
     public function isPureManufacturing(): bool

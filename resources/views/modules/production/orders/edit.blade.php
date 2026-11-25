@@ -2,14 +2,17 @@
 
 @section('title', __('production.edit_production_order') . ' ' . $order->order_number . ' | SaaS ERP')
 
+{{-- M-34: the Edit screen is the Add form (partials/order-form) with the saved order filled in — every field and the whole BOM / routing workspace. --}}
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    @include('modules.production.orders.partials.order-form-styles')
 @endpush
 
 @push('scripts')
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+    @include('modules.production.orders.partials.order-form-scripts')
 @endpush
 
 @section('content')
@@ -19,57 +22,6 @@
             <x-ui.toast :auto="true" type="error" title="Validation Failed: {{ $errors->first() }}" />
         @endif
 
-        <form method="POST" action="{{ route('production.orders.update', $order->id) }}">
-            @csrf
-            @method('PUT')
-
-            <x-ui.odoo-form-ui type="sheet">
-                <!-- Header with Close Button -->
-                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
-                    <div>
-                        <h4 class="fw-bold text-dark mb-0">{{ __('production.edit_production_order_number', ['number' => $order->order_number]) }}</h4>
-                        <small class="text-muted fs-12">{{ __('production.status') }}: <span class="fw-semibold text-uppercase text-primary">{{ $order->status }}</span> &mdash; {{ __('production.edit_order_draft_notice') }}</small>
-                    </div>
-                    <x-ui.button :href="route('production.orders.show', $order->id)" variant="light" class="border">{{ __('production.cancel') }}</x-ui.button>
-                </div>
-
-                <div class="row g-4 fs-13 text-dark">
-                    <!-- Left Column -->
-                    <div class="col-md-6 border-end">
-                        <x-ui.odoo-form-ui type="input" :label="__('production.target_product')" name="product_name" :value="$order->product->name" :readonly="true" />
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.bill_of_materials')" name="bom_ref" :value="$order->bom ? ($order->bom->bom_number . ' - ' . ($order->bom->bom_name ?? '') . ' (v' . $order->bom->version . ')') : 'No BOM assigned'" :readonly="true" />
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.process_routing')" name="routing_ref" :value="$order->routing ? ($order->routing->routing_number . ' - ' . $order->routing->name . ' (v' . $order->routing->version . ')') : 'No Routing assigned'" :readonly="true" />
-                        
-                        <x-ui.odoo-form-ui type="select" label="{{ __('production.production_mode') }}" name="production_mode" id="production_mode_select">
-                            <option value="standard" @selected(old('production_mode', $order->production_mode) === 'standard')>{{ __('production.mode_standard') }}</option>
-                            <option value="batch" @selected(old('production_mode', $order->production_mode) === 'batch')>{{ __('production.mode_batch') }}</option>
-                            <option value="serial" @selected(old('production_mode', $order->production_mode) === 'serial')>{{ __('production.mode_serial') }}</option>
-                            <option value="batch_and_serial" @selected(old('production_mode', $order->production_mode) === 'batch_and_serial')>{{ __('production.mode_batch_and_serial') }}</option>
-                        </x-ui.odoo-form-ui>
-                    </div>
-
-                    <!-- Right Column -->
-                    <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('production.qty_to_manufacture')" name="quantity_ordered" inputType="number" placeholder="e.g. 10.0000" :value="old('quantity_ordered', $order->quantity_ordered)" :required="true" />
-
-                        <x-ui.odoo-form-ui type="input" :label="__('production.start_date')" name="start_date" inputType="date" :value="old('start_date', $order->start_date->format('Y-m-d'))" :required="true" />
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.end_date')" name="end_date" inputType="date" :value="old('end_date', $order->end_date->format('Y-m-d'))" :required="true" />
-
-                        <x-ui.odoo-form-ui type="textarea" :label="__('production.remarks')" name="description" :placeholder="__('production.remarks_placeholder')" rows="4">{{ old('description', $order->description) }}</x-ui.odoo-form-ui>
-                    </div>
-                </div>
-
-                {{-- Footer Actions --}}
-                <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <x-ui.button type="submit" variant="primary" icon="feather-check-circle" class="px-4">
-                        {{ __('production.save_changes') }}
-                    </x-ui.button>
-                    <x-ui.button :href="route('production.orders.show', $order->id)" variant="secondary" class="px-4">{{ __('production.cancel') }}</x-ui.button>
-                </div>
-            </x-ui.odoo-form-ui>
-        </form>
+        @include('modules.production.orders.partials.order-form', ['editOrder' => $order])
     </div>
 @endsection

@@ -7,10 +7,12 @@ use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProductionRequisitionSlip extends BaseModel
 {
-    use BelongsToCompany, BelongsToBranch;
+    // SoftDeletes (M-36): deleting a draft order cancels its material requests and then soft-deletes them
+    use BelongsToCompany, BelongsToBranch, SoftDeletes;
 
     protected $table = 'production_requisition_slips';
 

@@ -170,13 +170,18 @@ class ProductionOrderController extends Controller
      */
     public function getEngineeringStatus(Request $request)
     {
-        Gate::authorize('create', ProductionOrder::class);
-
         $request->validate([
             'product_id' => 'required|integer',
             'branch_id'  => 'nullable|integer',
             'quantity'   => 'nullable|numeric|min:0',
+            'order_id'   => 'nullable|integer', // M-34: the Edit screen sends the order it edits
         ]);
+
+        if ($request->filled('order_id')) {
+            Gate::authorize('update', ProductionOrder::findOrFail($request->integer('order_id')));
+        } else {
+            Gate::authorize('create', ProductionOrder::class);
+        }
         $tenantId = require_tenant_id();
         $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($request->integer('product_id'));
         $branchId = $request->filled('branch_id') ? $request->integer('branch_id') : (branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id());
@@ -425,17 +430,66 @@ class ProductionOrderController extends Controller
 
         Gate::authorize('update', $order);
 
-        if ($order->isFrozen()) {
+        // M-35: locked / frozen, or material requested from the store AND reserved → no editing
+        if ($reason = $order->editBlockReason()) {
             return redirect()
                 ->route('production.orders.show', $order->id)
-                ->with('error', $order->isLocked()
-                    ? 'This order is locked (a material request was sent): it can no longer be edited — only cancelled or released.'
-                    : 'Frozen Production Orders cannot be edited.');
+                ->with('error', $reason);
         }
 
-        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
+        // M-34: the Edit screen is the Add form with this order filled in — the controller hands it the same things Add gets.
+        $tenantId = require_tenant_id();
+        $order->load(['product', 'bom', 'routing', 'operations']);
 
-        return view('modules.production.orders.edit', compact('order', 'products'));
+        $linkedRequest = ProductionOrderRequest::where('tenant_id', $tenantId)->where('production_order_id', $order->id)->first();
+        $productionOrderRequests = $this->orderRepository->getPendingRequests($tenantId, $linkedRequest?->id);
+        $productionOrderRequestId = old('production_order_request_id', $linkedRequest?->id);
+
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
+        if ($order->product && !$products->contains('id', (int) $order->product_id)) {
+            $products->push($order->product);
+        }
+
+        $salesOrder = $order->sales_order_id ? SalesOrder::with(['items.product'])->find($order->sales_order_id) : null;
+        $salesOrderItems = $salesOrder
+            ? $salesOrder->items->filter(fn ($item) => $item->product && $item->product->supplier_method === 'manufacture')
+            : collect();
+
+        $project = $order->project_id
+            ? \App\Domains\Projects\Models\Project::where('tenant_id', $tenantId)->find($order->project_id)
+            : null;
+        $projectTask = $order->project_task_id
+            ? \App\Domains\Projects\Models\Task::where('tenant_id', $tenantId)->with('project')->find($order->project_task_id)
+            : null;
+        $projectMilestone = $order->project_milestone_id
+            ? \App\Domains\Projects\Models\Milestone::where('tenant_id', $tenantId)->find($order->project_milestone_id)
+            : null;
+
+        // what is saved on the order's own (level 1) operations = the Tab 1 choices, so the workspace opens with them ticked
+        $ownOps = $order->operations->where('bom_level', 1);
+        $editOps = $ownOps->pluck('routing_operation_id')->filter()->map(fn ($v) => (int) $v)->unique()->values()->all();
+        $editMats = $ownOps->flatMap(fn ($op) => (array) $op->selected_routing_material_ids)->map(fn ($v) => (int) $v)->unique()->values()->all();
+
+        $selectedProductId = old('product_id', $order->product_id);
+        $selectedQty = old('quantity_ordered', rtrim(rtrim(number_format((float) $order->quantity_ordered, 4, '.', ''), '0'), '.'));
+        $selectedSoItemId = old('sales_order_item_id', $order->sales_order_item_id);
+
+        return view('modules.production.orders.edit', compact(
+            'order',
+            'products',
+            'productionOrderRequests',
+            'productionOrderRequestId',
+            'salesOrder',
+            'salesOrderItems',
+            'project',
+            'projectTask',
+            'projectMilestone',
+            'selectedProductId',
+            'selectedQty',
+            'selectedSoItemId',
+            'editOps',
+            'editMats'
+        ));
     }
 
     public function update(UpdateProductionOrderRequest $request, int $id)
@@ -445,11 +499,16 @@ class ProductionOrderController extends Controller
         Gate::authorize('update', $order);
 
         try {
-            $this->orderService->update($id, $request->validated());
+            $result = $this->orderService->updateDraft($id, $request->validated(), require_tenant_id(), Auth::id());
+
+            $message = __($result['rebuilt'] ? 'production.order_updated_plan_rebuilt' : 'production.order_updated_plan_kept', ['number' => $order->order_number]);
+            if ($result['cancelled_slips'] !== []) {
+                $message .= ' ' . __('production.order_updated_slips_cancelled', ['slips' => implode(', ', $result['cancelled_slips'])]);
+            }
 
             return redirect()
                 ->route('production.orders.show', $order->id)
-                ->with('success', 'Production Order updated successfully.');
+                ->with('success', $message);
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }

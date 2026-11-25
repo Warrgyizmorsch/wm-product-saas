@@ -7,9 +7,12 @@ use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Inventory\Models\Warehouse;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProductionRequisitionSlipItem extends BaseModel
 {
+    use SoftDeletes; // M-36: goes together with its slip
+
     protected $table = 'production_requisition_slip_items';
 
     protected $fillable = [

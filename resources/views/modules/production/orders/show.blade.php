@@ -203,7 +203,8 @@
 
             {{-- Grouped Header Actions Dropdown --}}
             <x-ui.action-dropdown id="headerActionsDropdownDraft">
-                @if($order->isDraft())
+                {{-- M-35 / M-36: edit and delete follow the same rule — both are closed once material is requested from the store AND reserved --}}
+                @if($order->isDraft() && !$order->materialsRequestedAndReserved())
                     <li>
                         <a href="{{ route('production.orders.edit', $order->id) }}" class="dropdown-item py-1.5 fs-12">
                             <i class="feather-edit me-2 text-primary fs-12"></i>{{ __('production.edit_order') }}
@@ -220,9 +221,9 @@
                         </form>
                     </li>
                 @else
-                    {{-- Locked: a material request was sent — no edit, no delete; only cancel (or release) is left --}}
+                    {{-- Locked (a material request was sent) or requested + reserved — no edit, no delete; only cancel (or release) is left --}}
                     <li>
-                        <span class="dropdown-item-text py-1.5 fs-11 text-muted"><i class="feather-lock me-2"></i>{{ __('production.locked_order_note') }}</span>
+                        <span class="dropdown-item-text py-1.5 fs-11 text-muted"><i class="feather-lock me-2"></i>{{ $order->isLocked() ? __('production.locked_order_note') : __('production.edit_blocked_material_reserved') }}</span>
                     </li>
                     <li><hr class="dropdown-divider my-1"></li>
                     <li>

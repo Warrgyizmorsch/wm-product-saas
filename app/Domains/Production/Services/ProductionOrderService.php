@@ -405,20 +405,7 @@ class ProductionOrderService
             // the Tab 1 selection, through the shared engineering service (same rules as the FormRequests).
             $branchId = $data['branch_id'] ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
             $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($productId);
-            $engineering = app(ProductionOrderEngineeringService::class);
-            $hasOps = array_key_exists('selected_operation_ids', $data);
-            $hasMats = array_key_exists('selected_material_ids', $data);
-            $requireExplicit = !empty($data['engineering_selection_submitted']) || $hasOps || $hasMats;
-            $resolution = $engineering->resolveAndValidate(
-                $product,
-                $tenantId,
-                !empty($data['bom_id']) ? (int) $data['bom_id'] : null,
-                !empty($data['routing_id']) ? (int) $data['routing_id'] : null,
-                $hasOps ? array_values((array) ($data['selected_operation_ids'] ?? [])) : null,
-                $hasMats ? array_values((array) ($data['selected_material_ids'] ?? [])) : null,
-                $requireExplicit
-            );
-            $engineering->assertCanCreate($resolution);
+            $resolution = $this->resolveOrderEngineering($data, $product, $tenantId);
             $bom = $resolution['bom'];        // null for bought / traded products (PO-02)
             $routing = $resolution['routing'];
             $defaultMode = $product ? $product->getDefaultProductionMode() : 'standard';
@@ -510,25 +497,7 @@ class ProductionOrderService
             // PO-IMPL-04 (PO-08 / PO-10 / PO-12): multi-level plan from the chosen operations + materials —
             // one reservation and one requisition line per product (shared materials summed), and only the chosen
             // parent operations + the primary operations of exploded child BOMs are snapshotted.
-            if ($bom && $routing) {
-                $plan = $engineering->computeMultiLevelPlan(
-                    $bom,
-                    $resolution['selected_operation_ids'],
-                    $resolution['selected_material_ids'],
-                    $quantity,
-                    $tenantId,
-                    $order->branch_id
-                );
-                $this->persistPlannedMaterials($order, $plan['consolidated_materials']);
-                $this->snapshotPlannedOperations($order, $plan['snapshot_tree_operations'], $userId, [
-                    'stock' => $plan['stock_snapshot'],
-                    'demands' => $plan['demands'],
-                    'merges' => [],
-                ]);
-            } elseif (! $bom && config('production.temp_flow')) {
-                // Temp no-BOM flow: operations come from the optional routing, no materials are planned.
-                $this->snapshotTempFlowOperations($order, $routing, $userId);
-            }
+            $this->persistOrderPlan($order, $resolution, $quantity, $userId);
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
@@ -552,6 +521,318 @@ class ProductionOrderService
 
             return $order;
         });
+    }
+
+    /**
+     * The BOM / Routing an order is made from plus the operation and material choices of the Tab 1 workspace — one resolution with the same
+     * blocking checks for Add (createDirect) and Edit (updateDraft). PO-IMPL-04 / PO-01 / PO-02 / PO-07.
+     *
+     * @return array<string, mixed> the result of ProductionOrderEngineeringService::resolveAndValidate() (already asserted creatable)
+     */
+    private function resolveOrderEngineering(array $data, Product $product, int $tenantId): array
+    {
+        $engineering = app(ProductionOrderEngineeringService::class);
+        $hasOps = array_key_exists('selected_operation_ids', $data);
+        $hasMats = array_key_exists('selected_material_ids', $data);
+        $requireExplicit = !empty($data['engineering_selection_submitted']) || $hasOps || $hasMats;
+        $resolution = $engineering->resolveAndValidate(
+            $product,
+            $tenantId,
+            !empty($data['bom_id']) ? (int) $data['bom_id'] : null,
+            !empty($data['routing_id']) ? (int) $data['routing_id'] : null,
+            $hasOps ? array_values((array) ($data['selected_operation_ids'] ?? [])) : null,
+            $hasMats ? array_values((array) ($data['selected_material_ids'] ?? [])) : null,
+            $requireExplicit
+        );
+        $engineering->assertCanCreate($resolution);
+
+        return $resolution;
+    }
+
+    /**
+     * PO-IMPL-04 (PO-08 / PO-10 / PO-12): the multi-level plan from the chosen operations + materials — one reservation and one
+     * requisition line per product (shared materials summed), and only the chosen parent operations + the primary operations of exploded
+     * child BOMs are snapshotted. Used by Add (createDirect) and by Edit when the plan has to be rebuilt (updateDraft).
+     *
+     * @param array<string, mixed> $resolution the result of resolveOrderEngineering()
+     */
+    private function persistOrderPlan(ProductionOrder $order, array $resolution, float $quantity, ?int $userId): void
+    {
+        $bom = $resolution['bom'];
+        $routing = $resolution['routing'];
+
+        if ($bom && $routing) {
+            $plan = app(ProductionOrderEngineeringService::class)->computeMultiLevelPlan(
+                $bom,
+                $resolution['selected_operation_ids'],
+                $resolution['selected_material_ids'],
+                $quantity,
+                $order->tenant_id,
+                $order->branch_id
+            );
+            $this->persistPlannedMaterials($order, $plan['consolidated_materials']);
+            $this->snapshotPlannedOperations($order, $plan['snapshot_tree_operations'], $userId, [
+                'stock' => $plan['stock_snapshot'],
+                'demands' => $plan['demands'],
+                'merges' => [],
+            ]);
+        } elseif (! $bom && config('production.temp_flow')) {
+            // Temp no-BOM flow: operations come from the optional routing, no materials are planned.
+            $this->snapshotTempFlowOperations($order, $routing, $userId);
+        }
+    }
+
+    /**
+     * M-34 — the Edit screen. A DRAFT order can be changed as freely as it was created: product, sales request, quantity, dates, mode,
+     * remarks, sales / project links and — through the BOM / Routing workspace — which operations and materials are chosen.
+     *
+     *  - Only the header fields changed (dates, mode, remarks, links)  → saved as they are; the plan is untouched (what the user set on
+     *    the operations, e.g. "Produce all here", stays).
+     *  - The product, BOM, routing, quantity or the operation / material choices changed → the operations and the material plan are
+     *    rebuilt exactly as Add builds them. Not allowed once material was issued, a schedule exists or subcontract procurement was
+     *    raised; a still-pending store request of the old plan is cancelled (the user sends a new one — requests are sent by hand).
+     *  - Taking the sales request off frees it again; picking another one links it (product, quantity and sales links come from it).
+     *
+     * @return array{order: ProductionOrder, rebuilt: bool, cancelled_slips: array<int, string>}
+     */
+    public function updateDraft(int $id, array $data, int $tenantId, ?int $userId = null): array
+    {
+        return DB::transaction(function () use ($id, $data, $tenantId, $userId) {
+            $order = ProductionOrder::where('tenant_id', $tenantId)->lockForUpdate()->findOrFail($id);
+
+            // M-35: not editable once material is requested AND reserved (or the order is locked / frozen)
+            if ($reason = $order->editBlockReason()) {
+                throw new InvalidArgumentException($reason);
+            }
+            if (!$order->isDraft()) {
+                throw new InvalidArgumentException('Only a draft order can be edited.');
+            }
+
+            // ---- the sales request (same rules as Add)
+            $currentRequest = ProductionOrderRequest::where('tenant_id', $tenantId)
+                ->where('production_order_id', $order->id)
+                ->lockForUpdate()
+                ->first();
+            $wantedRequestId = !empty($data['production_order_request_id']) ? (int) $data['production_order_request_id'] : null;
+            $keptRequest = ($currentRequest && $wantedRequestId === (int) $currentRequest->id) ? $currentRequest : null;
+            $newRequest = null;
+            if ($wantedRequestId && !$keptRequest) {
+                $newRequest = ProductionOrderRequest::where('tenant_id', $tenantId)
+                    ->where('status', 'draft')
+                    ->whereNull('production_order_id')
+                    ->with(['materialRequirementItem.materialRequirement'])
+                    ->lockForUpdate()
+                    ->findOrFail($wantedRequestId);
+
+                $data['product_id'] = $newRequest->product_id;
+                $data['quantity_ordered'] = $newRequest->quantity_requested;
+                $data['sales_order_id'] = $newRequest->materialRequirementItem?->materialRequirement?->sales_order_id;
+                $data['sales_order_item_id'] = $newRequest->materialRequirementItem?->sales_order_item_id;
+            }
+
+            $productId = (int) $data['product_id'];
+            $quantity = (float) $data['quantity_ordered'];
+            if ($keptRequest && (int) $keptRequest->product_id !== $productId) {
+                throw new InvalidArgumentException('The product of an order that comes from a sales request cannot be changed — take the sales request off first, or pick another request.');
+            }
+
+            // ---- the BOM / Routing + operation / material choices (same checks as Add)
+            $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($productId);
+            $resolution = $this->resolveOrderEngineering($data, $product, $tenantId);
+            $bom = $resolution['bom'];
+            $routing = $resolution['routing'];
+
+            // ---- did the plan change?
+            $planChanged = (int) $order->product_id !== $productId
+                || (int) $order->bom_id !== (int) ($bom?->id)
+                || (int) $order->routing_id !== (int) ($routing?->id)
+                || abs((float) $order->quantity_ordered - $quantity) > 0.00005;
+            if (!$planChanged && $bom) {
+                // the choices saved on the order's own (level 1) operations
+                $savedOps = $order->operations()->where('bom_level', 1)->get(['routing_operation_id', 'selected_routing_material_ids']);
+                $savedOpIds = $savedOps->pluck('routing_operation_id')->filter()->map(fn ($v) => (int) $v)->unique()->sort()->values()->all();
+                $savedMatIds = $savedOps->flatMap(fn ($op) => (array) $op->selected_routing_material_ids)->map(fn ($v) => (int) $v)->unique()->sort()->values()->all();
+                $newOpIds = collect($resolution['selected_operation_ids'])->map(fn ($v) => (int) $v)->unique()->sort()->values()->all();
+                $newMatIds = collect($resolution['selected_material_ids'])->map(fn ($v) => (int) $v)->unique()->sort()->values()->all();
+                $planChanged = $savedOpIds !== $newOpIds || $savedMatIds !== $newMatIds;
+            }
+
+            $cancelledSlips = [];
+            if ($planChanged) {
+                $this->assertPlanCanBeRebuilt($order);
+                // M-37: the old (pending) store request of the old plan is cancelled AND soft-deleted, same as on Delete
+                $cancelledSlips = $this->cancelPendingSlips($order, false, 'the plan of this order can no longer be changed', true);
+            }
+
+            // ---- the sales request link
+            if ($currentRequest && !$keptRequest) {
+                $currentRequest->update(['production_order_id' => null, 'status' => 'draft']);
+            }
+            if ($newRequest) {
+                $newRequest->update(['production_order_id' => $order->id, 'status' => 'production-order-created']);
+            } elseif (!$currentRequest && !empty($data['sales_order_item_id'])) {
+                $matching = ProductionOrderRequest::where('tenant_id', $tenantId)
+                    ->whereNull('production_order_id')
+                    ->whereIn('status', ['draft', 'approved'])
+                    ->whereHas('materialRequirementItem', fn ($q) => $q->where('sales_order_item_id', $data['sales_order_item_id']))
+                    ->lockForUpdate()
+                    ->first();
+                $matching?->update(['production_order_id' => $order->id, 'status' => 'production-order-created']);
+            }
+
+            // ---- the project link
+            $projectId = $data['project_id'] ?? null;
+            $projectTaskId = $data['project_task_id'] ?? null;
+            $projectMilestoneId = $data['project_milestone_id'] ?? null;
+            if ($projectTaskId && !$projectId) {
+                $task = \App\Domains\Projects\Models\Task::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($projectTaskId);
+                if ($task) {
+                    $projectId = $task->project_id;
+                    $projectMilestoneId = $projectMilestoneId ?? $task->milestone_id;
+                }
+            }
+
+            $order->fill([
+                'product_id' => $productId,
+                'bom_id' => $bom?->id,
+                'routing_id' => $routing?->id,
+                'sales_order_id' => $data['sales_order_id'] ?? null,
+                'sales_order_item_id' => $data['sales_order_item_id'] ?? null,
+                'project_id' => $projectId,
+                'project_milestone_id' => $projectMilestoneId,
+                'project_task_id' => $projectTaskId,
+                'quantity_ordered' => $quantity,
+                'start_date' => $data['start_date'],
+                'end_date' => $data['end_date'],
+                'production_mode' => !empty($data['production_mode']) ? $data['production_mode'] : $order->production_mode,
+                'description' => $data['description'] ?? null,
+            ]);
+            if (!empty($data['production_model'])) {
+                $order->production_model = $data['production_model'];
+            } elseif ($planChanged) {
+                $order->production_model = ProductionOrder::MODEL_PURE_MANUFACTURING; // worked out again from the new operations
+            }
+
+            if ($planChanged) {
+                // the old plan goes (nothing was issued, scheduled or sent to the store — checked above) and the new one is built as on Add
+                $this->releaseInventoryReservations($order);
+                $order->reservations()->delete();
+                ProductionOrderOperationDependency::where('production_order_id', $order->id)->delete();
+                $order->operations()->delete();
+                $order->sub_assembly_plan = null;
+                $order->save();
+
+                $order = $order->refresh();
+                $this->persistOrderPlan($order, $resolution, $quantity, $userId);
+            } else {
+                $order->save();
+            }
+
+            app(ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type' => 'Order Updated',
+                'title' => 'Production Order Edited',
+                'description' => "Production order {$order->order_number} was edited" . ($planChanged ? ': the operations and the material plan were rebuilt.' : '.'),
+                'severity' => 'info',
+                'event_source' => 'ProductionOrderService',
+                'triggered_by' => $userId,
+            ]);
+
+            return ['order' => $order->fresh(), 'rebuilt' => $planChanged, 'cancelled_slips' => $cancelledSlips];
+        });
+    }
+
+    /**
+     * The plan of a draft order can be thrown away and built again only while nothing depends on it: no material issued, no schedule,
+     * no subcontract procurement raised for its external operations.
+     */
+    private function assertPlanCanBeRebuilt(ProductionOrder $order): void
+    {
+        $issued = \App\Domains\Production\Models\ProductionOrderIssue::where('production_order_id', $order->id)->exists()
+            || (float) ProductionOrderReservation::where('production_order_id', $order->id)->sum('quantity_issued') > 0;
+        if ($issued) {
+            throw new InvalidArgumentException('Material has already been issued to this order, so its product, quantity and operation / material choices can no longer be changed.');
+        }
+
+        $scheduled = ProductionSchedule::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->where('status', '!=', ProductionSchedule::STATUS_CANCELLED)
+            ->exists();
+        if ($scheduled) {
+            throw new InvalidArgumentException('This order already has a schedule, so its plan can no longer be changed. Cancel the schedule first.');
+        }
+
+        $externalOpIds = $order->operations()->where('is_external', true)->pluck('id');
+        if ($externalOpIds->isNotEmpty()) {
+            $hasPo = \App\Domains\Purchase\Models\PurchaseOrderItem::whereIn('production_order_operation_id', $externalOpIds)
+                ->whereHas('order', fn ($q) => $q->where('tenant_id', $order->tenant_id)->where('status', '!=', 'Cancelled'))
+                ->exists();
+            $hasPr = \App\Domains\Purchase\Models\PurchaseRequisition::where('tenant_id', $order->tenant_id)
+                ->whereIn('source_type', ['mo', 'ProductionOrder'])
+                ->where('source_id', $order->id)
+                ->where('status', '!=', 'Cancelled')
+                ->exists();
+            if ($hasPo || $hasPr) {
+                throw new InvalidArgumentException('Subcontract purchasing has already been raised for this order, so its plan can no longer be changed. Cancel that purchase document first.');
+            }
+        }
+    }
+
+    /**
+     * A draft order made before requests were sent by hand can still carry the store request that was generated automatically. When the plan
+     * changes that request no longer matches it: a request the store has not started is cancelled (the user sends a new one); one the store has
+     * already worked on blocks the change. "Ad-hoc" extra requests are independent of the plan and stay. (M-36: the delete of a draft uses the
+     * same cancel with $includeAdHoc = true — every request of the order goes — and then soft-deletes them.)
+     *
+     * A request the store raised a purchase requisition from also blocks (cancelling the request would leave that purchase document behind).
+     *
+     * @return array<int, string> the requisition numbers that were cancelled
+     */
+    private function cancelPendingSlips(ProductionOrder $order, bool $includeAdHoc = false, string $consequence = 'the plan of this order can no longer be changed', bool $softDelete = false): array
+    {
+        $slips = ProductionRequisitionSlip::withoutGlobalScopes()
+            ->where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->when(!$includeAdHoc, fn ($q) => $q->where(fn ($n) => $n->whereNull('notes')->orWhere('notes', 'not like', 'Ad-hoc%')))
+            ->get()
+            ->reject(fn ($slip) => in_array(strtolower((string) $slip->status), ['cancelled', 'rejected'], true));
+
+        foreach ($slips as $slip) {
+            if (strtolower((string) $slip->status) !== 'pending') {
+                throw new InvalidArgumentException("Store request {$slip->requisition_number} is already {$slip->status}, so {$consequence}.");
+            }
+            if ($slip->purchaseRequisitions()->whereNotIn('status', ['Cancelled', 'cancelled', 'Rejected', 'rejected'])->exists()) {
+                throw new InvalidArgumentException("A purchase requisition was raised from store request {$slip->requisition_number}, so {$consequence}. Cancel that purchase requisition first.");
+            }
+        }
+
+        if ($slips->isNotEmpty()) {
+            ProductionRequisitionSlip::withoutGlobalScopes()->whereIn('id', $slips->pluck('id'))->update(['status' => 'cancelled']);
+
+            // M-37: when the plan is changed in Edit, the old request is not only cancelled — it is soft-deleted too (as on Delete)
+            if ($softDelete) {
+                $slips->each(function (ProductionRequisitionSlip $slip) {
+                    $slip->items()->delete();
+                    $slip->delete();
+                });
+            }
+        }
+
+        return $slips->pluck('requisition_number')->values()->all();
+    }
+
+    /** M-36: soft-delete every material request (slip + its lines) of the order — they were cancelled just before. */
+    private function softDeleteOrderSlips(ProductionOrder $order): void
+    {
+        ProductionRequisitionSlip::withoutGlobalScopes()
+            ->where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->whereNull('deleted_at')
+            ->get()
+            ->each(function (ProductionRequisitionSlip $slip) {
+                $slip->items()->delete();
+                $slip->delete();
+            });
     }
 
     /**
@@ -859,6 +1140,10 @@ class ProductionOrderService
         if ($order->isFrozen()) {
             throw new InvalidArgumentException('Frozen orders cannot be modified.');
         }
+        // M-35: material requested from the store AND reserved → the order cannot be edited
+        if ($reason = $order->editBlockReason()) {
+            throw new InvalidArgumentException($reason);
+        }
 
         $order->update($data);
 
@@ -867,16 +1152,28 @@ class ProductionOrderService
 
     /**
      * Delete draft order.
+     *
+     * M-36: deleting follows the SAME rule as editing — not possible once the order is locked / frozen, or material is requested from the
+     * store AND reserved. The only difference: the material request(s) of the order are cancelled and then soft-deleted, and a sales request
+     * the order came from is freed again.
      */
     public function delete(int $id): void
     {
         $order = ProductionOrder::findOrFail($id);
 
-        if ($order->isFrozen()) {
-            throw new InvalidArgumentException('Frozen orders cannot be deleted.');
+        if ($reason = $order->editBlockReason('deleted')) {
+            throw new InvalidArgumentException($reason);
         }
 
         DB::transaction(function () use ($order) {
+            $this->cancelPendingSlips($order, true, 'this order can no longer be deleted');
+            $this->softDeleteOrderSlips($order);
+
+            // the sales request this order was made from can be used for a new order again
+            ProductionOrderRequest::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->update(['production_order_id' => null, 'status' => 'draft']);
+
             $this->releaseInventoryReservations($order);
 
             // Delete child snapshots
