@@ -220,7 +220,7 @@ class QuotationController extends Controller
             'to_email'   => 'required|email',
             'subject'    => 'required|string|max:255',
             'body_html'  => 'required|string',
-            'account_id' => 'nullable|exists:email_configurations,id',
+            'account_id' => ['nullable', 'integer', tenant_exists('email_configurations')],
         ]);
 
         try {

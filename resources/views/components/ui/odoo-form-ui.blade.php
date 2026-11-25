@@ -30,12 +30,16 @@
                 display: flex;
                 align-items: center;
                 margin-bottom: 10px;
+                flex-wrap: wrap;
+                row-gap: 4px;
             }
             .odoo-form-group > .flex-grow-1 {
-                min-width: 0 !important;
+                min-width: 180px !important;
+                flex: 1 1 auto;
             }
             .odoo-form-label {
                 width: 130px;
+                min-width: 110px;
                 flex-shrink: 0 !important;
                 font-size: 13px;
                 font-weight: 700;
