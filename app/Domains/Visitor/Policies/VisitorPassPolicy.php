@@ -58,13 +58,13 @@ class VisitorPassPolicy
 
     public function update(User $user, VisitorPass $pass): bool
     {
-        return $this->access->allows($user, 'visitor.passes.create', [
+        return $this->access->allows($user, 'visitor.passes.update', [
             'tenant_id'     => $pass->tenant_id,
             'owner_id'      => $pass->host_user_id,
             'branch_id'     => $pass->branch_id,
             'department_id' => $user->department_id,
             'company_id'    => $pass->company_id,
-        ]) || $this->access->allows($user, 'visitor.passes.view', [
+        ]) || $this->access->allows($user, 'visitor.passes.create', [
             'tenant_id'     => $pass->tenant_id,
             'owner_id'      => $pass->host_user_id,
             'branch_id'     => $pass->branch_id,

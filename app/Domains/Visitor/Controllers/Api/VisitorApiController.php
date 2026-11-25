@@ -20,7 +20,7 @@ class VisitorApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $this->authorize('viewAny', VisitorPass::class);
+        $this->authorize('viewAny', Visitor::class);
 
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $visitors = Visitor::where('tenant_id', $tenantId)->latest()->paginate(20);
@@ -36,7 +36,7 @@ class VisitorApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $this->authorize('create', VisitorPass::class);
+        $this->authorize('create', Visitor::class);
 
         [$tenantId, $companyId, $branchId] = $this->visitorService->resolveTenantContext();
 
@@ -83,12 +83,34 @@ class VisitorApiController extends Controller
     public function preRegister(Request $request): JsonResponse
     {
         $this->authorize('create', VisitorPass::class);
+        [$tenantId, $companyId, $branchId] = $this->visitorService->resolveTenantContext();
 
-        // Initial pre-register skeleton
+        $validated = $request->validate([
+            'full_name'                 => 'required|string|max:255',
+            'phone'                     => 'required|string|max:30',
+            'email'                     => 'nullable|email|max:255',
+            'company_name'              => 'nullable|string|max:255',
+            'designation'               => 'nullable|string|max:100',
+            'visitor_type'              => 'nullable|string|in:Client,Vendor,Candidate,Service,Guest',
+            'host_user_id'              => ['nullable', \Illuminate\Validation\Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
+            'purpose'                   => 'required|string|max:100',
+            'expected_arrival_at'       => 'required|date',
+            'expected_duration_minutes' => 'nullable|integer|min:5|max:1440',
+            'notes'                     => 'nullable|string|max:1000',
+        ]);
+
+        $pass = $this->visitorService->createPass(
+            array_merge($validated, ['status' => 'Expected', 'entry_type' => 'Pre-registered']),
+            $tenantId,
+            $companyId,
+            $branchId
+        );
+
         return response()->json([
             'success' => true,
-            'message' => 'Visitor pre-registration endpoint ready.',
-        ]);
+            'message' => 'Visitor pre-registered successfully.',
+            'data'    => $pass,
+        ], 201);
     }
 
     /**
@@ -100,6 +122,22 @@ class VisitorApiController extends Controller
         $pass = VisitorPass::where('tenant_id', $tenantId)->findOrFail($id);
 
         $this->authorize('checkIn', $pass);
+
+        if ($pass->status === 'Checked-In') {
+            return response()->json(['success' => false, 'message' => 'Visitor is already checked in.'], 422);
+        }
+
+        if ($pass->status === 'Checked-Out') {
+            return response()->json(['success' => false, 'message' => 'Cannot re-admit a checked-out pass. A new pass must be issued.'], 422);
+        }
+
+        if ($pass->status === 'Waiting Approval') {
+            return response()->json(['success' => false, 'message' => 'Host approval is pending. You cannot check-in until the host approves this pass.'], 422);
+        }
+
+        if (in_array($pass->status, ['Rejected', 'Denied'])) {
+            return response()->json(['success' => false, 'message' => 'This visitor pass was denied/rejected and cannot be checked-in.'], 422);
+        }
 
         $pass->update([
             'status'      => 'Checked-In',
@@ -121,14 +159,31 @@ class VisitorApiController extends Controller
     public function checkOut(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
-        $pass = VisitorPass::where('tenant_id', $tenantId)->findOrFail($id);
+        $pass = VisitorPass::where('tenant_id', $tenantId)->with('belongings')->findOrFail($id);
 
         $this->authorize('checkOut', $pass);
+
+        if ($pass->status === 'Checked-Out') {
+            return response()->json(['success' => false, 'message' => 'Visitor pass has already been checked out.'], 422);
+        }
+
+        if (!in_array($pass->status, ['Checked-In', 'Meeting in Progress', 'Overstayed'])) {
+            return response()->json(['success' => false, 'message' => "Cannot check out a pass that has not been checked in. Current status: {$pass->status}."], 422);
+        }
 
         $pass->update([
             'status'       => 'Checked-Out',
             'check_out_at' => now(),
         ]);
+
+        // Verify belongings on exit
+        foreach ($pass->belongings as $belonging) {
+            $belonging->update([
+                'is_verified_on_exit' => true,
+                'exit_verified_by'    => auth()->id(),
+                'exit_verified_at'    => now(),
+            ]);
+        }
 
         $this->visitorService->notifyHost($pass, 'checked_out');
 

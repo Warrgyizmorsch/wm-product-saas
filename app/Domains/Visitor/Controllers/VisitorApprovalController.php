@@ -86,6 +86,14 @@ class VisitorApprovalController extends Controller
             ->with(['visitor', 'host'])
             ->findOrFail($id);
 
+        if ($pass->status !== 'Waiting Approval') {
+            $msg = "Pass #{$pass->pass_number} is in '{$pass->status}' status and cannot be approved.";
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
+
         $pass->update([
             'status'           => 'Approved',
             'rejection_reason' => null,
@@ -110,7 +118,7 @@ class VisitorApprovalController extends Controller
 
         // 2. Real-time Pusher WebSockets Broadcast
         \App\Services\Pusher\PusherBroadcastService::broadcast(
-            channels: ["visitor-tenant-{$tenantId}"],
+            channels: ["private-visitor-tenant-{$tenantId}"],
             eventName: 'visitor.approved',
             data: [
                 'pass_id'      => $pass->id,
@@ -155,6 +163,14 @@ class VisitorApprovalController extends Controller
             ->with(['visitor', 'host'])
             ->findOrFail($id);
 
+        if ($pass->status !== 'Waiting Approval') {
+            $msg = "Pass #{$pass->pass_number} is in '{$pass->status}' status and cannot be rejected.";
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
+
         $pass->update([
             'status'           => 'Rejected',
             'rejection_reason' => $validated['rejection_reason'],
@@ -179,7 +195,7 @@ class VisitorApprovalController extends Controller
 
         // 2. Real-time Pusher WebSockets Broadcast
         \App\Services\Pusher\PusherBroadcastService::broadcast(
-            channels: ["visitor-tenant-{$tenantId}"],
+            channels: ["private-visitor-tenant-{$tenantId}"],
             eventName: 'visitor.rejected',
             data: [
                 'pass_id'          => $pass->id,

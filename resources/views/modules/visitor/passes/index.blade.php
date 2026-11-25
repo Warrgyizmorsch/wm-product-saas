@@ -279,16 +279,16 @@
                             <td>
                                 @if($pass->check_in_at)
                                     <div class="text-success fw-semibold fs-12">
-                                        <i class="feather-log-in me-1"></i>{{ \Carbon\Carbon::parse($pass->check_in_at)->format('d M, h:i A') }}
+                                        <i class="feather-log-in me-1"></i>{{ \Carbon\Carbon::parse($pass->check_in_at)->setTimezone(tenant()?->timezone ?: config('app.timezone', 'UTC'))->format('d M, h:i A') }}
                                     </div>
                                     @if($pass->check_out_at)
                                         <div class="text-danger fw-semibold fs-11 mt-0.5">
-                                            <i class="feather-log-out me-1"></i>{{ \Carbon\Carbon::parse($pass->check_out_at)->format('d M, h:i A') }}
+                                            <i class="feather-log-out me-1"></i>{{ \Carbon\Carbon::parse($pass->check_out_at)->setTimezone(tenant()?->timezone ?: config('app.timezone', 'UTC'))->format('d M, h:i A') }}
                                         </div>
                                     @endif
                                 @else
                                     <span class="text-muted fs-12">
-                                        {{ $pass->expected_arrival_at ? \Carbon\Carbon::parse($pass->expected_arrival_at)->format('d M, h:i A') : '—' }}
+                                        {{ $pass->expected_arrival_at ? \Carbon\Carbon::parse($pass->expected_arrival_at)->setTimezone(tenant()?->timezone ?: config('app.timezone', 'UTC'))->format('d M, h:i A') : '—' }}
                                     </span>
                                 @endif
                             </td>

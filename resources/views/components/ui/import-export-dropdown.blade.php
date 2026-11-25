@@ -95,6 +95,7 @@
     <x-ui.icon-btn type="button" 
                    variant="transparent-dark"
                    title="Import / Export Options"
+                   aria-label="Import or Export Options"
                    size="md"
                    icon="feather-paperclip"
                    class="import-export-toggle-custom"

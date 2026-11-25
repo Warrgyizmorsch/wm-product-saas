@@ -16,6 +16,8 @@ return [
     'overstayed'                  => 'Просрочен престой',
     'denied_visits'               => 'Отказани / Отхвърлени',
     'new_visitor_pass'            => 'Нов пропуск за посетител',
+    'register_entry_subtext'      => 'Издаване на еднократен пропуск за посетители',
+    'notes_reason'                => 'Бележки / Причина',
     'all_passes'                  => 'Всички пропуски (All Passes)',
     'inside_premises'             => 'В сградата (Inside Premises)',
     'waiting_approval'            => 'Очаква одобрение (Waiting Approval)',

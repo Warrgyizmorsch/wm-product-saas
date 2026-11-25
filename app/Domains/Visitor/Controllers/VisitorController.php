@@ -75,7 +75,7 @@ class VisitorController extends Controller
 
         $passes = $passesQuery->with(['visitor', 'host', 'belongings', 'linkedLead'])->latest()->paginate(15)->withQueryString();
         $hosts = \App\Models\User::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'email']);
-        $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->with(['primaryImage', 'images'])->orderBy('name')->get();
+        $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->select(['id', 'name', 'sku', 'image_path'])->orderBy('name')->take(200)->get();
 
         return view('modules.visitor.index', compact(
             'stats',
@@ -110,8 +110,8 @@ class VisitorController extends Controller
             'id_proof_type'             => 'nullable|string|max:50',
             'id_proof_number'           => 'nullable|string|max:100',
             'id_verification_status'    => 'nullable|string|in:Pending,Verified,Exempted,Failed',
-            'photo_url'                 => 'nullable|string',
-            'host_user_id'              => 'nullable|exists:users,id',
+            'photo_url'                 => 'nullable|string|max:2097152',
+            'host_user_id'              => ['nullable', \Illuminate\Validation\Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
             'department_id'             => 'nullable|integer',
             'purpose'                   => 'required|string|max:100',
             'entry_type'                => 'nullable|string|max:50',
@@ -142,6 +142,8 @@ class VisitorController extends Controller
             'product_items.*.quantity'  => 'nullable|numeric|min:0.01',
             'inquiry_notes'             => 'nullable|string|max:1000',
             'create_crm_lead'           => 'nullable|boolean',
+            'allow_blacklisted_override' => 'nullable|boolean',
+            'blacklist_override_reason'  => 'nullable|string|max:500',
             'notes'                     => 'nullable|string|max:1000',
         ]);
 
@@ -176,6 +178,23 @@ class VisitorController extends Controller
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $pass = VisitorPass::where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('checkIn', $pass);
+
+        if ($pass->status === 'Checked-In') {
+            $msg = 'Visitor is already checked in. Duplicate check-in is not allowed.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
+
+        if ($pass->status === 'Checked-Out') {
+            $msg = 'Cannot re-admit a checked-out pass. A new pass must be issued.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
 
         if ($pass->status === 'Waiting Approval') {
             $msg = __('visitor.approval_required_checkin_blocked', [], null) ?? 'Host approval is pending. You cannot check-in until the host approves this pass.';
@@ -221,6 +240,23 @@ class VisitorController extends Controller
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $pass = VisitorPass::where('tenant_id', $tenantId)->with('belongings')->findOrFail($id);
+        $this->authorize('checkOut', $pass);
+
+        if ($pass->status === 'Checked-Out') {
+            $msg = 'Visitor pass has already been checked out.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
+
+        if (!in_array($pass->status, ['Checked-In', 'Meeting in Progress', 'Overstayed'])) {
+            $msg = "Cannot check out a pass that has not been checked in. Current status: {$pass->status}.";
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
 
         $badgeReturned = $request->boolean('badge_returned', true);
         $gatePassRef = $request->input('gate_pass_reference', $pass->gate_pass_reference);
@@ -259,6 +295,15 @@ class VisitorController extends Controller
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $pass = VisitorPass::where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('update', $pass);
+
+        if (in_array($pass->status, ['Checked-In', 'Meeting in Progress', 'Overstayed', 'Checked-Out'])) {
+            $msg = "Visitor pass is already {$pass->status}. Arrival cannot be re-logged.";
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
 
         $newStatus = $pass->host_user_id ? 'Waiting Approval' : 'Arrived';
         $pass->update([
@@ -286,6 +331,15 @@ class VisitorController extends Controller
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $pass = VisitorPass::where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('update', $pass);
+
+        if (!in_array($pass->status, ['Checked-In', 'Overstayed'])) {
+            $msg = "Meeting can only be started for visitors who are currently checked in (current status: {$pass->status}).";
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
 
         $pass->update([
             'status'             => 'Meeting in Progress',
@@ -310,6 +364,7 @@ class VisitorController extends Controller
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $pass = VisitorPass::where('tenant_id', $tenantId)->with('host')->findOrFail($id);
+        $this->authorize('view', $pass);
 
         if (!$pass->host_user_id) {
             return response()->json(['success' => false, 'message' => 'No host assigned to this pass.'], 422);
@@ -333,6 +388,7 @@ class VisitorController extends Controller
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $pass = VisitorPass::where('tenant_id', $tenantId)->with('visitor')->findOrFail($id);
+        $this->authorize('update', $pass);
 
         $validated = $request->validate([
             'denied_reason'     => 'required|string|max:500',
@@ -368,6 +424,7 @@ class VisitorController extends Controller
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $visitor = Visitor::where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('update', $visitor);
 
         $isCurrentlyBlacklisted = (bool)$visitor->is_blacklisted;
         $reason = $request->input('reason', 'Security / Front Desk Action');
@@ -396,6 +453,7 @@ class VisitorController extends Controller
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $pass = VisitorPass::where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('update', $pass);
 
         $validated = $request->validate([
             'extend_minutes' => 'required|integer|min:15|max:480',
@@ -431,6 +489,7 @@ class VisitorController extends Controller
     {
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $pass = VisitorPass::where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('update', $pass);
 
         $validated = $request->validate([
             'incident_details' => 'required|string|max:1000',
@@ -457,6 +516,7 @@ class VisitorController extends Controller
      */
     public function lookup(Request $request)
     {
+        $this->authorize('viewAny', Visitor::class);
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $phone = trim($request->input('phone', ''));
         $email = trim($request->input('email', ''));

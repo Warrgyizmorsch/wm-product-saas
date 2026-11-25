@@ -115,6 +115,6 @@ class VisitorPass extends Model
             return false;
         }
         $expectedMinutes = $this->expected_duration_minutes ?: 60;
-        return now()->diffInMinutes($this->check_in_at) > $expectedMinutes;
+        return $this->check_in_at->diffInMinutes(now()) > $expectedMinutes;
     }
 }

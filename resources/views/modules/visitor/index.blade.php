@@ -181,6 +181,51 @@
         color: #ffffff !important;
         border-bottom-color: #28334e !important;
     }
+
+    /* Accessibility: Focus Indicators (BUG-A11Y-03) */
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    .btn:focus-visible,
+    .form-control:focus-visible,
+    .form-select:focus-visible,
+    .form-check-input:focus-visible,
+    .nav-link:focus-visible {
+        outline: 2px solid var(--bs-primary, #6366f1) !important;
+        outline-offset: 2px !important;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
+    }
+
+    /* Accessibility: Touch Targets for Mobile (BUG-A11Y-02) */
+    .product-item-row .btn-link.text-danger {
+        min-width: 36px;
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px !important;
+    }
+    #newVisitorDrawer .btn,
+    #newVisitorDrawer .btn-close {
+        min-height: 40px;
+    }
+    @media (max-width: 767.98px) {
+        #newVisitorDrawer .btn,
+        .btn-mobile-touch {
+            min-height: 44px;
+        }
+    }
+
+    /* Accessibility: Contrast Enhancements (BUG-A11Y-01) */
+    .badge.bg-light.text-muted {
+        color: #475569 !important;
+        border-color: #cbd5e1 !important;
+    }
+    .fs-11.text-muted, .fs-10.text-muted {
+        color: #475569 !important;
+    }
 </style>
 @endpush
 
@@ -268,9 +313,9 @@
                         @endif
                     @endforeach
                     <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
-                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('visitor.search_placeholder') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('visitor.search_placeholder') }}" aria-label="{{ __('visitor.search_placeholder') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
                     @if(request('search'))
-                        <a href="{{ route('visitor.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
+                        <a href="{{ route('visitor.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search" aria-label="Clear Search">
                             <i class="feather-x fs-12"></i>
                         </a>
                     @endif
@@ -411,7 +456,7 @@
                 <thead>
                     <tr>
                         <th style="width: 35px;" class="text-center">
-                            <input type="checkbox" class="form-check-input">
+                            <input type="checkbox" class="form-check-input" aria-label="Select all visitor passes">
                         </th>
                         <th style="width: 14%;">{{ __('visitor.pass_number') }}</th>
                         <th style="width: 18%;">{{ __('visitor.visitor_name') }}</th>
@@ -431,7 +476,7 @@
                         @endphp
                         <tr class="{{ $isOverstay ? 'table-warning' : '' }}">
                             <td class="text-center">
-                                <input type="checkbox" class="form-check-input">
+                                <input type="checkbox" class="form-check-input" aria-label="Select pass {{ $pass->pass_number }}">
                             </td>
 
                             <!-- Pass Number & Type -->
@@ -528,11 +573,11 @@
                             <td>
                                 @if($pass->check_in_at)
                                     <div class="text-success fw-semibold fs-12">
-                                        <i class="feather-log-in me-1"></i>{{ \Carbon\Carbon::parse($pass->check_in_at)->format('h:i A') }}
+                                        <i class="feather-log-in me-1"></i>{{ \Carbon\Carbon::parse($pass->check_in_at)->setTimezone(tenant()?->timezone ?: config('app.timezone', 'UTC'))->format('h:i A') }}
                                     </div>
                                     @if($pass->check_out_at)
                                         <div class="text-danger fw-semibold fs-11 mt-0.5">
-                                            <i class="feather-log-out me-1"></i>{{ \Carbon\Carbon::parse($pass->check_out_at)->format('h:i A') }}
+                                            <i class="feather-log-out me-1"></i>{{ \Carbon\Carbon::parse($pass->check_out_at)->setTimezone(tenant()?->timezone ?: config('app.timezone', 'UTC'))->format('h:i A') }}
                                         </div>
                                     @elseif($isOverstay)
                                         <span class="badge bg-danger text-white fs-10 px-1 py-0.5 mt-0.5">
@@ -541,7 +586,7 @@
                                     @endif
                                 @else
                                     <span class="text-muted fs-12">
-                                        {{ $pass->expected_arrival_at ? \Carbon\Carbon::parse($pass->expected_arrival_at)->format('d M, h:i A') : '—' }}
+                                        {{ $pass->expected_arrival_at ? \Carbon\Carbon::parse($pass->expected_arrival_at)->setTimezone(tenant()?->timezone ?: config('app.timezone', 'UTC'))->format('d M, h:i A') : '—' }}
                                     </span>
                                 @endif
                             </td>
@@ -1427,24 +1472,14 @@
                 </select>
             </div>
 
-            <div class="row g-2 mb-3">
-                <div class="col-6">
-                    <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.lead_type') }}</label>
-                    <select name="lead_type" class="form-select fs-13">
-                        <option value="hot">🔥 {{ __('visitor.hot_lead') }}</option>
-                        <option value="warm" selected>⚡ {{ __('visitor.warm_lead') }}</option>
-                        <option value="cold">❄️ {{ __('visitor.cold_lead') }}</option>
-                    </select>
-                </div>
-                <div class="col-6">
-                    <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.priority') }}</label>
-                    <select name="priority" class="form-select fs-13">
-                        <option value="Urgent">{{ __('visitor.urgent') }}</option>
-                        <option value="High">{{ __('visitor.high') }}</option>
-                        <option value="Medium" selected>{{ __('visitor.medium') }}</option>
-                        <option value="Low">{{ __('visitor.low') }}</option>
-                    </select>
-                </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.priority') }}</label>
+                <select name="priority" class="form-select fs-13">
+                    <option value="Urgent">{{ __('visitor.urgent') }}</option>
+                    <option value="High">{{ __('visitor.high') }}</option>
+                    <option value="Medium" selected>{{ __('visitor.medium') }}</option>
+                    <option value="Low">{{ __('visitor.low') }}</option>
+                </select>
             </div>
 
             <div class="mb-3">
@@ -1564,6 +1599,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Smart Spreadsheet Import Modal -->
+    @include('modules.visitor.partials.smart-import-modal')
 
 @endsection
 

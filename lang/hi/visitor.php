@@ -16,6 +16,8 @@ return [
     'overstayed'                  => 'अत्यधिक समय (Overstayed)',
     'denied_visits'               => 'अस्वीकृत / रोके गए',
     'new_visitor_pass'            => 'नया विज़िटर पास बनाएं',
+    'register_entry_subtext'      => 'वॉक-इन या अपेक्षित आगंतुकों के लिए एकल-प्रवेश गेट पास जारी करें',
+    'notes_reason'                => 'नोट्स / उद्देश्य / कारण',
     'all_passes'                  => 'सभी पास (All Passes)',
     'inside_premises'             => 'परिसर के अंदर (Inside Premises)',
     'waiting_approval'            => 'अनुमोदन प्रतीक्षित (Waiting Approval)',
