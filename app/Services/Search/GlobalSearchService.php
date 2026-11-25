@@ -778,13 +778,18 @@ class GlobalSearchService
 
         // Employees
         if ($this->hasAnyPermission($user, ['hrms.employees.view', 'hrms.employees.create', 'hr.employees.manage'])) {
-            $employees = \App\Domains\HRMS\Models\Employee::query()
+            $employeeQuery = \App\Domains\HRMS\Models\Employee::query()
                 ->select(['id', 'employee_id', 'full_name', 'job_title', 'office_email', 'status'])
                 ->where(function ($q) use ($query) {
                     $q->where('employee_id', 'like', "{$query}%")
                       ->orWhere('full_name', 'like', "%{$query}%")
                       ->orWhere('office_email', 'like', "%{$query}%");
-                })
+                });
+
+            // Scope results to the user's authorized organizational boundary
+            $employeeQuery = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($employeeQuery, $user);
+
+            $employees = $employeeQuery
                 ->limit($limit)
                 ->get();
 

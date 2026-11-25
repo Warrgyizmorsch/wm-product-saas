@@ -166,6 +166,7 @@ class BiometricDeviceApiController extends Controller
                 'max:255',
                 Rule::unique('biometric_devices')->where('tenant_id', $tenantId),
             ],
+            'webhook_secret'   => 'nullable|string|max:255',
             'company_id'       => 'required|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
             'branch_id'        => 'nullable|exists:branches,id',
@@ -176,10 +177,15 @@ class BiometricDeviceApiController extends Controller
 
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = $request->has('status') ? (bool) $request->status : true;
+        $validated['webhook_secret'] = $request->input('webhook_secret') ?: \Illuminate\Support\Str::random(32);
 
         $device = $this->repository->storeDevice($validated);
 
-        return $this->sendSuccess($device->fresh(['company:id,company_name', 'businessUnit:id,name', 'branch:id,name']), 'Biometric device registered successfully.', 201);
+        $freshDevice = $device->fresh(['company:id,company_name', 'businessUnit:id,name', 'branch:id,name']);
+        $deviceData = $freshDevice ? $freshDevice->toArray() : [];
+        $deviceData['webhook_secret'] = $validated['webhook_secret'];
+
+        return $this->sendSuccess($deviceData, 'Biometric device registered successfully.', 201);
     }
 
     /**
@@ -200,7 +206,13 @@ class BiometricDeviceApiController extends Controller
             return $this->sendError("Biometric device with ID '{$id}' not found.", 404);
         }
 
-        return $this->sendSuccess($device, 'Biometric device details loaded successfully.');
+        $deviceData = $device->toArray();
+        if ($this->isHrAdmin()) {
+            $deviceData['webhook_secret'] = $device->webhook_secret
+                ?: (config('services.biometric.webhook_secret') ?: hash_hmac('sha256', (string) $device->device_serial, (string) config('app.key')));
+        }
+
+        return $this->sendSuccess($deviceData, 'Biometric device details loaded successfully.');
     }
 
     /**
@@ -231,6 +243,7 @@ class BiometricDeviceApiController extends Controller
                 'max:255',
                 Rule::unique('biometric_devices')->where('tenant_id', $tenantId)->ignore($device->id),
             ],
+            'webhook_secret'   => 'nullable|string|max:255',
             'company_id'       => 'required|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
             'branch_id'        => 'nullable|exists:branches,id',
@@ -240,6 +253,9 @@ class BiometricDeviceApiController extends Controller
         ]);
 
         $validated['status'] = $request->has('status') ? (bool) $request->status : true;
+        if ($request->filled('webhook_secret')) {
+            $validated['webhook_secret'] = $request->input('webhook_secret');
+        }
 
         $this->repository->updateDevice($device, $validated);
 

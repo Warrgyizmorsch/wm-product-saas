@@ -376,6 +376,8 @@ class GoalApiController extends Controller
             ];
 
             return $this->sendSuccess($response, 'Goal details loaded successfully.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            return $this->sendError($e->getMessage(), $e->getStatusCode());
         } catch (Exception $e) {
             return $this->sendError($e->getMessage(), 404);
         }
@@ -391,6 +393,18 @@ class GoalApiController extends Controller
         // RBAC validation: only managers/admins can create company-wide objectives or custom cycles/pillars
         if ($request->owner_type === 'company' && !$this->goalRepository->canManageGoals($user)) {
             return $this->sendError('You are not authorized to create organization-wide goals.', 403);
+        }
+
+        if ($request->owner_type === 'department' && !$this->goalRepository->canManageGoals($user)) {
+            return $this->sendError('You are not authorized to create department goals.', 403);
+        }
+
+        if ($request->owner_type === 'employee' && !$this->goalRepository->canManageGoals($user)) {
+            $currentEmp = $this->scopeService->resolveEmployee($user, (int) $tenantId);
+            $targetEmpId = $request->employee_id;
+            if ($targetEmpId && $currentEmp && (int)$targetEmpId !== (int)$currentEmp->id) {
+                return $this->sendError('You are not authorized to assign goals to other employees.', 403);
+            }
         }
 
         if (($request->filled('custom_goal_cycle') || $request->filled('custom_goal_category')) && !$this->goalRepository->canManageGoals($user)) {

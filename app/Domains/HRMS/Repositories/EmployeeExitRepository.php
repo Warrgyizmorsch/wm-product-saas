@@ -284,12 +284,16 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
 
     public function approveManager(EmployeeExit $exit, array $validated, ?int $userId): bool
     {
-        $updated = $exit->update([
+        $updateData = [
             'status' => 'pending_hr',
-            'manager_recommended_lwd' => $validated['manager_recommended_lwd'] ?? $exit->preferred_lwd,
             'manager_remarks' => $validated['manager_remarks'] ?? null,
             'approved_by' => $userId,
-        ]);
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('employee_exits', 'manager_recommended_lwd')) {
+            $updateData['manager_recommended_lwd'] = $validated['manager_recommended_lwd'] ?? $exit->preferred_lwd;
+        }
+
+        $updated = $exit->update($updateData);
 
         try {
             $exit->loadMissing('employee');
@@ -517,7 +521,6 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
             $exit->employee->update([
                 'status' => false,
                 'employee_stage' => 'Relieved',
-                'date_of_exit' => $exit->approved_lwd ?? $exit->preferred_lwd ?? now()->format('Y-m-d'),
             ]);
 
             // Dependent Module Reconciliations

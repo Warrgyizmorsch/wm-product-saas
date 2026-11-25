@@ -498,7 +498,6 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
                             $exit->employee->update([
                                 'status'         => false,
                                 'employee_stage' => 'Relieved',
-                                'date_of_exit'   => $exit->approved_lwd ?? $exit->preferred_lwd ?? now()->format('Y-m-d'),
                             ]);
 
                             CashAdvance::where('employee_id', $exit->employee_id)
@@ -1093,7 +1092,8 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
                     $q->where('status', true)
                       ->orWhere(function($sub) use ($startDateStr) {
                           $sub->where('status', false)
-                              ->where('date_of_exit', '>=', $startDateStr);
+                              ->whereHas('exits', fn ($q) => $q->whereIn('status', ['approved', 'completed', 'settled'])
+                                  ->whereDate('approved_lwd', '>=', $startDateStr));
                       });
                 })
                 ->where(function($q) {
@@ -1106,7 +1106,8 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
                 $q->where('status', true)
                   ->orWhere(function($sub) use ($startDateStr) {
                       $sub->where('status', false)
-                          ->where('date_of_exit', '>=', $startDateStr);
+                          ->whereHas('exits', fn ($q) => $q->whereIn('status', ['approved', 'completed', 'settled'])
+                              ->whereDate('approved_lwd', '>=', $startDateStr));
                   });
             })
             ->where(function($q) {

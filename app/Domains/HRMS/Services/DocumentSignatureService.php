@@ -36,14 +36,14 @@ class DocumentSignatureService
             $filename = "sig_" . Str::random(12) . "_" . time() . ".png";
             $relativePath = "{$folder}/{$filename}";
             
-            tenant_storage()->put('public', $relativePath, $imageDecoded);
+            tenant_storage()->put('local', $relativePath, $imageDecoded);
         } elseif (!str_contains($signatureInput, '/') && !str_contains($signatureInput, '\\') && strlen($signatureInput) > 30) {
             // Raw base64 string without data:image scheme
             $imageDecoded = base64_decode($signatureInput);
             if ($imageDecoded !== false) {
                 $filename = "sig_" . Str::random(12) . "_" . time() . ".png";
                 $relativePath = "{$folder}/{$filename}";
-                tenant_storage()->put('public', $relativePath, $imageDecoded);
+                tenant_storage()->put('local', $relativePath, $imageDecoded);
             } else {
                 $relativePath = $signatureInput;
             }
@@ -81,10 +81,12 @@ class DocumentSignatureService
         $hrName = e($user?->name ?? 'HR Department');
         $hrDesignation = e($user?->role ?? 'HR Manager');
         
-        if ($signaturePath && Storage::disk('public')->exists($signaturePath)) {
-            $sigFullUrl = asset('storage/' . $signaturePath);
+        $sigDisk = ($signaturePath && Storage::disk('local')->exists($signaturePath)) ? 'local' : (Storage::disk('public')->exists($signaturePath ?? '') ? 'public' : null);
+        if ($signaturePath && $sigDisk) {
+            $sigBytes = Storage::disk($sigDisk)->get($signaturePath);
+            $sigDataUri = 'data:image/png;base64,' . base64_encode($sigBytes);
             $sigHtml = '<div style="display:inline-block; text-align:center; margin-top:5px;">
-                <img src="' . $sigFullUrl . '" style="max-height:60px; width:auto;" alt="Digital Signature" />
+                <img src="' . $sigDataUri . '" style="max-height:60px; width:auto;" alt="Digital Signature" />
                 <div style="font-size:10px; color:#64748b; margin-top:2px;">Digitally Signed by ' . $hrName . ' on ' . $dateStr . '</div>
             </div>';
         } else {
@@ -122,7 +124,7 @@ class DocumentSignatureService
                 ->setPaper('a4', 'portrait')
                 ->setWarnings(false);
             
-            tenant_storage()->put('public', $pdfStoragePath, $pdf->output());
+            tenant_storage()->put('local', $pdfStoragePath, $pdf->output());
         } catch (\Exception $e) {
             Log::error("Failed to render PDF in DocumentSignatureService: " . $e->getMessage());
         }
@@ -205,8 +207,9 @@ class DocumentSignatureService
         // 2. Prepare Base64 Data URI for DomPDF
         $sigDataUri = $signatureImageInput;
         if (!str_starts_with($signatureImageInput, 'data:image')) {
-            if (Storage::disk('public')->exists($signaturePath)) {
-                $fileBytes = Storage::disk('public')->get($signaturePath);
+            $sigDisk = Storage::disk('local')->exists($signaturePath) ? 'local' : (Storage::disk('public')->exists($signaturePath) ? 'public' : null);
+            if ($sigDisk) {
+                $fileBytes = Storage::disk($sigDisk)->get($signaturePath);
                 $sigDataUri = 'data:image/png;base64,' . base64_encode($fileBytes);
             } elseif (!empty($signatureImageInput) && strlen($signatureImageInput) > 30) {
                 $sigDataUri = 'data:image/png;base64,' . ltrim($signatureImageInput, 'data:image/png;base64,');
@@ -223,10 +226,11 @@ class DocumentSignatureService
         $originalDataUri = null;
         $isImage = false;
 
-        if ($originalFilePath && Storage::disk('public')->exists($originalFilePath)) {
+        $origDisk = ($originalFilePath && Storage::disk('local')->exists($originalFilePath)) ? 'local' : (Storage::disk('public')->exists($originalFilePath ?? '') ? 'public' : null);
+        if ($originalFilePath && $origDisk) {
             $ext = strtolower(pathinfo($originalFilePath, PATHINFO_EXTENSION));
-            $fileBytes = Storage::disk('public')->get($originalFilePath);
-            $mimeType = Storage::disk('public')->mimeType($originalFilePath) ?? 'image/png';
+            $fileBytes = Storage::disk($origDisk)->get($originalFilePath);
+            $mimeType = Storage::disk($origDisk)->mimeType($originalFilePath) ?? 'image/png';
 
             if (in_array($ext, ['png', 'jpg', 'jpeg', 'webp', 'gif'])) {
                 $isImage = true;
@@ -314,7 +318,7 @@ class DocumentSignatureService
 
         try {
             $pdf = Pdf::loadHTML($signedHtml)->setPaper('a4', 'portrait')->setWarnings(false);
-            tenant_storage()->put('public', $pdfStoragePath, $pdf->output());
+            tenant_storage()->put('local', $pdfStoragePath, $pdf->output());
         } catch (\Throwable $e) {
             Log::error("Failed to generate signed document PDF: " . $e->getMessage());
             $pdfStoragePath = $originalFilePath;

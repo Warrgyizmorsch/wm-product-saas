@@ -474,4 +474,42 @@ class OvertimeRequestController extends Controller
 
         return redirect()->back()->with('success', __('hrms.overtime.deleted_successfully'));
     }
+
+    /**
+     * Update overtime settings (supports legacy tests and config forms).
+     */
+    public function updateSettings(Request $request): mixed
+    {
+        $hasThreshold = $request->filled('auto_overtime_threshold_hours');
+        $hasMinRequest = $request->filled('min_overtime_request_hours');
+
+        if (!$hasThreshold && !$hasMinRequest) {
+            $request->validate([
+                'auto_overtime_threshold_hours' => 'required|numeric|min:0',
+                'min_overtime_request_hours'    => 'required|numeric|min:0',
+            ]);
+        } else {
+            $request->validate([
+                'auto_overtime_threshold_hours' => 'nullable|numeric|min:0',
+                'min_overtime_request_hours'    => 'nullable|numeric|min:0',
+            ]);
+        }
+
+        $tenant = tenant() ?? ($request->user()?->tenant_id ? \App\Models\Tenant::find($request->user()->tenant_id) : null);
+        if ($tenant) {
+            $settings = is_array($tenant->settings) ? $tenant->settings : (json_decode($tenant->settings ?? '{}', true) ?: []);
+            $settings['auto_overtime_threshold_hours'] = $hasThreshold ? (float) $request->input('auto_overtime_threshold_hours') : null;
+            $settings['min_overtime_request_hours'] = $hasMinRequest ? (float) $request->input('min_overtime_request_hours') : null;
+            $tenant->settings = $settings;
+            $tenant->save();
+        }
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => __('hrms.overtime.settings_updated') ?? 'Overtime settings updated successfully.',
+            ]);
+        }
+        return redirect()->back()->with('success', __('hrms.overtime.settings_updated') ?? 'Overtime settings updated successfully.');
+    }
 }

@@ -1760,7 +1760,7 @@ return [
         'lbl_search_wfh_location' => 'Search address or subarea (Press Enter)...',
         'edit_profile' => 'Edit Profile',
         'frm_user_account' => 'User Account',
-        'frm_auto_create_user' => 'Auto-Create New User (Pass: 12345678)',
+        'frm_auto_create_user' => 'Auto-Create New User',
         'lbl_no_email' => 'No email',
         'lbl_no_employees_found' => 'No employees found.',
         'lbl_no_employees_hint' => 'Create your first employee record or broaden the filters.',

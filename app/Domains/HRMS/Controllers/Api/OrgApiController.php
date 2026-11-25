@@ -498,8 +498,22 @@ class OrgApiController extends Controller
             return $this->sendError("Business unit with ID '{$id}' not found.", 404);
         }
 
-        Employee::withTrashed()->where('business_unit_id', $businessUnit->id)->update(['business_unit_id' => null]);
         $departmentIds = Department::where('business_unit_id', $businessUnit->id)->pluck('id');
+        $branchIds = Branch::where('business_unit_id', $businessUnit->id)->pluck('id');
+
+        $activeEmployeesCount = Employee::where(function ($q) use ($businessUnit, $departmentIds, $branchIds) {
+            $q->where('business_unit_id', $businessUnit->id)
+              ->orWhereIn('department_id', $departmentIds)
+              ->orWhereIn('branch_id', $branchIds);
+        })->where(function ($q) {
+            $q->where('status', true)->orWhereNull('status');
+        })->count();
+
+        if ($activeEmployeesCount > 0) {
+            return $this->sendError("Cannot delete business unit. There are {$activeEmployeesCount} active employee(s) assigned to it or its child departments/branches.", 409);
+        }
+
+        Employee::withTrashed()->where('business_unit_id', $businessUnit->id)->update(['business_unit_id' => null]);
         
         Employee::withTrashed()->whereIn('department_id', $departmentIds)->update([
             'department_id' => null,
@@ -711,6 +725,18 @@ class OrgApiController extends Controller
         $branch = Branch::find($id);
         if (!$branch) {
             return $this->sendError("Branch with ID '{$id}' not found.", 404);
+        }
+
+        $departmentIds = Department::where('branch_id', $branch->id)->pluck('id');
+        $activeEmployeesCount = Employee::where(function ($q) use ($branch, $departmentIds) {
+            $q->where('branch_id', $branch->id)
+              ->orWhereIn('department_id', $departmentIds);
+        })->where(function ($q) {
+            $q->where('status', true)->orWhereNull('status');
+        })->count();
+
+        if ($activeEmployeesCount > 0) {
+            return $this->sendError("Cannot delete branch. There are {$activeEmployeesCount} active employee(s) assigned to it or its departments.", 409);
         }
 
         Employee::withTrashed()->where('branch_id', $branch->id)->update(['branch_id' => null]);
@@ -926,6 +952,15 @@ class OrgApiController extends Controller
             return $this->sendError("Department with ID '{$id}' not found.", 404);
         }
 
+        $activeEmployeesCount = Employee::where('department_id', $department->id)
+            ->where(function ($q) {
+                $q->where('status', true)->orWhereNull('status');
+            })->count();
+
+        if ($activeEmployeesCount > 0) {
+            return $this->sendError("Cannot delete department. There are {$activeEmployeesCount} active employee(s) assigned to it.", 409);
+        }
+
         Employee::withTrashed()->where('department_id', $department->id)->update([
             'department_id'  => null,
             'designation_id' => null
@@ -1074,6 +1109,15 @@ class OrgApiController extends Controller
         $designation = Designation::find($id);
         if (!$designation) {
             return $this->sendError("Designation with ID '{$id}' not found.", 404);
+        }
+
+        $activeEmployeesCount = Employee::where('designation_id', $designation->id)
+            ->where(function ($q) {
+                $q->where('status', true)->orWhereNull('status');
+            })->count();
+
+        if ($activeEmployeesCount > 0) {
+            return $this->sendError("Cannot delete designation. There are {$activeEmployeesCount} active employee(s) assigned to it.", 409);
         }
 
         Employee::withTrashed()->where('designation_id', $designation->id)->update(['designation_id' => null]);

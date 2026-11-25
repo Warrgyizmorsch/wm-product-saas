@@ -146,11 +146,11 @@
                     </div>
                 </div>
                 <div class="d-flex align-items-center flex-grow-1 justify-content-lg-end" style="min-width: 380px;">
-                    <div class="input-group input-group-sm" style="max-width: 560px; width: 100%;">
+                    <div class="input-group input-group-sm" style="max-width: 650px; width: 100%;">
                         <span class="input-group-text bg-white text-muted border-end-0 fs-12 px-2.5">
                             <i class="feather-link-2"></i>
                         </span>
-                        <input type="text" class="form-control bg-white fs-12 fw-monospace border-start-0 border-end-0 text-dark px-2" id="admsWebhookUrl" value="{{ url('api/hrms/biometric/webhook') }}" readonly style="cursor: text;" onclick="this.select()" title="{{ __('hrms.biometric.copy_url') }}">
+                        <input type="text" class="form-control bg-white fs-12 fw-monospace border-start-0 border-end-0 text-dark px-2" id="admsWebhookUrl" value="{{ url('api/hrms/biometric/webhook') }}?SN={DEVICE_SERIAL}&key={SECRET_KEY}" readonly style="cursor: text;" onclick="this.select()" title="{{ __('hrms.biometric.copy_url') }}">
                         <button class="btn btn-sm btn-primary fw-semibold px-3 d-inline-flex align-items-center flex-shrink-0" type="button" onclick="copyAdmsWebhookUrl(this)">
                             <i class="feather-copy me-1.5 fs-12"></i>{{ __('hrms.biometric.copy_url') }}
                         </button>
@@ -296,7 +296,20 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <code class="px-2 py-1 bg-light rounded text-secondary fw-semibold text-break d-inline-block">{{ $dev->device_serial }}</code>
+                                            <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                                <code class="px-2 py-1 bg-light rounded text-secondary fw-semibold text-break d-inline-block">{{ $dev->device_serial }}</code>
+                                                @php
+                                                    $deviceKey = $dev->webhook_secret ?: hash_hmac('sha256', (string) $dev->device_serial, (string) config('app.key'));
+                                                    $devicePushUrl = url('api/hrms/biometric/webhook') . '?SN=' . $dev->device_serial . '&key=' . $deviceKey;
+                                                @endphp
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1.5 fs-10 rounded d-inline-flex align-items-center" style="height: 22px;" title="Copy complete device push URL with key" onclick="navigator.clipboard.writeText('{{ $devicePushUrl }}'); var btn = this; btn.innerText = 'Copied!'; setTimeout(function(){ btn.innerText = 'Copy URL'; }, 2000);">
+                                                    Copy URL
+                                                </button>
+                                            </div>
+                                            <div class="mt-1 fs-11 text-muted">
+                                                <span class="text-secondary fw-semibold">Secret Key:</span>
+                                                <code class="text-dark bg-light px-1 rounded">{{ $deviceKey }}</code>
+                                            </div>
                                         </td>
                                         <td>
                                             <div class="fs-12">
@@ -356,6 +369,7 @@
                                                         data-ip="{{ $dev->ip_address }}"
                                                         data-port="{{ $dev->port }}"
                                                         data-status="{{ $dev->status ? '1' : '0' }}"
+                                                        data-secret="{{ $dev->webhook_secret ?: hash_hmac('sha256', (string) $dev->device_serial, (string) config('app.key')) }}"
                                                         onclick="populateEditModal(this); event.preventDefault();">
                                                         <i class="feather-edit me-2 text-muted"></i>{{ __('hrms.biometric.edit_device') }}
                                                     </a>
@@ -496,6 +510,10 @@
         </div>
 
         <div class="col-md-12">
+            <x-ui.modal-form-ui type="input" label="Device Webhook Secret Key (Optional)" name="webhook_secret" id="add_webhook_secret" placeholder="Leave empty to auto-generate a secure random key" helper-text="Secure token used by ADMS terminals to authenticate punch push requests (?key=... or X-Device-Secret header)." />
+        </div>
+
+        <div class="col-md-12">
             <x-ui.modal-form-ui type="select" :label="__('hrms.biometric.company_entity')" name="company_id" id="add_company_id" required>
                 <option value="">{{ __('hrms.biometric.select_company') }}</option>
                 @foreach($companies as $company)
@@ -554,6 +572,10 @@
         </div>
         <div class="col-md-6">
             <x-ui.modal-form-ui type="input" :label="__('hrms.biometric.device_serial')" name="device_serial" id="edit_serial" required />
+        </div>
+
+        <div class="col-md-12">
+            <x-ui.modal-form-ui type="input" label="Device Webhook Secret Key" name="webhook_secret" id="edit_webhook_secret" placeholder="Leave blank to keep existing secret" helper-text="Secure token required by ADMS devices to push punches." />
         </div>
 
         <div class="col-md-12">
@@ -656,9 +678,11 @@
         var ip = button.getAttribute('data-ip') || '';
         var port = button.getAttribute('data-port') || '4370';
         var status = button.getAttribute('data-status') || '1';
+        var secret = button.getAttribute('data-secret') || '';
 
         $('#edit_name').val(name);
         $('#edit_serial').val(serial);
+        $('#edit_webhook_secret').val(secret);
         $('#edit_company_id').val(company).trigger('change');
         $('#edit_business_unit_id').val(bu).trigger('change');
         $('#edit_branch_id').val(branch).trigger('change');

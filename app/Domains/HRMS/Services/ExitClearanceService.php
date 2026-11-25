@@ -17,13 +17,6 @@ class ExitClearanceService
     {
         $tenantId = $tenantId ?: tenant_id();
 
-        if ($tenantId) {
-            $tenantHasTemplates = ExitClearanceTemplate::where('tenant_id', $tenantId)->exists();
-            if (!$tenantHasTemplates) {
-                $this->resetTemplatesToDefaults($tenantId, $companyId);
-            }
-        }
-
         $query = ExitClearanceTemplate::query()
             ->where('status', true);
 
@@ -63,14 +56,6 @@ class ExitClearanceService
     public function getAllTemplatesForManagement(?int $companyId = null, ?int $tenantId = null): Collection|BaseCollection
     {
         $tenantId = $tenantId ?: tenant_id();
-
-        if ($tenantId) {
-            // Auto-initialize standard default templates in database if tenant has none
-            $tenantHasTemplates = ExitClearanceTemplate::where('tenant_id', $tenantId)->exists();
-            if (!$tenantHasTemplates) {
-                $this->resetTemplatesToDefaults($tenantId, $companyId);
-            }
-        }
 
         $query = ExitClearanceTemplate::query()->with('company');
 

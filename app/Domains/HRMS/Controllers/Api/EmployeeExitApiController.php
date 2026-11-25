@@ -79,14 +79,18 @@ class EmployeeExitApiController extends Controller
             $this->scopeService->isCompanyAdmin($user) ||
             $access->allows($user, 'hr.settings.manage', $context) ||
             $access->allows($user, 'hrms.exit_policies.manage', $context) ||
-            $access->allows($user, 'hrms.employee_exits.view', $context) ||
             $access->allows($user, 'hrms.employees.manage', $context) ||
             $user->hasHrPermission('hr.settings.manage') ||
             $user->hasHrPermission('hr.employees.manage') ||
             $user->hasHrPermission('hrms.employees.manage')
         );
 
-        return [$tenantId, $user, $currentEmployee, (bool) $isHrAdmin];
+        $canViewAll = $isHrAdmin || ($user && (
+            $access->allows($user, 'hrms.employee_exits.view', $context) ||
+            $user->hasHrPermission('hrms.employee_exits.view')
+        ));
+
+        return [$tenantId, $user, $currentEmployee, (bool) $isHrAdmin, (bool) $canViewAll];
     }
 
     // =========================================================================
@@ -99,12 +103,12 @@ class EmployeeExitApiController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
-        [$tenantId, , $currentEmployee, $isHrAdmin] = $this->resolveContext();
+        [$tenantId, , $currentEmployee, $isHrAdmin, $canViewAll] = $this->resolveContext();
 
         try {
             $baseQuery = EmployeeExit::where('tenant_id', $tenantId);
 
-            if (!$isHrAdmin && $currentEmployee) {
+            if (!$canViewAll && $currentEmployee) {
                 $baseQuery->where('employee_id', $currentEmployee->id);
             }
 
@@ -133,7 +137,7 @@ class EmployeeExitApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        [$tenantId, , $currentEmployee, $isHrAdmin] = $this->resolveContext();
+        [$tenantId, , $currentEmployee, $isHrAdmin, $canViewAll] = $this->resolveContext();
 
         $query = EmployeeExit::with([
             'employee:id,tenant_id,full_name,employee_id,department_id,designation_id,company_id,photo,date_of_joining',
@@ -145,7 +149,7 @@ class EmployeeExitApiController extends Controller
             ->withCount('clearances')
             ->where('tenant_id', $tenantId);
 
-        if (!$isHrAdmin) {
+        if (!$canViewAll) {
             if (!$currentEmployee) {
                 return $this->sendError('Employee profile not found.', 404);
             }
@@ -292,7 +296,7 @@ class EmployeeExitApiController extends Controller
      */
     public function show(mixed $id): JsonResponse
     {
-        [$tenantId, , $employee, $isHrAdmin] = $this->resolveContext();
+        [$tenantId, , $employee, $isHrAdmin, $canViewAll] = $this->resolveContext();
 
         $exit = EmployeeExit::with([
             'employee.company:id,company_name,legal_name,code',
@@ -309,7 +313,7 @@ class EmployeeExitApiController extends Controller
             return $this->sendError("Employee exit record not found.", 404);
         }
 
-        if (!$isHrAdmin && $employee && $exit->employee_id !== $employee->id) {
+        if (!$canViewAll && $employee && $exit->employee_id !== $employee->id) {
             return $this->sendError('Unauthorized action. You can only view your own exit record.', 403);
         }
 
@@ -381,11 +385,22 @@ class EmployeeExitApiController extends Controller
      */
     public function approveManager(Request $request, mixed $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user, $currentEmployee, $isHrAdmin] = $this->resolveContext();
 
-        $exit = EmployeeExit::where('tenant_id', $tenantId)->find($id);
+        $exit = EmployeeExit::with(['employee.reportingManager'])->where('tenant_id', $tenantId)->find($id);
         if (!$exit) {
             return $this->sendError("Exit record not found.", 404);
+        }
+
+        $isManager = false;
+        if ($exit->employee) {
+            $isManager = ($currentEmployee && (int)$exit->employee->reporting_manager_id === (int)$currentEmployee->id)
+                || ($user && (int)($exit->employee->reportingManager?->user_id ?? 0) === (int)$user->id);
+        }
+
+        $canApproveManager = $isHrAdmin || $isManager || ($user && $user->hasHrPermission('hrms.employee_exits.approve'));
+        if (!$canApproveManager) {
+            return $this->sendError('Unauthorized action. You must be the direct reporting manager or an HR Admin to endorse this exit request.', 403);
         }
 
         $validator = Validator::make($request->all(), [

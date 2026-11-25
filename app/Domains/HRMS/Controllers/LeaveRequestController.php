@@ -59,7 +59,8 @@ class LeaveRequestController extends Controller
         if (!$isHrAdmin) {
             $currentEmp = Employee::resolveForUser($user);
             if (!$currentEmp) {
-                return redirect()->back()->withInput()->with('error', __('hrms.leave.app.emp_not_found'));
+                $err = __('hrms.leave.app.emp_not_found');
+                return redirect()->back()->withInput()->with('error', $err)->withErrors(['error' => $err]);
             }
             $validated['employee_id'] = $currentEmp->id;
         }
@@ -68,10 +69,12 @@ class LeaveRequestController extends Controller
 
         $leaveType = \App\Domains\HRMS\Models\LeaveType::with('plan')->findOrFail($validated['leave_type_id']);
         if ($leaveType->leave_plan_id && (int) $employee->leave_plan_id !== (int) $leaveType->leave_plan_id) {
-            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.invalid_leave_type_for_employee'));
+            $err = __('hrms.leave.app.invalid_leave_type_for_employee');
+            return redirect()->back()->withInput()->with('error', $err)->withErrors(['error' => $err]);
         }
         if ($leaveType->plan && !$leaveType->plan->status) {
-            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.plan_inactive'));
+            $err = __('hrms.leave.app.plan_inactive');
+            return redirect()->back()->withInput()->with('error', $err)->withErrors(['error' => $err]);
         }
 
         $rules        = $leaveType->rules ?? [];
@@ -172,7 +175,7 @@ class LeaveRequestController extends Controller
         );
 
         if ($conflict) {
-            return redirect()->back()->withInput()->with('error', $conflict);
+            return redirect()->back()->withInput()->with('error', $conflict)->withErrors(['error' => $conflict, 'start_date' => $conflict]);
         }
 
         // Probation Restriction
@@ -180,12 +183,14 @@ class LeaveRequestController extends Controller
         $probRule = $probationRules['rule'] ?? ($probationRules['probation_rule'] ?? 'allow');
         $doj = $employee->date_of_joining;
         if ($probRule === 'disallow' && ($employee->employee_stage === 'Probation' || $employee->employment_status === 'probation')) {
-            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.probation_restricted'));
+            $msg = __('hrms.leave.app.probation_restricted');
+            return redirect()->back()->withInput()->with('error', $msg)->withErrors(['error' => $msg]);
         }
         if ($probRule === 'allow_after_months') {
             $requiredMonths = intval($probationRules['months'] ?? ($probationRules['probation_months'] ?? 3));
             if ($doj && Carbon::parse($doj)->addMonths($requiredMonths)->isFuture()) {
-                return redirect()->back()->withInput()->with('error', __('hrms.leave.app.probation_months_restricted', ['months' => $requiredMonths]));
+                $msg = __('hrms.leave.app.probation_months_restricted', ['months' => $requiredMonths]);
+                return redirect()->back()->withInput()->with('error', $msg)->withErrors(['error' => $msg]);
             }
         }
 
@@ -193,7 +198,8 @@ class LeaveRequestController extends Controller
         $noticeRules = $rules['notice'] ?? [];
         $noticeRule = $noticeRules['rule'] ?? ($noticeRules['notice_rule'] ?? 'allow');
         if ($noticeRule === 'disallow' && ($employee->employee_stage === 'Notice Period' || $employee->employment_status === 'notice')) {
-            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.notice_restricted'));
+            $msg = __('hrms.leave.app.notice_restricted');
+            return redirect()->back()->withInput()->with('error', $msg)->withErrors(['error' => $msg]);
         }
 
         // Apply in Advance Rule
@@ -201,7 +207,8 @@ class LeaveRequestController extends Controller
             $advanceDays = intval($appRules['advance_days'] ?? 3);
             $minAllowedDate = Carbon::today()->addDays($advanceDays);
             if ($startDate->lt($minAllowedDate)) {
-                return redirect()->back()->withInput()->with('error', __('hrms.leave.app.advance_restricted', ['days' => $advanceDays, 'date' => $minAllowedDate->format('Y-m-d')]));
+                $msg = __('hrms.leave.app.advance_restricted', ['days' => $advanceDays, 'date' => $minAllowedDate->format('Y-m-d')]);
+                return redirect()->back()->withInput()->with('error', $msg)->withErrors(['error' => $msg]);
             }
         }
 
@@ -210,17 +217,20 @@ class LeaveRequestController extends Controller
         $maxDuration = floatval($appRules['max_duration'] ?? ($isHourly ? 24.0 : 365.0));
         $unitLabel = $isHourly ? __('hrms.leave.app.hours') : __('hrms.leave.days');
         if ($minDuration > 0 && $duration < $minDuration) {
-            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.duration_min_error', ['duration' => $duration, 'unit' => $unitLabel, 'min' => $minDuration]));
+            $msg = __('hrms.leave.app.duration_min_error', ['duration' => $duration, 'unit' => $unitLabel, 'min' => $minDuration]);
+            return redirect()->back()->withInput()->with('error', $msg)->withErrors(['error' => $msg]);
         }
         if ($maxDuration > 0 && $duration > $maxDuration) {
-            return redirect()->back()->withInput()->with('error', __('hrms.leave.app.duration_max_error', ['duration' => $duration, 'unit' => $unitLabel, 'max' => $maxDuration]));
+            $msg = __('hrms.leave.app.duration_max_error', ['duration' => $duration, 'unit' => $unitLabel, 'max' => $maxDuration]);
+            return redirect()->back()->withInput()->with('error', $msg)->withErrors(['error' => $msg]);
         }
 
         // Attachment Requirement (for day-based leave applications)
         if (!$isHourly && !empty($appRules['require_attachment'])) {
             $attachmentDays = intval($appRules['attachment_days'] ?? 3);
             if ($duration >= $attachmentDays && !$request->hasFile('attachment')) {
-                return redirect()->back()->withInput()->with('error', __('hrms.leave.app.attachment_required', ['days' => $attachmentDays]));
+                $msg = __('hrms.leave.app.attachment_required', ['days' => $attachmentDays]);
+                return redirect()->back()->withInput()->with('error', $msg)->withErrors(['error' => $msg]);
             }
         }
 
@@ -254,16 +264,18 @@ class LeaveRequestController extends Controller
             if ($allowNegative) {
                 $maxAllowedDuration = $remaining + $maxNegative;
                 if ($duration > $maxAllowedDuration) {
-                    return redirect()->back()->withInput()->with('error', __('hrms.leave.app.insufficient_balance_negative', [
+                    $msg = __('hrms.leave.app.insufficient_balance_negative', [
                         'remaining'    => $remaining,
                         'max_negative' => $maxNegative,
                         'allowed'      => max(0.0, $maxAllowedDuration),
                         'duration'     => $duration
-                    ]));
+                    ]);
+                    return redirect()->back()->withInput()->with('error', $msg)->withErrors(['error' => $msg]);
                 }
             } else {
                 if ($duration > $remaining) {
-                    return redirect()->back()->withInput()->with('error', __('hrms.leave.app.insufficient_balance', ['remaining' => $remaining, 'duration' => $duration]));
+                    $msg = __('hrms.leave.app.insufficient_balance', ['remaining' => $remaining, 'duration' => $duration]);
+                    return redirect()->back()->withInput()->with('error', $msg)->withErrors(['error' => $msg]);
                 }
             }
         }

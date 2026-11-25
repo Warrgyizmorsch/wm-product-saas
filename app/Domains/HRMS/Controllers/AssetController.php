@@ -819,5 +819,13 @@ class AssetController extends Controller
 
         return redirect()->back()->with('success', __('hrms.assets.success_bulk_rejected'));
     }
+
+    /**
+     * Delegate any accidental static method calls to container-resolved instance.
+     */
+    public static function __callStatic(string $method, array $parameters)
+    {
+        return app(static::class)->$method(...$parameters);
+    }
 }
 

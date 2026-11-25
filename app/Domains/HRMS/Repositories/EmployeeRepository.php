@@ -317,42 +317,53 @@ class EmployeeRepository implements EmployeeRepositoryInterface
 
         $userIdInput = $validated['user_id'] ?? $request->input('user_id');
         $validated['timezone'] = $validated['timezone'] ?? $request->input('timezone') ?? $request->input('time_zone') ?? null;
-        if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
-            $userEmail = !empty($validated['office_email']) ? $validated['office_email'] : (!empty($validated['personal_email']) ? $validated['personal_email'] : null);
-            if (!empty($userEmail)) {
-                $existingUser = \App\Models\User::where('email', $userEmail)->first();
-                if ($existingUser) {
-                    $validated['user_id'] = $existingUser->id;
-                    $validated['office_email'] = $validated['office_email'] ?: $existingUser->email;
+
+        $employee = \Illuminate\Support\Facades\DB::transaction(function () use (&$validated, $request, $userIdInput) {
+            if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
+                $userEmail = !empty($validated['office_email']) ? $validated['office_email'] : (!empty($validated['personal_email']) ? $validated['personal_email'] : null);
+                if (!empty($userEmail)) {
+                    $existingUser = \App\Models\User::where('email', $userEmail)->first();
+                    if ($existingUser) {
+                        $validated['user_id'] = $existingUser->id;
+                        $validated['office_email'] = $validated['office_email'] ?: $existingUser->email;
+                    } else {
+                        $newUser = \App\Models\User::create([
+                            'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id') ?? 1,
+                            'company_id'    => $validated['company_id'] ?? null,
+                            'branch_id'     => $validated['branch_id'] ?? null,
+                            'department_id' => $validated['department_id'] ?? null,
+                            'role_id'       => $request->input('role_id') ?: null,
+                            'name'          => $validated['full_name'],
+                            'email'         => $userEmail,
+                            'password'      => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
+                        ]);
+                        $validated['user_id'] = $newUser->id;
+                        $validated['office_email'] = $validated['office_email'] ?: $userEmail;
+
+                        try {
+                            \Illuminate\Support\Facades\Password::broker()->createToken($newUser);
+                        } catch (\Throwable $e) {
+                            \Illuminate\Support\Facades\Log::warning("Could not issue password reset token in repository: " . $e->getMessage());
+                        }
+                    }
                 } else {
-                    $newUser = \App\Models\User::create([
-                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id') ?? 1,
-                        'company_id'    => $validated['company_id'] ?? null,
-                        'branch_id'     => $validated['branch_id'] ?? null,
-                        'department_id' => $validated['department_id'] ?? null,
-                        'role_id'       => $request->input('role_id') ?: null,
-                        'name'          => $validated['full_name'],
-                        'email'         => $userEmail,
-                        'password'      => \Illuminate\Support\Facades\Hash::make('12345678'),
-                    ]);
-                    $validated['user_id'] = $newUser->id;
-                    $validated['office_email'] = $validated['office_email'] ?: $userEmail;
+                    $validated['user_id'] = null;
                 }
-            } else {
-                $validated['user_id'] = null;
+            } elseif (!empty($validated['user_id'])) {
+                $user = \App\Models\User::find($validated['user_id']);
+                if ($user && !empty($user->email)) {
+                    $validated['office_email'] = $user->email;
+                }
             }
-        } elseif (!empty($validated['user_id'])) {
-            $user = \App\Models\User::find($validated['user_id']);
-            if ($user && !empty($user->email)) {
-                $validated['office_email'] = $user->email;
+
+            $employee = Employee::create($validated);
+
+            if ($request->filled('role_id') && $employee->user) {
+                $employee->user->update(['role_id' => $request->role_id]);
             }
-        }
 
-        $employee = Employee::create($validated);
-
-        if ($request->filled('role_id') && $employee->user) {
-            $employee->user->update(['role_id' => $request->role_id]);
-        }
+            return $employee;
+        });
 
         return $employee;
     }
