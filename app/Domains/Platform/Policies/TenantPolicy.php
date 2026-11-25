@@ -24,9 +24,7 @@ class TenantPolicy
 
     public function view(User $user, Tenant $tenant): bool
     {
-        return $this->access->allows($user, 'platform.tenants.manage', [
-            'tenant_id' => $tenant->id,
-        ]);
+        return $this->access->allows($user, 'platform.tenants.manage');
     }
 
     public function create(User $user): bool
@@ -36,16 +34,12 @@ class TenantPolicy
 
     public function update(User $user, Tenant $tenant): bool
     {
-        return $this->access->allows($user, 'platform.tenants.manage', [
-            'tenant_id' => $tenant->id,
-        ]);
+        return $this->access->allows($user, 'platform.tenants.manage');
     }
 
     public function updateStatus(User $user, Tenant $tenant): bool
     {
-        return $this->access->allows($user, 'platform.tenants.manage', [
-            'tenant_id' => $tenant->id,
-        ]);
+        return $this->access->allows($user, 'platform.tenants.manage');
     }
 
     /**

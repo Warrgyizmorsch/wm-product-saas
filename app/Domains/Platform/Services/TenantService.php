@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class TenantService
@@ -99,6 +100,20 @@ class TenantService
     private function payload(array $data, ?Tenant $tenant = null): array
     {
         $settings = $tenant?->settings ?? [];
+        $planId = ($data['plan_id'] ?? null) ?: null;
+        $plan = $planId ? Plan::query()->find($planId) : null;
+
+        $trialEndsAt = ($data['trial_ends_at'] ?? null) ?: null;
+        if ($trialEndsAt === null && $plan !== null && $plan->trial_days > 0) {
+            $isTrialStatus = ($data['status'] ?? null) === Tenant::STATUS_TRIAL
+                || ($data['subscription_status'] ?? null) === Tenant::SUBSCRIPTION_TRIAL;
+            if ($isTrialStatus) {
+                $startedAt = ($data['plan_started_at'] ?? null)
+                    ? \Carbon\Carbon::parse($data['plan_started_at'])
+                    : ($tenant?->plan_started_at ?? now());
+                $trialEndsAt = $startedAt->copy()->addDays($plan->trial_days);
+            }
+        }
 
         return [
             'name' => $data['name'],
@@ -107,11 +122,11 @@ class TenantService
             'billing_email' => ($data['billing_email'] ?? null) ?: null,
             'status' => $data['status'],
             'plan' => $data['plan'],
-            'plan_id' => ($data['plan_id'] ?? null) ?: null,
+            'plan_id' => $planId,
             'subscription_status' => $data['subscription_status'],
             'max_users' => ($data['max_users'] ?? null) ?: null,
             'max_storage_mb' => ($data['max_storage_mb'] ?? null) ?: null,
-            'trial_ends_at' => ($data['trial_ends_at'] ?? null) ?: null,
+            'trial_ends_at' => $trialEndsAt,
             'plan_started_at' => ($data['plan_started_at'] ?? null) ?: null,
             'plan_expires_at' => ($data['plan_expires_at'] ?? null) ?: null,
             'archived_at' => $data['status'] === Tenant::STATUS_ARCHIVED ? ($tenant?->archived_at ?? now()) : null,
@@ -138,7 +153,7 @@ class TenantService
             'tenant_id' => $tenant->id,
             'name' => $data['owner_name'],
             'email' => $data['owner_email'],
-            'password' => $data['owner_password'],
+            'password' => !empty($data['owner_password']) ? Hash::make($data['owner_password']) : $data['owner_password'],
             'role' => 'tenant_owner',
         ]);
 
