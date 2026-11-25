@@ -367,12 +367,15 @@ class NotificationService
 
         $query->where(function ($q) use ($roles) {
             foreach ($roles as $role) {
-                $q->orWhere('role', 'like', "%{$role}%")
-                  ->orWhereHas('primaryRole', function ($rq) use ($role) {
-                      $rq->where('name', 'like', "%{$role}%");
+                $lowerRole = strtolower($role);
+                $q->orWhereRaw('LOWER(role) = ?', [$lowerRole])
+                  ->orWhereHas('primaryRole', function ($rq) use ($lowerRole) {
+                      $rq->whereRaw('LOWER(name) = ?', [$lowerRole])
+                         ->orWhereRaw('LOWER(slug) = ?', [$lowerRole]);
                   })
-                  ->orWhereHas('roles', function ($rq) use ($role) {
-                      $rq->where('name', 'like', "%{$role}%");
+                  ->orWhereHas('roles', function ($rq) use ($lowerRole) {
+                      $rq->whereRaw('LOWER(name) = ?', [$lowerRole])
+                         ->orWhereRaw('LOWER(slug) = ?', [$lowerRole]);
                   });
             }
         });

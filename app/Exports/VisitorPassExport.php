@@ -59,7 +59,7 @@ class VisitorPassExport implements FromCollection, WithHeadings, WithMapping, Sh
             });
         }
 
-        return $query->latest()->get();
+        return $query->latest()->limit(10000)->get();
     }
 
     public static function availableColumns(): array
@@ -135,7 +135,12 @@ class VisitorPassExport implements FromCollection, WithHeadings, WithMapping, Sh
 
         $output = [];
         foreach ($this->getActiveColumns() as $col) {
-            $output[] = $values[$col] ?? '';
+            $val = $values[$col] ?? '';
+            // CWE-1236: Prevent CSV / Formula Injection
+            if (is_string($val) && strlen($val) > 0 && in_array($val[0], ['=', '+', '-', '@', "\t", "\r"])) {
+                $val = "'" . $val;
+            }
+            $output[] = $val;
         }
 
         return $output;

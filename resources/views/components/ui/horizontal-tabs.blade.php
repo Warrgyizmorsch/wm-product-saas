@@ -175,6 +175,8 @@
         @elseif(!empty($tab['url']) || !empty($tab['href']))
             <li class="nav-item" role="presentation">
                 <a class="nav-link {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
+                   role="tab"
+                   aria-selected="{{ ($tab['active'] ?? false) ? 'true' : 'false' }}"
                    id="{{ ($tab['id'] ?? 'tab-'.\Illuminate\Support\Str::slug($tab['label'] ?? 'item')) }}-tab"
                    href="{{ $tab['url'] ?? $tab['href'] }}">
                     @if(!empty($tab['icon']))

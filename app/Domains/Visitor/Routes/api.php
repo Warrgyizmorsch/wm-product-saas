@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['api', 'auth:sanctum'])
+Route::middleware(['api', 'auth:sanctum', 'throttle:60,1'])
     ->prefix('api/visitor')
     ->name('api.visitor.')
     ->group(function () {

@@ -16,6 +16,8 @@ return [
     'overstayed'                  => 'Overstayed',
     'denied_visits'               => 'Denied / Rejected',
     'new_visitor_pass'            => 'New Visitor Pass',
+    'register_entry_subtext'      => 'Issue single-entry gate pass for walk-in or expected visitors',
+    'notes_reason'                => 'Notes / Reason / Remarks',
     'all_passes'                  => 'All Passes',
     'inside_premises'             => 'Inside Premises',
     'waiting_approval'            => 'Waiting Approval',

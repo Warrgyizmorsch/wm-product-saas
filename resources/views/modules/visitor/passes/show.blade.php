@@ -591,10 +591,10 @@
                     </div>
                 </div>
 
-                <!-- QR Code Column Inside the Card -->
+                <!-- QR Code Column Inside the Card (Local Offline SVG) -->
                 <div class="col-auto text-center">
-                    <div class="pass-qr-box bg-white shadow-sm">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=8&data={{ urlencode($pass->pass_number) }}" alt="QR Code" width="118" height="118" class="img-fluid rounded" style="display:block; margin: 0 auto; background: #fff;">
+                    <div class="pass-qr-box bg-white shadow-sm p-2 rounded">
+                        <div id="visitorPassQrCode" class="d-flex align-items-center justify-content-center" style="width: 118px; height: 118px; margin: 0 auto;"></div>
                         <div class="fs-11 fw-bold text-dark mt-1 font-monospace">{{ $pass->pass_number }}</div>
                     </div>
                 </div>
@@ -609,7 +609,7 @@
                             <div class="tile-label"><i class="feather-user me-1 text-primary"></i> {{ __('visitor.host_details') }}</div>
                             @if($pass->host_notified_at)
                                 <span class="badge bg-success-subtle text-success fs-10 px-1.5 py-0.5">
-                                    <i class="feather-bell me-0.5"></i> Notified: {{ \Carbon\Carbon::parse($pass->host_notified_at)->format('h:i A') }}
+                                    <i class="feather-bell me-0.5"></i> Notified: {{ \Carbon\Carbon::parse($pass->host_notified_at)->setTimezone(tenant()?->timezone ?: config('app.timezone', 'UTC'))->format('h:i A') }}
                                 </span>
                             @endif
                         </div>
@@ -685,7 +685,7 @@
                     <div class="metric-tile">
                         <div class="tile-label"><i class="feather-clock me-1 text-muted"></i> {{ __('visitor.check_in_time') }}</div>
                         <div class="tile-value fs-13">
-                            {{ $pass->check_in_at ? \Carbon\Carbon::parse($pass->check_in_at)->format('d M Y, h:i A') : '—' }}
+                            {{ $pass->check_in_at ? \Carbon\Carbon::parse($pass->check_in_at)->setTimezone(tenant()?->timezone ?: config('app.timezone', 'UTC'))->format('d M Y, h:i A') : '—' }}
                         </div>
                     </div>
                 </div>
@@ -693,7 +693,7 @@
                     <div class="metric-tile">
                         <div class="tile-label"><i class="feather-users me-1 text-muted"></i> {{ __('visitor.meeting_started_time') }}</div>
                         <div class="tile-value fs-13">
-                            {{ $pass->meeting_started_at ? \Carbon\Carbon::parse($pass->meeting_started_at)->format('d M Y, h:i A') : '—' }}
+                            {{ $pass->meeting_started_at ? \Carbon\Carbon::parse($pass->meeting_started_at)->setTimezone(tenant()?->timezone ?: config('app.timezone', 'UTC'))->format('d M Y, h:i A') : '—' }}
                         </div>
                     </div>
                 </div>
@@ -701,7 +701,7 @@
                     <div class="metric-tile">
                         <div class="tile-label"><i class="feather-log-out me-1 text-muted"></i> {{ __('visitor.check_out_time') }}</div>
                         <div class="tile-value fs-13">
-                            {{ $pass->check_out_at ? \Carbon\Carbon::parse($pass->check_out_at)->format('d M Y, h:i A') : '—' }}
+                            {{ $pass->check_out_at ? \Carbon\Carbon::parse($pass->check_out_at)->setTimezone(tenant()?->timezone ?: config('app.timezone', 'UTC'))->format('d M Y, h:i A') : '—' }}
                         </div>
                     </div>
                 </div>
@@ -857,9 +857,9 @@
         <div class="card-footer bg-light p-3 d-flex flex-wrap justify-content-between align-items-center gap-2 no-print border-top">
             <div class="fs-12 text-muted">
                 {{ __('visitor.entry_type') }}: <strong class="text-dark">{{ $pass->entry_type ?? 'Walk-in' }}</strong>
-                @if($pass->pass_fee > 0)
+                @if(($pass->fee_amount ?? 0) > 0)
                     <span class="mx-2">•</span>
-                    Fee: <strong class="text-dark">{{ format_currency($pass->pass_fee) }}</strong>
+                    Fee: <strong class="text-dark">{{ format_currency($pass->fee_amount) }}</strong>
                 @endif
                 @if($pass->source_module === 'crm' && $pass->source_reference_id)
                     <span class="mx-2">•</span>
@@ -951,24 +951,14 @@
             </select>
         </div>
 
-        <div class="row g-2 mb-3">
-            <div class="col-6">
-                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.lead_type') }}</label>
-                <select name="lead_type" class="form-select fs-13">
-                    <option value="hot">🔥 Hot Lead</option>
-                    <option value="warm" selected>⚡ Warm Lead</option>
-                    <option value="cold">❄️ Cold Lead</option>
-                </select>
-            </div>
-            <div class="col-6">
-                <label class="form-label fw-bold fs-12 text-dark">Priority</label>
-                <select name="priority" class="form-select fs-13">
-                    <option value="Urgent">Urgent</option>
-                    <option value="High">High</option>
-                    <option value="Medium" selected>Medium</option>
-                    <option value="Low">Low</option>
-                </select>
-            </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold fs-12 text-dark">Priority</label>
+            <select name="priority" class="form-select fs-13">
+                <option value="Urgent">Urgent</option>
+                <option value="High">High</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="Low">Low</option>
+            </select>
         </div>
 
         <!-- Product & Quantity Items Repeater -->
@@ -1156,7 +1146,29 @@
 @endsection
 
 @push('scripts')
+<script src="{{ asset('assets/vendors/js/qrcode.min.js') }}"></script>
 <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const qrBox = document.getElementById('visitorPassQrCode');
+        if (qrBox && typeof qrcode !== 'undefined') {
+            try {
+                const qr = qrcode(0, 'M');
+                qr.addData("{{ $pass->pass_number }}");
+                qr.make();
+                qrBox.innerHTML = qr.createSvgTag(4, 1);
+                const svg = qrBox.querySelector('svg');
+                if (svg) {
+                    svg.setAttribute('width', '118');
+                    svg.setAttribute('height', '118');
+                    svg.style.display = 'block';
+                    svg.style.margin = '0 auto';
+                }
+            } catch (err) {
+                console.error("Local QR generation error:", err);
+            }
+        }
+    });
+
     const productOptionsHtml = `@foreach($products ?? [] as $prod)<option value="{{ $prod->id }}" data-image="{{ $prod->main_image_url ?: ($prod->image_path ? asset('storage/'.$prod->image_path) : '') }}" data-name="{{ addslashes($prod->name) }}" data-sku="{{ addslashes($prod->sku ?? '') }}">{{ addslashes($prod->name) }} {{ $prod->sku ? "(".addslashes($prod->sku).")" : "" }}</option>@endforeach`;
 
     function addProductItemRow(tableId) {

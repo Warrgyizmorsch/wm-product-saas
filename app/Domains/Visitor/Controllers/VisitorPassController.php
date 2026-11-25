@@ -87,8 +87,8 @@ class VisitorPassController extends Controller
             'id_proof_type'             => 'nullable|string|max:50',
             'id_proof_number'           => 'nullable|string|max:100',
             'id_verification_status'    => 'nullable|string|in:Pending,Verified,Exempted,Failed',
-            'photo_url'                 => 'nullable|string',
-            'host_user_id'              => 'nullable|exists:users,id',
+            'photo_url'                 => 'nullable|string|max:2097152',
+            'host_user_id'              => ['nullable', \Illuminate\Validation\Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
             'department_id'             => 'nullable|integer',
             'purpose'                   => 'required|string|max:100',
             'entry_type'                => 'nullable|string|max:50',
@@ -112,6 +112,8 @@ class VisitorPassController extends Controller
             'expected_arrival_at'       => 'nullable|date',
             'check_in_now'              => 'nullable|boolean',
             'status'                    => 'nullable|string|in:Expected,Arrived,Waiting Approval,Approved,Checked-In',
+            'allow_blacklisted_override' => 'nullable|boolean',
+            'blacklist_override_reason'  => 'nullable|string|max:500',
             'notes'                     => 'nullable|string|max:1000',
         ]);
 
@@ -138,7 +140,7 @@ class VisitorPassController extends Controller
         
         [$tenantId] = $this->visitorService->resolveTenantContext();
         $hosts = \App\Models\User::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'email']);
-        $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->with(['primaryImage', 'images'])->orderBy('name')->get();
+        $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->select(['id', 'name', 'sku', 'image_path'])->orderBy('name')->take(200)->get();
 
         return view('modules.visitor.passes.show', compact('pass', 'hosts', 'products'));
     }
@@ -153,7 +155,7 @@ class VisitorPassController extends Controller
         }
 
         $validated = $request->validate([
-            'lead_owner_id'               => 'nullable|exists:users,id',
+            'lead_owner_id'               => ['nullable', \Illuminate\Validation\Rule::exists('users', 'id')->where('tenant_id', $pass->tenant_id)],
             'lead_type'                   => 'nullable|string|in:hot,warm,cold',
             'priority'                    => 'nullable|string|in:Low,Medium,High,Urgent',
             'product_ids'                 => 'nullable|array',
@@ -175,12 +177,20 @@ class VisitorPassController extends Controller
     {
         $this->authorize('checkIn', $pass);
 
+        if ($pass->status === 'Checked-In') {
+            return redirect()->back()->with('error', 'Visitor is already checked in. Duplicate check-in is not allowed.');
+        }
+
+        if ($pass->status === 'Checked-Out') {
+            return redirect()->back()->with('error', 'Cannot re-admit a checked-out pass. A new pass must be issued.');
+        }
+
         if ($pass->status === 'Waiting Approval') {
             return redirect()->back()->with('error', 'Host approval is pending. You cannot check-in until the host approves this pass.');
         }
 
-        if ($pass->status === 'Rejected') {
-            return redirect()->back()->with('error', 'This visitor pass was rejected by the host and cannot be checked-in.');
+        if (in_array($pass->status, ['Rejected', 'Denied'])) {
+            return redirect()->back()->with('error', 'This visitor pass was denied/rejected and cannot be checked-in.');
         }
 
         $pass->update([
@@ -196,10 +206,29 @@ class VisitorPassController extends Controller
     public function checkOut(VisitorPass $pass)
     {
         $this->authorize('checkOut', $pass);
+
+        if ($pass->status === 'Checked-Out') {
+            return redirect()->back()->with('error', 'Visitor pass has already been checked out.');
+        }
+
+        if (!in_array($pass->status, ['Checked-In', 'Meeting in Progress', 'Overstayed'])) {
+            return redirect()->back()->with('error', "Cannot check out a pass that has not been checked in. Current status: {$pass->status}.");
+        }
+
+        $pass->loadMissing('belongings');
         $pass->update([
             'status'       => 'Checked-Out',
             'check_out_at' => now(),
         ]);
+
+        // Verify belongings on exit
+        foreach ($pass->belongings as $belonging) {
+            $belonging->update([
+                'is_verified_on_exit' => true,
+                'exit_verified_by'    => auth()->id(),
+                'exit_verified_at'    => now(),
+            ]);
+        }
 
         $this->visitorService->notifyHost($pass, 'checked_out');
 

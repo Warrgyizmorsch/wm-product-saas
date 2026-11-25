@@ -65,6 +65,30 @@ return new class extends Migration
                 ]);
             }
         }
+
+        // Grant operational permissions to receptionist & security roles (tenant scope)
+        $operationalRoles = Role::whereIn('slug', ['receptionist', 'security', 'front_desk', 'gate_keeper'])->get();
+        $operationalPermNames = [
+            'visitor.visitors.view',
+            'visitor.visitors.create',
+            'visitor.visitors.update',
+            'visitor.passes.view',
+            'visitor.passes.create',
+            'visitor.passes.update',
+            'visitor.passes.checkin',
+            'visitor.passes.checkout',
+        ];
+        $operationalPermIds = Permission::whereIn('name', $operationalPermNames)->pluck('id')->all();
+
+        foreach ($operationalRoles as $role) {
+            foreach ($operationalPermIds as $pId) {
+                RolePermission::firstOrCreate([
+                    'role_id'       => $role->id,
+                    'permission_id' => $pId,
+                    'scope'         => RolePermission::SCOPE_TENANT,
+                ]);
+            }
+        }
     }
 
     public function down(): void
