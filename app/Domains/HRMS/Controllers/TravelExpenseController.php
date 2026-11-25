@@ -219,9 +219,9 @@ class TravelExpenseController extends Controller
             'destination'      => 'required|string|max:255',
             'start_date'       => 'required|date',
             'end_date'         => 'required|date|after_or_equal:start_date',
-            'estimated_budget' => 'required|numeric|min:0',
+            'estimated_budget' => 'required|numeric|min:0|max:99999999.99',
             'request_advance'  => 'nullable|boolean',
-            'advance_amount'   => 'nullable|required_if:request_advance,1|numeric|min:1',
+            'advance_amount'   => 'nullable|required_if:request_advance,1|numeric|min:1|max:99999999.99',
         ]);
 
         $user = $request->user();
@@ -415,7 +415,7 @@ class TravelExpenseController extends Controller
         $validated = $request->validate([
             'employee_id'       => 'required|exists:employees,id',
             'travel_request_id' => 'nullable|exists:travel_requests,id',
-            'amount'            => 'required|numeric|min:1',
+            'amount'            => 'required|numeric|min:1|max:99999999.99',
             'purpose'           => 'required|string|max:255',
         ]);
 
@@ -608,8 +608,8 @@ class TravelExpenseController extends Controller
             'claims'            => 'required|array|min:1',
             'claims.*.category_id' => 'required|exists:expense_categories,id',
             'claims.*.date'        => 'required|date',
-            'claims.*.amount'      => 'required|numeric|min:0.01',
-            'claims.*.tax'         => 'nullable|numeric|min:0',
+            'claims.*.amount'      => 'required|numeric|min:0.01|max:99999999.99',
+            'claims.*.tax'         => 'nullable|numeric|min:0|max:99999999.99',
             'claims.*.merchant'    => 'nullable|string|max:255',
             'claims.*.desc'        => 'nullable|string|max:1000',
             'claims.*.receipt'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
@@ -827,8 +827,8 @@ class TravelExpenseController extends Controller
             'claims'                   => 'required|array|min:1',
             'claims.*.category_id'     => 'required|exists:expense_categories,id',
             'claims.*.date'            => 'required|date',
-            'claims.*.amount'          => 'required|numeric|min:0.01',
-            'claims.*.tax'             => 'nullable|numeric|min:0',
+            'claims.*.amount'          => 'required|numeric|min:0.01|max:99999999.99',
+            'claims.*.tax'             => 'nullable|numeric|min:0|max:99999999.99',
             'claims.*.merchant'        => 'nullable|string|max:255',
             'claims.*.desc'            => 'nullable|string|max:1000',
             'claims.*.receipt'         => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
@@ -1059,6 +1059,10 @@ class TravelExpenseController extends Controller
             if (!$currentEmp || $expenseReport->employee_id !== $currentEmp->id) {
                 abort(403, 'Unauthorized action.');
             }
+        }
+
+        if (!in_array($expenseReport->status, ['draft', 'rejected'], true)) {
+            return redirect()->back()->with('error', 'Only draft or rejected expense reports can be submitted.');
         }
 
         $emp = Employee::find($expenseReport->employee_id);
@@ -1592,58 +1596,22 @@ class TravelExpenseController extends Controller
     }
 
     /**
-     * Get or create a chart of account record for integration.
-     * Prevents system crashes if seeded defaults are missing.
+     * Resolve account via centralized accounting service (deprecated - use TravelExpenseAccountingService directly).
      */
     private function getOrCreateAccount(int $tenantId, string $code, string $name, string $type, string $normalBalance, ?string $subtype = null)
     {
-        // Try to fetch by exact code and tenant first (pure query, NO inserts)
-        $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
+        return \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
             ->where('code', $code)
-            ->first();
-
-        if ($account) {
-            return $account;
-        }
-
-        $groupAccountIds = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->whereNotNull('parent_id')
-            ->pluck('parent_id')
-            ->unique()
-            ->toArray();
-
-        // If not found, try to find any account of the same type for this tenant (excluding headers)
-        $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('type', $type)
-            ->whereNotIn('id', $groupAccountIds)
-            ->first();
-
-        if ($account) {
-            return $account;
-        }
-
-        // Ultimate fallback: return the first account available for this tenant (excluding headers)
-        $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->whereNotIn('id', $groupAccountIds)
-            ->first();
-
-        if ($account) {
-            return $account;
-        }
-
-        return \App\Domains\Accounting\Models\ChartOfAccount::create([
-            'tenant_id'      => $tenantId,
-            'code'           => $code,
-            'name'           => $name,
-            'type'           => $type,
-            'subtype'        => $subtype ?? \App\Domains\Accounting\Models\ChartOfAccount::SUBTYPE_CURRENT_ASSET,
-            'normal_balance' => $normalBalance,
-            'is_active'      => true,
-        ]);
+            ->first()
+            ?? \App\Domains\Accounting\Models\ChartOfAccount::create([
+                'tenant_id'      => $tenantId,
+                'code'           => $code,
+                'name'           => $name,
+                'type'           => $type,
+                'subtype'        => $subtype ?? \App\Domains\Accounting\Models\ChartOfAccount::SUBTYPE_CURRENT_ASSET,
+                'normal_balance' => $normalBalance,
+                'is_active'      => true,
+            ]);
     }
 
     /**

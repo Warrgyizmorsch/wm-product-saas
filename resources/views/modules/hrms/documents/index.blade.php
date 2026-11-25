@@ -338,12 +338,15 @@
                                                     </div>
                                                      <div class="d-flex align-items-center gap-1 ms-1 flex-shrink-0">
                                                          @php
-                                                             $activeDocFile = ($doc->is_signed && $doc->signed_file_path) ? $doc->signed_file_path : $doc->file_path;
+                                                             $docViewUrl = $doc->is_signed 
+                                                                 ? route('hrms.employees.documents.view-signed', $doc->id) 
+                                                                 : route('hrms.documents.file', $doc->id);
+                                                             $docDownloadUrl = route('hrms.documents.download', ['document' => $doc->id, 'type' => $doc->is_signed ? 'signed' : null]);
                                                          @endphp
-                                                         <a href="{{ $doc->is_signed ? route('hrms.employees.documents.view-signed', $doc->id) : asset('storage/' . $activeDocFile) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ $doc->is_signed ? __('hrms.documents.view_signed_doc') : __('hrms.documents.view_copy') }}">
+                                                         <a href="{{ $docViewUrl }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ $doc->is_signed ? __('hrms.documents.view_signed_doc') : __('hrms.documents.view_copy') }}">
                                                              <i class="{{ $doc->is_signed ? 'feather-check-circle text-success' : 'feather-eye' }} fs-11"></i>
                                                          </a>
-                                                         <a href="{{ asset('storage/' . $activeDocFile) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ $doc->is_signed ? __('hrms.documents.download_signed_copy') : __('hrms.documents.download_copy') }}">
+                                                         <a href="{{ $docDownloadUrl }}" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ $doc->is_signed ? __('hrms.documents.download_signed_copy') : __('hrms.documents.download_copy') }}">
                                                              <i class="feather-download fs-11"></i>
                                                          </a>
                                                      </div>

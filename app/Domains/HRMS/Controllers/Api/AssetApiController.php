@@ -237,6 +237,10 @@ class AssetApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $validated = $request->validate([
             'asset_category_id' => 'required_without:asset_item_id|exists:asset_categories,id',
             'asset_item_id'     => 'nullable|exists:asset_items,id',
@@ -286,6 +290,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $asset = Asset::find($id);
@@ -350,6 +358,10 @@ class AssetApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $asset = Asset::find($id);
         if (!$asset) {
             return $this->sendError("Asset with ID '{$id}' not found.", 404);
@@ -372,6 +384,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $asset = Asset::find($id);
@@ -424,6 +440,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $asset = Asset::find($id);
@@ -545,6 +565,10 @@ class AssetApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $validated = $request->validate([
             'company_id'  => 'required|exists:companies,id',
             'name'        => 'required|string|max:255',
@@ -560,6 +584,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $category = AssetCategory::find($id);
@@ -582,6 +610,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $category = AssetCategory::find($id);
@@ -686,6 +718,10 @@ class AssetApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $validated = $request->validate([
             'asset_category_id' => 'required|exists:asset_categories,id',
             'name'              => 'required|string|max:255',
@@ -707,6 +743,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $assetItem = \App\Domains\HRMS\Models\AssetItem::find($id);
@@ -735,6 +775,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $assetItem = \App\Domains\HRMS\Models\AssetItem::find($id);
@@ -770,6 +814,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $validated = $request->validate([
@@ -839,6 +887,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $validated = $request->validate([
@@ -1514,6 +1566,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$request->user()?->can('create', Asset::class) && !$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action.', 403);
         }
 
         $validated = $request->validate([

@@ -56,8 +56,10 @@ class AttendanceCorrectionController extends Controller
 
         $user = auth()->user();
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
         $isHrAdmin = $user && (
             $user->is_admin
+            || $scopeService->isCompanyAdmin($user)
             || $workflowService->isHrOrAdminActor($user)
             || $user->hasHrPermission('hrms.attendance_corrections.approve')
             || $user->hasHrPermission('hrms.attendance.approve')
@@ -67,6 +69,18 @@ class AttendanceCorrectionController extends Controller
         $isManager = false;
         if ($user && $correction->employee) {
             $isManager = $workflowService->canApprove($user, $correction->employee, $correction, 'hrms.attendance_corrections.approve');
+        }
+
+        $canAccess = $isHrAdmin 
+            || $isOwner 
+            || $isManager 
+            || ($correction->employee_id && $scopeService->canAccessEmployee($user, $correction->employee_id));
+
+        if (!$canAccess) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access to attendance correction request.',
+            ], 403);
         }
 
         $data = $this->attendanceCorrectionRepository->getSingleCorrection($correction);
@@ -98,16 +112,27 @@ class AttendanceCorrectionController extends Controller
         }
 
         $validated = $request->validate([
-            'employee_id'         => 'required|integer|exists:employees,id',
+            'employee_id'         => ['required', 'integer', \Illuminate\Validation\Rule::exists('employees', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'date'                => 'required|date_format:Y-m-d',
             'requested_check_in'  => 'nullable|date_format:H:i',
-            'requested_check_out' => 'nullable|date_format:H:i',
+            'requested_check_out' => [
+                'nullable',
+                'date_format:H:i',
+                function ($attribute, $value, $fail) use ($request) {
+                    if (!$request->boolean('is_overnight') && $request->filled('requested_check_in') && !empty($value)) {
+                        if ($value <= $request->input('requested_check_in')) {
+                            $fail('The requested check-out must be after the requested check-in time unless marked as an overnight shift.');
+                        }
+                    }
+                },
+            ],
+            'is_overnight'        => 'nullable|boolean',
             'reason'              => 'required|string|max:500',
         ]);
 
         if (empty($validated['requested_check_in']) && empty($validated['requested_check_out'])) {
             if (!$request->expectsJson() && !$request->ajax()) {
-                return redirect()->back()->with('error', 'At least one of requested check-in or requested check-out must be provided.')->withInput();
+                return redirect()->back()->with('error', 'At least one of requested check-in or requested check-out must be provided.')->withErrors(['error' => 'At least one of requested check-in or requested check-out must be provided.'])->withInput();
             }
             return response()->json([
                 'success' => false,
@@ -119,7 +144,7 @@ class AttendanceCorrectionController extends Controller
 
         if (!$request->expectsJson() && !$request->ajax()) {
             if (!$res['success']) {
-                return redirect()->back()->with('error', $res['message'])->withInput();
+                return redirect()->back()->with('error', $res['message'])->withErrors(['error' => $res['message']])->withInput();
             }
             return redirect()->back()->with('success', $res['message']);
         }

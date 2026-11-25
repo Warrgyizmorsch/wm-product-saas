@@ -163,100 +163,106 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
         $employeeId = $validated['employee_id'];
         $date = $validated['date'];
 
-        $existingPending = AttendanceCorrection::where('tenant_id', $tenantId)
-            ->where('employee_id', $employeeId)
-            ->where('date', $date)
-            ->where('status', 'pending')
-            ->first();
+        return DB::transaction(function () use ($validated, $user, $tenantId, $employeeId, $date) {
+            Employee::where('id', $employeeId)->lockForUpdate()->first();
 
-        if ($existingPending) {
-            return [
-                'success' => false,
-                'status_code' => 422,
-                'message' => 'A pending correction request already exists for this date.',
-            ];
-        }
+            $existingPending = AttendanceCorrection::where('tenant_id', $tenantId)
+                ->where('employee_id', $employeeId)
+                ->where('date', $date)
+                ->where('status', 'pending')
+                ->lockForUpdate()
+                ->first();
 
-        $attendance = Attendance::where('tenant_id', $tenantId)
-            ->where('employee_id', $employeeId)
-            ->whereDate('date', $date)
-            ->first();
-
-        // Enforce Pay Group Attendance Lock Day
-        $employee = Employee::with('payGroup')->find($employeeId);
-        if ($employee && $employee->payGroup && is_array($employee->payGroup->payroll_rules)) {
-            $lockDay = (int) ($employee->payGroup->payroll_rules['attendance_lock_day'] ?? 25);
-            $correctionMonth = Carbon::parse($date)->format('Y-m');
-            $currentMonth = Carbon::now()->format('Y-m');
-            if ($correctionMonth === $currentMonth && Carbon::now()->day > $lockDay) {
+            if ($existingPending) {
                 return [
                     'success' => false,
                     'status_code' => 422,
-                    'message' => "Attendance corrections for the current cycle are locked after day {$lockDay} of the month.",
+                    'message' => 'A pending correction request already exists for this date.',
                 ];
             }
-        }
 
-        $checkIn  = $validated['requested_check_in']  ? "{$date} {$validated['requested_check_in']}"  : null;
-        $checkOut = $validated['requested_check_out'] ? "{$date} {$validated['requested_check_out']}" : null;
+            $attendance = Attendance::where('tenant_id', $tenantId)
+                ->where('employee_id', $employeeId)
+                ->whereDate('date', $date)
+                ->first();
 
-        $correction = AttendanceCorrection::create([
-            'tenant_id'           => $tenantId,
-            'attendance_id'       => $attendance?->id,
-            'employee_id'         => $employeeId,
-            'date'                => $date,
-            'requested_check_in'  => $checkIn,
-            'requested_check_out' => $checkOut,
-            'reason'              => $validated['reason'],
-            'status'              => 'pending',
-        ]);
+            // Enforce Pay Group Attendance Lock Day
+            $employee = Employee::with('payGroup')->find($employeeId);
+            if ($employee && $employee->payGroup && is_array($employee->payGroup->payroll_rules)) {
+                $lockDay = (int) ($employee->payGroup->payroll_rules['attendance_lock_day'] ?? 25);
+                $correctionMonth = Carbon::parse($date)->format('Y-m');
+                $currentMonth = Carbon::now()->format('Y-m');
+                if ($correctionMonth === $currentMonth && Carbon::now()->day > $lockDay) {
+                    return [
+                        'success' => false,
+                        'status_code' => 422,
+                        'message' => "Attendance corrections for the current cycle are locked after day {$lockDay} of the month.",
+                    ];
+                }
+            }
 
-        $correction->load(['employee.reportingManager', 'attendance']);
+            $checkIn  = $validated['requested_check_in']  ? "{$date} {$validated['requested_check_in']}"  : null;
+            $checkOutDate = !empty($validated['is_overnight']) ? Carbon::parse($date)->addDay()->toDateString() : $date;
+            $checkOut = $validated['requested_check_out'] ? "{$checkOutDate} {$validated['requested_check_out']}" : null;
 
-        // Dispatch notifications to HR Admins & Reporting Manager
-        try {
-            $emp = $correction->employee ?? Employee::find($employeeId);
-            $actionUrl = \Illuminate\Support\Facades\Route::has('hrms.attendance.index') ? route('hrms.attendance.index') : url('/hrms/attendance');
-            $dateFormatted = Carbon::parse($date)->format('d M Y');
-            \App\Services\Notification\NotificationService::sendToHrAdmins(
-                title: 'Attendance Regularization Requested',
-                message: "{$emp?->full_name} submitted an attendance regularization request for {$dateFormatted}.",
-                actionUrl: $actionUrl,
-                type: 'attendance_correction_request',
-                iconClass: 'feather-clock'
-            );
+            $correction = AttendanceCorrection::create([
+                'tenant_id'           => $tenantId,
+                'attendance_id'       => $attendance?->id,
+                'employee_id'         => $employeeId,
+                'date'                => $date,
+                'requested_check_in'  => $checkIn,
+                'requested_check_out' => $checkOut,
+                'reason'              => $validated['reason'],
+                'status'              => 'pending',
+            ]);
 
-            if ($emp && $emp->reportingManager) {
-                \App\Services\Notification\NotificationService::sendToEmployee(
-                    employee: $emp->reportingManager,
+            $correction->load(['employee.reportingManager', 'attendance']);
+
+            // Dispatch notifications to HR Admins & Reporting Manager
+            try {
+                $emp = $correction->employee ?? Employee::find($employeeId);
+                $actionUrl = \Illuminate\Support\Facades\Route::has('hrms.attendance.index') ? route('hrms.attendance.index') : url('/hrms/attendance');
+                $dateFormatted = Carbon::parse($date)->format('d M Y');
+                \App\Services\Notification\NotificationService::sendToHrAdmins(
                     title: 'Attendance Regularization Requested',
-                    message: "{$emp->full_name} submitted an attendance regularization request for {$dateFormatted}.",
+                    message: "{$emp?->full_name} submitted an attendance regularization request for {$dateFormatted}.",
                     actionUrl: $actionUrl,
                     type: 'attendance_correction_request',
                     iconClass: 'feather-clock'
                 );
+
+                if ($emp && $emp->reportingManager) {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employee: $emp->reportingManager,
+                        title: 'Attendance Regularization Requested',
+                        message: "{$emp->full_name} submitted an attendance regularization request for {$dateFormatted}.",
+                        actionUrl: $actionUrl,
+                        type: 'attendance_correction_request',
+                        iconClass: 'feather-clock'
+                    );
+                }
+
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.attendance.regularization_applied', [
+                    'tenant_id'     => $tenantId,
+                    'employee_name' => $emp?->full_name ?? 'Employee',
+                    'date'          => $dateFormatted,
+                    'check_in'      => $validated['requested_check_in'] ?? 'N/A',
+                    'check_out'     => $validated['requested_check_out'] ?? 'N/A',
+                    'reason'        => $validated['reason'] ?? '',
+                    'employee_id'   => $emp?->id,
+                    'user_id'       => $emp?->user_id,
+                ], $correction);
+            } catch (\Throwable $notifEx) {
+                Log::warning('Attendance correction submit notification failed: ' . $notifEx->getMessage());
             }
 
-            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.attendance.regularization_applied', [
-                'tenant_id'     => $tenantId,
-                'employee_name' => $emp?->full_name ?? 'Employee',
-                'date'          => $dateFormatted,
-                'check_in'      => $validated['requested_check_in'] ?? 'N/A',
-                'check_out'     => $validated['requested_check_out'] ?? 'N/A',
-                'reason'        => $validated['reason'] ?? '',
-                'employee_id'   => $emp?->id,
-                'user_id'       => $emp?->user_id,
-            ], $correction);
-        } catch (\Throwable $notifEx) {
-            Log::warning('Attendance correction submit notification failed: ' . $notifEx->getMessage());
-        }
-
-        return [
-            'success' => true,
-            'status_code' => 201,
-            'message' => 'Attendance correction request submitted successfully.',
-            'data' => $this->transformCorrection($correction),
-        ];
+            return [
+                'success' => true,
+                'status_code' => 201,
+                'message' => 'Attendance correction request submitted successfully.',
+                'data' => $this->transformCorrection($correction),
+            ];
+        });
     }
 
     public function approve(AttendanceCorrection $correction, ?User $user, ?string $approvedCheckIn = null, ?string $approvedCheckOut = null): array

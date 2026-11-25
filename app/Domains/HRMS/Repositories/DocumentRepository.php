@@ -149,7 +149,7 @@ class DocumentRepository implements DocumentRepositoryInterface
     public function storeDocument(array $validated, Request $request, ?User $user): Document
     {
         $file = $request->file('file');
-        $path = $file->storeTenantFile('documents/employee', 'public');
+        $path = $file->storeTenantFile('documents/employee', 'local');
 
         $docMaster = !empty($validated['document_master_id']) ? DocumentMaster::find($validated['document_master_id']) : null;
         $name = !empty($validated['name']) ? $validated['name'] : ($docMaster?->name ?? $file->getClientOriginalName());
@@ -207,12 +207,16 @@ class DocumentRepository implements DocumentRepositoryInterface
         ];
 
         if ($request->hasFile('file')) {
-            if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-                Storage::disk('public')->delete($document->file_path);
+            if ($document->file_path) {
+                if (Storage::disk('local')->exists($document->file_path)) {
+                    Storage::disk('local')->delete($document->file_path);
+                } elseif (Storage::disk('public')->exists($document->file_path)) {
+                    Storage::disk('public')->delete($document->file_path);
+                }
             }
 
             $file = $request->file('file');
-            $updateData['file_path'] = $file->storeTenantFile('documents/employee', 'public');
+            $updateData['file_path'] = $file->storeTenantFile('documents/employee', 'local');
             $updateData['file_type'] = $file->getClientOriginalExtension();
             $updateData['file_size'] = $file->getSize();
         }
@@ -256,12 +260,20 @@ class DocumentRepository implements DocumentRepositoryInterface
 
     public function deleteDocument(Document $document): bool
     {
-        if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
+        if ($document->file_path) {
+            if (Storage::disk('local')->exists($document->file_path)) {
+                Storage::disk('local')->delete($document->file_path);
+            } elseif (Storage::disk('public')->exists($document->file_path)) {
+                Storage::disk('public')->delete($document->file_path);
+            }
         }
 
-        if ($document->signed_file_path && Storage::disk('public')->exists($document->signed_file_path)) {
-            Storage::disk('public')->delete($document->signed_file_path);
+        if ($document->signed_file_path) {
+            if (Storage::disk('local')->exists($document->signed_file_path)) {
+                Storage::disk('local')->delete($document->signed_file_path);
+            } elseif (Storage::disk('public')->exists($document->signed_file_path)) {
+                Storage::disk('public')->delete($document->signed_file_path);
+            }
         }
 
         return (bool) $document->delete();

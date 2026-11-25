@@ -148,6 +148,8 @@ Route::prefix('hrms')
             Route::patch('/documents/{document}/status', [EmployeeController::class, 'updateDocumentStatus'])->name('employees.documents.status');
             Route::post('/documents/{document}/sign', [EmployeeController::class, 'signDocument'])->name('employees.documents.sign');
             Route::get('/documents/{document}/view-signed', [EmployeeController::class, 'viewSignedDocument'])->name('employees.documents.view-signed');
+            Route::get('/documents/{document}/file', [\App\Domains\HRMS\Controllers\DocumentController::class, 'viewFile'])->name('employees.documents.file');
+            Route::get('/documents/{document}/download', [\App\Domains\HRMS\Controllers\DocumentController::class, 'downloadFile'])->name('employees.documents.download');
             Route::delete('/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
 
             Route::post('/{employee}/adhoc-components', [EmployeeController::class, 'storeAdhocComponent'])->name('employees.adhoc-components.store');
@@ -293,6 +295,7 @@ Route::prefix('hrms')
             Route::post('/{overtimeRequest}/request-cancellation', [OvertimeRequestController::class, 'requestCancellation'])->name('overtime.request-cancellation');
             Route::post('/{overtimeRequest}/approve-cancellation', [OvertimeRequestController::class, 'approveCancellation'])->name('overtime.approve-cancellation');
             Route::post('/{overtimeRequest}/deny-cancellation', [OvertimeRequestController::class, 'denyCancellation'])->name('overtime.deny-cancellation');
+            Route::match(['get', 'post', 'put'], '/update-settings', [OvertimeRequestController::class, 'updateSettings'])->name('overtime.update-settings');
         });
 
         // Asset Management
@@ -374,6 +377,8 @@ Route::prefix('hrms')
             Route::post('/bulk-approve', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkApprove'])->name('documents.bulk-approve');
             Route::post('/bulk-reject', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkReject'])->name('documents.bulk-reject');
             Route::post('/bulk-delete', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkDelete'])->name('documents.bulk-delete');
+            Route::get('/{document}/file', [\App\Domains\HRMS\Controllers\DocumentController::class, 'viewFile'])->name('documents.file');
+            Route::get('/{document}/download', [\App\Domains\HRMS\Controllers\DocumentController::class, 'downloadFile'])->name('documents.download');
         });
 
 

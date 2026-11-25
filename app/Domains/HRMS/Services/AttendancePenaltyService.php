@@ -35,7 +35,7 @@ class AttendancePenaltyService
                 return null;
             }
 
-            $diffMinutes = $punchTime->diffInMinutes($shiftStartTime);
+            $diffMinutes = (int) abs($punchTime->diffInMinutes($shiftStartTime));
             if ($diffMinutes <= 0) {
                 return null;
             }

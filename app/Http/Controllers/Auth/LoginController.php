@@ -22,6 +22,37 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
+    public function showResetForm(Request $request, ?string $token = null): View
+    {
+        return view('auth.reset-password', [
+            'token' => $token ?? $request->route('token'),
+            'email' => $request->input('email'),
+        ]);
+    }
+
+    public function resetPassword(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'token'    => 'required',
+            'email'    => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $status = \Illuminate\Support\Facades\Password::broker()->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, string $password) {
+                $user->forceFill([
+                    'password' => \Illuminate\Support\Facades\Hash::make($password),
+                ])->setRememberToken(\Illuminate\Support\Str::random(60));
+                $user->save();
+            }
+        );
+
+        return $status === \Illuminate\Support\Facades\Password::PASSWORD_RESET
+            ? redirect()->route('login')->with('success', __('Your password has been set successfully! Please log in.'))
+            : back()->withErrors(['email' => __($status)]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $credentials = $request->validate([

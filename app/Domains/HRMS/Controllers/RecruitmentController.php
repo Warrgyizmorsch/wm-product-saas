@@ -277,35 +277,23 @@ class RecruitmentController extends Controller
         return redirect()->back()->with('success', $result['message']);
     }
 
-    // Convert Candidate to HRMS Employee: Create User & Redirect to Pre-filled Employee Form
+    // Convert Candidate to HRMS Employee: Mark Hired & Redirect to Pre-filled Employee Form
     public function convertToEmployee(Request $request, JobOffer $offer): RedirectResponse
     {
         $this->authorizeHrms('hrms.recruitment.manage');
 
-        $request->validate([
-            'initial_password' => 'nullable|string|min:8|max:64',
-        ]);
-
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
-        $result = $this->recruitmentRepository->convertToEmployee($offer, $tenantId, $request->input('initial_password'));
+        $result = $this->recruitmentRepository->convertToEmployee($offer, $tenantId);
 
         if (!$result['success']) {
             return redirect()->back()->with('error', $result['message']);
         }
 
-        $user = $result['user'];
         $candidate = $result['candidate'];
-        $initialPassword = $result['initial_password'] ?? null;
-
-        $msg = "🎉 User account created for {$candidate->full_name}!";
-        if ($initialPassword && !$request->filled('initial_password')) {
-            $msg .= " Initial password: {$initialPassword} (Please share securely with employee).";
-        }
-        $msg .= " Candidate moved to Hired stage. Please complete the Employee Profile below.";
+        $msg = "🎉 Candidate {$candidate->full_name} moved to Hired stage. Please complete the Employee Profile and provide their official Office Email below.";
 
         return redirect()->route('hrms.employees.index', array_filter([
             'convert_offer_id' => $offer->id,
-            'user_id'          => $user->id,
             'account_id'       => $request->account_id,
         ]))->with('success', $msg);
     }

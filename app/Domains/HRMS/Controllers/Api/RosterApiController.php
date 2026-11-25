@@ -303,6 +303,15 @@ class RosterApiController extends Controller
             return $this->sendError("Production shift with ID '{$id}' not found.", 404);
         }
 
+        $activeEmployeesCount = Employee::where('shift_id', $shift->id)
+            ->where(function ($q) {
+                $q->where('status', true)->orWhereNull('status');
+            })->count();
+
+        if ($activeEmployeesCount > 0) {
+            return $this->sendError("Cannot delete production shift. There are {$activeEmployeesCount} active employee(s) assigned to it.", 409);
+        }
+
         $shift->delete();
 
         return $this->sendSuccess(['id' => (int)$id], 'Production shift deleted successfully');
@@ -571,6 +580,10 @@ class RosterApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'day_of_week' => 'required|integer|between:0,6',
@@ -609,6 +622,10 @@ class RosterApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $validated = $request->validate([
@@ -674,6 +691,10 @@ class RosterApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $validated = $request->validate([
             'employee_ids'   => 'required|array|min:1',
             'employee_ids.*' => 'exists:employees,id',
@@ -708,6 +729,10 @@ class RosterApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $validated = $request->validate([

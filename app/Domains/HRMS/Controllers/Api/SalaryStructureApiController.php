@@ -8,6 +8,7 @@ use App\Domains\HRMS\Models\PayGroup;
 use App\Domains\HRMS\Models\SalaryComponent;
 use App\Domains\HRMS\Models\SalaryStructure;
 use App\Domains\HRMS\Models\SalaryStructureItem;
+use App\Domains\HRMS\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -389,6 +390,15 @@ class SalaryStructureApiController extends Controller
             $model = $payGroup instanceof PayGroup ? $payGroup : PayGroup::find($payGroup);
             if (!$model) {
                 return $this->sendError('Pay group not found', 404);
+            }
+
+            $activeEmployeesCount = Employee::where('pay_group_id', $model->id)
+                ->where(function ($q) {
+                    $q->where('status', true)->orWhereNull('status');
+                })->count();
+
+            if ($activeEmployeesCount > 0) {
+                return $this->sendError("Cannot delete pay group. There are {$activeEmployeesCount} active employee(s) assigned to it.", 409);
             }
 
             $model->delete();
@@ -1011,6 +1021,15 @@ class SalaryStructureApiController extends Controller
             $model = $salaryStructure instanceof SalaryStructure ? $salaryStructure : SalaryStructure::find($salaryStructure);
             if (!$model) {
                 return $this->sendError('Salary structure not found', 404);
+            }
+
+            $activeEmployeesCount = Employee::where('salary_structure_id', $model->id)
+                ->where(function ($q) {
+                    $q->where('status', true)->orWhereNull('status');
+                })->count();
+
+            if ($activeEmployeesCount > 0) {
+                return $this->sendError("Cannot delete salary structure. There are {$activeEmployeesCount} active employee(s) assigned to it.", 409);
             }
 
             $model->items()->delete();

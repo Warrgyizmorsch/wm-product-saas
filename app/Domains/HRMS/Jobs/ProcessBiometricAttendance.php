@@ -103,7 +103,7 @@ class ProcessBiometricAttendance implements ShouldQueue
                 continue;
             }
             $lastLog = $filteredLogs->last();
-            $diffSec = Carbon::parse($log->punch_time)->diffInSeconds(Carbon::parse($lastLog->punch_time));
+            $diffSec = abs(Carbon::parse($log->punch_time)->diffInSeconds(Carbon::parse($lastLog->punch_time)));
             if ($diffSec >= 60) {
                 $filteredLogs->push($log);
             }
@@ -158,7 +158,7 @@ class ProcessBiometricAttendance implements ShouldQueue
                 if (isset($filteredLogs[$i + 1])) {
                     $bIn = Carbon::parse($filteredLogs[$i]->punch_time);
                     $bOut = Carbon::parse($filteredLogs[$i + 1]->punch_time);
-                    $dur = max(1, (int) round($bIn->diffInMinutes($bOut)));
+                    $dur = max(1, (int) round(abs($bIn->diffInMinutes($bOut))));
                     $breaks[] = [
                         'break_in'         => $bIn,
                         'break_out'        => $bOut,
@@ -174,7 +174,7 @@ class ProcessBiometricAttendance implements ShouldQueue
 
         $netWorkHours = 0.00;
         if ($checkOutTime && $checkOutTime->gt($checkInTime)) {
-            $totalGrossMinutes = $checkInTime->diffInMinutes($checkOutTime);
+            $totalGrossMinutes = abs($checkInTime->diffInMinutes($checkOutTime));
             $netMinutes = max(0, $totalGrossMinutes - $totalBreakMinutes);
             $netWorkHours = round($netMinutes / 60, 2);
         }

@@ -1188,4 +1188,12 @@ class AssetRepository implements AssetRepositoryInterface
     {
         return $assetRequest->delete();
     }
+
+    /**
+     * Delegate any accidental static method calls to container-resolved instance.
+     */
+    public static function __callStatic(string $method, array $parameters)
+    {
+        return app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class)->$method(...$parameters);
+    }
 }

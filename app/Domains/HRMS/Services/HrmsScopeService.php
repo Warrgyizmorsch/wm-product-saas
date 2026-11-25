@@ -17,6 +17,12 @@ use Illuminate\Support\Facades\Cache;
  */
 class HrmsScopeService
 {
+    /** @var array<string, ?Employee> */
+    private array $resolvedEmployeeCache = [];
+
+    /** @var array<int, bool> */
+    private array $isCompanyAdminCache = [];
+
     /**
      * Proxy static calls to container-resolved instance to prevent non-static call fatal errors.
      */
@@ -39,6 +45,11 @@ class HrmsScopeService
             return null;
         }
 
+        $cacheKey = $user->id . '|' . ($tenantId ?? '');
+        if (array_key_exists($cacheKey, $this->resolvedEmployeeCache)) {
+            return $this->resolvedEmployeeCache[$cacheKey];
+        }
+
         $query = Employee::query();
         if ($tenantId) {
             $query->where('tenant_id', $tenantId);
@@ -52,7 +63,7 @@ class HrmsScopeService
             })->first();
         }
 
-        return $emp;
+        return $this->resolvedEmployeeCache[$cacheKey] = $emp;
     }
 
     /**
@@ -65,6 +76,15 @@ class HrmsScopeService
             return false;
         }
 
+        if (isset($this->isCompanyAdminCache[$user->id])) {
+            return $this->isCompanyAdminCache[$user->id];
+        }
+
+        return $this->isCompanyAdminCache[$user->id] = $this->checkIsCompanyAdmin($actor, $user);
+    }
+
+    private function checkIsCompanyAdmin(User|Employee|null $actor, User $user): bool
+    {
         // Superadmin or root administrative roles
         if (!empty($user->is_super_admin)) {
             return true;

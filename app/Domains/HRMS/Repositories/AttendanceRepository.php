@@ -490,6 +490,23 @@ class AttendanceRepository implements AttendanceRepositoryInterface
             }
         }
 
+        // Teleportation / Impossible Speed Check between check-in and check-out
+        if (!is_null($latitude) && !is_null($longitude)
+            && !is_null($attendance->check_in_latitude) && !is_null($attendance->check_in_longitude)
+            && (abs((float)$attendance->check_in_latitude) > 0.001 || abs((float)$attendance->check_in_longitude) > 0.001)) {
+            $distMeters = $this->calculateDistance((float)$latitude, (float)$longitude, (float)$attendance->check_in_latitude, (float)$attendance->check_in_longitude);
+            $checkInTime = Carbon::parse($attendance->check_in);
+            $timeMinutes = max(1, abs($checkInTime->diffInMinutes($now)));
+            $speedKmh = ($distMeters / 1000) / ($timeMinutes / 60);
+
+            // If distance > 10 km and speed > 500 km/h, flag as impossible travel jump
+            if ($distMeters > 10000 && $speedKmh > 500) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'location' => sprintf('Suspicious location jump detected (impossible travel speed: %d km/h over %d km). Please verify genuine GPS.', round($speedKmh), round($distMeters / 1000)),
+                ]);
+            }
+        }
+
         // If employee is on break, end the break automatically
         $activeBreak = $attendance->activeBreak();
         if ($activeBreak) {
@@ -505,7 +522,7 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         $totalBreakHours = round($totalBreakMinutes / 60, 2);
 
         $checkIn = Carbon::parse($attendance->check_in);
-        $totalDiffHours = $checkIn->diffInMinutes($now) / 60;
+        $totalDiffHours = $checkIn->diffInSeconds($now) / 3600;
         $totalWorkHours = max(0, round($totalDiffHours - $totalBreakHours, 2));
 
         // Rely strictly on custom penalization policy to determine checkout status
@@ -1050,6 +1067,25 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                     (float) $referenceLatitude,
                     (float) $referenceLongitude
                 );
+
+                // Teleportation / Impossible Speed Check between consecutive location waypoints
+                if ($distance > 10000) {
+                    $refTime = $lastLocation ? Carbon::parse($lastLocation->created_at) : ($attendance->check_in ? Carbon::parse($attendance->check_in) : null);
+                    if ($refTime) {
+                        $minutes = max(1, abs($refTime->diffInMinutes(Carbon::now())));
+                        $speedKmh = ($distance / 1000) / ($minutes / 60);
+                        if ($speedKmh > 500) {
+                            return [
+                                'status'                    => 'impossible_speed_detected',
+                                'tracking'                  => false,
+                                'recorded'                  => false,
+                                'message'                   => 'Suspicious location jump detected (impossible travel speed). Update rejected.',
+                                'tracking_interval_minutes' => $intervalMinutes,
+                                'next_ping_seconds'         => $intervalMinutes * 60,
+                            ];
+                        }
+                    }
+                }
 
                 if ($distance <= $movementThreshold) {
                     if ($wfhOutOfBounds !== null) {

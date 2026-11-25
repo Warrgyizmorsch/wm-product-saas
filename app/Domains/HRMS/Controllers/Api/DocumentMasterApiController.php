@@ -216,6 +216,7 @@ class DocumentMasterApiController extends Controller
         $validated['is_required'] = $request->boolean('is_required');
         $validated['approval_required'] = $request->boolean('approval_required');
         $validated['requires_signature'] = $request->boolean('requires_signature');
+        $validated['expiry_applicable'] = $request->boolean('expiry_applicable');
         if ($validated['upload_responsibility'] !== 'hr') {
             $validated['employee_can_view'] = true;
             $validated['employee_can_download'] = true;
@@ -226,7 +227,7 @@ class DocumentMasterApiController extends Controller
                 : $validated['employee_can_view'];
         }
 
-        if (!$validated['expiry_applicable']) {
+        if (empty($validated['expiry_applicable'])) {
             $validated['reminder_days_before'] = null;
         }
 
@@ -280,6 +281,7 @@ class DocumentMasterApiController extends Controller
         $validated['is_required'] = $request->boolean('is_required');
         $validated['approval_required'] = $request->boolean('approval_required');
         $validated['requires_signature'] = $request->boolean('requires_signature');
+        $validated['expiry_applicable'] = $request->boolean('expiry_applicable');
         if ($validated['upload_responsibility'] !== 'hr') {
             $validated['employee_can_view'] = true;
             $validated['employee_can_download'] = true;
@@ -290,7 +292,7 @@ class DocumentMasterApiController extends Controller
                 : $validated['employee_can_view'];
         }
 
-        if (!$validated['expiry_applicable']) {
+        if (empty($validated['expiry_applicable'])) {
             $validated['reminder_days_before'] = null;
         }
 

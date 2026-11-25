@@ -53,7 +53,6 @@ class LeaveStructureApiController extends Controller
         }
 
         return $user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hrms.leave_requests.approve')
             || $user->hasHrPermission('hrms.leaves.manage')
             || $user->hasHrPermission('hrms.leave_structures.manage');
     }
@@ -749,6 +748,10 @@ class LeaveStructureApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to transition leave plans.', 403);
         }
 
         $validated = $request->validate([

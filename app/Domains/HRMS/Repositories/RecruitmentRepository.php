@@ -927,21 +927,6 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             return ['success' => false, 'message' => "Candidate information not found."];
         }
 
-        $user = User::where('tenant_id', $tenantId)->where('email', $candidate->email)->first();
-
-        // Secure password generation instead of hardcoded default
-        $initialPassword = $specifiedPassword ?: Str::password(16, symbols: true);
-
-        if (!$user) {
-            $user = User::create([
-                'tenant_id' => $tenantId,
-                'name'      => $candidate->full_name,
-                'email'     => $candidate->email,
-                'password'  => Hash::make($initialPassword),
-                'role'      => 'employee',
-            ]);
-        }
-
         $candidate->update(['status' => 'hired']);
         if ($application && $application->current_stage !== 'hired') {
             $application->update([
@@ -968,7 +953,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
         try {
             NotificationService::sendToHrAdmins(
                 'Candidate Converted to Employee',
-                "Candidate {$candidate->full_name} has been successfully hired and provisioned as an Employee.",
+                "Candidate {$candidate->full_name} has been successfully moved to Hired stage. Please complete their Employee Profile.",
                 route('hrms.employees.index'),
                 'candidate_hired',
                 'feather-user-check'
@@ -978,10 +963,8 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
         }
 
         return [
-            'success' => true,
-            'user' => $user,
+            'success'   => true,
             'candidate' => $candidate,
-            'initial_password' => $initialPassword,
         ];
     }
 

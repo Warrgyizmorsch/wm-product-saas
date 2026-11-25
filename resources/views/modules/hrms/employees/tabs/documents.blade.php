@@ -304,7 +304,7 @@
                                                     </div>
                                                     <div class="d-flex align-items-center gap-1 ms-1 flex-shrink-0">
                                                          @if($canManageDocStatus || ($doc->documentMaster?->employee_can_view ?? true))
-                                                             <a href="{{ $doc->is_signed ? route('hrms.employees.documents.view-signed', $doc->id) : asset('storage/' . $doc->file_path) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.common.view') }}">
+                                                             <a href="{{ $doc->is_signed ? route('hrms.employees.documents.view-signed', $doc->id) : route('hrms.employees.documents.file', $doc->id) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.common.view') }}">
                                                                  <i class="feather-eye fs-11"></i>
                                                              </a>
                                                          @endif
@@ -314,13 +314,13 @@
                                                              </a>
                                                          @endif
                                                          @if($canManageDocStatus || ($doc->documentMaster?->employee_can_view ?? true))
-                                                             <a href="{{ asset('storage/' . ($doc->signed_file_path ?: $doc->file_path)) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.employees.lbl_download_doc') ?? 'Download' }}">
+                                                             <a href="{{ route('hrms.employees.documents.download', ['document' => $doc->id, 'type' => $doc->is_signed ? 'signed' : null]) }}" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.employees.lbl_download_doc') ?? 'Download' }}">
                                                                  <i class="feather-download fs-11"></i>
                                                              </a>
                                                          @endif
                                                          @if($doc->status === 'pending_signature')
                                                              <x-ui.button type="button" variant="warning" size="xs" icon="feather-edit-3" class="text-dark fw-bold px-2 py-0.5 border-0 rounded-pill ms-1" 
-                                                                     onclick="openSignModal('{{ $doc->id }}', '{{ route('hrms.employees.documents.sign', $doc->id) }}', '{{ addslashes($doc->name) }}', '{{ asset('storage/' . $doc->file_path) }}', '{{ strtolower(pathinfo($doc->file_path, PATHINFO_EXTENSION)) }}')" 
+                                                                     onclick="openSignModal('{{ $doc->id }}', '{{ route('hrms.employees.documents.sign', $doc->id) }}', '{{ addslashes($doc->name) }}', '{{ route('hrms.employees.documents.file', $doc->id) }}', '{{ strtolower(pathinfo($doc->file_path, PATHINFO_EXTENSION)) }}')" 
                                                                      title="{{ __('hrms.employees.mdl_sign_doc_title') }}">
                                                                  {{ __('hrms.employees.lbl_sign') }}
                                                              </x-ui.button>

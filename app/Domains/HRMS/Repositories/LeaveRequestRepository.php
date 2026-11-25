@@ -345,6 +345,23 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
             && (($rules['accrual']['quota_type'] ?? 'limited') !== 'unlimited');
 
         return DB::transaction(function () use ($validated, $request, $status, $currentLevel, $emp, $rules, $isPaidLimited) {
+            // Lock employee record to serialize concurrent leave submissions
+            Employee::whereKey($validated['employee_id'])->lockForUpdate()->first();
+
+            // Re-verify session/date conflict inside the locked transaction
+            $conflict = \App\Domains\HRMS\Helpers\SessionConflictChecker::hasConflict(
+                employeeId:   (int) $validated['employee_id'],
+                newStart:     \Carbon\Carbon::parse($validated['start_date']),
+                newEnd:       \Carbon\Carbon::parse($validated['end_date']),
+                newStartType: $validated['start_date_type'] ?? 'full_day',
+                newEndType:   $validated['end_date_type']   ?? 'full_day'
+            );
+            if ($conflict) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'start_date' => $conflict,
+                ]);
+            }
+
             $balance = null;
             if ($status === 'approved' && $isPaidLimited) {
                 $balance = LeaveBalance::where('employee_id', $validated['employee_id'])
@@ -682,10 +699,14 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
 
             if (!$existing) {
                 Attendance::create([
-                    'tenant_id'   => $tenantId,
-                    'employee_id' => $leaveRequest->employee_id,
-                    'date'        => $dateStr,
-                    'status'      => 'on_leave',
+                    'tenant_id'          => $tenantId,
+                    'employee_id'        => $leaveRequest->employee_id,
+                    'date'               => $dateStr,
+                    'check_in'           => null,
+                    'check_out'          => null,
+                    'status'             => 'on_leave',
+                    'total_work_hours'   => 0.00,
+                    'total_break_hours'  => 0.00,
                 ]);
             } elseif (empty($existing->check_in) && in_array($existing->status, ['absent', 'on_leave', 'missing_logs', null], true)) {
                 $existing->update([
