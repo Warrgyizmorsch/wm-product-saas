@@ -30,6 +30,8 @@ Route::prefix('inventory')
         Route::get('products/download-sample', [ProductController::class, 'downloadSample'])->name('products.downloadSample');
         Route::get('products/barcode-lookup', [ProductController::class, 'barcodeLookup'])->name('products.barcodeLookup');
         Route::get('products/stock-check', [ProductController::class, 'stockCheck'])->name('products.stockCheck');
+        Route::get('products/available-serials', [ProductController::class, 'availableSerials'])->name('products.availableSerials');
+        Route::get('products/next-serial-sequence', [ProductController::class, 'nextSerialSequence'])->name('products.nextSerialSequence');
         Route::post('products/import', [ProductController::class, 'import'])->name('products.import');
         Route::post('products/import/parse', [ProductController::class, 'parseImportFile'])->name('products.import.parse');
         Route::post('products/import/process', [ProductController::class, 'processMappedImport'])->name('products.import.process');
@@ -71,6 +73,7 @@ Route::prefix('inventory')
         Route::post('transfers/{transfer}/dispatch', [StockTransferController::class, 'dispatch'])->name('transfers.dispatch');
         Route::post('transfers/{transfer}/receive', [StockTransferController::class, 'receive'])->name('transfers.receive');
         Route::post('transfers/{transfer}/cancel', [StockTransferController::class, 'cancel'])->name('transfers.cancel');
+        Route::delete('transfers/{transfer}', [StockTransferController::class, 'destroy'])->name('transfers.destroy');
 
         // Stock Adjustments
         Route::get('adjustments/export', [StockAdjustmentController::class, 'export'])->name('adjustments.export');

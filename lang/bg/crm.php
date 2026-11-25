@@ -2302,7 +2302,7 @@ return array (
   'system_detected_existing_record' => 'Системата откри съществуващ запис, съответстващ на :matched.',
   'company_name_label' => 'Име на фирма',
   'revenue_label' => 'Приходи',
-  'active_deals_count' => 'Активни: :count сделки',
+  'active_deals_count' => 'Брой активни сделки',
   'date_label' => 'Дата',
   'meetings_geo_verification' => 'Гео-верификация:',
   'download_pdf' => 'Изтегляне на PDF',

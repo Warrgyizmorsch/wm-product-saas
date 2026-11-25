@@ -141,13 +141,13 @@ class LeadApiController extends Controller
             ->with(['owner:id,name,email', 'crmAccount:id,name', 'crmDeal:id,title,estimated_value']);
 
         // Search
-        if ($search = $request->input('search')) {
+        if ($search = trim((string)$request->input('search'))) {
             $query->where(function ($q) use ($search) {
                 $q->where('contact_person', 'like', "%{$search}%")
                   ->orWhere('company_name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('lead_number', 'like', "%{$search}%");
+                  ->orWhere('lead_number', 'like', "{$search}%")
+                  ->orWhere('email', 'like', "{$search}%")
+                  ->orWhere('phone', 'like', "{$search}%");
             });
         }
 

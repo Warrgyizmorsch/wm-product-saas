@@ -427,7 +427,7 @@
                         <div class="zoho-field-label">{{ __('crm.contact_email') }}</div>
                         <div class="zoho-field-value">
                             @if($lead->email)
-                                <a href="mailto:{{ $lead->email }}" class="text-primary hover-underline">{{ $lead->email }}</a>
+                                <a href="mailto:{{ $lead->email }}" class="text-primary hover-underline text-break">{{ $lead->email }}</a>
                             @else
                                 —
                             @endif

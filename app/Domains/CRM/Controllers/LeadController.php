@@ -93,12 +93,13 @@ class LeadController extends Controller
             ->where('tenant_id', $tenantId);
 
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = trim((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('company_name', 'like', "%{$search}%")
                   ->orWhere('contact_person', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
+                  ->orWhere('lead_number', 'like', "{$search}%")
+                  ->orWhere('email', 'like', "{$search}%")
+                  ->orWhere('phone', 'like', "{$search}%");
             });
         }
 

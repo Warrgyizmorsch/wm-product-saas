@@ -2308,7 +2308,7 @@ return array (
   'system_detected_existing_record' => 'System detected an existing record matching :matched.',
   'company_name_label' => 'Company Name',
   'revenue_label' => 'Revenue',
-  'active_deals_count' => 'Active: :count Deals',
+  'active_deals_count' => 'Active Deals Count',
   'date_label' => 'Date',
   'meetings_geo_verification' => 'Geo-Verification:',
   'download_pdf' => 'Download PDF',
