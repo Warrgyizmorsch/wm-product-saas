@@ -38,6 +38,7 @@ class PlanningExceptionService
     // Planner Recommendations
     public const REC_EXPEDITE_PO              = 'EXPEDITE_PO';
     public const REC_RESCHEDULE_OPERATION     = 'RESCHEDULE_OPERATION';
+    /** @deprecated RT-11: there are no alternate machines any more — kept so old references still resolve. */
     public const REC_ASSIGN_ALTERNATE_MACHINE = 'ASSIGN_ALTERNATE_MACHINE';
     public const REC_REVIEW_SUBCONTRACT       = 'REVIEW_SUBCONTRACT';
     public const REC_REVIEW_PENDING_ECO       = 'REVIEW_PENDING_ECO';
@@ -66,6 +67,7 @@ class PlanningExceptionService
             ->where('tenant_id', $tenantId)
             ->whereIn('status', [
                 ProductionOrder::STATUS_DRAFT,
+                ProductionOrder::STATUS_LOCKED,
                 ProductionOrder::STATUS_RELEASED,
                 ProductionOrder::STATUS_IN_PROGRESS,
             ])
@@ -387,41 +389,45 @@ class PlanningExceptionService
     private function evaluateMachineUnavailableVector(ProductionOrder $order, Collection $downtimes, array &$exceptions): void
     {
         foreach ($order->operations as $op) {
-            if ($op->status === ProductionOrderOperation::STATUS_COMPLETED || !$op->machine_id) continue;
+            if ($op->status === ProductionOrderOperation::STATUS_COMPLETED) continue;
 
-            $activeDowntime = $downtimes->firstWhere('machine_id', $op->machine_id);
-            if ($activeDowntime) {
-                // Check if valid alternate machine exists on routing operation
-                $hasAlternate = false;
-                if ($op->routing_operation_id) {
-                    $hasAlternate = \App\Domains\Production\Models\RoutingOperationAlternateMachine::withoutGlobalScopes()
-                        ->where('routing_operation_id', $op->routing_operation_id)
-                        ->exists();
-                }
-
-                if ($hasAlternate) {
-                    $exceptions[] = [
-                        'type' => self::TYPE_MACHINE_UNAVAILABLE,
-                        'severity' => self::SEVERITY_MEDIUM,
-                        'production_order_id' => $order->id,
-                        'operation_id' => $op->id,
-                        'operation_name' => $op->name,
-                        'reason' => "Primary Machine '{$op->machine?->name}' is down ({$activeDowntime->reason}), but alternate machine is available.",
-                        'risk_driver' => 'Machine Downtime (Alternate Available)',
-                        'recommended_action' => self::REC_ASSIGN_ALTERNATE_MACHINE,
-                        'evidence' => "Machine #{$op->machine_id} has active downtime ID #{$activeDowntime->id}.",
-                    ];
-                } else {
+            // RT-06 / RT-07 / RT-11: an operation has ONE resource — its machine OR its manual batch — and there are no alternate
+            // machines. When that resource is down the only moves are: close the downtime, or reschedule the operation.
+            if ($op->machine_id) {
+                $activeDowntime = $downtimes->firstWhere('machine_id', $op->machine_id);
+                if ($activeDowntime) {
+                    $since = $activeDowntime->start_time ? $activeDowntime->start_time->format('d M H:i') : 'unknown';
                     $exceptions[] = [
                         'type' => self::TYPE_MACHINE_UNAVAILABLE,
                         'severity' => self::SEVERITY_CRITICAL,
                         'production_order_id' => $order->id,
                         'operation_id' => $op->id,
                         'operation_name' => $op->name,
-                        'reason' => "Assigned Machine '{$op->machine?->name}' is down ({$activeDowntime->reason}) with NO alternate machine defined.",
-                        'risk_driver' => 'Machine Breakdown (No Alternate)',
-                        'recommended_action' => self::REC_ASSIGN_ALTERNATE_MACHINE,
-                        'evidence' => "Machine #{$op->machine_id} open breakdown since {$activeDowntime->start_time}.",
+                        'reason' => "Assigned machine '{$op->machine?->name}' is down ({$activeDowntime->reason}) since {$since}. The operation has no other machine.",
+                        'risk_driver' => $activeDowntime->end_time ? 'Machine Downtime (Planned)' : 'Machine Breakdown (Open)',
+                        'recommended_action' => self::REC_RESCHEDULE_OPERATION,
+                        'evidence' => "Machine #{$op->machine_id} has open downtime ID #{$activeDowntime->id}.",
+                    ];
+                }
+
+                continue;
+            }
+
+            // A manual batch is unavailable when it, or its section, is inactive.
+            if ($op->section_manual_production_id) {
+                $batch = $op->manualProduction;
+                $section = $batch?->section;
+                if (!$batch || !$batch->active || !$section || !$section->isActive()) {
+                    $exceptions[] = [
+                        'type' => self::TYPE_MACHINE_UNAVAILABLE,
+                        'severity' => self::SEVERITY_CRITICAL,
+                        'production_order_id' => $order->id,
+                        'operation_id' => $op->id,
+                        'operation_name' => $op->name,
+                        'reason' => 'Assigned manual batch' . ($batch ? " '{$batch->batch_name}'" : '') . ' is inactive' . ($section && !$section->isActive() ? ' (its section is inactive)' : '') . '. The operation has no other resource.',
+                        'risk_driver' => 'Manual Batch Unavailable',
+                        'recommended_action' => self::REC_RESCHEDULE_OPERATION,
+                        'evidence' => "Manual batch #{$op->section_manual_production_id} is not available.",
                     ];
                 }
             }

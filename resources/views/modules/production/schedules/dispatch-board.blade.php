@@ -898,6 +898,22 @@
                 loadDispatchData();
             });
 
+            // Resource filter: machines AND manual batches of a work center (an operation runs on one or the other)
+            function appendResourceOptions(select, res) {
+                (res.machines || []).forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = `${m.name} (${m.code})`;
+                    select.appendChild(opt);
+                });
+                (res.batches || []).forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = 'batch:' + b.id;
+                    opt.textContent = `${b.name} — manual batch`;
+                    select.appendChild(opt);
+                });
+            }
+
             // Work Center Filter Change -> Populate Machine Filter Dropdown
             filterWorkCenter.addEventListener('change', function () {
                 const wcId = this.value;
@@ -905,12 +921,7 @@
                 if (dispatchBoardData && dispatchBoardData.resources) {
                     dispatchBoardData.resources.forEach(res => {
                         if (!wcId || res.id == wcId) {
-                            res.machines.forEach(m => {
-                                const opt = document.createElement('option');
-                                opt.value = m.id;
-                                opt.textContent = `${m.name} (${m.code})`;
-                                filterMachine.appendChild(opt);
-                            });
+                            appendResourceOptions(filterMachine, res);
                         }
                     });
                 }
@@ -1031,7 +1042,8 @@
                     end_date: endDate,
                 });
                 if (workCenterId) params.append('work_center_id', workCenterId);
-                if (machineId) params.append('machine_id', machineId);
+                if (machineId && String(machineId).startsWith('batch:')) params.append('manual_production_id', String(machineId).slice(6));
+                else if (machineId) params.append('machine_id', machineId);
                 if (status) params.append('status', status);
                 if (scenarioId) params.append('scenario_id', scenarioId);
                 if (scheduleIdVal || scheduleIdUrl) params.append('schedule_id', scheduleIdVal || scheduleIdUrl);
@@ -1093,14 +1105,7 @@
 
                         // Render Machine Filter dropdown options if empty
                         if (filterMachine.options.length <= 1 && data.resources) {
-                            data.resources.forEach(res => {
-                                res.machines.forEach(m => {
-                                    const opt = document.createElement('option');
-                                    opt.value = m.id;
-                                    opt.textContent = `${m.name} (${m.code})`;
-                                    filterMachine.appendChild(opt);
-                                });
-                            });
+                            data.resources.forEach(res => appendResourceOptions(filterMachine, res));
                         }
 
                         renderTimelineAndOperations(data);
@@ -1229,13 +1234,23 @@
                                     ${wcUtilBadge}
                                 </div>
                                 <div class="gantt-timeline-col flex-grow-1 text-muted fs-11 px-2" style="min-width: ${minTimelineWidth}px;">
-                                    ${res.machines.length} machine lane(s)
+                                    ${res.machines.length} machine lane(s)${(res.batches || []).length ? `, ${res.batches.length} manual batch lane(s)` : ''}
                                 </div>
                             `;
                     bodyEl.appendChild(wcRow);
 
                     // Machine Swimlane Rows
-                    const machineLanes = res.machines.length > 0 ? res.machines : [{ id: null, name: 'Manual / Machine-less Operations', code: 'MANUAL', status: 'active', work_center_id: res.id }];
+                    // One lane per machine and per manual batch (an operation runs on ONE of them); operations that have neither
+                    // go to an "unassigned" lane so nothing disappears from the board.
+                    const wcOpsAll = (data.operations || []).filter(op => op.work_center_id === res.id);
+                    const hasUnassignedOps = wcOpsAll.some(op => !op.machine_id && !op.section_manual_production_id);
+                    const machineLanes = [
+                        ...res.machines.map(m => ({ ...m, kind: 'machine' })),
+                        ...(res.batches || []).map(b => ({ ...b, kind: 'batch' })),
+                    ];
+                    if (machineLanes.length === 0 || hasUnassignedOps) {
+                        machineLanes.push({ id: null, kind: 'none', name: machineLanes.length === 0 ? 'Manual / Machine-less Operations' : 'Unassigned operations', code: 'MANUAL', status: 'active', work_center_id: res.id });
+                    }
 
                     machineLanes.forEach(m => {
                         const laneRow = document.createElement('div');
@@ -1243,16 +1258,19 @@
                         laneRow.style.minHeight = '52px';
                         laneRow.style.minWidth = rowMinWidth;
                         laneRow.dataset.workCenterId = res.id;
-                        laneRow.dataset.machineId = m.id ?? '';
+                        laneRow.dataset.machineId = m.kind === 'machine' ? (m.id ?? '') : '';
+                        laneRow.dataset.batchId = m.kind === 'batch' ? (m.id ?? '') : '';
 
-                        const mIcon = m.id ? 'feather-cpu text-secondary' : 'feather-user text-info';
+                        const mIcon = m.kind === 'machine' ? 'feather-cpu text-secondary' : (m.kind === 'batch' ? 'feather-users text-primary' : 'feather-user text-info');
                         const laneResourceCol = `
                                     <div class="gantt-resource-col border-end p-2 fs-12 d-flex align-items-center justify-content-between sticky-start" style="width: 280px; min-width: 280px; max-width: 280px; flex-shrink: 0; z-index: 5;">
                                         <div class="text-truncate" title="${m.name}">
                                             <i class="${mIcon} me-1"></i> <strong>${m.name}</strong>
-                                            ${m.code ? `<span class="text-muted fs-11">(${m.code})</span>` : ''}
+                                            ${m.kind === 'batch'
+                                                ? `<span class="badge bg-soft-secondary text-secondary fs-10 ms-1">Manual batch</span> <span class="text-muted fs-11">${[m.section_name, m.shift_name].filter(Boolean).join(' · ')}</span>`
+                                                : (m.code ? `<span class="text-muted fs-11">(${m.code})</span>` : '')}
                                         </div>
-                                        <span class="badge bg-soft-success text-success fs-10">${m.status}</span>
+                                        <span class="badge ${m.status === 'active' ? 'bg-soft-success text-success' : 'bg-soft-danger text-danger'} fs-10">${m.status}</span>
                                     </div>
                                 `;
 
@@ -1289,11 +1307,12 @@
                         laneTimelineCol.appendChild(gridOverlay);
 
                         // Render Machine Downtime Blockers
-                        if (m.id && data.downtimes) {
-                            const machineDowntimes = data.downtimes.filter(d => d.machine_id === m.id);
+                        if (m.kind === 'machine' && data.downtimes) {
+                            const machineDowntimes = data.downtimes.filter(d => d.machine_id === m.id && d.status !== 'closed');
                             machineDowntimes.forEach(dt => {
                                 const dtStart = new Date(dt.start_time).getTime();
-                                const dtEnd = new Date(dt.end_time).getTime();
+                                // an OPEN downtime with no end blocks the machine until it is closed: draw it to the end of the range
+                                const dtEnd = dt.end_time ? new Date(dt.end_time).getTime() : (startMs + totalDurationMs);
                                 if (dtEnd > startMs && dtStart < (startMs + totalDurationMs)) {
                                     const leftPct = Math.max(0, ((dtStart - startMs) / totalDurationMs) * 100);
                                     const widthPct = Math.min(100 - leftPct, ((dtEnd - Math.max(startMs, dtStart)) / totalDurationMs) * 100);
@@ -1303,7 +1322,7 @@
                                     dtBlock.style.left = `${leftPct}%`;
                                     dtBlock.style.width = `${widthPct}%`;
                                     dtBlock.style.zIndex = '2';
-                                    dtBlock.title = `Downtime: ${dt.reason} (${dt.start_time} to ${dt.end_time})`;
+                                    dtBlock.title = `Downtime: ${dt.reason} (${dt.start_time} to ${dt.end_time || 'still open'})`;
                                     laneTimelineCol.appendChild(dtBlock);
                                 }
                             });
@@ -1311,8 +1330,9 @@
 
                         // Render Operations in this lane
                         const machineOps = (data.operations || []).filter(op => {
-                            if (m.id) return op.machine_id === m.id;
-                            return op.work_center_id === res.id && !op.machine_id;
+                            if (m.kind === 'machine') return op.machine_id === m.id;
+                            if (m.kind === 'batch') return !op.machine_id && op.section_manual_production_id === m.id;
+                            return op.work_center_id === res.id && !op.machine_id && !op.section_manual_production_id;
                         });
 
                         machineOps.forEach(op => {
@@ -1360,7 +1380,7 @@
                                             <div><strong>Order:</strong> ${escapeHtml(op.production_order_number)}</div>
                                             <div><strong>Product:</strong> ${escapeHtml(op.product_name || 'N/A')}</div>
                                             <div><strong>Work Center:</strong> ${escapeHtml(res.name)}</div>
-                                            ${m.name ? `<div><strong>Machine:</strong> ${escapeHtml(m.name)}</div>` : ''}
+                                            ${m.kind !== 'none' && m.name ? `<div><strong>${m.kind === 'batch' ? 'Manual batch' : 'Machine'}:</strong> ${escapeHtml(m.name)}</div>` : ''}
                                             <div><strong>Start:</strong> ${formatIsoDate(op.planned_start)}</div>
                                             <div><strong>Finish:</strong> ${formatIsoDate(op.planned_finish)}</div>
                                             ${op.baseline_start ? `<div><strong>Baseline Start:</strong> ${formatIsoDate(op.baseline_start)}</div>` : ''}
@@ -1409,7 +1429,9 @@
                                         element: bar,
                                         originalParent: bar.parentElement,
                                         originalLeft: bar.style.left,
-                                        originalMachineId: m.id,
+                                        originalMachineId: m.kind === 'machine' ? m.id : null,
+                                        originalLaneKind: m.kind,
+                                        originalLaneId: m.id,
                                         originalWorkCenterId: res.id,
                                         startMs: startMs,
                                         totalDurationMs: totalDurationMs,
@@ -1450,8 +1472,8 @@
                             if (!dragContext) return;
 
                             const targetWorkCenterId = parseInt(res.id);
-                            const targetMachineId = m.id ? parseInt(m.id) : null;
-                            const targetMachineName = m.id ? `${m.name} (${m.code})` : 'Manual Operation';
+                            const targetMachineId = m.kind === 'machine' ? parseInt(m.id) : null;
+                            const targetMachineName = m.kind === 'machine' ? `${m.name} (${m.code})` : (m.kind === 'batch' ? `${m.name} (manual batch)` : 'Manual Operation');
 
                             // Validation: Cannot move operation to a different Work Center
                             if (targetWorkCenterId !== parseInt(dragContext.op.work_center_id)) {
@@ -1465,19 +1487,23 @@
                                 return;
                             }
 
-                            // Validation: Target machine must be approved for this operation (Primary or Approved Alternate)
-                            if (targetMachineId && dragContext.op.qualified_machine_ids && dragContext.op.qualified_machine_ids.length > 0) {
-                                const isQualified = dragContext.op.qualified_machine_ids.map(Number).includes(targetMachineId);
-                                if (!isQualified) {
-                                    showPlannerAlert(
-                                        'Incompatible Machine',
-                                        `Machine [${targetMachineName}] is not an approved primary or alternate machine for operation [${dragContext.op.operation_name}]. It cannot perform this work.`,
-                                        'danger'
-                                    );
-                                    loadDispatchData();
-                                    dragContext = null;
-                                    return;
-                                }
+                            // Validation (RT-06 / RT-07): an operation has ONE resource — its machine OR its manual batch. It can be moved in
+                            // TIME on that resource only; there are no alternate machines.
+                            const opIsBatch = !dragContext.op.machine_id && !!dragContext.op.section_manual_production_id;
+                            const wrongLane = opIsBatch
+                                ? !(m.kind === 'batch' && parseInt(m.id) === parseInt(dragContext.op.section_manual_production_id))
+                                : (dragContext.op.machine_id ? !(m.kind === 'machine' && parseInt(m.id) === parseInt(dragContext.op.machine_id)) : false);
+                            if (wrongLane) {
+                                showPlannerAlert(
+                                    'Wrong resource',
+                                    opIsBatch
+                                        ? `Operation [${dragContext.op.operation_name}] runs on the manual batch [${dragContext.op.resource_name || ''}]. It can only be moved in time on that batch.`
+                                        : `Operation [${dragContext.op.operation_name}] runs on machine [${dragContext.op.resource_name || ''}]. It can only be moved in time on that machine — there are no alternate machines.`,
+                                    'danger'
+                                );
+                                loadDispatchData();
+                                dragContext = null;
+                                return;
                             }
 
                             const rect = laneTimelineCol.getBoundingClientRect();
@@ -1660,7 +1686,17 @@
                 // Populate Machines Select with qualification indicators
                 const selectM = document.querySelector('#editMachineId select') || document.getElementById('editMachineId');
                 selectM.innerHTML = '<option value="">{{ __('production.no_machine_manual') }}</option>';
-                if (dispatchBoardData && dispatchBoardData.resources) {
+                const opIsBatch = !op.machine_id && !!op.section_manual_production_id;
+                selectM.disabled = false;
+                if (opIsBatch) {
+                    // the operation keeps its manual batch: show it, no machine can be assigned
+                    selectM.innerHTML = '';
+                    const batchOpt = document.createElement('option');
+                    batchOpt.value = '';
+                    batchOpt.textContent = `Manual batch: ${op.resource_name || ''}`;
+                    selectM.appendChild(batchOpt);
+                    selectM.disabled = true;
+                } else if (dispatchBoardData && dispatchBoardData.resources) {
                     dispatchBoardData.resources.forEach(res => {
                         if (res.id === op.work_center_id) {
                             res.machines.forEach(m => {
@@ -1670,11 +1706,9 @@
                                 const hasQualification = op.qualified_machine_ids && op.qualified_machine_ids.length > 0;
                                 if (hasQualification) {
                                     if (op.primary_machine_id && (parseInt(op.primary_machine_id) === parseInt(m.id))) {
-                                        suffix = ' — Primary Machine ⭐';
-                                    } else if (op.qualified_machine_ids.map(Number).includes(parseInt(m.id))) {
-                                        suffix = ' — Approved Alternate ✓';
+                                        suffix = ' — planned machine ⭐';
                                     } else {
-                                        suffix = ' — Incompatible / Not Approved ⚠️';
+                                        suffix = ' — not this operation\'s machine ⚠️';
                                         opt.disabled = true;
                                     }
                                 }

@@ -39,6 +39,8 @@ class ProductionOrderOperation extends BaseModel
         'source_bom_id',
         'source_routing_id',
         'bom_level',
+        'plan_key',
+        'execution_order',
         'target_produced_qty',
         'is_intermediate',
         'quantity_claimed',
@@ -90,6 +92,7 @@ class ProductionOrderOperation extends BaseModel
     protected $casts = [
         'sequence'                => 'integer',
         'bom_level'               => 'integer',
+        'execution_order'         => 'integer',
         'section_id'              => 'integer',
         'section_manual_production_id' => 'integer',
         'selected_routing_material_ids' => 'array',
@@ -144,6 +147,86 @@ class ProductionOrderOperation extends BaseModel
             'operation_id',
             'predecessor_operation_id'
         )->withPivot('dependency_type')->withTimestamps();
+    }
+
+    /** @var array<int, int>|null memo for subAssemblyPredecessorIds() */
+    protected ?array $subAssemblyPredecessorIdsMemo = null;
+
+    /**
+     * UR-07 — ids of the operations that make a sub-assembly this operation needs (dependency type cross_assembly / sub_assembly).
+     * Such a link is ALWAYS strict finish-to-start: no overlap / transfer-batch early start, in the scheduler, the planner moves and
+     * the checks. (Links of other types — FS inside a routing — keep the routing's own overlap setting.)
+     *
+     * @return array<int, int>
+     */
+    public function subAssemblyPredecessorIds(): array
+    {
+        if ($this->subAssemblyPredecessorIdsMemo === null) {
+            $deps = $this->relationLoaded('predecessorDependencies')
+                ? $this->predecessorDependencies
+                : $this->predecessorDependencies()->get();
+
+            $this->subAssemblyPredecessorIdsMemo = $deps
+                ->filter(fn ($p) => in_array($p->pivot->dependency_type ?? null, ['cross_assembly', 'sub_assembly'], true))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
+
+        return $this->subAssemblyPredecessorIdsMemo;
+    }
+
+    /**
+     * "OP-010 — op1 · test-semi-01 (L3)": operation number and name, plus the product it makes and its BOM level when it belongs to a
+     * sub-assembly. Operation names and numbers repeat on every BOM level, so lists and selects need this to tell them apart.
+     */
+    public function contextLabel(): string
+    {
+        $label = trim(($this->operation_number ? $this->operation_number . ' — ' : '') . html_entity_decode((string) $this->name, ENT_QUOTES, 'UTF-8'));
+
+        if ((int) ($this->bom_level ?? 1) > 1) {
+            $label .= ' · ' . ($this->sourceProduct?->name ?? 'sub-assembly') . ' (L' . (int) $this->bom_level . ')';
+
+            // UR-10: the same sub-assembly can be made once for each operation that needs it — say which one this set is for
+            $for = $this->ownerLabel();
+            if ($for !== null) {
+                $label .= ' → ' . $for;
+            }
+        }
+
+        return $label;
+    }
+
+    /** @var array<int, \Illuminate\Support\Collection> plan key => operation, per order (loaded once per request) */
+    protected static array $planKeyMaps = [];
+
+    /**
+     * UR-10: the operation this sub-assembly operation was made for ("OP-020"), taken from its plan key; null for the order's own operations
+     * and for operations of orders created before the per-operation plan.
+     */
+    public function ownerLabel(): ?string
+    {
+        $key = (string) ($this->plan_key ?? '');
+        $slash = strrpos($key, '/');
+        if ($key === '' || $slash === false) {
+            return null;
+        }
+
+        $setKey = substr($key, 0, $slash);
+        $arrow = strrpos($setKey, '>');
+        if ($arrow === false) {
+            return null;
+        }
+        $ownerKey = substr($setKey, 0, $arrow);
+
+        $map = static::$planKeyMaps[$this->production_order_id] ??= static::where('production_order_id', $this->production_order_id)
+            ->whereNotNull('plan_key')
+            ->get(['id', 'plan_key', 'operation_number', 'sequence', 'name'])
+            ->keyBy('plan_key');
+        $owner = $map->get($ownerKey);
+
+        return $owner ? ($owner->operation_number ?: ('OP-' . str_pad((string) $owner->sequence, 3, '0', STR_PAD_LEFT))) : null;
     }
 
     public function successorDependencies(): \Illuminate\Database\Eloquent\Relations\BelongsToMany

@@ -79,6 +79,11 @@ class RbacSeeder extends Seeder
             ], RolePermission::SCOPE_TENANT);
         }
 
+        // PX-09: only the production manager may log output beyond the ready quantity (every use is logged).
+        $this->grant($roles['production_manager'], [
+            'production.mes.override_readiness' => $permissions['production.mes.override_readiness'],
+        ], RolePermission::SCOPE_TENANT);
+
         $this->grant($roles['sales_manager'], [
             'crm.leads.view' => $permissions['crm.leads.view'],
             'crm.leads.create' => $permissions['crm.leads.create'],
@@ -610,6 +615,7 @@ class RbacSeeder extends Seeder
             ['name' => 'production.order.update', 'module' => 'production', 'entity' => 'order', 'action' => 'update'],
             ['name' => 'production.order.cancel', 'module' => 'production', 'entity' => 'order', 'action' => 'cancel'],
             ['name' => 'production.mes.execute', 'module' => 'production', 'entity' => 'mes', 'action' => 'execute'],
+            ['name' => 'production.mes.override_readiness', 'module' => 'production', 'entity' => 'mes', 'action' => 'override_readiness'],
             ['name' => 'production.schedule.manage', 'module' => 'production', 'entity' => 'schedule', 'action' => 'manage'],
             ['name' => 'production.intelligence.view', 'module' => 'production', 'entity' => 'intelligence', 'action' => 'view'],
             ['name' => 'production.quality.manage', 'module' => 'production', 'entity' => 'quality', 'action' => 'manage'],

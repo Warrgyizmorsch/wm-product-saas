@@ -74,6 +74,9 @@ class ProductionOrder extends BaseModel
 
     public const STATUS_DRAFT = 'draft';
 
+    /** UR-12 (M-24): a draft whose first material request has been sent — it can no longer be edited or deleted, only cancelled or released. */
+    public const STATUS_LOCKED = 'locked';
+
     public const STATUS_RELEASED = 'released';
 
     public const STATUS_IN_PROGRESS = 'in_progress';
@@ -86,6 +89,7 @@ class ProductionOrder extends BaseModel
 
     public const STATUSES = [
         self::STATUS_DRAFT,
+        self::STATUS_LOCKED,
         self::STATUS_RELEASED,
         self::STATUS_IN_PROGRESS,
         self::STATUS_COMPLETED,
@@ -140,9 +144,11 @@ class ProductionOrder extends BaseModel
         'project_id',
         'project_milestone_id',
         'project_task_id',
+        'sub_assembly_plan',
     ];
 
     protected $casts = [
+        'sub_assembly_plan' => 'array',
         'quantity_ordered' => 'float',
         'quantity_produced' => 'float',
         'quantity_rejected' => 'float',
@@ -223,7 +229,11 @@ class ProductionOrder extends BaseModel
 
     public function operations(): HasMany
     {
+        // UR-10: planned operations carry their execution order (sub-assembly operations first, then the operation that needs them);
+        // orders created before that have none and keep the old order (deepest BOM level first, then sequence).
         return $this->hasMany(ProductionOrderOperation::class, 'production_order_id')
+            ->orderByRaw('execution_order IS NULL')
+            ->orderBy('execution_order', 'asc')
             ->orderBy('bom_level', 'desc')
             ->orderBy('sequence', 'asc')
             ->orderBy('id', 'asc');
@@ -247,6 +257,18 @@ class ProductionOrder extends BaseModel
     public function receipts(): HasMany
     {
         return $this->hasMany(ProductionOrderReceipt::class, 'production_order_id');
+    }
+
+    /** PX-19: finished goods already received into stock for this order. */
+    public function receivedFgQuantity(): float
+    {
+        return (float) $this->receipts()->sum('quantity_received');
+    }
+
+    /** PX-19: good output produced but not yet received into stock. */
+    public function pendingFgQuantity(): float
+    {
+        return max(0.0, round((float) $this->quantity_produced - $this->receivedFgQuantity(), 4));
     }
 
     public function scraps(): HasMany
@@ -311,6 +333,17 @@ class ProductionOrder extends BaseModel
         return $this->status === self::STATUS_DRAFT;
     }
 
+    public function isLocked(): bool
+    {
+        return $this->status === self::STATUS_LOCKED;
+    }
+
+    /** Not released to the shop floor yet: a draft, or a locked draft (material requested). */
+    public function isPreRelease(): bool
+    {
+        return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_LOCKED], true);
+    }
+
     public function isReleased(): bool
     {
         return $this->status === self::STATUS_RELEASED;
@@ -339,6 +372,7 @@ class ProductionOrder extends BaseModel
     public function isFrozen(): bool
     {
         return in_array($this->status, [
+            self::STATUS_LOCKED,
             self::STATUS_RELEASED,
             self::STATUS_IN_PROGRESS,
             self::STATUS_COMPLETED,

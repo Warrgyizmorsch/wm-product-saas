@@ -2,7 +2,6 @@
 
 namespace App\Domains\Production\Services;
 
-use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionMachineDowntime;
 use App\Domains\Production\Models\ProductionOrderReservation;
@@ -202,7 +201,8 @@ class SchedulePreReleaseValidationService
                     $predOrderOp = $predSchedOp->orderOperation;
 
                     $earliestNextStart = $predSchedOp->planned_finish;
-                    if ($predOrderOp && (bool) $predOrderOp->overlap_enabled) {
+                    // UR-07: a sub-assembly maker is always finish-to-start (no transfer-batch early start)
+                    if ($predOrderOp && (bool) $predOrderOp->overlap_enabled && !in_array((int) $predOrderOp->id, $orderOp->subAssemblyPredecessorIds(), true)) {
                         $predQty = (float) ($predOrderOp->target_produced_qty > 0 ? $predOrderOp->target_produced_qty : $orderQty);
                         $earliestNextStart = $this->schedulingService->calculateTransferReadyAt(
                             $predOrderOp,
@@ -273,28 +273,33 @@ class SchedulePreReleaseValidationService
                     }
                 }
 
-                // Downtime Collision Check
-                $downtimeConflict = ProductionMachineDowntime::withoutGlobalScopes()
-                    ->where('tenant_id', $tenantId)
-                    ->where('machine_id', $m->id)
-                    ->whereIn('status', ['scheduled', 'in_progress'])
-                    ->where(function ($q) use ($op) {
-                        $q->whereBetween('start_time', [$op->planned_start, $op->planned_finish])
-                          ->orWhereBetween('end_time', [$op->planned_start, $op->planned_finish])
-                          ->orWhere(function ($sub) use ($op) {
-                              $sub->where('start_time', '<=', $op->planned_start)
-                                  ->where('end_time', '>=', $op->planned_finish);
-                          });
-                    })
-                    ->first();
+                // Downtime Collision Check — PX-07 / B-16: downtimes are `open` (planned maintenance with an end, or a running
+                // breakdown with no end yet) or `closed`. An open downtime with no end blocks the machine until it is closed.
+                if ($op->planned_start && $op->planned_finish) {
+                    $downtimeConflict = ProductionMachineDowntime::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('machine_id', $m->id)
+                        ->where('status', ProductionMachineDowntime::STATUS_OPEN)
+                        ->where(function ($q) use ($op) {
+                            $q->whereNull('start_time')->orWhere('start_time', '<=', $op->planned_finish);
+                        })
+                        ->where(function ($q) use ($op) {
+                            $q->whereNull('end_time')->orWhere('end_time', '>=', $op->planned_start);
+                        })
+                        ->orderByRaw('end_time is null desc')
+                        ->first();
 
-                if ($downtimeConflict) {
-                    $errors[] = [
-                        'code'         => 'MACHINE_DOWNTIME_COLLISION',
-                        'severity'     => 'error',
-                        'message'      => "Machine [{$m->name}] has scheduled maintenance downtime during operation sequence {$op->sequence}.",
-                        'operation_id' => $op->id,
-                    ];
+                    if ($downtimeConflict) {
+                        $open = $downtimeConflict->end_time === null;
+                        $errors[] = [
+                            'code'         => $open ? 'MACHINE_DOWNTIME_OPEN' : 'MACHINE_DOWNTIME_COLLISION',
+                            'severity'     => 'error',
+                            'message'      => $open
+                                ? "Machine [{$m->name}] has an open downtime" . ($downtimeConflict->start_time ? ' since ' . $downtimeConflict->start_time->format('d M H:i') : '') . " ({$downtimeConflict->reason}). Close it before operation sequence {$op->sequence} can run."
+                                : "Machine [{$m->name}] has scheduled maintenance downtime during operation sequence {$op->sequence}.",
+                            'operation_id' => $op->id,
+                        ];
+                    }
                 }
             }
         }
@@ -325,78 +330,58 @@ class SchedulePreReleaseValidationService
             ];
         }
 
-        // 6. Material Readiness Checks (Warnings for Shortages)
-        if ($schedule->production_order_id) {
-            $reservations = ProductionOrderReservation::withoutGlobalScopes()
+        // 6. Operation readiness (PX-05 / PX-09, D-04): material that is not issued / short, quality or batch gates, subcontract —
+        //    judged by the SAME readiness engine as the order screen. They are WARNINGS the planner must confirm, not errors.
+        if ($schedule->production_order_id && $schedule->order) {
+            $order = $schedule->order;
+            $hasReservations = ProductionOrderReservation::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
-                ->where('production_order_id', $schedule->production_order_id)
-                ->with(['product'])
-                ->get();
+                ->where('production_order_id', $order->id)
+                ->exists();
 
-            if ($reservations->isEmpty()) {
+            if (!$hasReservations) {
                 $info[] = [
                     'code'         => 'NO_MATERIAL_RESERVATIONS',
                     'severity'     => 'info',
                     'message'      => 'No explicit material BOM reservations found for this Production Order.',
                     'operation_id' => null,
                 ];
-            } else {
-                $totalItems = $reservations->count();
-                $readyCount = 0;
-                $shortageCount = 0;
+            }
 
-                foreach ($reservations as $res) {
-                    $required = (float) $res->quantity_planned;
-                    $issued   = (float) $res->quantity_issued;
-                    $reserved = (float) $res->quantity_reserved;
+            $readiness = app(ProductionReadinessService::class)->evaluateOrderReadiness($order);
+            $schedOpByOrderOp = $operations->keyBy('production_order_operation_id');
+            $seen = [];
 
-                    if ($issued >= $required && $required > 0) {
-                        $readyCount++;
+            foreach ($readiness['operations'] ?? [] as $opEval) {
+                $schedOp = $schedOpByOrderOp->get($opEval['operation_id']);
+                $items = array_merge($opEval['actionable_blockers'] ?? [], $opEval['warnings'] ?? []);
+                foreach ($items as $item) {
+                    $dimension = $item['dimension'] ?? '';
+                    if ($dimension === 'machine') {
+                        continue; // machine problems are already errors above
+                    }
+                    $message = 'Operation sequence ' . ($opEval['sequence'] ?? '—') . ': ' . ($item['message'] ?? 'not ready');
+                    $key = ($item['code'] ?? '') . '|' . $message;
+                    if (isset($seen[$key])) {
                         continue;
                     }
-
-                    $available = 0.0;
-                    if ($res->warehouse_id) {
-                        $available = (float) StockService::getAvailableStock($res->product_id, $res->warehouse_id);
-                    }
-                    if ($available <= 0) {
-                        $available = (float) \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
-                            ->where('product_id', $res->product_id)
-                            ->sum('quantity');
-                    }
-
-                    $totalAvailable = $issued + $reserved + $available;
-
-                    if ($totalAvailable >= $required || ($issued + $reserved) >= $required) {
-                        $readyCount++;
-                    } elseif ($totalAvailable > 0) {
-                        $shortageCount++;
-                        $warnings[] = [
-                            'code'         => 'MATERIAL_PARTIALLY_AVAILABLE',
-                            'severity'     => 'warning',
-                            'message'      => "Material [{$res->product->name}] is partially available (Issued: {$issued}, Warehouse Stock: {$available}, Required: {$required}).",
-                            'operation_id' => null,
-                        ];
-                    } else {
-                        $shortageCount++;
-                        $warnings[] = [
-                            'code'         => 'MATERIAL_SHORTAGE',
-                            'severity'     => 'warning',
-                            'message'      => "Material shortage for [{$res->product->name}] (Required: {$required}, Issued: {$issued}, Warehouse Stock: {$available}).",
-                            'operation_id' => null,
-                        ];
-                    }
+                    $seen[$key] = true;
+                    $warnings[] = [
+                        'code'         => $item['code'] ?? 'OPERATION_NOT_READY',
+                        'severity'     => 'warning',
+                        'message'      => $message,
+                        'operation_id' => $schedOp?->id,
+                    ];
                 }
-
-                $info[] = [
-                    'code'         => 'MATERIAL_READINESS_SUMMARY',
-                    'severity'     => 'info',
-                    'message'      => "Material readiness: {$readyCount}/{$totalItems} component items ready.",
-                    'operation_id' => null,
-                ];
             }
-        }
 
+            $info[] = [
+                'code'         => 'READINESS_SUMMARY',
+                'severity'     => 'info',
+                'message'      => "Operation readiness: {$readiness['ready_operations_count']} ready, {$readiness['partial_operations_count']} partially ready, {$readiness['waiting_operations_count']} waiting, {$readiness['blocked_operations_count']} blocked.",
+                'operation_id' => null,
+            ];
+        }
         $canRelease = empty($errors);
         $hasWarnings = !empty($warnings);
 

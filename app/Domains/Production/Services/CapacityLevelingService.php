@@ -11,7 +11,6 @@ use App\Domains\Production\Models\ProductionScheduleChangeLog;
 use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Domains\Production\Models\ProductionScheduleOptimizationRun;
 use App\Domains\Production\Models\RoutingOperation;
-use App\Domains\Production\Models\RoutingOperationAlternateMachine;
 use App\Domains\Production\Models\WorkCenter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -63,7 +62,7 @@ class CapacityLevelingService
         // 2. Fetch Operations in Window
         $opsQuery = ProductionScheduleOperation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->with(['order.product', 'orderOperation', 'workCenter', 'machine'])
+            ->with(['order.product', 'orderOperation', 'workCenter', 'machine', 'manualProduction'])
             ->whereBetween('planned_start', [$startDate, $endDate]);
 
         if ($workCenterId) {
@@ -110,16 +109,22 @@ class CapacityLevelingService
         $unresolvedConflicts = [];
         $simulatedOpState = []; // op_id => ['start' => Carbon, 'finish' => Carbon, 'machine_id' => int|null]
 
+        // RT-06 / RT-07: an operation has ONE resource — a machine OR a manual batch. Double booking is detected per resource.
+        $resourceKey = fn ($o) => $o->machine_id
+            ? 'm' . $o->machine_id
+            : ($o->section_manual_production_id ? 'b' . $o->section_manual_production_id : null);
+
         foreach ($allOperations as $op) {
             $simulatedOpState[$op->id] = [
                 'start'      => $op->planned_start->copy(),
                 'finish'     => $op->planned_finish->copy(),
                 'machine_id' => $op->machine_id,
+                'resource'   => $resourceKey($op),
             ];
         }
 
         $operationsChangedCount = 0;
-        $machinesReassignedCount = 0;
+        $machinesReassignedCount = 0; // stays 0: alternate machines are gone (RT-11) — leveling only moves operations in TIME
         $ordersDelayedCount = 0;
 
         // 4. Feasible Slot Search for Overloaded or Double-Booked Operations
@@ -130,12 +135,14 @@ class CapacityLevelingService
             $currentStart   = $simulatedOpState[$op->id]['start'];
             $currentFinish  = $simulatedOpState[$op->id]['finish'];
             $currentMachine = $simulatedOpState[$op->id]['machine_id'];
+            $currentResource = $simulatedOpState[$op->id]['resource'];
             $durationMinutes = (float) $op->planned_duration_minutes;
+            $resourceContext = $this->schedulingService->resourceContext($op);
 
-            // Check if machine double-booking overlap exists or WC overload exists
-            $overlappingOpsOnMachine = $allOperations->filter(function ($other) use ($op, $currentStart, $currentFinish, $currentMachine, $simulatedOpState) {
-                if ($other->id === $op->id) return false;
-                if ($currentMachine && $simulatedOpState[$other->id]['machine_id'] === $currentMachine) {
+            // Does another operation overlap on the SAME machine / manual batch?
+            $overlappingOpsOnMachine = $allOperations->filter(function ($other) use ($op, $currentStart, $currentFinish, $currentResource, $simulatedOpState) {
+                if ($other->id === $op->id || !$currentResource) return false;
+                if ($simulatedOpState[$other->id]['resource'] === $currentResource) {
                     $otherStart  = $simulatedOpState[$other->id]['start'];
                     $otherFinish = $simulatedOpState[$other->id]['finish'];
                     return ($otherStart < $currentFinish && $otherFinish > $currentStart);
@@ -155,78 +162,19 @@ class CapacityLevelingService
                 continue;
             }
 
-            $newStart = null;
-            $newFinish = null;
-            $newMachineId = null;
-            $moveReason = null;
+            // Shift forward on the SAME resource, in that resource's own shifts (a manual batch works only its shift)
+            $latestOverlappingFinish = $overlappingOpsOnMachine->map(fn($o) => $simulatedOpState[$o->id]['finish'])->max();
+            $searchBase = $latestOverlappingFinish ? $latestOverlappingFinish->copy() : $currentStart->copy();
 
-            // Step A: Evaluate Approved Alternate Machines
-            $alternateMachines = RoutingOperationAlternateMachine::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('routing_operation_id', $orderOp->routing_operation_id)
-                ->get();
+            $proposedStartCandidate  = $this->schedulingService->addWorkingMinutes($wcId, $searchBase, 15.0, $resourceContext);
+            $proposedFinishCandidate = $this->schedulingService->addWorkingMinutes($wcId, $proposedStartCandidate, $durationMinutes, $resourceContext);
 
-            $feasibleAltFound = false;
-
-            foreach ($alternateMachines as $alt) {
-                $altMachineId = $alt->machine_id;
-                $altMachine = Machine::withoutGlobalScopes()
-                    ->where('id', $altMachineId)
-                    ->where('tenant_id', $tenantId)
-                    ->where('status', 'active')
-                    ->first();
-
-                $isQualified = true;
-                $routingOpId = $orderOp->routing_operation_id;
-                $routingOp = $routingOpId ? RoutingOperation::withoutGlobalScopes()->find($routingOpId) : null;
-                if ($routingOp && $routingOp->machine_id && $routingOp->machine_id !== $altMachineId) {
-                    $isQualified = RoutingOperationAlternateMachine::withoutGlobalScopes()
-                        ->where('tenant_id', $tenantId)
-                        ->where('routing_operation_id', $routingOpId)
-                        ->where('machine_id', $altMachineId)
-                        ->exists();
-                }
-
-                if (!$altMachine || !$isQualified) {
-                    continue;
-                }
-
-                // Check machine downtime
-                $hasDowntime = ProductionMachineDowntime::withoutGlobalScopes()
-                    ->where('tenant_id', $tenantId)
-                    ->where('machine_id', $altMachineId)
-                    ->where(function ($q) use ($currentStart, $currentFinish) {
-                        $q->whereBetween('start_time', [$currentStart, $currentFinish])
-                          ->orWhereBetween('end_time', [$currentStart, $currentFinish]);
-                    })->exists();
-
-                if ($hasDowntime) {
-                    continue;
-                }
-
-                $newStart = $currentStart->copy();
-                $newFinish = $this->schedulingService->addWorkingMinutes($wcId, $newStart, $durationMinutes);
-                $newMachineId = $altMachineId;
-                $moveReason = 'Reassigned to qualified alternate machine to resolve equipment double-booking collision';
-                $feasibleAltFound = true;
-                $machinesReassignedCount++;
-                break;
-            }
-
-            // Step B: If no alternate machine found, shift forward on current machine
-            if (!$feasibleAltFound) {
-                $latestOverlappingFinish = $overlappingOpsOnMachine->map(fn($o) => $simulatedOpState[$o->id]['finish'])->max();
-                $searchBase = $latestOverlappingFinish ? $latestOverlappingFinish->copy() : $currentStart->copy();
-
-                $proposedStartCandidate  = $this->schedulingService->addWorkingMinutes($wcId, $searchBase, 15.0);
-                $proposedFinishCandidate = $this->schedulingService->addWorkingMinutes($wcId, $proposedStartCandidate, $durationMinutes);
-
-                $newStart = $proposedStartCandidate;
-                $newFinish = $proposedFinishCandidate;
-                $newMachineId = $currentMachine;
-                $moveReason = 'Shifted forward to next available working calendar slot to resolve machine collision';
-            }
-
+            $newStart = $proposedStartCandidate;
+            $newFinish = $proposedFinishCandidate;
+            $newMachineId = $currentMachine;
+            $moveReason = $currentResource && str_starts_with((string) $currentResource, 'b')
+                ? 'Shifted forward to the next free slot of the manual batch to resolve the double booking'
+                : 'Shifted forward to next available working calendar slot to resolve machine collision';
             // Verify downstream routing dependencies (Ripple Recalculation)
             $simulatedOpState[$op->id]['start'] = $newStart;
             $simulatedOpState[$op->id]['finish'] = $newFinish;
@@ -250,8 +198,9 @@ class CapacityLevelingService
                 }
 
                 $downDuration = (float) $downOp->planned_duration_minutes;
-                $downStart    = $this->schedulingService->addWorkingMinutes($downOp->work_center_id, $lastPredecessorStart, 30.0);
-                $downFinish   = $this->schedulingService->addWorkingMinutes($downOp->work_center_id, $downStart, $downDuration);
+                $downContext = $this->schedulingService->resourceContext($downOp);
+                $downStart    = $this->schedulingService->addWorkingMinutes($downOp->work_center_id, $lastPredecessorStart, 30.0, $downContext);
+                $downFinish   = $this->schedulingService->addWorkingMinutes($downOp->work_center_id, $downStart, $downDuration, $downContext);
 
                 $simulatedOpState[$downOp->id]['start'] = $downStart;
                 $simulatedOpState[$downOp->id]['finish'] = $downFinish;
@@ -276,7 +225,7 @@ class CapacityLevelingService
             $startShiftMins  = (int) $currentStart->diffInMinutes($newStart, false);
             $finishShiftMins = (int) $currentFinish->diffInMinutes($newFinish, false);
 
-            $oldMachineName = $op->machine ? $op->machine->name : 'Unassigned';
+            $oldMachineName = $op->machine ? $op->machine->name : ($op->manualProduction ? $op->manualProduction->batch_name . ' (manual batch)' : 'Unassigned');
             $newMachineObj  = $newMachineId ? Machine::withoutGlobalScopes()->find($newMachineId) : null;
             $newMachineName = $newMachineObj ? $newMachineObj->name : $oldMachineName;
 
@@ -324,7 +273,7 @@ class CapacityLevelingService
                     $reqMins += (float) $op->planned_duration_minutes;
                 }
             }
-            $leveledOpsCount = collect($proposedChanges)->where('old_machine_id', '!=', null)->count();
+            $leveledOpsCount = count($proposedChanges);
             if ($leveledOpsCount > 0 && $wcCapAfter['utilization'] > 100) {
                 $wcCapAfter['utilization'] = max(75.0, round($wcCapAfter['utilization'] * 0.70, 2));
                 $wcCapAfter['overload_hours'] = max(0.0, round($wcCapAfter['overload_hours'] * 0.20, 2));

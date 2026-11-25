@@ -201,7 +201,8 @@ class ProductionOrderApiController extends ApiBaseController
         Gate::authorize('release', $order);
 
         try {
-            $orderService->release($id, auth()->id());
+            // UR-12 (M-24): material not issued yet is a soft stop — send confirm_materials=true to release anyway
+            $orderService->release($id, auth()->id(), request()->boolean('confirm_materials'));
 
             return $this->successResponse(
                 new ProductionOrderDetailResource($order->fresh(['product'])),
@@ -537,7 +538,7 @@ class ProductionOrderApiController extends ApiBaseController
      * POST /api/v1/production/orders/{id}/close
      * Close and archive a completed production order.
      */
-    public function close(int $id, ProductionOrderService $orderService): JsonResponse
+    public function close(Request $request, int $id, ProductionOrderService $orderService): JsonResponse
     {
         $tenantId = $this->getTenantId();
         $order = ProductionOrder::where('tenant_id', $tenantId)->findOrFail($id);
@@ -545,7 +546,7 @@ class ProductionOrderApiController extends ApiBaseController
         Gate::authorize('close', $order);
 
         try {
-            $orderService->close($id, auth()->id());
+            $orderService->close($id, auth()->id(), $request->input('no_fg_reason'));
 
             return $this->successResponse(
                 new ProductionOrderDetailResource($order->fresh(['product'])),

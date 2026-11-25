@@ -110,7 +110,11 @@ class CapacityLevelingTest extends TestCase
         $this->assertNotEquals($change['old_start'], $change['new_start']);
     }
 
-    public function test_capacity_leveling_uses_qualified_alternate_machine(): void
+    /**
+     * RT-06 / RT-07 / RT-11: an operation has ONE resource and there are no alternate machines — a leftover alternate-machine row
+     * is ignored. Leveling resolves the overload by moving the operation in TIME on its own machine / manual batch.
+     */
+    public function test_capacity_leveling_never_reassigns_to_an_alternate_machine(): void
     {
         $setup = $this->createOverloadedScheduleSetup();
         $wc = $setup['workCenter'];
@@ -145,8 +149,10 @@ class CapacityLevelingTest extends TestCase
         $this->assertGreaterThan(0, count($preview['proposed_changes']));
         $change = $preview['proposed_changes'][0];
 
-        $this->assertEquals($altMachine->id, $change['new_machine_id']);
-        $this->assertEquals('CNC Alternate Machine', $change['new_machine_name']);
+        $this->assertEquals($change['old_machine_id'], $change['new_machine_id'], 'the operation keeps its own machine');
+        $this->assertNotEquals($altMachine->id, $change['new_machine_id']);
+        $this->assertSame(0, $preview['summary']['machines_reassigned']);
+        $this->assertNotEquals($change['old_start'], $change['new_start'], 'it is moved in time instead');
     }
 
     public function test_capacity_leveling_respects_locked_operations(): void

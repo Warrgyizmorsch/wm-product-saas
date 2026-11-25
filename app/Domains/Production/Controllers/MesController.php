@@ -49,6 +49,7 @@ class MesController extends Controller
             'operations.machine',
             'operations.orderOperation.vendor',
             'operations.orderOperation.routingOperation',
+            'operations.orderOperation.predecessorDependencies',
             'operations.orderOperation.latestDeliveryChallan',
             'operations.orderOperation.deliveryChallans',
             'operations.orderOperation.operatorAssignments.user',
@@ -109,7 +110,7 @@ class MesController extends Controller
 
         // Running operations (for stopwatch timer block countdowns)
         $running = ProductionScheduleOperation::where('tenant_id', $tenantId)
-            ->with(['schedule.order.product', 'workCenter', 'machine'])
+            ->with(['schedule.order.product', 'workCenter', 'machine', 'manualProduction'])
             ->whereHas('schedule', fn($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
             ->orderBy('planned_start')
@@ -117,7 +118,7 @@ class MesController extends Controller
 
         // Paused operations (for completion modals)
         $paused = ProductionScheduleOperation::where('tenant_id', $tenantId)
-            ->with(['schedule.order.product', 'workCenter', 'machine'])
+            ->with(['schedule.order.product', 'workCenter', 'machine', 'manualProduction'])
             ->whereHas('schedule', fn($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_PAUSED)
             ->orderBy('planned_start')
@@ -141,6 +142,7 @@ class MesController extends Controller
             'operations.workCenter',
             'operations.machine',
             'operations.orderOperation.vendor',
+            'operations.orderOperation.predecessorDependencies',
             'operations.orderOperation.latestDeliveryChallan',
             'operations.orderOperation.deliveryChallans',
             'operations.orderOperation.operatorAssignments.user',
@@ -822,6 +824,7 @@ class MesController extends Controller
             'operation.order.product',
             'operation.workCenter',
             'operation.machine',
+            'operation.manualProduction',
         ])
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId);
@@ -863,6 +866,9 @@ class MesController extends Controller
                         })
                         ->orWhereHas('machine', function ($mQ) use ($search) {
                             $mQ->where('name', 'like', $search);
+                        })
+                        ->orWhereHas('manualProduction', function ($bQ) use ($search) {
+                            $bQ->where('batch_name', 'like', $search);
                         });
                 });
             });
@@ -911,7 +917,7 @@ class MesController extends Controller
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
-        $op = ProductionOrderOperation::with(['order.product', 'workCenter', 'machine'])->findOrFail($opId);
+        $op = ProductionOrderOperation::with(['order.product', 'workCenter', 'machine', 'manualProduction'])->findOrFail($opId);
 
         $order = $op->order;
         $batchService = app(\App\Domains\Production\Services\BatchProductionService::class);

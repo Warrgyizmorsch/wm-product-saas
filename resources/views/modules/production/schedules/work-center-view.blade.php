@@ -69,7 +69,7 @@
                                         <th style="width: 15%">{{ __('production.production_order') }} #</th>
                                         <th style="width: 20%">{{ __('production.product') }}</th>
                                         <th style="width: 18%">{{ __('production.operations') }}</th>
-                                        <th style="width: 10%">{{ __('production.assigned_machine') ?? 'Machine' }}</th>
+                                        <th style="width: 10%">{{ __('production.assigned_machine') ?? 'Machine' }} / Manual batch</th>
                                         <th style="width: 12%">{{ __('production.planned_start') }}</th>
                                         <th style="width: 12%">{{ __('production.planned_finish') }}</th>
                                         <th style="width: 10%">{{ __('production.status') }}</th>
@@ -91,7 +91,16 @@
                                                 <span class="fw-semibold text-dark fs-12">{{ $op->orderOperation->name ?? '—' }}</span>
                                                 <br><small class="text-muted font-monospace">{{ $op->orderOperation->operation_number ?? '' }}</small>
                                             </td>
-                                            <td class="text-muted fs-12">{{ $op->machine->name ?? '—' }}</td>
+                                            <td class="text-muted fs-12">
+                                                @if($op->machine)
+                                                    {{ $op->machine->name }}
+                                                @elseif($op->manualProduction)
+                                                    {{ $op->manualProduction->batch_name }}
+                                                    <span class="badge bg-soft-secondary text-secondary fs-9 d-block mt-1" style="width: max-content">Manual batch</span>
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
                                             <td class="fs-12 text-muted">{{ $op->planned_start->format('d/m H:i') }}</td>
                                             <td class="fs-12 text-muted">{{ $op->planned_finish->format('d/m H:i') }}</td>
                                             <td>

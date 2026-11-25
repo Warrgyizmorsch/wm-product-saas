@@ -557,7 +557,7 @@
         <tbody>
             @forelse($reportData['data'] as $r)
                 @php
-                    $sc = match($r['status']) { 'completed' => 'badge-success', 'in_progress' => 'badge-primary', 'released' => 'badge-info', 'draft' => 'badge-dark', default => 'badge-dark' };
+                    $sc = match($r['status']) { 'completed' => 'badge-success', 'in_progress' => 'badge-primary', 'released' => 'badge-info', 'draft' => 'badge-dark', 'locked' => 'badge-dark', default => 'badge-dark' };
                 @endphp
                 <tr>
                     <td style="font-weight:bold; font-family:monospace;">{{ $r['order_number'] }}</td>

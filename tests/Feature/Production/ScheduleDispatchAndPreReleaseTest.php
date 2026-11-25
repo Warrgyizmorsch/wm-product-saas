@@ -314,7 +314,7 @@ class ScheduleDispatchAndPreReleaseTest extends TestCase
             'end_time'       => $op->planned_finish->copy()->addMinutes(10),
             'category'       => 'unplanned',
             'reason'         => 'Emergency Spindle Maintenance',
-            'status'         => 'scheduled',
+            'status'         => 'open',
             'created_by'     => $this->planner->id,
         ]);
 

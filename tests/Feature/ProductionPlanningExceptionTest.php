@@ -231,7 +231,7 @@ class ProductionPlanningExceptionTest extends TestCase
         $machEx = collect($risk['exceptions'])->firstWhere('type', PlanningExceptionService::TYPE_MACHINE_UNAVAILABLE);
         $this->assertNotNull($machEx);
         $this->assertEquals(PlanningExceptionService::SEVERITY_CRITICAL, $machEx['severity']);
-        $this->assertEquals(PlanningExceptionService::REC_ASSIGN_ALTERNATE_MACHINE, $machEx['recommended_action']);
+        $this->assertEquals(PlanningExceptionService::REC_RESCHEDULE_OPERATION, $machEx['recommended_action'], 'RT-11: no alternate machines — close the downtime or reschedule');
     }
 
     /**

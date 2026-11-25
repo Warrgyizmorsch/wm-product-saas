@@ -10,7 +10,6 @@ use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Domains\Production\Models\ProductionScheduleScenario;
 use App\Domains\Production\Models\ProductionScheduleScenarioOperation;
 use App\Domains\Production\Models\RoutingOperation;
-use App\Domains\Production\Models\RoutingOperationAlternateMachine;
 use App\Domains\Production\Models\WorkCenter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -96,6 +95,9 @@ class ProductionScheduleScenarioService
                     'production_order_operation_id' => $op->production_order_operation_id,
                     'work_center_id'                 => $op->work_center_id,
                     'machine_id'                     => $op->machine_id,
+                    'section_id'                     => $op->section_id,
+                    'section_manual_production_id'   => $op->section_manual_production_id,
+                    'resource_id'                    => $op->resource_id,
                     'sequence'                       => $op->sequence,
                     'priority'                       => $op->priority ?? 3,
                     'planned_start'                  => $op->planned_start,
@@ -180,7 +182,7 @@ class ProductionScheduleScenarioService
                 }
 
                 $newStart  = $baseStart;
-                $newFinish = $this->schedulingService->addWorkingMinutes($wcId, $newStart, $duration);
+                $newFinish = $this->schedulingService->addWorkingMinutes($wcId, $newStart, $duration, $this->schedulingService->resourceContext($op));
 
                 $op->planned_start  = $newStart;
                 $op->planned_finish = $newFinish;
@@ -228,7 +230,7 @@ class ProductionScheduleScenarioService
         }
 
         $ops = $scenario->scenarioOperations;
-        $reassignedCount = 0;
+        $reassignedCount = 0; // stays 0: alternate machines are gone (RT-11) — leveling only moves operations in TIME
         $shiftedCount = 0;
 
         foreach ($ops as $op) {
@@ -236,68 +238,34 @@ class ProductionScheduleScenarioService
                 continue;
             }
 
-            // Check machine collisions inside scenario
-            $collisions = $ops->filter(function ($other) use ($op) {
-                if ($other->id === $op->id || !$op->machine_id) return false;
-                if ($other->machine_id === $op->machine_id) {
-                    return ($other->planned_start < $op->planned_finish && $other->planned_finish > $op->planned_start);
-                }
-                return false;
+            // RT-06 / RT-07: ONE resource per operation — collisions are checked on the same machine OR manual batch
+            $key = $op->resourceKey();
+            if (!$key) {
+                continue;
+            }
+
+            $collisions = $ops->filter(function ($other) use ($op, $key) {
+                return $other->id !== $op->id
+                    && $other->resourceKey() === $key
+                    && $other->planned_start < $op->planned_finish
+                    && $other->planned_finish > $op->planned_start;
             });
 
             if ($collisions->count() > 0 && $op->orderOperation) {
-                $orderOp = $op->orderOperation;
-                $altMachines = RoutingOperationAlternateMachine::withoutGlobalScopes()
-                    ->where('tenant_id', $tenantId)
-                    ->where('routing_operation_id', $orderOp->routing_operation_id)
-                    ->get();
+                $maxFinish = $collisions->pluck('planned_finish')->max();
+                if ($maxFinish) {
+                    $context   = $this->schedulingService->resourceContext($op);
+                    $newStart  = $this->schedulingService->addWorkingMinutes($op->work_center_id, $maxFinish, 15, $context);
+                    $newFinish = $this->schedulingService->addWorkingMinutes($op->work_center_id, $newStart, (float) $op->planned_duration_minutes, $context);
 
-                $altFound = false;
-                foreach ($altMachines as $alt) {
-                    $altMachineId = $alt->machine_id;
-                    $altMachine = Machine::withoutGlobalScopes()
-                        ->where('id', $altMachineId)
-                        ->where('tenant_id', $tenantId)
-                        ->where('status', 'active')
-                        ->first();
-                    if (!$altMachine) continue;
-
-                    // Check if alt machine is free
-                    $altCollision = $ops->filter(function ($other) use ($op, $altMachineId) {
-                        if ($other->id === $op->id) return false;
-                        if ($other->machine_id === $altMachineId) {
-                            return ($other->planned_start < $op->planned_finish && $other->planned_finish > $op->planned_start);
-                        }
-                        return false;
-                    })->count();
-
-                    if ($altCollision === 0) {
-                        $op->machine_id = $altMachineId;
-                        $op->manual_override = true;
-                        $op->save();
-                        $altFound = true;
-                        $reassignedCount++;
-                        break;
-                    }
-                }
-
-                if (!$altFound) {
-                    // Shift forward on current machine
-                    $maxFinish = $collisions->pluck('planned_finish')->max();
-                    if ($maxFinish) {
-                        $newStart  = $this->schedulingService->addWorkingMinutes($op->work_center_id, $maxFinish, 15);
-                        $newFinish = $this->schedulingService->addWorkingMinutes($op->work_center_id, $newStart, (float) $op->planned_duration_minutes);
-
-                        $op->planned_start  = $newStart;
-                        $op->planned_finish = $newFinish;
-                        $op->manual_override = true;
-                        $op->save();
-                        $shiftedCount++;
-                    }
+                    $op->planned_start  = $newStart;
+                    $op->planned_finish = $newFinish;
+                    $op->manual_override = true;
+                    $op->save();
+                    $shiftedCount++;
                 }
             }
         }
-
         // Recalculate KPIs
         $this->recalculateScenario($tenantId, $scenarioId);
 
@@ -316,7 +284,7 @@ class ProductionScheduleScenarioService
         $scenario = ProductionScheduleScenario::withoutGlobalScopes()
             ->where('id', $scenarioId)
             ->where('tenant_id', $tenantId)
-            ->with(['scenarioOperations.sourceOperation', 'scenarioOperations.order.product', 'scenarioOperations.workCenter', 'scenarioOperations.machine'])
+            ->with(['scenarioOperations.sourceOperation', 'scenarioOperations.order.product', 'scenarioOperations.workCenter', 'scenarioOperations.machine', 'scenarioOperations.manualProduction'])
             ->first();
 
         if (!$scenario) {
@@ -329,7 +297,7 @@ class ProductionScheduleScenarioService
         $liveOps = ProductionScheduleOperation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->whereIn('id', $sourceOpIds)
-            ->with(['order', 'machine', 'workCenter'])
+            ->with(['order', 'machine', 'workCenter', 'manualProduction'])
             ->get()
             ->keyBy('id');
 
@@ -358,8 +326,8 @@ class ProductionScheduleScenarioService
                 'production_order_number' => $sOp->order ? $sOp->order->order_number : 'PO-' . $sOp->production_order_id,
                 'product_name'            => $sOp->order?->product?->name ?? 'Product',
                 'sequence'                => $sOp->sequence,
-                'live_machine'            => $lOp->machine ? $lOp->machine->name : 'Unassigned',
-                'scenario_machine'        => $sOp->machine ? $sOp->machine->name : 'Unassigned',
+                'live_machine'            => $lOp->machine ? $lOp->machine->name : ($lOp->manualProduction ? $lOp->manualProduction->batch_name . ' (manual batch)' : 'Unassigned'),
+                'scenario_machine'        => $sOp->machine ? $sOp->machine->name : ($sOp->manualProduction ? $sOp->manualProduction->batch_name . ' (manual batch)' : 'Unassigned'),
                 'live_start'              => $lOp->planned_start->toIso8601String(),
                 'scenario_start'          => $sOp->planned_start->toIso8601String(),
                 'live_finish'             => $lOp->planned_finish->toIso8601String(),
@@ -478,18 +446,21 @@ class ProductionScheduleScenarioService
                         $this->capacityPlanningService->validateMachineQualification($lOp, (int) $sOp->machine_id, $tenantId);
                     }
 
+                    // PX-07: downtimes are `open` / `closed`; an OPEN one with no end blocks the machine until it is closed
                     $downtimeConflict = ProductionMachineDowntime::withoutGlobalScopes()
                         ->where('tenant_id', $tenantId)
                         ->where('machine_id', $sOp->machine_id)
-                        ->whereIn('status', ['scheduled', 'in_progress', 'open'])
-                        ->where(function ($q) use ($sOp) {
-                            $q->whereBetween('start_time', [$sOp->planned_start, $sOp->planned_finish])
-                              ->orWhereBetween('end_time', [$sOp->planned_start, $sOp->planned_finish]);
-                        })->exists();
+                        ->where('status', ProductionMachineDowntime::STATUS_OPEN)
+                        ->where(fn ($q) => $q->whereNull('start_time')->orWhere('start_time', '<=', $sOp->planned_finish))
+                        ->where(fn ($q) => $q->whereNull('end_time')->orWhere('end_time', '>=', $sOp->planned_start))
+                        ->exists();
 
                     if ($downtimeConflict) {
                         throw new InvalidArgumentException("PROMOTION_BLOCKED: Machine downtime collision detected for sequence #{$sOp->sequence}.");
                     }
+                } elseif ($sOp->section_manual_production_id) {
+                    // a manual batch operation: its batch must still be active (a scenario never swaps the batch)
+                    $this->capacityPlanningService->validateBatchAvailability($tenantId, (int) $sOp->section_manual_production_id);
                 }
             }
 
@@ -630,13 +601,14 @@ class ProductionScheduleScenarioService
             }
         }
 
-        // Machine Conflicts inside scenario
+        // Resource conflicts inside scenario: two operations on the same machine OR the same manual batch
         $conflictsCount = 0;
         foreach ($ops as $op) {
-            if (!$op->machine_id) continue;
-            $overlap = $ops->filter(function ($other) use ($op) {
+            $key = $op->resourceKey();
+            if (!$key) continue;
+            $overlap = $ops->filter(function ($other) use ($op, $key) {
                 if ($other->id === $op->id) return false;
-                return $other->machine_id === $op->machine_id && ($other->planned_start < $op->planned_finish && $other->planned_finish > $op->planned_start);
+                return $other->resourceKey() === $key && ($other->planned_start < $op->planned_finish && $other->planned_finish > $op->planned_start);
             })->count();
             if ($overlap > 0) {
                 $conflictsCount++;
@@ -718,6 +690,8 @@ class ProductionScheduleScenarioService
             $targetMachineId = $newMachineId ?: $scenOp->machine_id;
             if ($targetMachineId) {
                 $this->capacityPlanningService->validateMachineQualification($scenOp, $targetMachineId, $tenantId);
+            } elseif ($scenOp->section_manual_production_id) {
+                $this->capacityPlanningService->validateBatchAvailability($tenantId, (int) $scenOp->section_manual_production_id);
             }
 
             $wc = $scenOp->workCenter;
@@ -727,7 +701,7 @@ class ProductionScheduleScenarioService
             }
 
             $durationMinutes = (float) $scenOp->planned_duration_minutes;
-            $newFinish       = $this->schedulingService->addWorkingMinutes($scenOp->work_center_id, $newStart, $durationMinutes);
+            $newFinish       = $this->schedulingService->addWorkingMinutes($scenOp->work_center_id, $newStart, $durationMinutes, $this->schedulingService->resourceContext($scenOp));
 
             if ($targetMachineId) {
                 $this->capacityPlanningService->validateMachineAvailability($tenantId, $targetMachineId, $newStart, $newFinish, $scenOp->id);
@@ -769,7 +743,8 @@ class ProductionScheduleScenarioService
 
             if ($predecessor) {
                 $predOrderOp = $predecessor->orderOperation;
-                if ($predOrderOp && (bool) $predOrderOp->overlap_enabled) {
+                // UR-07: a sub-assembly maker is always finish-to-start (no transfer-batch early start)
+                if ($predOrderOp && (bool) $predOrderOp->overlap_enabled && !($orderOp && in_array((int) $predOrderOp->id, $orderOp->subAssemblyPredecessorIds(), true))) {
                     $setupMinutes          = (float) ($predOrderOp->setup_time_planned ?? 0);
                     $batchQty              = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
                     $lagMinutes            = (float) ($predOrderOp->transfer_lag_minutes ?? 0);
@@ -811,7 +786,7 @@ class ProductionScheduleScenarioService
 
             if ($shiftMode === ProductionScheduleChangeLog::SHIFT_MODE_ISOLATED) {
                 if ($successor) {
-                    if ($orderOp && (bool) $orderOp->overlap_enabled) {
+                    if ($orderOp && (bool) $orderOp->overlap_enabled && !($successor->orderOperation && in_array((int) $orderOp->id, $successor->orderOperation->subAssemblyPredecessorIds(), true))) {
                         $setupMinutes          = (float) ($orderOp->setup_time_planned ?? 0);
                         $batchQty              = (float) ($orderOp->transfer_batch_quantity ?? 0);
                         $lagMinutes            = (float) ($orderOp->transfer_lag_minutes ?? 0);

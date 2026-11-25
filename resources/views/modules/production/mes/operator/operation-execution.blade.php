@@ -363,15 +363,24 @@
 
                             <div class="row g-2">
                                 @if($op->status !== 'running' && $op->status !== 'paused' && $op->status !== 'completed')
+                                    @php $startFlow = $readiness['readiness_evaluation']['dependency'] ?? null; @endphp
                                     <div class="col-12">
-                                        <form method="POST"
-                                            action="{{ route('production.mes.start', optional($scheduleOp)->id ?? $op->id) }}">
-                                            @csrf
-                                            <x-ui.button type="submit" variant="success" icon="feather-play"
-                                                class="btn-touch-large w-100">
+                                        @if(($startFlow['state'] ?? '') === 'waiting')
+                                            {{-- UR-07: waiting for its predecessor / the operations that make its sub-assembly — cannot start yet --}}
+                                            <div class="alert alert-info py-2 px-3 fs-12 mb-2"><i class="feather-clock me-1"></i><strong>{{ $startFlow['label'] }}</strong>@if(!empty($startFlow['detail'])) — {{ $startFlow['detail'] }}@endif</div>
+                                            <x-ui.button type="button" variant="secondary" icon="feather-lock" class="btn-touch-large w-100" disabled>
                                                 START OPERATION
                                             </x-ui.button>
-                                        </form>
+                                        @else
+                                            <form method="POST"
+                                                action="{{ route('production.mes.start', optional($scheduleOp)->id ?? $op->id) }}">
+                                                @csrf
+                                                <x-ui.button type="submit" variant="success" icon="feather-play"
+                                                    class="btn-touch-large w-100">
+                                                    START OPERATION
+                                                </x-ui.button>
+                                            </form>
+                                        @endif
                                     </div>
                                 @endif
 

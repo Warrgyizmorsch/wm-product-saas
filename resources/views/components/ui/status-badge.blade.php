@@ -28,6 +28,7 @@
         'delayed' => ['bg' => 'bg-soft-danger', 'text' => 'text-danger', 'dot' => 'bg-danger', 'default_label' => 'Delayed'],
         'blocked' => ['bg' => 'bg-soft-danger', 'text' => 'text-danger', 'dot' => 'bg-danger', 'default_label' => 'Blocked'],
         'draft' => ['bg' => 'bg-soft-secondary', 'text' => 'text-secondary', 'dot' => 'bg-secondary', 'default_label' => 'Draft'],
+        'locked' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Locked'],
         'cancelled' => ['bg' => 'bg-soft-dark', 'text' => 'text-dark', 'dot' => 'bg-dark', 'default_label' => 'Cancelled'],
         'out_of_stock' => ['bg' => 'bg-soft-danger', 'text' => 'text-danger', 'dot' => 'bg-danger', 'default_label' => 'Out of Stock'],
         'low_stock' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Low Stock Alert'],

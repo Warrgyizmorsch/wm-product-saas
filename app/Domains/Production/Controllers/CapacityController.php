@@ -41,6 +41,9 @@ class CapacityController extends Controller
         // 2. Machine capacity & utilization
         $machineLoads = $this->capacityService->getMachineCapacity($tenantId, $startDate, $endDate);
 
+        // 2b. Manual batch capacity & utilization (a batch works only its own shift)
+        $batchLoads = $this->capacityService->getBatchCapacity($tenantId, $startDate, $endDate);
+
         // 3. Daily loads summary
         $dailyLoads = $this->capacityService->getDailyLoad($tenantId, $startDate, $endDate);
 
@@ -52,7 +55,7 @@ class CapacityController extends Controller
         $activeOperations = ProductionScheduleOperation::where('tenant_id', $tenantId)
             ->whereBetween('planned_start', [$startDate, $endDate])
             ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
-            ->with(['order.product', 'orderOperation', 'workCenter', 'machine'])
+            ->with(['order.product', 'orderOperation', 'workCenter', 'machine', 'manualProduction', 'section'])
             ->orderBy('planned_start')
             ->get();
 
@@ -63,6 +66,7 @@ class CapacityController extends Controller
         return view('modules.production.capacity.index', compact(
             'workCenterLoads',
             'machineLoads',
+            'batchLoads',
             'dailyLoads',
             'conflictMessages',
             'overloadMessages',
@@ -133,7 +137,9 @@ class CapacityController extends Controller
 
             $formatted = collect($suggestions)->map(function($s) {
                 return [
-                    'machine_id' => $s['machine']->id,
+                    'machine_id' => ($s['resource_type'] ?? 'machine') === 'machine' ? $s['machine']->id : null,
+                    'resource_type' => $s['resource_type'] ?? 'machine',
+                    'resource_key' => $s['resource_key'] ?? null,
                     'machine_name' => $s['machine']->name,
                     'machine_code' => $s['machine']->code,
                     'suggested_start' => $s['suggested_start']->toDateTimeString(),

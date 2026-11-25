@@ -21,6 +21,9 @@ class ProductionScheduleScenarioOperation extends BaseModel
         'production_order_operation_id',
         'work_center_id',
         'machine_id',
+        'section_id',
+        'section_manual_production_id',
+        'resource_id',
         'sequence',
         'priority',
         'planned_start',
@@ -38,6 +41,8 @@ class ProductionScheduleScenarioOperation extends BaseModel
         'planned_finish'           => 'datetime',
         'planned_duration_minutes' => 'float',
         'sequence'                 => 'integer',
+        'section_id'               => 'integer',
+        'section_manual_production_id' => 'integer',
         'priority'                 => 'integer',
         'source_version'           => 'integer',
         'locked'                   => 'boolean',
@@ -78,5 +83,22 @@ class ProductionScheduleScenarioOperation extends BaseModel
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(WorkCenterSection::class, 'section_id');
+    }
+
+    /** The manual batch this operation runs on (an operation runs on a machine OR a manual batch). */
+    public function manualProduction(): BelongsTo
+    {
+        return $this->belongsTo(SectionManualProduction::class, 'section_manual_production_id');
+    }
+
+    /** Collision key: one machine or one manual batch. */
+    public function resourceKey(): ?string
+    {
+        return $this->machine_id ? 'm' . $this->machine_id : ($this->section_manual_production_id ? 'b' . $this->section_manual_production_id : null);
     }
 }

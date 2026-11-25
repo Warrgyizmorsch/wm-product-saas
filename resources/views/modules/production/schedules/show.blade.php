@@ -270,7 +270,7 @@
                                 <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
                                 <th style="width: 14%">{{ __('production.operations') }}</th>
                                 <th style="width: 11%">{{ __('production.work_centers') }}</th>
-                                <th style="width: 11%">{{ __('production.planned_machine') ?? 'Planned Machine' }}</th>
+                                <th style="width: 11%">{{ __('production.planned_machine') ?? 'Planned Machine' }} / Manual batch</th>
                                 <th style="width: 10%">{{ __('production.actual_machine') }}</th>
                                 <th style="width: 7%">{{ __('production.status') }}</th>
                                 <th style="width: 8%">{{ __('production.duration') }}</th>
@@ -288,7 +288,7 @@
                                     <td class="fw-bold text-center align-middle text-muted">{{ $loop->iteration }}</td>
                                     <td class="align-middle">
                                         @if($op->orderOperation?->sourceProduct && $op->orderOperation->source_product_id !== $schedule->order?->product_id)
-                                            <span class="badge bg-soft-secondary text-dark border font-monospace mb-1" style="font-size: 10px;">{{ $op->orderOperation->sourceProduct->name }}</span><br>
+                                            <span class="badge bg-soft-secondary text-dark border font-monospace mb-1" style="font-size: 10px;" title="Sub-assembly operation — executed before the operation that needs it">{{ $op->orderOperation->sourceProduct->name }} (L{{ (int) ($op->orderOperation->bom_level ?? 1) }})</span><br>
                                         @endif
                                         <span class="fw-semibold text-dark">{{ $op->orderOperation->name ?? '—' }}</span>
                                         <br><small class="text-muted font-monospace">{{ $op->orderOperation->operation_number ?? '' }}</small>
@@ -347,6 +347,16 @@
                                             <span class="badge bg-soft-danger text-danger">{{ __('production.cancelled') }}</span>
                                         @else
                                             <span class="erp-badge-draft text-uppercase">{{ $op->status }}</span>
+                                        @endif
+                                        @php $rd = ($readinessByOrderOp ?? collect())->get($op->production_order_operation_id); @endphp
+                                        @if($rd && in_array($op->status, ['ready', 'waiting'], true))
+                                            @if($rd['overall_status'] === 'BLOCKED')
+                                                <small class="text-danger d-block fs-10 mt-1" title="{{ $rd['actionable_blockers'][0]['message'] ?? '' }}"><i class="feather-alert-circle me-1"></i>Blocked: {{ \Illuminate\Support\Str::limit($rd['actionable_blockers'][0]['message'] ?? 'see readiness', 60) }}</small>
+                                            @elseif($rd['overall_status'] === 'WAITING_PREDECESSOR')
+                                                <small class="text-muted d-block fs-10 mt-1"><i class="feather-clock me-1"></i>Waiting for the previous operation</small>
+                                            @elseif($rd['overall_status'] === 'PARTIALLY_READY')
+                                                <small class="text-warning d-block fs-10 mt-1">Ready {{ qty_format($rd['ready_qty']) }} of {{ qty_format($rd['target_qty']) }}</small>
+                                            @endif
                                         @endif
                                     </td>
                                     <td class="align-middle fs-11 text-dark fw-semibold">{{ number_format($op->planned_duration_minutes, 1) }} mins</td>
@@ -628,6 +638,9 @@
                                     </td>
                                     <td class="align-middle text-center">
                                         <span class="badge bg-soft-info text-info">{{ __('production.active_machines', ['count' => $detail['active_machines']]) }}</span>
+                                        @if(!empty($detail['active_batches']))
+                                            <span class="badge bg-soft-secondary text-secondary">{{ $detail['active_batches'] }} manual {{ \Illuminate\Support\Str::plural('batch', $detail['active_batches']) }}</span>
+                                        @endif
                                     </td>
                                     <td class="align-middle text-end font-monospace">{{ number_format($detail['scheduled_minutes'], 1) }} mins</td>
                                     <td class="align-middle text-end font-monospace">{{ number_format($detail['capacity_minutes'], 1) }} mins</td>

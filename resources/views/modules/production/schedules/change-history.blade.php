@@ -71,12 +71,12 @@
                             <td class="fs-11 font-monospace text-muted">
                                 <div><strong>Start:</strong> {{ $log->old_planned_start ? \Illuminate\Support\Carbon::parse($log->old_planned_start)->format('d/m H:i') : '—' }}</div>
                                 <div><strong>Finish:</strong> {{ $log->old_planned_finish ? \Illuminate\Support\Carbon::parse($log->old_planned_finish)->format('d/m H:i') : '—' }}</div>
-                                <div><strong>Machine:</strong> {{ $log->oldMachine->name ?? 'Unassigned' }}</div>
+                                <div><strong>{{ $log->oldMachine || !$log->operation?->manualProduction ? 'Machine' : 'Manual batch' }}:</strong> {{ $log->oldMachine->name ?? $log->operation?->manualProduction?->batch_name ?? 'Unassigned' }}</div>
                             </td>
                             <td class="fs-11 font-monospace text-dark fw-bold">
                                 <div><strong>Start:</strong> {{ $log->new_planned_start ? \Illuminate\Support\Carbon::parse($log->new_planned_start)->format('d/m H:i') : '—' }}</div>
                                 <div><strong>Finish:</strong> {{ $log->new_planned_finish ? \Illuminate\Support\Carbon::parse($log->new_planned_finish)->format('d/m H:i') : '—' }}</div>
-                                <div><strong>Machine:</strong> {{ $log->newMachine->name ?? 'Unassigned' }}</div>
+                                <div><strong>{{ $log->newMachine || !$log->operation?->manualProduction ? 'Machine' : 'Manual batch' }}:</strong> {{ $log->newMachine->name ?? $log->operation?->manualProduction?->batch_name ?? 'Unassigned' }}</div>
                             </td>
                             <td class="fs-12 text-muted">
                                 {{ $log->reason ?? '—' }}

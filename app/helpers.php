@@ -692,3 +692,19 @@ if (! function_exists('billing_organization_details')) {
 
 
 
+
+if (! function_exists('qty_format')) {
+    /**
+     * Production quantity display (rule G1, "no rounding — show the truth"):
+     * whole numbers without decimals, anything else with 4 decimals. Never rounded to 2.
+     */
+    function qty_format(int|float|string|null $value): string
+    {
+        $v = (float) $value;
+        if (abs($v - round($v)) < 0.00005) {
+            return number_format(round($v), 0);
+        }
+
+        return number_format($v, 4);
+    }
+}

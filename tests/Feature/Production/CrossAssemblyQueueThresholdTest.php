@@ -385,7 +385,7 @@ class CrossAssemblyQueueThresholdTest extends TestCase
 
         // Before SFG claims or produces transfer batch, FG operation is blocked by dependency dimension
         $evalBefore = $this->readinessService->evaluateOperationReadiness($fgOrderOp);
-        $this->assertEquals(ProductionReadinessService::STATUS_BLOCKED, $evalBefore['dependency']['status']);
+        $this->assertEquals(ProductionReadinessService::STATUS_WAITING_PREDECESSOR, $evalBefore['dependency']['status']);
         $this->assertEquals(0.0, $evalBefore['dependency']['ready_qty']);
 
         // Now SFG operation logs progress equal to transfer batch quantity (10 units)
@@ -406,7 +406,7 @@ class CrossAssemblyQueueThresholdTest extends TestCase
 
         // Evaluate readiness again after reaching the transfer batch threshold
         $evalAfter = $this->readinessService->evaluateOperationReadiness($fgOrderOp);
-        $this->assertNotEquals(ProductionReadinessService::STATUS_BLOCKED, $evalAfter['dependency']['status']);
+        $this->assertNotEquals(ProductionReadinessService::STATUS_WAITING_PREDECESSOR, $evalAfter['dependency']['status']);
         $this->assertGreaterThanOrEqual(10.0, $evalAfter['dependency']['ready_qty']);
 
         // Order operation status is advanced to READY

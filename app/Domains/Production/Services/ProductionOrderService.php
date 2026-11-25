@@ -95,7 +95,13 @@ class ProductionOrderService
         return DB::transaction(function () use ($planId, $userId) {
             $plan = ProductionPlan::with(['requirements', 'operations'])->findOrFail($planId);
 
-            if ($plan->status !== ProductionPlan::STATUS_APPROVED && $plan->status !== ProductionPlan::STATUS_MRP_GENERATED) {
+            // PX-21: a plan that was "released" but has no live order yet can still create its order
+            $releasedWithoutOrder = $plan->status === ProductionPlan::STATUS_RELEASED
+                && !ProductionOrder::where('production_plan_id', $plan->id)
+                    ->where('status', '!=', ProductionOrder::STATUS_CANCELLED)
+                    ->exists();
+
+            if ($plan->status !== ProductionPlan::STATUS_APPROVED && $plan->status !== ProductionPlan::STATUS_MRP_GENERATED && !$releasedWithoutOrder) {
                 throw new InvalidArgumentException('Only approved or MRP-generated production plans can be converted to production orders.');
             }
 
@@ -115,6 +121,7 @@ class ProductionOrderService
             $planBomId = $plan->bom_id;
             $planRoutingId = $plan->routing_id;
             $engineering = app(ProductionOrderEngineeringService::class);
+            $resolution = null;
             if ($product && $engineering->requiresEngineering($product)) {
                 $resolution = $engineering->resolveAndValidate($product, $plan->tenant_id, $planBomId ? (int) $planBomId : null, $planRoutingId ? (int) $planRoutingId : null);
                 $engineering->assertCanCreate($resolution);
@@ -143,9 +150,30 @@ class ProductionOrderService
                 'created_by' => $userId,
             ]);
 
-            // 2. Clone Planning Requirements -> Order Reservations
+            // PX-21 (decision D-07 A): a manufactured product with BOM + routing is planned by the SAME engine as a direct order
+            // (PO-06/07/08/12): one reservation + requisition line per product, only the chosen operations snapshotted.
+            // The plan's requirement rows are already multi-level — cloning them AND exploding again doubled the material.
+            $useDirectEngine = $resolution && $resolution['bom'] && $resolution['routing'];
+            if ($useDirectEngine) {
+                $planned = $engineering->computeMultiLevelPlan(
+                    $resolution['bom'],
+                    $resolution['selected_operation_ids'],
+                    $resolution['selected_material_ids'],
+                    (float) $plan->quantity,
+                    $plan->tenant_id,
+                    $order->branch_id
+                );
+                $this->persistPlannedMaterials($order, $planned['consolidated_materials']);
+                $this->snapshotPlannedOperations($order, $planned['snapshot_tree_operations'], $userId, [
+                    'stock' => $planned['stock_snapshot'],
+                    'demands' => $planned['demands'],
+                    'merges' => [],
+                ]);
+            }
+
+            // 2. Clone Planning Requirements -> Order Reservations (products without BOM / routing only)
             $itemsToResolve = [];
-            foreach ($plan->requirements as $req) {
+            foreach ($useDirectEngine ? [] : $plan->requirements as $req) {
                 $this->createMaterialReservation(
                     $order,
                     $req->bom_item_id,
@@ -161,7 +189,8 @@ class ProductionOrderService
                     'child_bom_id' => null,
                 ];
             }
-            $this->createRequisitionSlip($order, $itemsToResolve);
+            // UR-11 (M-23 / M-24): no requisition slip is created here any more — the user sends the material request(s) by hand
+            // (sendMaterialRequest()); $itemsToResolve only documents what the plan needs.
 
             // 3. Clone Planning Operations -> Order Operations (snapshot)
             $createdOps = [];
@@ -170,7 +199,9 @@ class ProductionOrderService
 
             $hasChildBoms = $bom && $bom->operationMaterials()->whereNotNull('child_bom_id')->exists();
 
-            if ($hasChildBoms && $routing) {
+            if ($useDirectEngine) {
+                // already built above by the direct-order engine
+            } elseif ($hasChildBoms && $routing) {
                 $this->snapshotMultiLevelRoutings($order, $bom, $routing, (float) $order->quantity_ordered, $order->tenant_id, $userId);
             } else {
                 foreach ($plan->operations as $idx => $planOp) {
@@ -489,7 +520,11 @@ class ProductionOrderService
                     $order->branch_id
                 );
                 $this->persistPlannedMaterials($order, $plan['consolidated_materials']);
-                $this->snapshotPlannedOperations($order, $plan['snapshot_tree_operations'], $userId);
+                $this->snapshotPlannedOperations($order, $plan['snapshot_tree_operations'], $userId, [
+                    'stock' => $plan['stock_snapshot'],
+                    'demands' => $plan['demands'],
+                    'merges' => [],
+                ]);
             } elseif (! $bom && config('production.temp_flow')) {
                 // Temp no-BOM flow: operations come from the optional routing, no materials are planned.
                 $this->snapshotTempFlowOperations($order, $routing, $userId);
@@ -528,29 +563,14 @@ class ProductionOrderService
             $order = $this->orderRepository->find($id);
             abort_if(!$order, 404, 'Production Order not found.');
 
-            if ($order->status !== ProductionOrder::STATUS_DRAFT) {
-                throw new InvalidArgumentException('Only draft orders can be released.');
+            if (!$order->isPreRelease()) {
+                throw new InvalidArgumentException('Only draft or locked orders can be released.');
             }
 
-            if (!$force) {
-                $latestSlip = $order->requisitionSlips()->latest('id')->first();
-                if ($latestSlip) {
-                    $slipStatusLower = strtolower($latestSlip->status ?? '');
-                    $hasIssuedMaterial = in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
-
-                    if (!$hasIssuedMaterial) {
-                        $hasIssuedReservation = $order->reservations()->where('quantity_issued', '>', 0)->exists();
-                        if ($hasIssuedReservation) {
-                            $latestSlip->status = 'partially issued';
-                            $latestSlip->save();
-                            $hasIssuedMaterial = true;
-                        }
-                    }
-
-                    if (!$hasIssuedMaterial) {
-                        throw new InvalidArgumentException('Cannot release order: Raw materials must be fully or partially issued by the store department first.');
-                    }
-                }
+            // UR-12 (M-24): a SOFT rule — not having the material yet does not stop the release, it only has to be confirmed
+            // ("The materials are not released. Do you still want to schedule it?"); on OK the order is released even with 0 issued.
+            if (!$force && $this->materialsNotReleased($order)) {
+                throw new MaterialsNotReleasedException(__('production.materials_not_released_confirm'));
             }
 
             $order->status = ProductionOrder::STATUS_RELEASED;
@@ -560,6 +580,9 @@ class ProductionOrderService
 
             // Initialize Work-in-Progress (WIP) tracking
             app(ProductionWipService::class)->initializeWip($order->id, null, $userId);
+
+            // PX-10: readiness is computed from release on (event), not when a page is opened
+            $this->reconcileOperationReadiness($order);
 
             // Orchestrate subcontract procurement for external operations
             $externalOps = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $order->id)
@@ -580,7 +603,10 @@ class ProductionOrderService
                 'triggered_by' => $userId,
             ]);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Production order release failed: ' . $e->getMessage());
+            // the soft "materials not released" stop is a normal question to the user, not a failure
+            if (!($e instanceof MaterialsNotReleasedException)) {
+                \Illuminate\Support\Facades\Log::error('Production order release failed: ' . $e->getMessage());
+            }
             throw $e;
         }
     }
@@ -699,13 +725,37 @@ class ProductionOrderService
     /**
      * Close order execution.
      */
-    public function close(int $id, ?int $userId = null): void
+    public function close(int $id, ?int $userId = null, ?string $noFinishedGoodsReason = null): void
     {
         $order = $this->orderRepository->find($id);
         abort_if(!$order, 404, 'Production Order not found.');
 
         if (! $order->isCompleted()) {
             throw new InvalidArgumentException('Only completed orders can be closed.');
+        }
+
+        // PX-19: an order is closed only after its finished goods are received — or with an explicit reason
+        $received = $order->receivedFgQuantity();
+        $pending = $order->pendingFgQuantity();
+        $nothingReceived = $received <= 0.0;
+        $reason = trim((string) $noFinishedGoodsReason);
+        if (($nothingReceived || $pending > 0.0) && $reason === '') {
+            throw new InvalidArgumentException(
+                $nothingReceived
+                    ? 'Cannot close this order: no finished goods have been received. Receive the finished goods first, or close with a reason.'
+                    : "Cannot close this order: {$pending} units of finished goods are produced but not received. Receive them first, or close with a reason."
+            );
+        }
+        if ($reason !== '') {
+            app(ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type' => 'Closed Without Finished Goods',
+                'title' => 'Order closed without (complete) finished goods receipt',
+                'description' => "Received {$received}, pending {$pending}. Reason: {$reason}",
+                'severity' => 'warning',
+                'event_source' => 'ProductionOrderService',
+                'triggered_by' => $userId,
+            ]);
         }
 
         $order->status = ProductionOrder::STATUS_CLOSED;
@@ -737,7 +787,21 @@ class ProductionOrderService
         }
 
         DB::transaction(function () use ($order, $userId) {
+            // PX-20 (decision D-06 A): material already issued to the order but not consumed by output goes back to stock
+            // in the same action; the requisition slip and the WIP are closed with the order.
+            $this->returnUnconsumedMaterial($order, $userId);
+
             $this->releaseInventoryReservations($order);
+
+            \App\Domains\Production\Models\ProductionRequisitionSlip::withoutGlobalScopes()
+                ->where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->update(['status' => 'cancelled']);
+            \App\Domains\Production\Models\ProductionWip::withoutGlobalScopes()
+                ->where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->update(['status' => 'cancelled']);
 
             $order->status = ProductionOrder::STATUS_CANCELLED;
             $order->save();
@@ -764,7 +828,7 @@ class ProductionOrderService
                 $schedule->update([
                     'status' => ProductionSchedule::STATUS_CANCELLED,
                     'cancelled_at' => now(),
-                    'cancelled_by' => $userId ?: 1,
+                    'cancelled_by' => $userId ?: auth()->id(),
                 ]);
                 $schedule->operations()->update(['status' => ProductionScheduleOperation::STATUS_CANCELLED]);
             }
@@ -960,6 +1024,34 @@ class ProductionOrderService
             ?? Warehouse::query()->where('tenant_id', $tenantId)->value('id');
     }
 
+    /**
+     * PX-20: return the unconsumed part of the issued material (issued - estimated consumption of the output so far)
+     * to the warehouse it was issued from.
+     */
+    private function returnUnconsumedMaterial(ProductionOrder $order, ?int $userId): void
+    {
+        $consumed = app(OperationMaterialService::class)->consumedEstimate($order);
+        $materialService = app(ProductionMaterialService::class);
+
+        foreach ($order->reservations()->get() as $reservation) {
+            $issued = (float) $reservation->quantity_issued;
+            if ($issued <= 0.0) {
+                continue;
+            }
+            $back = round($issued - min($issued, (float) ($consumed[$reservation->product_id] ?? 0.0)), 4);
+            if ($back <= 0.0) {
+                continue;
+            }
+            $materialService->returnMaterial(
+                (int) $reservation->id,
+                $back,
+                'Automatic return: production order ' . $order->order_number . ' cancelled',
+                $userId ?: auth()->id(),
+                $reservation->warehouse_id ? (int) $reservation->warehouse_id : null
+            );
+        }
+    }
+
     private function releaseInventoryReservations(ProductionOrder $order): void
     {
         $order->loadMissing('reservations');
@@ -1081,6 +1173,9 @@ class ProductionOrderService
                 ]);
             }
 
+            // UR-12: any request sent to the store — this one too — locks a draft order
+            $this->lockOnFirstRequest($order, $userId);
+
             return $slip;
         });
     }
@@ -1100,7 +1195,7 @@ class ProductionOrderService
         }
     }
 
-    private function newRequisitionSlip(ProductionOrder $order): ProductionRequisitionSlip
+    private function newRequisitionSlip(ProductionOrder $order, ?string $notes = null, ?int $requestedBy = null): ProductionRequisitionSlip
     {
         $branchId = $order->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
         $companyId = $order->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
@@ -1134,8 +1229,9 @@ class ProductionOrderService
             'production_order_id' => $order->id,
             'requisition_number' => $reqNumber,
             'status' => 'pending',
+            'requested_by' => $requestedBy,
             'requisition_date' => now()->toDateString(),
-            'notes' => 'Generated automatically from Production Order ' . $order->order_number,
+            'notes' => $notes ?? ('Generated automatically from Production Order ' . $order->order_number),
         ]);
 
         return $slip;
@@ -1384,6 +1480,7 @@ class ProductionOrderService
                 'quantity_rejected' => 0.0000,
                 'quantity_scrapped' => 0.0000,
                 'is_external' => (bool) ($routingOp->is_external ?? false),
+                'quality_required' => (bool) ($routingOp->quality_required ?? false),
                 'vendor_id' => $routingOp->vendor_id,
                 'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
                 'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
@@ -1618,20 +1715,159 @@ class ProductionOrderService
      */
     private function persistPlannedMaterials(ProductionOrder $order, array $materials): void
     {
-        if ($materials === []) {
-            return;
-        }
-
-        $slip = $this->newRequisitionSlip($order);
+        // UR-11 (M-23 / M-24): the material PLAN (reservation rows) is kept, but nothing is requested from the store here any more —
+        // the user selects the items and sends the request(s) by hand (sendMaterialRequest()).
         foreach ($materials as $m) {
             $productId = (int) $m['product_id'];
             $qty = (float) $m['quantity_planned'];
             if ($qty <= 0) {
                 continue;
             }
-            $reservation = $this->accumulateReservation($order, $productId, $qty, $m['uom_id'] ?? null, $m['bom_item_id'] ?? null);
-            $this->createRequisitionSlipItem($slip, $productId, $qty, $reservation->uom_id, $reservation->warehouse_id);
+            $this->accumulateReservation($order, $productId, $qty, $m['uom_id'] ?? null, $m['bom_item_id'] ?? null);
         }
+    }
+
+    /**
+     * UR-12 (M-24): true when the order has planned material and none of it has been issued to production yet.
+     * Releasing / scheduling is still allowed then — only after the user confirmed it.
+     */
+    public function materialsNotReleased(ProductionOrder $order): bool
+    {
+        $reservations = ProductionOrderReservation::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->get();
+
+        $planned = (float) $reservations->sum('quantity_planned');
+        if ($planned <= 0) {
+            return false;
+        }
+
+        return (float) $reservations->sum('quantity_issued') <= 0;
+    }
+
+    /**
+     * UR-11 — the planned materials of an order with what has been requested from the store so far (slips that are not cancelled,
+     * "ad-hoc" extra requests excluded: they are on top of the plan) and what is still left to request.
+     *
+     * @return \Illuminate\Support\Collection<int, array{product_id: int, reservation: ProductionOrderReservation, planned: float, requested: float, remaining: float}>
+     */
+    public function materialRequestLines(ProductionOrder $order): \Illuminate\Support\Collection
+    {
+        $reservations = ProductionOrderReservation::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->where('quantity_planned', '>', 0)
+            ->with('product')
+            ->orderBy('id')
+            ->get();
+
+        $requested = ProductionRequisitionSlipItem::where('tenant_id', $order->tenant_id)
+            ->whereHas('slip', function ($q) use ($order) {
+                $q->where('production_order_id', $order->id)
+                    ->whereNotIn('status', ['cancelled', 'rejected'])
+                    ->where(fn ($n) => $n->whereNull('notes')->orWhere('notes', 'not like', 'Ad-hoc%'));
+            })
+            ->get()
+            ->groupBy('product_id')
+            ->map(fn ($items) => round((float) $items->sum('quantity_planned'), 4));
+
+        return $reservations->map(function (ProductionOrderReservation $r) use ($requested) {
+            $planned = round((float) $r->quantity_planned, 4);
+            $done = (float) ($requested[$r->product_id] ?? 0.0);
+
+            return [
+                'product_id' => (int) $r->product_id,
+                'reservation' => $r,
+                'planned' => $planned,
+                'requested' => $done,
+                'remaining' => max(0.0, round($planned - $done, 4)),
+            ];
+        });
+    }
+
+    /**
+     * UR-11 (M-23 / M-24) — send ONE request to the store with the items the user selected. An order can have many requests; every request is
+     * its own requisition slip. The first request locks a draft order (UR-12): from then on it cannot be edited or deleted, only cancelled or released.
+     *
+     * @param array<int, array{product_id: int|string, quantity: float|int|string}> $items
+     */
+    public function sendMaterialRequest(ProductionOrder $order, array $items, ?int $userId = null, ?string $notes = null): ProductionRequisitionSlip
+    {
+        if ($order->isCompleted() || $order->isClosed() || $order->isCancelled()) {
+            throw new InvalidArgumentException('Cannot request material for a completed, closed or cancelled order.');
+        }
+
+        return DB::transaction(function () use ($order, $items, $userId, $notes) {
+            $lines = $this->materialRequestLines($order)->keyBy('product_id');
+
+            $wanted = [];
+            foreach ($items as $item) {
+                $productId = (int) ($item['product_id'] ?? 0);
+                $qty = round((float) ($item['quantity'] ?? 0), 4);
+                if ($productId <= 0 || $qty <= 0) {
+                    continue;
+                }
+                $line = $lines->get($productId);
+                if (!$line) {
+                    throw new InvalidArgumentException("Product #{$productId} is not a planned material of this order.");
+                }
+                $wanted[$productId] = ($wanted[$productId] ?? 0.0) + $qty;
+                if ($wanted[$productId] > $line['remaining'] + 0.0001) {
+                    $name = $line['reservation']->product?->name ?? ('#' . $productId);
+                    throw new InvalidArgumentException("{$name}: only " . rtrim(rtrim(number_format($line['remaining'], 4, '.', ''), '0'), '.') . ' is left to request.');
+                }
+            }
+            if ($wanted === []) {
+                throw new InvalidArgumentException('Select at least one material to request.');
+            }
+
+            $slip = $this->newRequisitionSlip(
+                $order,
+                'Material request for Production Order ' . $order->order_number . ($notes ? ' — ' . $notes : ''),
+                $userId ?? auth()->id()
+            );
+            foreach ($wanted as $productId => $qty) {
+                $reservation = $lines->get($productId)['reservation'];
+                $this->createRequisitionSlipItem($slip, (int) $productId, $qty, $reservation->uom_id, $reservation->warehouse_id);
+            }
+
+            app(ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type' => 'material_requested',
+                'title' => 'Material Request Sent to Store',
+                'description' => "Material request {$slip->requisition_number} sent to the store (" . count($wanted) . ' items).',
+                'severity' => 'info',
+                'event_source' => 'ProductionOrderService',
+                'triggered_by' => $userId ?? auth()->id(),
+            ]);
+
+            $this->lockOnFirstRequest($order, $userId);
+
+            return $slip;
+        });
+    }
+
+    /**
+     * UR-12 (M-24): the first material request turns a draft order into a LOCKED order.
+     */
+    private function lockOnFirstRequest(ProductionOrder $order, ?int $userId = null): void
+    {
+        $order->refresh();
+        if ($order->status !== ProductionOrder::STATUS_DRAFT) {
+            return;
+        }
+
+        $order->status = ProductionOrder::STATUS_LOCKED;
+        $order->save();
+
+        app(ProductionEventService::class)->writeEvent($order->tenant_id, [
+            'production_order_id' => $order->id,
+            'event_type' => 'Order Locked',
+            'title' => 'Production Order Locked',
+            'description' => "Production order {$order->order_number} is locked: the first material request was sent. It can no longer be edited or deleted — only cancelled or released.",
+            'severity' => 'info',
+            'event_source' => 'ProductionOrderService',
+            'triggered_by' => $userId ?? auth()->id(),
+        ]);
     }
 
     /**
@@ -1692,59 +1928,217 @@ class ProductionOrderService
         $this->snapshotPlannedOperations($order, $entries, $userId);
     }
 
-    private function snapshotPlannedOperations(ProductionOrder $order, array $entries, ?int $userId = null): void
+    /**
+     * The columns of an order operation that are copied from a plan entry (routing operation snapshot).
+     */
+    private function plannedOperationAttributes(ProductionOrder $order, array $entry): array
     {
+        $routingOp = $entry['routing_operation'];
+        $target = (float) $entry['target_produced_qty'];
+        $processingTime = (float) $routingOp->processing_time_minutes * $target;
+
+        return [
+            'tenant_id' => $order->tenant_id,
+            'production_order_id' => $order->id,
+            'routing_operation_id' => $routingOp->id,
+            'selected_routing_material_ids' => $entry['selected_routing_material_ids'],
+            'source_product_id' => $entry['source_product_id'],
+            'source_bom_id' => $entry['source_bom_id'],
+            'source_routing_id' => $entry['source_routing_id'],
+            'bom_level' => $entry['bom_level'],
+            'target_produced_qty' => round($target, 4),
+            'is_intermediate' => (bool) $entry['is_intermediate'],
+            'quantity_claimed' => 0.0000,
+            'sequence' => $routingOp->sequence,
+            'operation_number' => $routingOp->operation_number ?: ('OP-' . str_pad((string) $routingOp->sequence, 3, '0', STR_PAD_LEFT)),
+            'name' => $routingOp->name,
+            'work_center_id' => $routingOp->work_center_id,
+            'section_id' => $routingOp->section_id,
+            'machine_id' => $routingOp->machine_id,
+            'section_manual_production_id' => $routingOp->section_manual_production_id,
+            'status' => ProductionOrderOperation::STATUS_WAITING,
+            'setup_time_planned' => (float) ($routingOp->setup_time_minutes ?? 0),
+            'processing_time_planned' => $processingTime,
+            'total_time_planned' => (float) ($routingOp->setup_time_minutes ?? 0) + $processingTime,
+            'setup_time_actual' => 0.00,
+            'processing_time_actual' => 0.00,
+            'quantity_produced' => 0.0000,
+            'quantity_rejected' => 0.0000,
+            'quantity_scrapped' => 0.0000,
+            'is_external' => (bool) ($routingOp->is_external ?? false),
+            'quality_required' => (bool) ($routingOp->quality_required ?? false),
+            'vendor_id' => $routingOp->vendor_id,
+            'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
+            'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
+            'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
+            'material_supply_type' => $routingOp->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
+            'subcontract_input_type' => $routingOp->subcontract_input_type ?? 'bom_raw_materials',
+            'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
+            'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
+            'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
+            'overlap_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
+            'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),
+            'transfer_lag_minutes' => (int) ($routingOp->transfer_lag_minutes ?? 0),
+            'is_parallel' => (bool) ($routingOp->is_parallel ?? false),
+            'parallel_group' => $routingOp->parallel_group,
+            'parallel_type' => $routingOp->parallel_type ?? 'AND',
+        ];
+    }
+
+    /**
+     * UR-10 — (re)build the operations of a plan made by ProductionOrderEngineeringService::computeMultiLevelPlan().
+     * Every operation carries its plan key and execution order. Operations that already exist (same plan key) are updated in place
+     * (so what the user set on them stays), new ones are created, the ones the plan no longer has are removed, and the links
+     * "sub-assembly operation → the operation that needs it" are rebuilt: each set of makers is a predecessor of the operations it serves.
+     *
+     * @param array<int, array<string, mixed>> $entries
+     * @param array<string, mixed>|null $planMeta  stored in production_orders.sub_assembly_plan (stock, demands, merges)
+     * @return array<string, ProductionOrderOperation>  plan key => operation
+     */
+    public function syncPlannedTree(ProductionOrder $order, array $entries, ?int $userId = null, ?array $planMeta = null, bool $isResync = false): array
+    {
+        usort($entries, fn ($a, $b) => ProductionOrderEngineeringService::comparePlanPaths($a['exec_path'], $b['exec_path']));
+
+        $existing = ProductionOrderOperation::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->whereNotNull('plan_key')
+            ->get()
+            ->keyBy('plan_key');
+
+        $byKey = [];
+        $createdNow = [];
+        foreach ($entries as $i => $entry) {
+            $attributes = $this->plannedOperationAttributes($order, $entry);
+            $attributes['plan_key'] = $entry['op_key'];
+            $attributes['execution_order'] = $i + 1;
+
+            $op = $existing->get($entry['op_key']);
+            if ($op) {
+                $op->update([
+                    'target_produced_qty' => $attributes['target_produced_qty'],
+                    'processing_time_planned' => $attributes['processing_time_planned'],
+                    'total_time_planned' => $attributes['total_time_planned'],
+                    'bom_level' => $attributes['bom_level'],
+                    'execution_order' => $attributes['execution_order'],
+                ]);
+            } else {
+                $op = ProductionOrderOperation::create($attributes);
+                $createdNow[] = $op;
+            }
+            $byKey[$entry['op_key']] = $op;
+        }
+
+        // operations the plan no longer has (a set that was merged into an earlier one)
+        $obsolete = $existing->reject(fn ($op, $key) => isset($byKey[$key]));
+        if ($obsolete->isNotEmpty()) {
+            $obsoleteIds = $obsolete->pluck('id')->all();
+            ProductionOrderOperationDependency::where('production_order_id', $order->id)
+                ->where(fn ($q) => $q->whereIn('operation_id', $obsoleteIds)->orWhereIn('predecessor_operation_id', $obsoleteIds))
+                ->delete();
+            ProductionOrderOperation::where('production_order_id', $order->id)->whereIn('id', $obsoleteIds)->delete();
+        }
+
+        // the chain inside each set (and inside the order's own routing)
+        $bySet = [];
+        $setEntries = [];
+        foreach ($entries as $entry) {
+            $groupKey = $entry['set_key'] ?? 'root';
+            $bySet[$groupKey][] = $byKey[$entry['op_key']];
+            $setEntries[$groupKey] ??= $entry;
+        }
+        foreach ($bySet as $setOps) {
+            $sorted = collect($setOps)->sortBy('sequence')->values();
+            for ($i = 1; $i < $sorted->count(); $i++) {
+                $current = $sorted[$i];
+                $rOp = $current->routingOperation;
+                if ($rOp && $rOp->is_parallel) {
+                    $current->previous_operation_id = null;
+                } else {
+                    $pred = ($rOp && $rOp->previous_operation_id) ? $sorted->firstWhere('routing_operation_id', $rOp->previous_operation_id) : null;
+                    $pred ??= $sorted[$i - 1];
+                    $current->previous_operation_id = $pred->id;
+                    if ($rOp && $rOp->previous_operation_id && (int) $pred->routing_operation_id === (int) $rOp->previous_operation_id) {
+                        ProductionOrderOperationDependency::firstOrCreate([
+                            'tenant_id' => $order->tenant_id,
+                            'production_order_id' => $order->id,
+                            'operation_id' => $current->id,
+                            'predecessor_operation_id' => $pred->id,
+                            'dependency_type' => 'FS',
+                        ]);
+                    }
+                }
+                if ($current->isDirty()) {
+                    $current->save();
+                }
+            }
+        }
+
+        // links: every operation of a set must be finished before each operation the set serves (the last one is the "cross_assembly" link,
+        // the others are "sub_assembly" = ordering only). Rebuilt from scratch — they are fully described by the plan.
+        ProductionOrderOperationDependency::where('production_order_id', $order->id)
+            ->whereIn('dependency_type', ['cross_assembly', 'sub_assembly'])
+            ->delete();
+        foreach ($bySet as $groupKey => $setOps) {
+            if ($groupKey === 'root') {
+                continue;
+            }
+            $sorted = collect($setOps)->sortBy('sequence')->values();
+            $final = $sorted->last();
+            foreach ((array) ($setEntries[$groupKey]['serves_keys'] ?? []) as $consumerKey) {
+                $consumer = $byKey[$consumerKey] ?? null;
+                if (!$consumer) {
+                    continue;
+                }
+                foreach ($sorted as $maker) {
+                    ProductionOrderOperationDependency::firstOrCreate(
+                        ['operation_id' => $consumer->id, 'predecessor_operation_id' => $maker->id],
+                        ['tenant_id' => $order->tenant_id, 'production_order_id' => $order->id, 'dependency_type' => (int) $maker->id === (int) $final->id ? 'cross_assembly' : 'sub_assembly']
+                    );
+                }
+            }
+        }
+
+        if ($planMeta !== null) {
+            $order->sub_assembly_plan = array_merge((array) $order->sub_assembly_plan, $planMeta);
+            $order->save();
+        }
+
+        foreach ($createdNow as $createdOp) {
+            if ($createdOp->is_external) {
+                try {
+                    app(SubcontractProcurementOrchestrator::class)->orchestrateSubcontractProcurement($createdOp, $order->tenant_id, $userId);
+                } catch (\Throwable $e) {
+                    // Procurement orchestration fallback
+                }
+            }
+        }
+
+        $this->reconcileOperationReadiness($order);
+
+        if (!$isResync) {
+            $currentModel = $order->production_model;
+            if (empty($currentModel) || $currentModel === ProductionOrder::MODEL_PURE_MANUFACTURING) {
+                $fallback = $order->product?->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING;
+                $order->production_model = ProductionOrder::determineProductionModelFromOperations($order->operations()->get(), $fallback);
+                $order->save();
+            }
+        }
+
+        return $byKey;
+    }
+
+    private function snapshotPlannedOperations(ProductionOrder $order, array $entries, ?int $userId = null, ?array $planMeta = null): void
+    {
+        // UR-10: plans from the multi-level engine carry plan keys — one set of sub-assembly operations per operation that needs it
+        if ($entries !== [] && isset($entries[array_key_first($entries)]['op_key'])) {
+            $this->syncPlannedTree($order, $entries, $userId, $planMeta ?? ['stock' => [], 'demands' => [], 'merges' => []]);
+
+            return;
+        }
+
         $created = [];
         foreach ($entries as $entry) {
-            $routingOp = $entry['routing_operation'];
-            $target = (float) $entry['target_produced_qty'];
-            $processingTime = (float) $routingOp->processing_time_minutes * $target;
-
-            $created[] = ProductionOrderOperation::create([
-                'tenant_id' => $order->tenant_id,
-                'production_order_id' => $order->id,
-                'routing_operation_id' => $routingOp->id,
-                'selected_routing_material_ids' => $entry['selected_routing_material_ids'],
-                'source_product_id' => $entry['source_product_id'],
-                'source_bom_id' => $entry['source_bom_id'],
-                'source_routing_id' => $entry['source_routing_id'],
-                'bom_level' => $entry['bom_level'],
-                'target_produced_qty' => round($target, 4),
-                'is_intermediate' => (bool) $entry['is_intermediate'],
-                'quantity_claimed' => 0.0000,
-                'sequence' => $routingOp->sequence,
-                'operation_number' => $routingOp->operation_number ?: ('OP-' . str_pad((string) $routingOp->sequence, 3, '0', STR_PAD_LEFT)),
-                'name' => $routingOp->name,
-                'work_center_id' => $routingOp->work_center_id,
-                'section_id' => $routingOp->section_id,
-                'machine_id' => $routingOp->machine_id,
-                'section_manual_production_id' => $routingOp->section_manual_production_id,
-                'status' => ProductionOrderOperation::STATUS_WAITING,
-                'setup_time_planned' => (float) ($routingOp->setup_time_minutes ?? 0),
-                'processing_time_planned' => $processingTime,
-                'total_time_planned' => (float) ($routingOp->setup_time_minutes ?? 0) + $processingTime,
-                'setup_time_actual' => 0.00,
-                'processing_time_actual' => 0.00,
-                'quantity_produced' => 0.0000,
-                'quantity_rejected' => 0.0000,
-                'quantity_scrapped' => 0.0000,
-                'is_external' => (bool) ($routingOp->is_external ?? false),
-                'vendor_id' => $routingOp->vendor_id,
-                'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
-                'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
-                'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
-                'material_supply_type' => $routingOp->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
-                'subcontract_input_type' => $routingOp->subcontract_input_type ?? 'bom_raw_materials',
-                'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
-                'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
-                'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
-                'overlap_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
-                'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),
-                'transfer_lag_minutes' => (int) ($routingOp->transfer_lag_minutes ?? 0),
-                'is_parallel' => (bool) ($routingOp->is_parallel ?? false),
-                'parallel_group' => $routingOp->parallel_group,
-                'parallel_type' => $routingOp->parallel_type ?? 'AND',
-            ]);
+            $created[] = ProductionOrderOperation::create($this->plannedOperationAttributes($order, $entry));
         }
 
         // Dependencies inside each BOM's routing
@@ -1775,30 +2169,42 @@ class ProductionOrderService
             }
         }
 
-        // Cross-assembly: child BOM's last operation → the parent operation that consumes the child product
+        // Cross-assembly: child BOM's last operation → EVERY operation (of a shallower level) that consumes the child product.
+        // (A sub-assembly can be needed at two levels — e.g. by the order's own BOM and by another child BOM — so there can be several consumers.)
         foreach ($byBom as $branchOps) {
             $first = $branchOps->first();
             if ((int) $first->bom_level < 2) {
                 continue;
             }
             $final = $branchOps->sortBy('sequence')->last();
-            $parents = collect($created)->filter(fn ($op) => (int) $op->bom_level === (int) $first->bom_level - 1);
-            $consumer = $parents->first(function ($op) use ($first) {
+            $shallower = collect($created)->filter(fn ($op) => (int) $op->bom_level < (int) $first->bom_level);
+            $consumers = $shallower->filter(function ($op) use ($first) {
                 $ids = is_array($op->selected_routing_material_ids) ? $op->selected_routing_material_ids : [];
 
                 return $ids !== [] && RoutingOperationMaterial::withoutGlobalScopes()
                     ->whereIn('id', $ids)
                     ->where('material_id', $first->source_product_id)
+                    ->where('child_bom_id', $first->source_bom_id)
                     ->exists();
-            }) ?? $parents->sortBy('sequence')->first();
+            });
+            if ($consumers->isEmpty()) {
+                // legacy rows without a child-BOM link: the first operation one level up
+                $fallback = $shallower->filter(fn ($op) => (int) $op->bom_level === (int) $first->bom_level - 1)->sortBy('sequence')->first();
+                $consumers = $fallback ? collect([$fallback]) : collect();
+            }
 
-            if ($final && $consumer) {
-                ProductionOrderOperationDependency::firstOrCreate(
-                    ['operation_id' => $consumer->id, 'predecessor_operation_id' => $final->id],
-                    ['tenant_id' => $order->tenant_id, 'production_order_id' => $order->id, 'dependency_type' => 'cross_assembly']
-                );
+            if ($final) {
+                foreach ($consumers as $consumer) {
+                    ProductionOrderOperationDependency::firstOrCreate(
+                        ['operation_id' => $consumer->id, 'predecessor_operation_id' => $final->id],
+                        ['tenant_id' => $order->tenant_id, 'production_order_id' => $order->id, 'dependency_type' => 'cross_assembly']
+                    );
+                }
             }
         }
+
+        // The parent waits for ALL the operations that make its sub-assembly, not only the last one (type sub_assembly = ordering only)
+        app(SubAssemblyDependencyService::class)->ensure($order);
 
         foreach ($created as $createdOp) {
             if ($createdOp->is_external) {
@@ -1896,6 +2302,46 @@ class ProductionOrderService
     }
 
     /**
+     * PX-09 (decision D-04 A): operations that would be BLOCKED right now (material not issued / short, machine down, quality).
+     * Releasing is still allowed, but only after the user confirms these. Workflow waits (predecessor not done) are not listed.
+     *
+     * @return array<int, string> "Op #10: message"
+     */
+    public function releaseWarnings(ProductionOrder $order): array
+    {
+        $readiness = app(ProductionReadinessService::class)->evaluateOrderReadiness($order->fresh());
+
+        return collect($readiness['actionable_blockers'] ?? [])
+            ->map(fn ($b) => 'Op #' . ($b['sequence'] ?? '—') . ': ' . ($b['message'] ?? 'Blocker'))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * PX-18: order.quantity_produced = cumulative good output of the final FG operation (never lowered; FG receipts use max() too).
+     */
+    public function syncProducedQuantity(ProductionOrder $order): void
+    {
+        $fgOps = $order->operations()
+            ->where('is_intermediate', false)
+            ->where(fn ($q) => $q->whereNull('source_product_id')->orWhere('source_product_id', $order->product_id))
+            ->orderBy('sequence')
+            ->get();
+
+        $final = $fgOps->last();
+        if (!$final) {
+            return;
+        }
+
+        $good = (float) $final->quantity_produced;
+        if ($good > (float) $order->quantity_produced) {
+            $order->quantity_produced = $good;
+            $order->save();
+        }
+    }
+
+    /**
      * Reconcile initial readiness status for all operations of an order.
      * An operation is READY if it has no uncompleted predecessor operations.
      * An operation is WAITING if any of its predecessors are incomplete.
@@ -1907,13 +2353,23 @@ class ProductionOrderService
             return;
         }
 
-        $ops = $order->operations()->with(['predecessorDependencies', 'scheduleOperation'])->get();
+        // PX-10: a draft (or locked) order carries no readiness-driven operation status (it is computed from release on).
+        if ($order->isPreRelease()) {
+            return;
+        }
+
+        // UR-05: when the order screen already holds the operations, refresh THOSE instances so the screen shows the saved status it just refreshed.
+        $ops = $order->relationLoaded('operations')
+            ? $order->operations->loadMissing(['predecessorDependencies', 'scheduleOperation'])
+            : $order->operations()->with(['predecessorDependencies', 'scheduleOperation'])->get();
         if ($ops->isEmpty()) {
             return;
         }
 
         $readinessService = app(ProductionReadinessService::class);
+        $readinessService->beginOrderContext($order);   // every operation resolved once for the whole loop
 
+        try {
         foreach ($ops as $op) {
             // Do not override terminal or active progress states
             if (in_array($op->status, [
@@ -1939,7 +2395,12 @@ class ProductionOrderService
                     && (float) ($op->active_qc_hold ?? 0) <= 0;
             });
 
-            $newStatus = ($hardExecutionBlockers->isEmpty() && ($eval['dependency']['status'] ?? '') !== ProductionReadinessService::STATUS_BLOCKED)
+            // UR-02: a predecessor wait is reported as WAITING_PREDECESSOR (no longer BLOCKED) — either way the operation is not ready yet.
+            $dependencyWaits = in_array($eval['dependency']['status'] ?? '', [
+                ProductionReadinessService::STATUS_BLOCKED,
+                ProductionReadinessService::STATUS_WAITING_PREDECESSOR,
+            ], true);
+            $newStatus = ($hardExecutionBlockers->isEmpty() && !$dependencyWaits)
                 ? ProductionOrderOperation::STATUS_READY
                 : ProductionOrderOperation::STATUS_WAITING;
 
@@ -1964,6 +2425,9 @@ class ProductionOrderService
                     $op->scheduleOperation->save();
                 }
             }
+        }
+        } finally {
+            $readinessService->endOrderContext($order);
         }
     }
 }

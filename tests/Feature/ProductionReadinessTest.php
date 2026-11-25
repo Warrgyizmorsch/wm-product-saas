@@ -197,7 +197,7 @@ class ProductionReadinessTest extends TestCase
     }
 
     /**
-     * Test 4 — Predecessor Incomplete -> BLOCKED, PREDECESSOR_INCOMPLETE.
+     * Test 4 — Predecessor Incomplete -> WAITING (PX-08: a pure workflow wait is not a fault, so it is not BLOCKED).
      */
     public function test_4_predecessor_incomplete_blocks_successor(): void
     {
@@ -208,8 +208,10 @@ class ProductionReadinessTest extends TestCase
         $readinessService = app(ProductionReadinessService::class);
         $eval = $readinessService->evaluateOperationReadiness($op2);
 
-        $this->assertEquals(ProductionReadinessService::STATUS_BLOCKED, $eval['overall_status']);
+        $this->assertEquals(ProductionReadinessService::STATUS_WAITING_PREDECESSOR, $eval['overall_status']);
         $this->assertEquals(ProductionReadinessService::REASON_PREDECESSOR_INCOMPLETE, $eval['blocking_reasons'][0]['code']);
+        $this->assertEmpty($eval['actionable_blockers'], 'a predecessor wait is a workflow dependency, not an actionable blocker');
+        $this->assertNotEmpty($eval['workflow_dependencies']);
     }
 
     /**
@@ -263,7 +265,8 @@ class ProductionReadinessTest extends TestCase
     }
 
     /**
-     * Test 7 — Alternate Machine Available -> READY with warning.
+     * Test 7 — PX-07 / RT-06 / RT-07 / RT-11: an operation has exactly ONE resource; other machines of the work center
+     * are not "invented alternates" (alternatives are operations chosen on the order). An unavailable machine blocks.
      */
     public function test_7_alternate_machine_available_prevents_hard_block(): void
     {
@@ -297,15 +300,16 @@ class ProductionReadinessTest extends TestCase
         $readinessService = app(ProductionReadinessService::class);
         $eval = $readinessService->evaluateOperationReadiness($op);
 
-        $this->assertEquals(ProductionReadinessService::STATUS_READY, $eval['overall_status']);
-        $this->assertTrue($eval['machine']['alternate_available']);
-        $this->assertNotEmpty($eval['warnings']);
+        $this->assertEquals(ProductionReadinessService::STATUS_BLOCKED, $eval['overall_status']);
+        $this->assertEquals(ProductionReadinessService::REASON_MACHINE_UNDER_MAINTENANCE, $eval['blocking_reasons'][0]['code']);
+        $this->assertFalse($eval['machine']['alternate_available'], 'no invented alternate machines');
     }
 
     /**
-     * Test 8 — Subcontract WIP Pending -> BLOCKED, SUBCONTRACT_WIP_PENDING.
+     * Test 8 — UR-04 (the user's rule): the Subcontract column only says "Subcontracted" / "Not subcontracted".
+     * It gives no ready / blocked verdict for now (the vendor-return tests come later), so an external operation at the vendor is not blocked by it.
      */
-    public function test_8_subcontract_wip_pending_blocks_external_op(): void
+    public function test_8_subcontract_column_only_says_subcontracted_and_never_blocks(): void
     {
         $order = $this->createOrder(100);
         $op = $this->createOp($order, 10, 'Heat Treatment (Outsourced)');
@@ -314,8 +318,11 @@ class ProductionReadinessTest extends TestCase
         $readinessService = app(ProductionReadinessService::class);
         $eval = $readinessService->evaluateOperationReadiness($op);
 
-        $this->assertEquals(ProductionReadinessService::STATUS_BLOCKED, $eval['overall_status']);
-        $this->assertEquals(ProductionReadinessService::REASON_SUBCONTRACT_WIP_PENDING, $eval['blocking_reasons'][0]['code']);
+        $this->assertSame('Subcontracted', $eval['subcontract']['label']);
+        $this->assertTrue($eval['subcontract']['is_subcontracted']);
+        $this->assertSame([], $eval['subcontract']['blockers']);
+        $this->assertSame([], $eval['blocking_reasons'], 'no vendor-return block for now');
+        $this->assertSame('Sent to vendor', $eval['dependency']['label'], 'any other operation status is shown by its own name');
     }
 
     /**
@@ -411,7 +418,7 @@ class ProductionReadinessTest extends TestCase
 
         $op2 = $this->createOp($order, 20, 'Bending', $op1->id); // PARTIALLY READY (50/100)
 
-        $op3 = $this->createOp($order, 30, 'Assembly', $op2->id); // BLOCKED (0/100)
+        $op3 = $this->createOp($order, 30, 'Assembly', $op2->id); // WAITING (0/100) — only its predecessor is unfinished (PX-08)
 
         $readinessService = app(ProductionReadinessService::class);
         $orderEval = $readinessService->evaluateOrderReadiness($order);
@@ -420,7 +427,8 @@ class ProductionReadinessTest extends TestCase
         $this->assertEquals(3, $orderEval['total_operations']);
         $this->assertEquals(1, $orderEval['ready_operations_count']);
         $this->assertEquals(1, $orderEval['partial_operations_count']);
-        $this->assertEquals(1, $orderEval['blocked_operations_count']);
+        $this->assertEquals(1, $orderEval['waiting_operations_count']);
+        $this->assertEquals(0, $orderEval['blocked_operations_count'], 'a predecessor wait is counted as waiting, not blocked');
     }
 
     /**

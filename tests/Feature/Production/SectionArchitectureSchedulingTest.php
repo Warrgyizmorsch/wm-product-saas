@@ -236,6 +236,13 @@ class SectionArchitectureSchedulingTest extends TestCase
     public function test_schedule_screen_shows_and_releases_to_shop_floor(): void
     {
         $order = $this->createOrder();
+
+        // PX-05 (D-02 A): the shop floor can only start with material that was issued to the order
+        $warehouse = \App\Domains\Inventory\Models\Warehouse::withoutGlobalScopes()->create(['tenant_id' => $this->tenant->id, 'branch_id' => $this->branchId, 'name' => 'Main', 'code' => 'MAIN', 'type' => 'standard', 'status' => 'active']);
+        \App\Domains\Inventory\Models\ProductWarehouseStock::withoutGlobalScopes()->create(['tenant_id' => $this->tenant->id, 'branch_id' => $this->branchId, 'product_id' => $this->rm->id, 'warehouse_id' => $warehouse->id, 'quantity' => 100, 'reserved_qty' => 0, 'available_qty' => 100]);
+        $reservation = \App\Domains\Production\Models\ProductionOrderReservation::where('production_order_id', $order->id)->firstOrFail();
+        app(\App\Domains\Production\Services\ProductionMaterialService::class)->issueMaterial($reservation->id, (float) $reservation->quantity_planned, null, $this->user->id, $warehouse->id);
+
         app(ProductionOrderService::class)->release($order->id, $this->user->id, true);
         $headers = ['X-Tenant' => 'sch'];
 

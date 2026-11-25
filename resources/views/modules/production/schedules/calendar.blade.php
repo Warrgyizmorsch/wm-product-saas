@@ -324,8 +324,14 @@
                                         <div class="gantt-resource-col border-end d-flex flex-column justify-content-center px-3 py-2 bg-white" style="width: 250px; min-width: 250px; flex-shrink: 0; z-index: 10;">
                                             <span class="fw-semibold text-dark fs-12">
                                                 {{ $machine['name'] }}
+                                                @if(($machine['type'] ?? '') === 'batch')
+                                                    <span class="badge bg-soft-secondary text-secondary fs-9 ms-1" style="font-size: 9px;">Manual batch</span>
+                                                @endif
                                                 @if(!empty($machine['code']))
                                                     <small class="text-muted font-monospace d-block fs-10">{{ $machine['code'] }}</small>
+                                                @endif
+                                                @if(!empty($machine['section']))
+                                                    <small class="text-muted d-block fs-10">{{ $machine['section'] }}</small>
                                                 @endif
                                             </span>
                                             @if(!empty($machine['badge']))
@@ -361,6 +367,7 @@
                                                                      . "<div><strong>Order:</strong> " . e($op['order_number']) . "</div>"
                                                                      . "<div><strong>Product:</strong> " . e($op['product_name']) . "</div>"
                                                                      . "<div><strong>Work Center:</strong> " . e($wc['name']) . "</div>"
+                                                                     . (!empty($op['resource']) ? "<div><strong>Resource:</strong> " . e($op['resource']) . "</div>" : '')
                                                                      . "<div><strong>Start:</strong> " . e($op['planned_start'] ? $op['planned_start']->format('d/m H:i') : 'N/A') . "</div>"
                                                                      . "<div><strong>End:</strong> " . e($op['planned_finish'] ? $op['planned_finish']->format('d/m H:i') : 'N/A') . "</div>"
                                                                      . "<div class='mt-1 pt-1 border-top border-secondary'><strong>Status:</strong> <span class='badge bg-light text-dark'>" . ucfirst($op['status']) . "</span></div></div>";

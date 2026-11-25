@@ -13,11 +13,21 @@ use Illuminate\Support\Facades\DB;
 class MrpEngineService
 {
     /**
+     * PX-21 / PO-08: remaining usable supply per product while one plan is exploded, so a material needed by several
+     * allocations (or levels) is compared with the stock ONCE instead of with the full stock for every row.
+     *
+     * @var array<int, float>
+     */
+    private array $supplyLedger = [];
+
+    /**
      * Run MRP for a production plan.
      * Generates a snapshot of required materials and routing operations.
      */
     public function runMrp(ProductionPlan $plan): void
     {
+        $this->supplyLedger = [];
+
         DB::transaction(function () use ($plan) {
             // 1. Clear existing plan snapshots
             $plan->requirements()->delete();
@@ -80,7 +90,7 @@ class MrpEngineService
         ?int $sourceItemId
     ): void {
         $bom = ProductionBom::withoutGlobalScopes()
-            ->with(['operationMaterials.material', 'items.material'])
+            ->with(['operationMaterials.material', 'operationMaterials.routingOperation', 'items.material'])
             ->find($bomId);
         if (! $bom) {
             return;
@@ -89,26 +99,31 @@ class MrpEngineService
         $sourceRows = $bom->operationMaterials->isNotEmpty()
             ? $bom->operationMaterials
             : $bom->items;
+        $baseQty = (float) $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
 
         foreach ($sourceRows as $item) {
             // Alternatives must not be treated as separate simultaneously required materials
             if ($item->is_alternative) {
                 continue;
             }
+            // PX-21 / B-02: neither may the materials of an ALTERNATIVE OPERATION (only one operation of a stage runs)
+            if ($item instanceof \App\Domains\Production\Models\RoutingOperationMaterial && $item->routingOperation?->is_alternative) {
+                continue;
+            }
 
-            // Required quantity including scrap loss (gross_quantity when available)
+            // Required quantity including scrap loss (gross_quantity when available), scaled by the BOM base quantity (PO-08)
             $grossUnitQty = method_exists($item, 'calculateGrossQuantity')
                 ? (float) ($item->gross_quantity ?? $item->calculateGrossQuantity())
                 : ((float) $item->quantity * (1.0 + (((float) ($item->material_scrap_percentage ?? 0)) / 100)));
-            $requiredQty = $parentQty * $grossUnitQty;
+            $requiredQty = ($parentQty / $baseQty) * $grossUnitQty;
             $bomItemId = $item instanceof \App\Domains\Production\Models\RoutingOperationMaterial
                 ? $item->bom_item_id
                 : $item->id;
 
             $requiredDate = $plan->start_date ?? $plan->end_date;
 
-            // Fetch inventory availability
-            $stockSnapshot = $this->getInventorySnapshot($plan->tenant_id, $item->material_id);
+            // Fetch inventory availability — PO-04: active standard warehouses of the plan's branch, max(0, qty - reserved)
+            $stockSnapshot = $this->getInventorySnapshot($plan->tenant_id, $item->material_id, $plan->branch_id);
             $availableStock = $stockSnapshot['available'];
             $reserved = $stockSnapshot['reserved'];
 
@@ -118,7 +133,12 @@ class MrpEngineService
             $openWoSupply = $mrpShortageService->getOpenProductionOrderSupplySnapshot($plan->tenant_id, $item->material_id, null, $requiredDate)['usable_qty'] ?? 0.0;
 
             $totalUsableSupply = $availableStock + $openPoSupply + $openWoSupply;
-            $shortage = max(0.0, $requiredQty - $totalUsableSupply);
+
+            // PO-08: one pool per product — what an earlier row already took is not available again
+            $remainingSupply = $this->supplyLedger[$item->material_id] ?? $totalUsableSupply;
+            $coveredBySupply = min($requiredQty, $remainingSupply);
+            $this->supplyLedger[$item->material_id] = max(0.0, $remainingSupply - $coveredBySupply);
+            $shortage = max(0.0, $requiredQty - $coveredBySupply);
 
             // Save snapshot requirement
             ProductionPlanRequirement::create([
@@ -158,17 +178,20 @@ class MrpEngineService
     /**
      * Snapshot live inventory across all warehouses for the product.
      */
-    private function getInventorySnapshot(int $tenantId, int $productId): array
+    private function getInventorySnapshot(int $tenantId, int $productId, ?int $branchId = null): array
     {
-        $stock = ProductWarehouseStock::query()
+        // PO-04: same warehouse set as the Production Order create screen
+        $warehouseIds = app(ProductionOrderEngineeringService::class)->branchWarehouseIds($tenantId, $branchId ? (int) $branchId : null);
+
+        $rows = ProductWarehouseStock::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('product_id', $productId)
-            ->selectRaw('COALESCE(SUM(available_qty), 0) as available_qty, COALESCE(SUM(reserved_qty), 0) as reserved_qty')
-            ->first();
+            ->whereIn('warehouse_id', $warehouseIds)
+            ->get();
 
         return [
-            'available' => max(0.0, (float) ($stock?->available_qty ?? 0.0)),
-            'reserved' => max(0.0, (float) ($stock?->reserved_qty ?? 0.0)),
+            'available' => (float) $rows->sum(fn ($s) => max(0.0, (float) $s->quantity - (float) ($s->reserved_qty ?? 0))),
+            'reserved' => max(0.0, (float) $rows->sum('reserved_qty')),
         ];
     }
 

@@ -12,6 +12,21 @@ class ProductionMachineDowntime extends BaseModel
 {
     use HasFactory;
 
+    /**
+     * PX-10: opening / closing a downtime changes the readiness of the operations planned on that machine.
+     */
+    protected static function booted(): void
+    {
+        $refresh = function (self $downtime) {
+            if ($downtime->machine_id) {
+                app(\App\Domains\Production\Services\ProductionReadinessRefresher::class)
+                    ->forMachine((int) $downtime->tenant_id, (int) $downtime->machine_id);
+            }
+        };
+        static::saved($refresh);
+        static::deleted($refresh);
+    }
+
     protected $table = 'production_machine_downtimes';
 
     public const STATUS_OPEN   = 'open';

@@ -44,6 +44,8 @@ class SchedulingCalendarService
             'orderOperation.operatorAssignments.user',
             'workCenter.activeMachines',
             'machine',
+            'manualProduction',
+            'section',
         ])
         ->where('tenant_id', $tenantId)
         ->where('planned_start', '<', $endDate)
@@ -71,6 +73,10 @@ class SchedulingCalendarService
 
         if (isset($filters['machine_id'])) {
             $opsQuery->where('machine_id', $filters['machine_id']);
+        }
+
+        if (!empty($filters['manual_production_id'])) {
+            $opsQuery->where('section_manual_production_id', $filters['manual_production_id']);
         }
 
         if (isset($filters['production_order_id'])) {
@@ -110,7 +116,23 @@ class SchedulingCalendarService
         if (isset($filters['work_center_id'])) {
             $wcQuery->where('id', $filters['work_center_id']);
         }
-        $workCenters = $wcQuery->with(['machines'])->get();
+        $workCenters = $wcQuery->with(['machines.section'])->get();
+
+        // Manual batches are resources too: one lane (row) each, next to the machines of the work center
+        $sectionsById = \App\Domains\Production\Models\WorkCenterSection::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('work_center_id', $workCenters->pluck('id'))
+            ->whereNull('deleted_at')
+            ->get()
+            ->keyBy('id');
+        $batchesByWc = \App\Domains\Production\Models\SectionManualProduction::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('section_id', $sectionsById->keys())
+            ->whereNull('deleted_at')
+            ->with('shift')
+            ->orderBy('batch_name')
+            ->get()
+            ->groupBy(fn ($b) => $sectionsById[$b->section_id]->work_center_id ?? 0);
 
         // Calculate columns for UI rendering
         $columns = [];
@@ -199,10 +221,11 @@ class SchedulingCalendarService
 
             if ($hasExternalOps) {
                 $classification = 'external';
-            } elseif ($wc->machines->isNotEmpty()) {
-                $hasUnassigned = $wcOps->contains(fn($op) => is_null($op->machine_id));
+            } elseif ($wc->machines->isNotEmpty() || ($batchesByWc[$wc->id] ?? collect())->isNotEmpty()) {
+                // an operation without a machine AND without a manual batch is the "unassigned" case
+                $hasUnassigned = $wcOps->contains(fn($op) => is_null($op->machine_id) && is_null($op->section_manual_production_id));
                 $classification = $hasUnassigned ? 'machine_optional' : 'machine_based';
-            } elseif ($wc->machines->isEmpty()) {
+            } else {
                 $classification = 'manual';
             }
 
@@ -220,11 +243,32 @@ class SchedulingCalendarService
                 $machineOps = $wcOps->where('machine_id', $machine->id);
                 $machineRows[] = [
                     'id' => $machine->id,
+                    'type' => 'machine',
+                    'section' => $machine->section?->name,
                     'name' => $machine->name,
                     'code' => $machine->code,
                     'is_active' => $machine->isActive(),
                     'badge' => $machine->isActive() ? '' : 'Inactive',
                     'lanes' => $this->packOperationsIntoLanes($machineOps, $timelineStart, $timelineEnd, $totalSeconds, $holidays, $downtimes, $operatorSkills, $allOrderOps, $capacityGrid[$wc->id] ?? []),
+                ];
+            }
+
+            // One row per manual batch (active ones, plus inactive ones that still have operations in the range)
+            foreach (($batchesByWc[$wc->id] ?? collect()) as $batch) {
+                $batchOps = $wcOps->where('section_manual_production_id', $batch->id)->whereNull('machine_id');
+                if (!$batch->active && $batchOps->isEmpty()) {
+                    continue;
+                }
+                $machineRows[] = [
+                    'id' => null,
+                    'type' => 'batch',
+                    'batch_id' => $batch->id,
+                    'section' => $sectionsById[$batch->section_id]->name ?? null,
+                    'name' => $batch->batch_name,
+                    'code' => 'Manual batch' . ($batch->shift ? ' · ' . $batch->shift->name : ''),
+                    'is_active' => (bool) $batch->active,
+                    'badge' => $batch->active ? '' : 'Inactive',
+                    'lanes' => $this->packOperationsIntoLanes($batchOps, $timelineStart, $timelineEnd, $totalSeconds, $holidays, $downtimes, $operatorSkills, $allOrderOps, $capacityGrid[$wc->id] ?? []),
                 ];
             }
 
@@ -249,7 +293,7 @@ class SchedulingCalendarService
                 ];
             } elseif ($classification === 'machine_optional') {
                 // Renders machines lanes + an unassigned fallback lane
-                $fallbackOps = $wcOps->whereNull('machine_id');
+                $fallbackOps = $wcOps->whereNull('machine_id')->whereNull('section_manual_production_id');
                 if ($fallbackOps->isNotEmpty()) {
                     $machineRows[] = [
                         'id' => null,
@@ -372,6 +416,7 @@ class SchedulingCalendarService
                     'name' => $op->orderOperation->name ?? 'OP',
                     'operation_number' => $op->orderOperation->operation_number ?? '',
                     'status' => $op->status,
+                    'resource' => $op->machine?->name ?? ($op->manualProduction ? $op->manualProduction->batch_name . ' (manual batch)' : null),
                     'planned_start' => $op->planned_start,
                     'planned_finish' => $op->planned_finish,
                     'left_percent' => $op->left_percent,
@@ -448,6 +493,20 @@ class SchedulingCalendarService
                     ];
                     $highestSeverity = 'danger';
                 }
+            }
+        }
+
+        // 2b. Manual batch availability (an operation runs on a machine OR a manual batch)
+        if (!$op->machine_id && $op->section_manual_production_id) {
+            $batch = $op->manualProduction;
+            if (!$batch || !$batch->active || ($op->section && !$op->section->isActive())) {
+                $conflicts[] = [
+                    'type' => 'manual_batch_unavailable',
+                    'message' => 'Manual batch' . ($batch ? " [{$batch->batch_name}]" : '') . ' (or its section) is inactive.',
+                    'severity' => 'danger',
+                    'related_ids' => [],
+                ];
+                $highestSeverity = 'danger';
             }
         }
 
@@ -601,7 +660,8 @@ class SchedulingCalendarService
                 }
 
                 $predOrderOp = $otherOp->orderOperation;
-                if ($predOrderOp && (bool) ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled)) {
+                // UR-07: a sub-assembly maker is always finish-to-start (no transfer-batch early start)
+                if ($predOrderOp && (bool) ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled) && !in_array((int) $predOrderOp->id, $orderOp->subAssemblyPredecessorIds(), true)) {
                     $batchQty = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
                     $lagMinutes = (float) ($predOrderOp->transfer_lag_minutes ?? 0);
                     $orderQty = (float) ($op->order?->quantity_ordered ?? 1);

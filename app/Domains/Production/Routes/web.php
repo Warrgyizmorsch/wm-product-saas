@@ -220,6 +220,9 @@ Route::prefix('production')
         Route::post('orders/{order}/close', [ProductionOrderController::class, 'close'])->name('orders.close');
         Route::post('orders/{order}/cancel', [ProductionOrderController::class, 'cancel'])->name('orders.cancel');
         Route::post('orders/{order}/request-additional-material', [ProductionOrderController::class, 'requestAdditionalMaterial'])->name('orders.request-additional-material');
+        Route::post('orders/{order}/send-material-request', [ProductionOrderController::class, 'sendMaterialRequest'])->name('orders.send-material-request'); // UR-11
+        Route::post('orders/{order}/sub-assembly/merge', [ProductionOrderController::class, 'mergeSubAssembly'])->name('orders.sub-assembly.merge');       // UR-10
+        Route::post('orders/{order}/sub-assembly/split', [ProductionOrderController::class, 'splitSubAssembly'])->name('orders.sub-assembly.split');       // UR-10
         Route::post('orders/{order}/cost-adjustments', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'store'])->name('orders.cost-adjustments.store');
         Route::put('cost-adjustments/{adjustment}', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'update'])->name('cost-adjustments.update');
         Route::delete('cost-adjustments/{adjustment}', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'destroy'])->name('cost-adjustments.destroy');

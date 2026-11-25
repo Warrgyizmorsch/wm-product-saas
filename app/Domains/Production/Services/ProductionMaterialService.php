@@ -209,6 +209,9 @@ class ProductionMaterialService
                 'triggered_by'        => $userId,
             ]);
 
+            // PX-10: issuing material changes what the operations can start with
+            app(ProductionReadinessRefresher::class)->forOrder((int) $res->production_order_id);
+
             return $issue;
         });
     }
@@ -426,6 +429,9 @@ class ProductionMaterialService
             $res->loadMissing('product');
             $unitCost = (float) ($res->product?->unit_cost ?? $res->product?->cost_price ?? 0.0);
             app(ProductionWipService::class)->deductMaterialCost($res->production_order_id, $quantity * $unitCost);
+
+            // PX-10: a return lowers what the operations can start with
+            app(ProductionReadinessRefresher::class)->forOrder((int) $res->production_order_id);
 
             return $issue;
         });

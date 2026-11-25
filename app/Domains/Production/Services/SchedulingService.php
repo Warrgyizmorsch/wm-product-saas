@@ -29,6 +29,7 @@ class SchedulingService
         $this->workCentersCache = [];
         $this->calendarsCache = [];
         $this->shiftsCache = [];
+        $this->resourcesCache = [];
     }
 
     public function __construct(
@@ -96,6 +97,52 @@ class SchedulingService
             'machine' => $machine,
             'batch' => $batch,
         ];
+    }
+
+    /**
+     * Public gateway to the shifts of a resource (used by capacity planning, planner moves and the screens):
+     * a manual batch works its own shift, a machine works its section's shifts.
+     *
+     * @param array{section_id?: int|null, manual_production_id?: int|null} $resource
+     */
+    public function getResourceShifts(WorkCenter $wc, array $resource): \Illuminate\Support\Collection
+    {
+        return $this->resolveResourceShifts($wc, $resource);
+    }
+
+    /** Resource context ({section_id, manual_production_id}) of a scheduled operation. */
+    public function resourceContext(ProductionScheduleOperation|\App\Domains\Production\Models\ProductionScheduleScenarioOperation $op): array
+    {
+        return [
+            'section_id' => $op->section_id ?: null,
+            'manual_production_id' => $op->machine_id ? null : ($op->section_manual_production_id ?: null),
+        ];
+    }
+
+    /**
+     * Minutes a resource can work on a day: its own shifts (a manual batch → its shift, a machine → its section's shifts),
+     * zero on non-working days. Used for capacity so a batch on the evening shift is not credited with the day shift.
+     *
+     * @param array{section_id?: int|null, manual_production_id?: int|null} $resource
+     */
+    public function resourceDailyMinutes(WorkCenter $wc, array $resource, Carbon $date): float
+    {
+        $calendar = $this->getCachedCalendar($wc, $wc->tenant_id);
+        if (!$this->isWorkingDay($calendar, $date, $wc->tenant_id)) {
+            return 0.0;
+        }
+
+        $minutes = 0.0;
+        foreach ($this->resolveResourceShifts($wc, $resource) as $shift) {
+            $start = Carbon::parse($date->toDateString() . ' ' . $shift->start_time);
+            $end = Carbon::parse($date->toDateString() . ' ' . $shift->end_time);
+            if ($end->lt($start)) {
+                $end->addDay();
+            }
+            $minutes += max(0.0, $start->diffInMinutes($end) - (int) ($shift->break_minutes ?? 0));
+        }
+
+        return $minutes;
     }
 
     /**
@@ -306,12 +353,15 @@ class SchedulingService
         $this->workCentersCache = [];
         $this->calendarsCache = [];
         $this->shiftsCache = [];
+        $this->resourcesCache = [];
     }
 
     public function generateForwardSchedule(ProductionOrder $order, Carbon $startDate): ProductionSchedule
     {
         return DB::transaction(function () use ($order, $startDate) {
             $this->clearCaches();
+            // UR-07 / SD-02: the operations that make a sub-assembly are predecessors of the operation that needs it (all of them)
+            app(SubAssemblyDependencyService::class)->ensure($order);
             $rawOperations = $order->operations()->with(['workCenter', 'routingOperation', 'predecessorDependencies'])->get();
             if ($rawOperations->isEmpty()) {
                 throw new \LogicException("Cannot generate schedule: Production Order has no operations configured.");
@@ -505,6 +555,8 @@ class SchedulingService
     {
         return DB::transaction(function () use ($order, $dueDate) {
             $this->clearCaches();
+            // UR-07 / SD-02: the operations that make a sub-assembly are predecessors of the operation that needs it (all of them)
+            app(SubAssemblyDependencyService::class)->ensure($order);
             $rawOperations = $order->operations()->with(['workCenter', 'routingOperation', 'predecessorDependencies', 'successorDependencies'])->get();
             if ($rawOperations->isEmpty()) {
                 throw new \LogicException("Cannot generate schedule: Production Order has no operations configured.");
@@ -932,10 +984,21 @@ class SchedulingService
         if ($machineId) {
             $downtimes = ProductionMachineDowntime::withoutGlobalScopes()
                 ->where('machine_id', $machineId)
-                ->whereNotIn('status', ['closed', 'resolved', 'cancelled'])
+                ->whereNotIn('status', [ProductionMachineDowntime::STATUS_CLOSED, 'resolved', 'cancelled'])
                 ->get();
 
             foreach ($downtimes as $dt) {
+                if (!$dt->end_time) {
+                    // PX-07 / B-16: an OPEN downtime with no end is not "until now". The machine stays unavailable until
+                    // someone closes it, so the slot is flagged (and the schedule cannot be released) instead of looking free.
+                    $warnings[] = [
+                        'code' => 'MACHINE_DOWNTIME_OPEN',
+                        'message' => 'Machine has an open downtime' . ($dt->start_time ? ' since ' . Carbon::parse($dt->start_time)->format('d M H:i') : '') . ($dt->reason ? " ({$dt->reason})" : '') . '. Close it before this operation can run.',
+                        'severity' => 'error',
+                    ];
+                    continue;
+                }
+
                 $bookings->push((object) [
                     'id' => null,
                     'planned_start' => Carbon::parse($dt->start_time),
@@ -1328,35 +1391,59 @@ class SchedulingService
             return 0.0;
         }
 
-        $totalMinutes = 0.0;
+        // Capacity = sum over the work center's resources (active machines + active manual batches) of the minutes
+        // THAT resource works: a machine works its section's shifts, a manual batch works its own shift.
+        $resources = $this->workCenterResources($wc);
+        if ($resources === []) {
+            $totalMinutes = 0.0;
             foreach ($shifts as $shift) {
                 $start = Carbon::parse($shift->start_time);
                 $end = Carbon::parse($shift->end_time);
-
                 if ($end->lt($start)) {
                     $end->addDay();
                 }
-
-                $diff = $start->diffInMinutes($end);
-                if ($shift->break_minutes > 0) {
-                    $diff -= $shift->break_minutes;
-                }
-
-                $totalMinutes += max(0.0, $diff);
+                $totalMinutes += max(0.0, $start->diffInMinutes($end) - (int) ($shift->break_minutes ?? 0));
             }
 
-        // Resources of the work center = active machines + active manual batches of its sections
-        $machineCount = $wc->machines()->where('production_machines.status', Machine::STATUS_ACTIVE)->count()
-            + SectionManualProduction::withoutGlobalScopes()
-                ->where('active', true)
-                ->whereNull('deleted_at')
-                ->whereIn('section_id', WorkCenterSection::withoutGlobalScopes()->where('work_center_id', $wc->id)->whereNull('deleted_at')->select('id'))
-                ->count();
-        if ($machineCount <= 0) {
-            $machineCount = 1;
+            return $totalMinutes * (($wc->efficiency_percentage ?? 100.0) / 100.0);
         }
 
-        return $totalMinutes * $machineCount * (($wc->efficiency_percentage ?? 100.0) / 100.0);
+        $totalMinutes = 0.0;
+        foreach ($resources as $resource) {
+            $totalMinutes += $this->resourceDailyMinutes($wc, $resource, $date);
+        }
+
+        return $totalMinutes * (($wc->efficiency_percentage ?? 100.0) / 100.0);
+    }
+
+    /** @var array<int, array<int, array{type: string, id: int, section_id: int|null, manual_production_id: int|null}>> */
+    private array $resourcesCache = [];
+
+    /**
+     * Active resources of a work center: machines (through their section) and manual batches of its sections.
+     *
+     * @return array<int, array{type: string, id: int, section_id: int|null, manual_production_id: int|null}>
+     */
+    public function workCenterResources(WorkCenter $wc): array
+    {
+        if (isset($this->resourcesCache[$wc->id])) {
+            return $this->resourcesCache[$wc->id];
+        }
+
+        $resources = [];
+        foreach ($wc->machines()->where('production_machines.status', Machine::STATUS_ACTIVE)->get(['production_machines.id', 'production_machines.section_id']) as $machine) {
+            $resources[] = ['type' => 'machine', 'id' => (int) $machine->id, 'section_id' => $machine->section_id ? (int) $machine->section_id : null, 'manual_production_id' => null];
+        }
+        $batches = SectionManualProduction::withoutGlobalScopes()
+            ->where('active', true)
+            ->whereNull('deleted_at')
+            ->whereIn('section_id', WorkCenterSection::withoutGlobalScopes()->where('work_center_id', $wc->id)->whereNull('deleted_at')->select('id'))
+            ->get(['id', 'section_id']);
+        foreach ($batches as $batch) {
+            $resources[] = ['type' => 'batch', 'id' => (int) $batch->id, 'section_id' => $batch->section_id ? (int) $batch->section_id : null, 'manual_production_id' => (int) $batch->id];
+        }
+
+        return $this->resourcesCache[$wc->id] = $resources;
     }
 
     /**
@@ -1661,7 +1748,7 @@ class SchedulingService
     /**
      * Add working minutes to a timestamp respecting work center shifts, working days, and holidays.
      */
-    public function addWorkingMinutes(?int $workCenterId, Carbon $from, float $minutes): Carbon
+    public function addWorkingMinutes(?int $workCenterId, Carbon $from, float $minutes, array $resource = []): Carbon
     {
         if ($minutes <= 0) {
             return $from->copy();
@@ -1678,7 +1765,8 @@ class SchedulingService
 
         $tenantId = $wc->tenant_id;
         $calendar = $this->getCachedCalendar($wc, $tenantId);
-        $shifts = $this->getCachedShifts($wc);
+        // a resource (machine → its section's shifts, manual batch → its own shift) works only its own shifts
+        $shifts = array_filter($resource) !== [] ? $this->resolveResourceShifts($wc, $resource) : $this->getCachedShifts($wc);
         if ($shifts->isEmpty()) {
             return $from->copy()->addMinutes((int) ceil($minutes));
         }
@@ -1727,7 +1815,7 @@ class SchedulingService
     /**
      * Subtract working minutes from a timestamp respecting work center shifts, working days, and holidays.
      */
-    public function subtractWorkingMinutes(?int $workCenterId, Carbon $from, float $minutes): Carbon
+    public function subtractWorkingMinutes(?int $workCenterId, Carbon $from, float $minutes, array $resource = []): Carbon
     {
         if ($minutes <= 0) {
             return $from->copy();
@@ -1744,7 +1832,7 @@ class SchedulingService
 
         $tenantId = $wc->tenant_id;
         $calendar = $this->getCachedCalendar($wc, $tenantId);
-        $shifts = $this->getCachedShifts($wc);
+        $shifts = array_filter($resource) !== [] ? $this->resolveResourceShifts($wc, $resource) : $this->getCachedShifts($wc);
         if ($shifts->isEmpty()) {
             return $from->copy()->subMinutes((int) ceil($minutes));
         }
@@ -1843,6 +1931,7 @@ class SchedulingService
         ?ProductionOrderOperation $currentOp = null
     ): Carbon {
         $successorOpIds = [];
+        $strictSuccessorIds = []; // UR-07 / SD-01: successors that need THIS operation's sub-assembly — always finish-to-start
         if ($currentOp) {
             $allOps = ProductionOrderOperation::where('tenant_id', $currentOp->tenant_id)
                 ->where('production_order_id', $currentOp->production_order_id)
@@ -1852,6 +1941,9 @@ class SchedulingService
                 $predIds = $aOp->predecessorDependencies->pluck('id')->toArray();
                 if ($aOp->previous_operation_id === $currentOp->id || in_array($currentOp->id, $predIds)) {
                     $successorOpIds[] = $aOp->id;
+                }
+                if (in_array((int) $currentOp->id, $aOp->subAssemblyPredecessorIds(), true)) {
+                    $strictSuccessorIds[] = (int) $aOp->id;
                 }
             }
         }
@@ -1883,11 +1975,15 @@ class SchedulingService
             return $defaultDueDate->copy();
         }
 
-        $latestFinishTimestamps = $successors->map(function ($succ) use ($orderQuantity, $currentOp) {
+        $latestFinishTimestamps = $successors->map(function ($succ) use ($orderQuantity, $currentOp, $strictSuccessorIds) {
             $succStart = $succ['planned_start']->copy();
 
             if ($currentOp && (bool) $currentOp->is_external) {
                 return $succStart;
+            }
+
+            if (in_array((int) ($succ['order_op']?->id ?? $succ['production_order_operation_id'] ?? 0), $strictSuccessorIds, true)) {
+                return $succStart; // sub-assembly maker: must be finished before the operation that needs it starts
             }
 
             if ($currentOp && (bool) $currentOp->overlap_enabled) {
@@ -1989,8 +2085,15 @@ class SchedulingService
             return $defaultStart->copy();
         }
 
-        $earliestStartTimestamps = $predecessors->map(function ($prev) use ($orderQuantity) {
+        // UR-07 / SD-01: an operation that makes a sub-assembly this one needs is ALWAYS finish-to-start (no transfer-batch early start)
+        $strictPredIds = $currentOp ? $currentOp->subAssemblyPredecessorIds() : [];
+
+        $earliestStartTimestamps = $predecessors->map(function ($prev) use ($orderQuantity, $strictPredIds) {
             $prevOrderOp = $prev['order_op'] ?? null;
+
+            if ($prevOrderOp && in_array((int) $prevOrderOp->id, $strictPredIds, true)) {
+                return $prev['planned_finish']->copy();
+            }
 
             if ($prevOrderOp && (bool) ($prevOrderOp->is_external || $prevOrderOp->isOutsourced())) {
                 return $prev['planned_finish']->copy();
@@ -2025,6 +2128,25 @@ class SchedulingService
         });
 
         return $earliestStartTimestamps->max()->copy();
+    }
+
+    /**
+     * Schedule operations in dependency order (the order's operation graph, incl. sub-assembly makers before the operation that needs them).
+     * Operations without an order operation keep their place at the end.
+     */
+    public function sortScheduleOperationsTopologically(\Illuminate\Support\Collection $scheduleOps): \Illuminate\Support\Collection
+    {
+        $orderOps = ProductionOrderOperation::withoutGlobalScopes()
+            ->whereIn('id', $scheduleOps->pluck('production_order_operation_id')->filter()->unique()->all())
+            ->with('predecessorDependencies')
+            ->get();
+        if ($orderOps->isEmpty()) {
+            return $scheduleOps;
+        }
+
+        $position = $this->sortOperationsTopologically($orderOps)->pluck('id')->flip();
+
+        return $scheduleOps->sortBy(fn ($s) => $position[$s->production_order_operation_id] ?? PHP_INT_MAX)->values();
     }
 
     /**
@@ -2071,8 +2193,16 @@ class SchedulingService
             }
         }
 
+        // UR-10 (M-23 / M-24): the BOM order of the sub-assemblies is only an INDICATION for the scheduler — of the operations that are ready,
+        // the one that comes first in the execution order is planned first (so the semi listed first in the BOM gets the earlier slot).
+        // It is never a link between the sub-assemblies: nothing waits for it.
+        $prioritised = $operations->isNotEmpty() && $operations->every(fn ($o) => $o->execution_order !== null);
+
         $sorted = collect();
         while (!empty($queue)) {
+            if ($prioritised) {
+                usort($queue, fn ($a, $b) => [(int) $opMap->get($a)->execution_order, (int) $a] <=> [(int) $opMap->get($b)->execution_order, (int) $b]);
+            }
             $currId = array_shift($queue);
             $sorted->push($opMap->get($currId));
 
@@ -2337,6 +2467,7 @@ class SchedulingService
             $workingDaysStr = implode(', ', array_map(fn($d) => $daysMap[$d] ?? $d, $workingDays));
 
             $activeMachinesCount = $wc->activeMachines()->count();
+            $activeBatchesCount = collect($this->workCenterResources($wc))->where('type', 'batch')->count();
 
             $dailyBreakdown = [];
             $date = $minDate->copy()->startOfDay();
@@ -2426,6 +2557,7 @@ class SchedulingService
                 'working_days' => $workingDaysStr,
                 'shifts' => empty($shiftsList) ? 'No Active Shifts' : implode(', ', $shiftsList),
                 'active_machines' => $activeMachinesCount,
+                'active_batches' => $activeBatchesCount,
                 'scheduled_minutes' => $totalScheduled,
                 'capacity_minutes' => $totalCapacity,
                 'utilization' => min(100.00, $utilization),
@@ -2587,10 +2719,15 @@ class SchedulingService
                 throw new \LogicException("Cannot reschedule: Production Order is missing for Schedule [{$schedule->schedule_number}].");
             }
 
+            // UR-07 / SD-02 / SD-03: every operation that makes a sub-assembly is a predecessor of the operation that needs it
+            app(SubAssemblyDependencyService::class)->ensure($order);
+
             $operations = $schedule->operations()->orderBy('sequence')->get();
             if ($operations->isEmpty()) {
                 return $schedule;
             }
+            // predecessors first (sub-assembly operations before the operation that needs them) — plain sequence order is not enough across BOM levels
+            $operations = $this->sortScheduleOperationsTopologically($operations);
 
             $tenantId = $schedule->tenant_id;
             $scheduledData = [];

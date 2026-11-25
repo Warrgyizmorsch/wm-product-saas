@@ -79,6 +79,7 @@ class ProductionDashboardApiController extends ApiBaseController
             'orders' => [
                 'total'       => array_sum($orderCounts),
                 'draft'       => (int) ($orderCounts[ProductionOrder::STATUS_DRAFT] ?? 0),
+                'locked'      => (int) ($orderCounts[ProductionOrder::STATUS_LOCKED] ?? 0),
                 'released'    => (int) ($orderCounts[ProductionOrder::STATUS_RELEASED] ?? 0),
                 'in_progress' => (int) ($orderCounts[ProductionOrder::STATUS_IN_PROGRESS] ?? 0),
                 'completed'   => (int) ($orderCounts[ProductionOrder::STATUS_COMPLETED] ?? 0),

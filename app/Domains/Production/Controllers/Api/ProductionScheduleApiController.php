@@ -105,8 +105,9 @@ class ProductionScheduleApiController extends ApiBaseController
         $order = ProductionOrder::where('tenant_id', $tenantId)->findOrFail($validated['production_order_id']);
 
         try {
-            if ($order->isDraft()) {
-                $this->orderService->release($order->id, auth()->id() ?? 1);
+            if ($order->isPreRelease()) {
+                // UR-12 (M-24): material not issued yet is a soft stop — send confirm_materials=true to schedule anyway
+                $this->orderService->release($order->id, auth()->id() ?? 1, $request->boolean('confirm_materials'));
                 $order->refresh();
             }
 

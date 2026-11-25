@@ -125,6 +125,7 @@ class ProductionDashboardController extends Controller
 
         $orderStatusCounts = [
             'draft'       => $rawOrderCounts[ProductionOrder::STATUS_DRAFT] ?? 0,
+            'locked'      => $rawOrderCounts[ProductionOrder::STATUS_LOCKED] ?? 0,
             'released'    => $rawOrderCounts[ProductionOrder::STATUS_RELEASED] ?? 0,
             'in_progress' => $rawOrderCounts[ProductionOrder::STATUS_IN_PROGRESS] ?? 0,
             'completed'   => $rawOrderCounts[ProductionOrder::STATUS_COMPLETED] ?? 0,
@@ -132,7 +133,7 @@ class ProductionDashboardController extends Controller
             'cancelled'   => $rawOrderCounts[ProductionOrder::STATUS_CANCELLED] ?? 0,
             'total'       => array_sum($rawOrderCounts),
         ];
-        $totalActiveOrders = $orderStatusCounts['draft'] + $orderStatusCounts['released'] + $orderStatusCounts['in_progress'];
+        $totalActiveOrders = $orderStatusCounts['draft'] + $orderStatusCounts['locked'] + $orderStatusCounts['released'] + $orderStatusCounts['in_progress'];
 
         // 7. Requisition Slips Metrics (Store Material Issue Track)
         $rawReqCounts = ProductionRequisitionSlip::where('tenant_id', $tenantId)

@@ -210,6 +210,7 @@
                             <x-ui.odoo-form-ui type="select" name="status">
                                 <option value="">{{ __('production.all_statuses') }}</option>
                                 <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>{{ __('production.draft') }}</option>
+                                <option value="locked" {{ request('status') === 'locked' ? 'selected' : '' }}>{{ __('production.locked') }}</option>
                                 <option value="released" {{ request('status') === 'released' ? 'selected' : '' }}>{{ __('production.released') }}</option>
                                 <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>{{ __('production.in_progress') }}</option>
                                 <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>{{ __('production.completed') }}</option>
@@ -375,6 +376,8 @@
                         <td>
                             @if($order->isDraft())
                                 <span class="erp-badge-draft">{{ __('production.draft') }}</span>
+                            @elseif($order->isLocked())
+                                <span class="badge bg-soft-warning text-dark" title="{{ __('production.locked_order_note') }}"><i class="feather-lock me-1"></i>{{ __('production.locked') }}</span>
                             @elseif($order->isReleased())
                                 <span class="erp-badge-pending">{{ __('production.released') }}</span>
                             @elseif($order->isInProgress())

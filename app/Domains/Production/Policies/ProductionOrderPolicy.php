@@ -37,13 +37,26 @@ class ProductionOrderPolicy
 
     public function release(User $user, ProductionOrder $order): bool
     {
-        return $order->isDraft()
+        // a draft or a locked draft (UR-12) can be released
+        return $order->isPreRelease()
             && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
     public function issue(User $user, ProductionOrder $order): bool
     {
-        return ($order->isDraft() || $order->isReleased() || $order->isInProgress())
+        return ($order->isPreRelease() || $order->isReleased() || $order->isInProgress())
+            && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
+    }
+
+    /**
+     * UR-10: change how a sub-assembly is made ("produce all at one level"). Allowed on a locked order too (it only moves operations
+     * around, the material totals stay); whether it is still possible (not scheduled, no work started) is checked by SubAssemblySetService.
+     */
+    public function restructure(User $user, ProductionOrder $order): bool
+    {
+        return !$order->isCompleted()
+            && !$order->isClosed()
+            && !$order->isCancelled()
             && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
@@ -61,7 +74,8 @@ class ProductionOrderPolicy
 
     public function receiveFg(User $user, ProductionOrder $order): bool
     {
-        return ($order->isInProgress() || $order->isReleased())
+        // PX-19: the order auto-completes with its last operation — finished goods can still be received afterwards
+        return ($order->isInProgress() || $order->isReleased() || ($order->isCompleted() && $order->pendingFgQuantity() > 0))
             && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 

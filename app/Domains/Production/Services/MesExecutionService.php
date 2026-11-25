@@ -64,6 +64,11 @@ class MesExecutionService
                 );
             }
 
+            // UR-07: an operation that needs a sub-assembly made inside this order never starts before ALL the operations that make it are completed
+            if ($orderOp) {
+                app(ProductionReadinessService::class)->assertSubAssembliesComplete($orderOp);
+            }
+
             // Sync with underlying ProductionOrderOperation and check skills qualification
             // Skills validation is opt-in: only enforced if tenant has skills configured
             if ($operatorId && $orderOp) {
@@ -190,6 +195,35 @@ class MesExecutionService
 
             // Validate machine if provided
             $resolvedMachineId = $machineId ?? $schedOp->machine_id;
+
+            // RT-06 / RT-07: an operation has ONE resource — a machine OR a manual batch. A manual-batch operation runs on its batch:
+            // no machine is assigned at start, the batch must be active, and one batch (crew) runs one operation at a time.
+            if (!$schedOp->machine_id && $schedOp->section_manual_production_id) {
+                if ($machineId) {
+                    throw new InvalidArgumentException("Operation #{$schedOp->sequence} runs on a manual batch; a machine cannot be assigned to it.");
+                }
+
+                $batch = \App\Domains\Production\Models\SectionManualProduction::withoutGlobalScopes()
+                    ->where('tenant_id', $schedOp->schedule->order->tenant_id)
+                    ->whereNull('deleted_at')
+                    ->lockForUpdate()
+                    ->find($schedOp->section_manual_production_id);
+                if (!$batch || !$batch->active) {
+                    throw new InvalidArgumentException('The manual batch of this operation is inactive. Cannot start the operation.');
+                }
+
+                $batchBusy = ProductionScheduleOperation::withoutGlobalScopes()
+                    ->where('tenant_id', $schedOp->schedule->order->tenant_id)
+                    ->where('section_manual_production_id', $batch->id)
+                    ->whereNull('machine_id')
+                    ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
+                    ->where('id', '!=', $scheduleOpId)
+                    ->exists();
+                if ($batchBusy) {
+                    throw new InvalidArgumentException("Manual batch [{$batch->batch_name}] is already running another operation. Cannot start a second operation on the same batch simultaneously.");
+                }
+            }
+
             if ($resolvedMachineId) {
                 // Lock machine row to prevent concurrent assignment
                 Machine::withoutGlobalScopes()
@@ -496,6 +530,9 @@ class MesExecutionService
             // Sync ProductionOrderOperation
             $orderOp = ProductionOrderOperation::find($schedOp->production_order_operation_id);
             if ($orderOp) {
+                // UR-07: no completing while the operations that make its sub-assembly are still open (the transaction rolls back)
+                app(ProductionReadinessService::class)->assertSubAssembliesComplete($orderOp);
+
                 $produced = (float) ($data['quantity_produced'] ?? 0);
                 $rejected = (float) ($data['quantity_rejected'] ?? 0);
                 $scrapped = (float) ($data['quantity_scrapped'] ?? 0);
@@ -550,6 +587,13 @@ class MesExecutionService
                 if ($rejected > 0 && !$isQcRequired) {
                     throw new InvalidArgumentException('Rejected quantity cannot be logged directly on operations where Quality Check is not required.');
                 }
+
+                // PX-09: output may not exceed what the material issued to the order covers (manager override is logged)
+                app(ProductionReadinessService::class)->assertWithinReadyQty(
+                    $orderOp,
+                    (float) ($produced + $rejected + $scrapped),
+                    $operatorId ? \App\Models\User::find($operatorId) : auth()->user()
+                );
 
                 // Create progress log
                 $progressLog = ProductionOrderProgressLog::create([
@@ -625,8 +669,13 @@ class MesExecutionService
                             ->where('sequence', '>', $orderOp->sequence)
                             ->exists();
 
+                    // PX-18: the order's produced quantity is the cumulative good output of the final FG operation
+                    // (partial logs included), not just the last "complete" quantity.
                     if ($isFinalFgOp) {
-                        $order->quantity_produced += $produced;
+                        $order->quantity_produced = max(
+                            (float) $order->quantity_produced,
+                            (float) $orderOp->quantity_produced + ($isQcRequired ? $produced : 0.0)
+                        );
                     }
                     $order->quantity_rejected += $rejected;
                     $order->quantity_scrapped += $scrapped;
@@ -1120,7 +1169,7 @@ class MesExecutionService
         $executableQty = (float) $eval['ready_qty'];
         $claimedQty = (float) $eval['claimed_qty'];
         $remainingExecutableQty = (float) $eval['remaining_executable_qty'];
-        $isReady = ($eval['overall_status'] !== ProductionReadinessService::STATUS_BLOCKED) && $remainingExecutableQty > 0;
+        $isReady = !in_array($eval['overall_status'], [ProductionReadinessService::STATUS_BLOCKED, ProductionReadinessService::STATUS_WAITING_PREDECESSOR], true) && $remainingExecutableQty > 0;
 
         return [
             'is_ready' => $isReady,

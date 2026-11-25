@@ -102,11 +102,31 @@ class ProductionScheduleController extends Controller
             $startDate = Carbon::parse($request->validated()['start_date']);
             $type = $request->validated()['scheduling_type'];
 
-            $wasDraft = $order->isDraft();
+            // a draft, or a locked draft (material requested), is released together with its schedule
+            $wasDraft = $order->isPreRelease();
 
             if ($wasDraft) {
-                // Automatically release the draft production order
-                app(ProductionOrderService::class)->release($order->id, Auth::id() ?? 1);
+                // PX-09 (D-04 A): releasing an order with operations that are blocked right now needs an explicit confirmation
+                if (!$request->boolean('confirm_blocked')) {
+                    $warnings = app(ProductionOrderService::class)->releaseWarnings($order);
+                    if ($warnings !== []) {
+                        return redirect()->back()->withInput()->with(
+                            'error',
+                            'Some operations are blocked right now: ' . implode(' | ', array_slice($warnings, 0, 6))
+                            . '. Tick "Release anyway" in the release dialog to continue.'
+                        );
+                    }
+                }
+
+                // UR-12 (M-24): a SOFT rule — materials not issued yet only has to be confirmed ("The materials are not released.
+                // Do you still want to schedule it?"); on OK the order is released and scheduled even with 0 issued.
+                $orderService = app(ProductionOrderService::class);
+                if (!$request->boolean('confirm_materials') && $orderService->materialsNotReleased($order)) {
+                    return redirect()->back()->withInput()->with('error', __('production.materials_not_released_confirm'));
+                }
+
+                // Automatically release the draft / locked production order
+                $orderService->release($order->id, Auth::id(), true);
                 $order->refresh();
             }
 
@@ -157,7 +177,13 @@ class ProductionScheduleController extends Controller
         $groupBy = $request->input('group_by');
         $capacityDetails = $this->schedulingService->getWorkCenterCapacityDetails($schedule, $groupBy);
 
-        return view('modules.production.schedules.show', compact('schedule', 'warnings', 'factoryConflicts', 'capacityDetails', 'groupBy'));
+        // PX-05..09: what the order screen says about each operation (material issued, machine / batch, predecessor) is shown here too
+        $readinessByOrderOp = collect();
+        if ($schedule->order) {
+            $readinessByOrderOp = collect(app(\App\Domains\Production\Services\ProductionReadinessService::class)->evaluateOrderReadiness($schedule->order)['operations'] ?? [])->keyBy('operation_id');
+        }
+
+        return view('modules.production.schedules.show', compact('schedule', 'warnings', 'factoryConflicts', 'capacityDetails', 'groupBy', 'readinessByOrderOp'));
     }
 
     public function destroy(int $id)
@@ -303,6 +329,7 @@ class ProductionScheduleController extends Controller
             'end_date' => 'nullable|date',
             'work_center_id' => 'nullable|integer',
             'machine_id' => 'nullable|integer',
+            'manual_production_id' => 'nullable|integer',
             'production_order_id' => 'nullable|integer',
             'schedule_id' => 'nullable|integer',
             'scenario_id' => 'nullable|integer',
@@ -324,7 +351,7 @@ class ProductionScheduleController extends Controller
                 $tenantId,
                 $startDate,
                 $endDate,
-                $request->only(['work_center_id', 'machine_id', 'production_order_id', 'schedule_id', 'status', 'scenario_id'])
+                $request->only(['work_center_id', 'machine_id', 'manual_production_id', 'production_order_id', 'schedule_id', 'status', 'scenario_id'])
             );
 
             return response()->json($data);
@@ -347,7 +374,7 @@ class ProductionScheduleController extends Controller
         $logs = \App\Domains\Production\Models\ProductionScheduleChangeLog::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('production_schedule_id', $schedule->id)
-            ->with(['changedBy', 'operation.orderOperation', 'oldMachine', 'newMachine'])
+            ->with(['changedBy', 'operation.orderOperation', 'operation.manualProduction', 'oldMachine', 'newMachine'])
             ->orderByDesc('created_at')
             ->paginate(15);
 
@@ -444,6 +471,7 @@ class ProductionScheduleController extends Controller
             'schedule',
             'order.product',
             'machine',
+            'manualProduction',
             'orderOperation',
         ])
             ->whereHas(

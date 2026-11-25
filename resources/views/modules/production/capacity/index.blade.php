@@ -102,6 +102,7 @@
                     const machineId     = button.getAttribute('data-op-machine');
                     const workCenterName= button.getAttribute('data-op-wc-name');
                     const wcId          = button.getAttribute('data-op-wc-id');
+                    const resourceType  = button.getAttribute('data-op-resource');
 
                     rescheduleModal.querySelector('form').action = `{{ url('production/capacity') }}/${opId}/reschedule`;
                     document.getElementById('reschedule-op-title').textContent =
@@ -114,6 +115,8 @@
                         opt.style.display = (opt.value === '' || opt.getAttribute('data-wc-id') === wcId) ? '' : 'none';
                     });
                     machineSelect.value = machineId || '';
+                    // RT-06 / RT-07: an operation has ONE resource — a manual batch operation keeps its batch, no machine can be assigned
+                    machineSelect.disabled = (resourceType === 'batch');
                 });
             }
 
@@ -146,7 +149,7 @@
                                     html += `
                                         <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center mb-2 rounded border p-3">
                                             <div>
-                                                <h6 class="fw-bold mb-1 text-dark">${s.machine_name} (${s.machine_code})</h6>
+                                                <h6 class="fw-bold mb-1 text-dark">${s.machine_name} <span class="text-muted fs-11">(${s.machine_code})</span></h6>
                                                 <p class="mb-1 text-muted fs-12">
                                                     <strong>{{ __('production.js_suggested_start') }}:</strong> ${s.suggested_start}<br>
                                                     <strong>{{ __('production.js_suggested_finish') }}:</strong> ${s.suggested_finish}
@@ -157,7 +160,7 @@
                                                 <span class="${badgeClass} d-block mb-2">${badgeText}</span>
                                                 <button type="button" class="btn btn-sm btn-primary apply-suggestion-btn"
                                                         data-op-id="${opId}"
-                                                        data-machine-id="${s.machine_id}"
+                                                        data-machine-id="${s.machine_id ?? ''}"
                                                         data-start="${s.suggested_start}">
                                                     {{ __('production.btn_apply') }}
                                                 </button>
@@ -177,7 +180,7 @@
                                             },
                                             body: JSON.stringify({
                                                 planned_start: this.getAttribute('data-start'),
-                                                machine_id:    this.getAttribute('data-machine-id'),
+                                                machine_id:    this.getAttribute('data-machine-id') || null,
                                                 reason: '{{ __('production.js_applied_load_reason') }}'
                                             })
                                         })
@@ -394,7 +397,7 @@
                 <x-ui.odoo-form-ui type="table">
                     <thead>
                         <tr>
-                            <th>{{ __('production.col_machine') }}</th>
+                            <th>{{ __('production.col_machine') }} / Manual batch</th>
                             <th>{{ __('production.col_work_center') }}</th>
                             <th>{{ __('production.col_available_hrs') }}</th>
                             <th>{{ __('production.col_required_hrs') }}</th>
@@ -405,6 +408,31 @@
                         </tr>
                     </thead>
                     <tbody>
+                        @foreach(($batchLoads ?? []) as $bl)
+                            {{-- A manual batch works only its own shift: capacity = that shift on working days --}}
+                            <tr>
+                                <td>
+                                    <strong>{{ $bl['batch']->batch_name }}</strong>
+                                    <span class="badge bg-soft-secondary text-secondary fs-10">Manual batch</span>
+                                    <span class="text-muted fs-11">{{ $bl['batch']->section?->name }}{{ $bl['batch']->shift ? ' · ' . $bl['batch']->shift->name : '' }}</span>
+                                </td>
+                                <td>{{ $bl['work_center']->name }}</td>
+                                <td>{{ qty_format($bl['available_hours']) }}</td>
+                                <td>{{ qty_format($bl['required_hours']) }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1 mb-0" style="height:6px;">
+                                            <div class="progress-bar {{ $bl['utilization'] > 100 ? 'bg-danger' : ($bl['utilization'] > 85 ? 'bg-warning' : 'bg-success') }}"
+                                                 role="progressbar" style="width:{{ min(100, $bl['utilization']) }}%"></div>
+                                        </div>
+                                        <span class="fs-12 fw-bold">{{ qty_format($bl['utilization']) }}%</span>
+                                    </div>
+                                </td>
+                                <td class="text-muted">—</td>
+                                <td>{{ qty_format($bl['overload_hours']) }}</td>
+                                <td><span class="badge badge-status-{{ $bl['status'] }}">{{ strtoupper($bl['status']) }}</span></td>
+                            </tr>
+                        @endforeach
                         @forelse($machineLoads as $ml)
                             <tr>
                                 <td><strong>{{ $ml['machine']->name }}</strong> <span class="text-muted fs-11">({{ $ml['machine']->code }})</span></td>
@@ -431,12 +459,14 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
-                                    <i class="feather-settings mb-2 d-block" style="font-size:28px;opacity:.3"></i>
-                                    {{ __('production.no_active_machines') }}
-                                </td>
-                            </tr>
+                            @if(empty($batchLoads))
+                                <tr>
+                                    <td colspan="8" class="text-center py-5 text-muted">
+                                        <i class="feather-settings mb-2 d-block" style="font-size:28px;opacity:.3"></i>
+                                        {{ __('production.no_active_machines') }}
+                                    </td>
+                                </tr>
+                            @endif
                         @endforelse
                     </tbody>
                 </x-ui.odoo-form-ui>
@@ -588,7 +618,7 @@
                             <th>{{ __('production.product') }}</th>
                             <th>{{ __('production.col_seq') }}</th>
                             <th>{{ __('production.col_work_center') }}</th>
-                            <th>{{ __('production.col_machine') }}</th>
+                            <th>{{ __('production.col_machine') }} / Manual batch</th>
                             <th>{{ __('production.col_planned_qty') }}</th>
                             <th>{{ __('production.col_duration_mins') }}</th>
                             <th>{{ __('production.col_planned_start') }}</th>
@@ -603,7 +633,16 @@
                                 <td>{{ $ao->order?->product?->name }}</td>
                                 <td><code>{{ $ao->sequence }}</code></td>
                                 <td>{{ $ao->workCenter?->name }}</td>
-                                <td>{{ $ao->machine?->name ?? '—' }}</td>
+                                <td>
+                                    @if($ao->machine)
+                                        {{ $ao->machine->name }}
+                                    @elseif($ao->manualProduction)
+                                        {{ $ao->manualProduction->batch_name }}
+                                        <span class="badge bg-soft-secondary text-secondary fs-10">Manual batch</span>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
                                 <td>{{ number_format($ao->order?->quantity_ordered ?? 0) }}</td>
                                 <td>{{ number_format($ao->planned_duration_minutes) }}</td>
                                 <td><span class="text-dark fs-12">{{ $ao->planned_start->toDateTimeString() }}</span></td>
@@ -617,6 +656,7 @@
                                                 data-op-seq="{{ $ao->sequence }}"
                                                 data-op-start="{{ $ao->planned_start->toDateTimeString() }}"
                                                 data-op-machine="{{ $ao->machine_id }}"
+                                                data-op-resource="{{ $ao->machine_id ? 'machine' : ($ao->section_manual_production_id ? 'batch' : 'none') }}"
                                                 data-op-wc-id="{{ $ao->work_center_id }}"
                                                 data-op-wc-name="{{ $ao->workCenter?->name }}">
                                             {{ __('production.btn_reschedule') }}

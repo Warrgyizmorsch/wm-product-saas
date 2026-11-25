@@ -78,6 +78,9 @@ class ProductionExecutionService
                 throw new InvalidArgumentException('Cannot log progress on an already completed operation.');
             }
 
+            // UR-07: an operation that needs a sub-assembly made inside this order cannot be logged on until ALL the operations that make it are completed
+            app(ProductionReadinessService::class)->assertSubAssembliesComplete($op);
+
             // Prevent logging total processed quantity beyond available input WIP
             $isFirstOp = $op->isEntryOperation();
 
@@ -153,6 +156,13 @@ class ProductionExecutionService
                 }
             }
 
+            // PX-09: output may not exceed what the material issued to the order covers (manager override is logged)
+            app(ProductionReadinessService::class)->assertWithinReadyQty(
+                $op,
+                (float) ($produced + $rejected + $scrapped),
+                $userId ? \App\Models\User::find($userId) : auth()->user()
+            );
+
             // Validate total logged units against remaining planned batch capacity when rejected units are logged
             if ($batch->planned_quantity > 0 && $rejected > 0) {
                 $alreadyLoggedForBatch = ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
@@ -219,6 +229,11 @@ class ProductionExecutionService
                 $op->actual_end_time = now();
             }
             $op->save();
+
+            // PX-18: keep the order's produced quantity equal to the cumulative good output of its final FG operation
+            if ($produced > 0) {
+                app(ProductionOrderService::class)->syncProducedQuantity($order->fresh());
+            }
 
             app(ProductionOrderService::class)->reconcileOperationReadiness($op->production_order_id);
 

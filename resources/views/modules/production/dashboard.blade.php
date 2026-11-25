@@ -2677,7 +2677,8 @@
                                             </td>
                                             <td>
                                                 <div class="d-flex flex-wrap gap-1">
-                                                    @forelse($order->operations->take(3) as $op)
+                                                    @php $ownOps = $order->operations->filter(fn ($o) => (int) ($o->bom_level ?? 1) <= 1)->sortBy('sequence')->values(); @endphp
+                                                    @forelse(($ownOps->isNotEmpty() ? $ownOps : $order->operations)->take(3) as $op)
                                                         <span
                                                             class="badge bg-soft-primary text-primary fs-10 font-monospace rounded-pill">
                                                             {{ $op->sequence }}. {{ $op->name }}

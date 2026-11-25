@@ -36,6 +36,11 @@ Schedule::command('production:process-calculation-countdowns')
     ->everyMinute()
     ->withoutOverlapping();
 
+// PX-10: operation readiness is refreshed on events and by this sweep — never by opening an order page.
+Schedule::command('production:reconcile-readiness')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
 // Tenant storage usage: drop deleted files, record untracked ones.
 Schedule::command('tenant:storage-sync')
     ->dailyAt('02:30')

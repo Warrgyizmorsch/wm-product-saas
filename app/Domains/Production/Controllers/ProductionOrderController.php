@@ -157,7 +157,9 @@ class ProductionOrderController extends Controller
 
             return redirect()
                 ->route('production.orders.show', ['order' => $order->id, 'tab' => 'vtab-reservations'])
-                ->with('success', "Requisition request sent to Store. Once items are issued, you can release the order.");
+                // UR-11 / UR-12 (M-23 / M-24): nothing is sent to the store automatically any more — the order stays a draft until the
+                // user selects the materials and sends the request(s) by hand.
+                ->with('success', "Production Order {$order->order_number} created as a draft. Check it, then select the materials to request and send them to the store.");
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
@@ -207,12 +209,9 @@ class ProductionOrderController extends Controller
 
         Gate::authorize('view', $order);
 
-        // Reconcile operation readiness and auto-evaluate completion
-        if (in_array($order->status, ['released', 'in_progress', 'draft'])) {
-            $this->orderService->reconcileOperationReadiness($order);
-            if ($order->status !== 'draft') {
-                $this->orderService->evaluateAndAutoCompleteOrder($order, Auth::id());
-            }
+        // Auto-completion is a separate concern and stays.
+        if (in_array($order->status, ['released', 'in_progress'])) {
+            $this->orderService->evaluateAndAutoCompleteOrder($order, Auth::id());
         }
 
         if (in_array($order->status, ['released', 'in_progress']) && $order->wips->isEmpty()) {
@@ -245,6 +244,15 @@ class ProductionOrderController extends Controller
             }
         }
 
+        // UR-05 (the user's rule): every time this screen loads, ALL readiness checks run again and the saved operation status is
+        // refreshed at that moment (written only when it changed; draft orders are skipped inside). The 5-minute sweep and the
+        // event refreshes (issue / return, start, log, machine, downtime, release) stay as a safety net.
+        try {
+            $this->orderService->reconcileOperationReadiness($order);
+        } catch (\Throwable $e) {
+            // Fail-safe to avoid blocking page load
+        }
+
         // Get variance analysis calculations
         $costs = $this->costService->getCostAnalysis($order);
 
@@ -265,12 +273,26 @@ class ProductionOrderController extends Controller
         $wipWorkCenterSummaries = app(\App\Domains\Production\Services\ProductionWipService::class)
             ->getWorkCenterWipSummaries($order->tenant_id, $order->id);
         $readiness = app(\App\Domains\Production\Services\ProductionReadinessService::class)->evaluateOrderReadiness($order);
+        // UR-07: the operations as a tree — the operations that make a sub-assembly sit in an arrow drawer ABOVE the operation that needs them
+        // (executed first). Every operation is resolved once and shared by the tree and the per-operation details.
+        $opMaterialService = app(\App\Domains\Production\Services\OperationMaterialService::class);
+        $opList = $opMaterialService->orderedOperations($order);
+        $opResolved = $opMaterialService->resolveAll($opList);
+        $opTree = $opMaterialService->operationTree($order, $opList, $opResolved);
+        $opDescribe = $opMaterialService->describeAll($order, $opList, $opResolved);
         $varianceAnalysis = app(\App\Domains\Production\Services\ProductionVarianceAnalysisService::class)->analyzeProductionOrder($order);
         $riskAnalysis = app(\App\Domains\Production\Services\PlanningExceptionService::class)->evaluateOrderRisk($order);
+        // UR-11 / UR-12: what can still be requested from the store, and whether releasing needs the "materials not released" confirmation
+        $materialRequestLines = $this->orderService->materialRequestLines($order);
+        $materialsNotReleased = $order->isPreRelease() && $this->orderService->materialsNotReleased($order);
 
         return view('modules.production.orders.show', compact(
             'order',
             'readiness',
+            'materialRequestLines',
+            'materialsNotReleased',
+            'opTree',
+            'opDescribe',
             'varianceAnalysis',
             'riskAnalysis',
             'costs',
@@ -322,6 +344,81 @@ class ProductionOrderController extends Controller
         }
     }
 
+    /**
+     * UR-11 (M-23 / M-24): the user selects the planned materials to request and sends them to the store — one request (one requisition
+     * slip) per click, as many as needed per order. The first request locks a draft order (UR-12).
+     */
+    public function sendMaterialRequest(Request $request, int $id)
+    {
+        $order = ProductionOrder::findOrFail($id);
+        Gate::authorize('issue', $order);
+
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.selected' => 'nullable|boolean',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $selected = collect($validated['items'])->filter(fn ($i) => !empty($i['selected']) && (float) ($i['quantity'] ?? 0) > 0)->values()->all();
+        if ($selected === []) {
+            return redirect()->back()->withInput()->with('error', 'Select at least one material to request.');
+        }
+
+        try {
+            $wasDraft = $order->isDraft();
+            $slip = $this->orderService->sendMaterialRequest($order, $selected, auth()->id(), $validated['notes'] ?? null);
+
+            $totalQty = (float) collect($selected)->sum('quantity');
+            try {
+                app(\App\Domains\Production\Services\ProductionNotificationService::class)
+                    ->notifyAdditionalMaterialRequested($order, $totalQty, $validated['notes'] ?? 'Material request sent to the store', (int) (auth()->id() ?? 1));
+            } catch (\Throwable $e) {
+                // a notification problem must not undo the request
+            }
+
+            return redirect()->route('production.orders.show', ['order' => $order->id, 'tab' => 'vtab-procurement'])
+                ->with('success', "Request {$slip->requisition_number} sent to the store." . ($wasDraft ? ' The order is now locked: it can no longer be edited or deleted, only cancelled or released.' : ''));
+        } catch (\Exception $e) {
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
+        }
+    }
+
+    /** UR-10: "Produce all here" — the set of this operation also makes what the later operations need. */
+    public function mergeSubAssembly(Request $request, int $id)
+    {
+        $order = ProductionOrder::findOrFail($id);
+        Gate::authorize('restructure', $order);
+        $data = $request->validate(['operation_id' => 'required|integer', 'child_bom_id' => 'required|integer']);
+
+        try {
+            app(\App\Domains\Production\Services\SubAssemblySetService::class)
+                ->merge($order, (int) $data['operation_id'], (int) $data['child_bom_id'], auth()->id());
+
+            return redirect()->back()->with('success', __('production.sa_merged'));
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    /** UR-10: "Produce separately" — every operation gets its own set again. */
+    public function splitSubAssembly(Request $request, int $id)
+    {
+        $order = ProductionOrder::findOrFail($id);
+        Gate::authorize('restructure', $order);
+        $data = $request->validate(['operation_id' => 'required|integer', 'child_bom_id' => 'required|integer']);
+
+        try {
+            app(\App\Domains\Production\Services\SubAssemblySetService::class)
+                ->split($order, (int) $data['operation_id'], (int) $data['child_bom_id'], auth()->id());
+
+            return redirect()->back()->with('success', __('production.sa_split'));
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
     public function edit(int $id)
     {
         $order = ProductionOrder::findOrFail($id);
@@ -331,7 +428,9 @@ class ProductionOrderController extends Controller
         if ($order->isFrozen()) {
             return redirect()
                 ->route('production.orders.show', $order->id)
-                ->with('error', 'Frozen Production Orders cannot be edited.');
+                ->with('error', $order->isLocked()
+                    ? 'This order is locked (a material request was sent): it can no longer be edited — only cancelled or released.'
+                    : 'Frozen Production Orders cannot be edited.');
         }
 
         $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
@@ -375,13 +474,14 @@ class ProductionOrderController extends Controller
 
     // ── Shop Floor Transitions ──
 
-    public function release(int $id)
+    public function release(Request $request, int $id)
     {
         $order = ProductionOrder::findOrFail($id);
         Gate::authorize('release', $order);
 
         try {
-            $this->orderService->release($id, Auth::id());
+            // UR-12 (M-24): not having the material yet is only a warning — releasing needs the user's confirmation
+            $this->orderService->release($id, Auth::id(), $request->boolean('confirm_materials'));
 
             return redirect()
                 ->route('production.orders.show', $order->id)
@@ -407,13 +507,13 @@ class ProductionOrderController extends Controller
         }
     }
 
-    public function close(int $id)
+    public function close(Request $request, int $id)
     {
         $order = ProductionOrder::findOrFail($id);
         Gate::authorize('close', $order);
 
         try {
-            $this->orderService->close($id, Auth::id());
+            $this->orderService->close($id, Auth::id(), $request->input('no_fg_reason'));
 
             return redirect()->back()->with('success', 'Production Order closed and archived.');
         } catch (\Exception $e) {
@@ -755,7 +855,7 @@ class ProductionOrderController extends Controller
         switch ($action) {
             case 'release':
                 foreach ($orders as $order) {
-                    if ($order->isDraft() && auth()->user()->can('update', $order)) {
+                    if ($order->isPreRelease() && auth()->user()->can('release', $order)) {
                         try {
                             $this->orderService->releaseOrder($order->id, auth()->id() ?: 1);
                             $successCount++;
@@ -787,7 +887,7 @@ class ProductionOrderController extends Controller
 
             case 'cancel':
                 foreach ($orders as $order) {
-                    if (($order->isDraft() || $order->isReleased()) && auth()->user()->can('update', $order)) {
+                    if (($order->isPreRelease() || $order->isReleased()) && auth()->user()->can('cancel', $order)) {
                         try {
                             $this->orderService->cancelOrder($order->id, auth()->id() ?: 1);
                             $successCount++;

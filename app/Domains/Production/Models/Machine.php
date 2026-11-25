@@ -15,6 +15,19 @@ class Machine extends BaseModel
 {
     use HasFactory, SoftDeletes, Loggable;
 
+    /**
+     * PX-10: a machine status change (inactive / under maintenance / active) changes the readiness of the operations planned on it.
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (self $machine) {
+            if ($machine->wasChanged('status')) {
+                app(\App\Domains\Production\Services\ProductionReadinessRefresher::class)
+                    ->forMachine((int) $machine->tenant_id, (int) $machine->id);
+            }
+        });
+    }
+
     protected $table = 'production_machines';
 
     // Q3: Defined status constants — no magic strings in application code

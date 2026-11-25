@@ -745,8 +745,13 @@
                                                                     </button>
                                                                 </form>
                                                             @else
+                                                                @php
+                                                                    // UR-07: say it when the operation waits for the operations that make its sub-assembly
+                                                                    $subWaitIds = $orderOp->relationLoaded('predecessorDependencies') ? $orderOp->subAssemblyPredecessorIds() : [];
+                                                                    $subWaiting = $subWaitIds === [] ? 0 : $orderOp->predecessorDependencies->filter(fn ($p) => in_array((int) $p->id, $subWaitIds, true) && !in_array($p->status, ['completed', 'skipped', 'cancelled'], true))->count();
+                                                                @endphp
                                                                 <span class="action-icon-btn opacity-65" data-bs-toggle="tooltip"
-                                                                    data-bs-placement="top" title="Waiting for Upstream Operation Completion">
+                                                                    data-bs-placement="top" title="{{ $subWaiting > 0 ? 'Waiting for the operations that make its sub-assembly (' . $subWaiting . ' not completed)' : 'Waiting for Upstream Operation Completion' }}">
                                                                     <i class="feather-lock fs-12"></i>
                                                                 </span>
                                                             @endif
@@ -877,6 +882,9 @@
                                                     @if($op->machine)
                                                         <small class="text-muted d-block fs-9 text-wrap mt-0.5"><i
                                                                 class="feather-cpu me-1"></i>{{ $op->machine->name }}</small>
+                                                    @elseif($op->manualProduction)
+                                                        <small class="text-muted d-block fs-9 text-wrap mt-0.5"><i
+                                                                class="feather-users me-1"></i>{{ $op->manualProduction->batch_name }} <span class="badge bg-soft-secondary text-secondary fs-9">Manual batch</span></small>
                                                     @endif
                                                 @endif
                                             </td>

@@ -48,7 +48,24 @@ class CapacityPlanningService
         }
 
         $workCenters = $wcQuery->get();
-        $resources = $workCenters->map(function ($wc) {
+
+        // Manual batches are resources too (one lane each): an operation runs on a machine OR a manual batch of a section.
+        $sections = \App\Domains\Production\Models\WorkCenterSection::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('work_center_id', $workCenters->pluck('id'))
+            ->whereNull('deleted_at')
+            ->get()
+            ->keyBy('id');
+        $batchesByWc = \App\Domains\Production\Models\SectionManualProduction::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('section_id', $sections->keys())
+            ->whereNull('deleted_at')
+            ->with('shift')
+            ->orderBy('batch_name')
+            ->get()
+            ->groupBy(fn ($b) => $sections[$b->section_id]->work_center_id ?? 0);
+
+        $resources = $workCenters->map(function ($wc) use ($sections, $batchesByWc) {
             return [
                 'id'                    => $wc->id,
                 'code'                  => $wc->code,
@@ -60,8 +77,23 @@ class CapacityPlanningService
                     'code'           => $m->code,
                     'name'           => $m->name,
                     'type'           => 'machine',
+                    'resource_key'   => 'Machine_' . $m->id,
                     'work_center_id' => $wc->id,
+                    'section_id'     => $m->section_id,
+                    'section_name'   => $sections[$m->section_id]->name ?? null,
                     'status'         => $m->status,
+                ])->values()->all(),
+                'batches'               => ($batchesByWc[$wc->id] ?? collect())->map(fn ($b) => [
+                    'id'             => $b->id,
+                    'code'           => null,
+                    'name'           => $b->batch_name,
+                    'type'           => 'batch',
+                    'resource_key'   => 'Batch_' . $b->id,
+                    'work_center_id' => $wc->id,
+                    'section_id'     => $b->section_id,
+                    'section_name'   => $sections[$b->section_id]->name ?? null,
+                    'shift_name'     => $b->shift?->name,
+                    'status'         => $b->active ? 'active' : 'inactive',
                 ])->values()->all(),
             ];
         })->values()->all();
@@ -74,9 +106,12 @@ class CapacityPlanningService
                 ->where('scenario_id', $scenarioId)
                 ->with([
                     'order.product',
-                    'orderOperation.routingOperation.alternateMachines',
+                    'orderOperation.routingOperation',
+                    'orderOperation.manualProduction',
                     'workCenter',
                     'machine',
+                    'section',
+                    'manualProduction',
                 ]);
 
             if (!empty($filters['work_center_id'])) {
@@ -84,6 +119,9 @@ class CapacityPlanningService
             }
             if (!empty($filters['machine_id'])) {
                 $opsQuery->where('machine_id', $filters['machine_id']);
+            }
+            if (!empty($filters['manual_production_id'])) {
+                $opsQuery->where('section_manual_production_id', $filters['manual_production_id']);
             }
             if (!empty($filters['production_order_id'])) {
                 $opsQuery->where('production_order_id', $filters['production_order_id']);
@@ -96,13 +134,10 @@ class CapacityPlanningService
                 $orderOp = $op->orderOperation;
                 $routingOp = $orderOp?->routingOperation;
                 $primaryMachineId = $orderOp?->machine_id ?: $routingOp?->machine_id;
-                $altMachineIds = $routingOp ? $routingOp->alternateMachines->pluck('machine_id')->toArray() : [];
-                $qualifiedMachineIds = array_values(array_unique(array_filter(array_merge(
-                    $primaryMachineId ? [(int) $primaryMachineId] : [],
-                    array_map('intval', $altMachineIds)
-                ))));
+                // RT-06 / RT-07 / RT-11: one resource per operation — its own machine only, no alternates
+                $qualifiedMachineIds = $primaryMachineId ? [(int) $primaryMachineId] : [];
 
-                return [
+                return $this->describeResource($op, $orderOp) + [
                     'schedule_operation_id'   => $op->source_schedule_operation_id ?: $op->id,
                     'scenario_operation_id'   => $op->id,
                     'schedule_id'             => $op->production_schedule_id,
@@ -140,9 +175,12 @@ class CapacityPlanningService
                 ->with([
                     'schedule',
                     'order.product',
-                    'orderOperation.routingOperation.alternateMachines',
+                    'orderOperation.routingOperation',
+                    'orderOperation.manualProduction',
                     'workCenter',
                     'machine',
+                    'section',
+                    'manualProduction',
                 ])
                 ->whereBetween('planned_start', [$startWindow, $endWindow]);
 
@@ -151,6 +189,9 @@ class CapacityPlanningService
             }
             if (!empty($filters['machine_id'])) {
                 $opsQuery->where('machine_id', $filters['machine_id']);
+            }
+            if (!empty($filters['manual_production_id'])) {
+                $opsQuery->where('section_manual_production_id', $filters['manual_production_id']);
             }
             if (!empty($filters['production_order_id'])) {
                 $opsQuery->where('production_order_id', $filters['production_order_id']);
@@ -166,13 +207,10 @@ class CapacityPlanningService
                 $orderOp = $op->orderOperation;
                 $routingOp = $orderOp?->routingOperation;
                 $primaryMachineId = $orderOp?->machine_id ?: $routingOp?->machine_id;
-                $altMachineIds = $routingOp ? $routingOp->alternateMachines->pluck('machine_id')->toArray() : [];
-                $qualifiedMachineIds = array_values(array_unique(array_filter(array_merge(
-                    $primaryMachineId ? [(int) $primaryMachineId] : [],
-                    array_map('intval', $altMachineIds)
-                ))));
+                // RT-06 / RT-07 / RT-11: one resource per operation — its own machine only, no alternates
+                $qualifiedMachineIds = $primaryMachineId ? [(int) $primaryMachineId] : [];
 
-                return [
+                return $this->describeResource($op, $orderOp) + [
                     'schedule_operation_id'   => $op->id,
                     'schedule_id'             => $op->production_schedule_id,
                     'schedule_number'        => $op->schedule ? $op->schedule->schedule_number : null,
@@ -263,6 +301,129 @@ class CapacityPlanningService
     }
 
     /**
+     * The resource a scheduled (or scenario) operation runs on — a machine OR a manual batch of a section — for the screens.
+     * Reads the operation's own columns first and falls back to the order operation snapshot.
+     *
+     * @return array{resource_type: string, resource_key: string|null, resource_name: string|null, section_id: int|null, section_name: string|null, section_manual_production_id: int|null}
+     */
+    public function describeResource($op, $orderOp = null): array
+    {
+        $batchId = $op->machine_id ? null : ($op->section_manual_production_id ?: ($orderOp?->section_manual_production_id));
+        $batch = null;
+        if ($batchId) {
+            $batch = ($op->manualProduction && (int) $op->manualProduction->id === (int) $batchId)
+                ? $op->manualProduction
+                : ($orderOp?->manualProduction && (int) $orderOp->manualProduction->id === (int) $batchId ? $orderOp->manualProduction : null);
+        }
+        $type = $op->machine_id ? 'machine' : ($batchId ? 'batch' : 'none');
+
+        return [
+            'resource_type' => $type,
+            'resource_key' => $type === 'machine' ? 'Machine_' . $op->machine_id : ($type === 'batch' ? 'Batch_' . $batchId : null),
+            'resource_name' => $op->machine?->name ?? $batch?->batch_name,
+            'section_id' => ($op->section_id ?: ($batch?->section_id ?? $op->machine?->section_id)) ?: null,
+            'section_name' => $op->section?->name,
+            'section_manual_production_id' => $batchId ? (int) $batchId : null,
+        ];
+    }
+
+    /**
+     * Capacity / load of every ACTIVE manual batch in the range (the batch counterpart of getMachineCapacity):
+     * a batch works only its own shift, so its capacity is that shift's minutes on working days.
+     */
+    public function getBatchCapacity(int $tenantId, Carbon $startDate, Carbon $endDate): array
+    {
+        $batches = \App\Domains\Production\Models\SectionManualProduction::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('active', true)
+            ->whereNull('deleted_at')
+            ->with(['section.workCenter', 'shift'])
+            ->orderBy('batch_name')
+            ->get();
+
+        $details = [];
+        foreach ($batches as $batch) {
+            $wc = $batch->section?->workCenter;
+            if (!$wc || $wc->status !== 'active') {
+                continue;
+            }
+
+            $totalCapacity = 0.0;
+            $date = $startDate->copy()->startOfDay();
+            while ($date->lte($endDate)) {
+                $totalCapacity += $this->schedulingService->resourceDailyMinutes($wc, ['section_id' => $batch->section_id, 'manual_production_id' => $batch->id], $date);
+                $date->addDay();
+            }
+
+            $ops = ProductionScheduleOperation::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('section_manual_production_id', $batch->id)
+                ->whereNull('machine_id')
+                ->where('planned_start', '<=', $endDate->copy()->endOfDay())
+                ->where('planned_finish', '>=', $startDate->copy()->startOfDay())
+                ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
+                ->get();
+
+            $required = 0.0;
+            $day = $startDate->copy()->startOfDay();
+            while ($day->lte($endDate)) {
+                foreach ($ops as $op) {
+                    $required += $this->schedulingService->calculateOperationScheduledMinutesOnDate($op, $day);
+                }
+                $day->addDay();
+            }
+
+            $utilization = $totalCapacity > 0 ? ($required / $totalCapacity) * 100 : ($required > 0 ? 100.0 : 0.0);
+            $status = 'available';
+            if ($totalCapacity <= 0) {
+                $status = 'unavailable';
+            } elseif ($utilization > 100) {
+                $status = 'overloaded';
+            } elseif ($utilization > 85) {
+                $status = 'near_capacity';
+            } elseif ($utilization > 0) {
+                $status = 'balanced';
+            }
+
+            $details[] = [
+                'batch' => $batch,
+                'work_center' => $wc,
+                'available_hours' => round($totalCapacity / 60.0, 2),
+                'required_hours' => round($required / 60.0, 2),
+                'utilization' => round($utilization, 2),
+                'overload_hours' => round(max(0.0, $required - $totalCapacity) / 60.0, 2),
+                'ops_count' => $ops->count(),
+                'status' => $status,
+            ];
+        }
+
+        return $details;
+    }
+
+    /**
+     * A manual batch can take a (re)scheduled operation only while it is active and its section is active.
+     */
+    public function validateBatchAvailability(int $tenantId, int $batchId): \App\Domains\Production\Models\SectionManualProduction
+    {
+        $batch = \App\Domains\Production\Models\SectionManualProduction::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->find($batchId);
+        if (!$batch) {
+            throw new InvalidArgumentException("Reschedule failed: manual batch #{$batchId} does not exist.");
+        }
+        if (!$batch->active) {
+            throw new InvalidArgumentException("Reschedule failed: manual batch '{$batch->batch_name}' is inactive.");
+        }
+        $section = \App\Domains\Production\Models\WorkCenterSection::withoutGlobalScopes()->find($batch->section_id);
+        if (!$section || !$section->isActive()) {
+            throw new InvalidArgumentException("Reschedule failed: the section of manual batch '{$batch->batch_name}' is inactive.");
+        }
+
+        return $batch;
+    }
+
+    /**
      * Get capacity planning details for work centers.
      */
     public function getWorkCenterCapacity(int $tenantId, Carbon $startDate, Carbon $endDate): array
@@ -346,20 +507,29 @@ class CapacityPlanningService
             $wc = $m->workCenter;
             if (!$wc) continue;
 
+            // a machine works its SECTION's shifts — not the whole work center's capacity
             $totalCapacity = 0.0;
             $date = $startDate->copy()->startOfDay();
             while ($date->lte($endDate)) {
-                $totalCapacity += $this->schedulingService->calculateCapacity($wc->id, $date);
+                $totalCapacity += $this->schedulingService->resourceDailyMinutes($wc, ['section_id' => $m->section_id], $date);
                 $date->addDay();
             }
 
             $ops = ProductionScheduleOperation::where('tenant_id', $tenantId)
                 ->where('machine_id', $m->id)
-                ->whereBetween('planned_start', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+                ->where('planned_start', '<=', $endDate->copy()->endOfDay())
+                ->where('planned_finish', '>=', $startDate->copy()->startOfDay())
                 ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
                 ->get();
 
-            $required = (float) $ops->sum('planned_duration_minutes');
+            $required = 0.0;
+            $day = $startDate->copy()->startOfDay();
+            while ($day->lte($endDate)) {
+                foreach ($ops as $op) {
+                    $required += $this->schedulingService->calculateOperationScheduledMinutesOnDate($op, $day);
+                }
+                $day->addDay();
+            }
 
             $downtime = (float) ProductionMachineDowntime::where('tenant_id', $tenantId)
                 ->where('machine_id', $m->id)
@@ -406,10 +576,12 @@ class CapacityPlanningService
         $workCenters = WorkCenter::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $days = [];
 
-        // Pre-fetch all operations for date range in a single query
+        // Pre-fetch all operations overlapping the date range in a single query
         $allOps = ProductionScheduleOperation::where('tenant_id', $tenantId)
-            ->whereBetween('planned_start', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->where('planned_start', '<=', $endDate->copy()->endOfDay())
+            ->where('planned_finish', '>=', $startDate->copy()->startOfDay())
             ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
+            ->with('orderOperation')
             ->get();
 
         // Pre-fetch all machine downtimes in a single query
@@ -423,13 +595,16 @@ class CapacityPlanningService
             foreach ($workCenters as $wc) {
                 $capacity = $this->schedulingService->calculateCapacity($wc->id, $date);
 
-                // Filter operations in-memory
-                $ops = $allOps->filter(function ($op) use ($wc, $currentDateStr) {
-                    return $op->work_center_id === $wc->id 
-                        && $op->planned_start->toDateString() === $currentDateStr;
+                // Filter operations in-memory: every operation that runs on this day (not only the ones that start on it)
+                $ops = $allOps->filter(function ($op) use ($wc, $date) {
+                    return $op->work_center_id === $wc->id
+                        && $op->planned_start->lte($date->copy()->endOfDay())
+                        && $op->planned_finish->gte($date->copy()->startOfDay());
                 });
 
-                $required = (float) $ops->sum('planned_duration_minutes');
+                $required = (float) $ops->sum(fn ($op) => ($op->orderOperation && (bool) $op->orderOperation->is_external)
+                    ? 0.0
+                    : $this->schedulingService->calculateOperationScheduledMinutesOnDate($op, $date));
 
                 // Filter downtimes in-memory
                 $downtime = (float) $allDowntimes->filter(function ($dt) use ($wc, $currentDateStr) {
@@ -600,14 +775,22 @@ class CapacityPlanningService
                 $this->validateMachineQualification($schedOp, $targetMachineId, $tenantId);
             }
 
+            // An operation has ONE resource (RT-06 / RT-07): its machine OR its manual batch. A batch operation keeps its batch.
+            $targetBatchId = $targetMachineId ? null : ($schedOp->section_manual_production_id ?: null);
+            if ($targetBatchId) {
+                $this->validateBatchAvailability($tenantId, (int) $targetBatchId);
+            }
+
             $wc       = $schedOp->workCenter;
             $calendar = $this->resolveCalendarForWorkCenter($wc, $tenantId);
             if (!$this->isWorkingDay($calendar, $newStart, $tenantId)) {
                 throw new InvalidArgumentException("Reschedule failed: Target date is not a valid working day on calendar.");
             }
 
+            // The finish time is worked out in the RESOURCE's own shifts (a manual batch → its shift, a machine → its section's shifts)
+            $resourceContext = $this->schedulingService->resourceContext($schedOp);
             $durationMinutes = (float) $schedOp->planned_duration_minutes;
-            $newFinish       = $this->schedulingService->addWorkingMinutes($schedOp->work_center_id, $newStart, $durationMinutes);
+            $newFinish       = $this->schedulingService->addWorkingMinutes($schedOp->work_center_id, $newStart, $durationMinutes, $resourceContext);
 
             if ($targetMachineId) {
                 $this->validateMachineAvailability($tenantId, $targetMachineId, $newStart, $newFinish, $schedOp->id);
@@ -649,7 +832,8 @@ class CapacityPlanningService
 
             if ($predecessor) {
                 $predOrderOp = $predecessor->orderOperation;
-                if ($predOrderOp && (bool) $predOrderOp->overlap_enabled) {
+                // UR-07: a sub-assembly maker is always finish-to-start (no transfer-batch early start)
+                if ($predOrderOp && (bool) $predOrderOp->overlap_enabled && !($orderOp && in_array((int) $predOrderOp->id, $orderOp->subAssemblyPredecessorIds(), true))) {
                     $setupMinutes          = (float) ($predOrderOp->setup_time_planned ?? 0);
                     $batchQty              = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
                     $lagMinutes            = (float) ($predOrderOp->transfer_lag_minutes ?? 0);
@@ -710,7 +894,7 @@ class CapacityPlanningService
 
                 if ($successor) {
                     $orderOp = $schedOp->orderOperation;
-                    if ($orderOp && (bool) $orderOp->overlap_enabled) {
+                    if ($orderOp && (bool) $orderOp->overlap_enabled && !($successor->orderOperation && in_array((int) $orderOp->id, $successor->orderOperation->subAssemblyPredecessorIds(), true))) {
                         $setupMinutes          = (float) ($orderOp->setup_time_planned ?? 0);
                         $batchQty              = (float) ($orderOp->transfer_batch_quantity ?? 0);
                         $lagMinutes            = (float) ($orderOp->transfer_lag_minutes ?? 0);
@@ -832,10 +1016,12 @@ class CapacityPlanningService
 
                     if ($succOp->planned_start->lt($earliestStart)) {
                         $succDuration = (float) $succOp->planned_duration_minutes;
-                        $succFinish   = $this->schedulingService->addWorkingMinutes($succOp->work_center_id, $earliestStart, $succDuration);
+                        $succFinish   = $this->schedulingService->addWorkingMinutes($succOp->work_center_id, $earliestStart, $succDuration, $this->schedulingService->resourceContext($succOp));
 
                         if ($succOp->machine_id) {
                             $this->validateMachineAvailability($tenantId, $succOp->machine_id, $earliestStart, $succFinish, $succOp->id);
+                        } elseif ($succOp->section_manual_production_id) {
+                            $this->validateBatchAvailability($tenantId, (int) $succOp->section_manual_production_id);
                         }
 
                         $succOldStart  = $succOp->planned_start;
@@ -901,74 +1087,53 @@ class CapacityPlanningService
     }
 
     /**
-     * Get rule-based load balancing suggestions for an overloaded operation.
+     * Load-balancing suggestion for an overloaded operation.
+     *
+     * RT-06 / RT-07 / RT-11: an operation has ONE resource (its machine OR its manual batch) and an alternative is a different
+     * OPERATION chosen at order creation — so the only balancing move left is TIME: the next free slot on the SAME machine
+     * or manual batch, worked out in that resource's own shifts.
+     *
+     * @return array<int, array{machine: object, resource_type: string, resource_key: string|null, suggested_start: Carbon, suggested_finish: Carbon, conflict_resolved: bool, warning: string|null}>
      */
     public function getLoadBalanceSuggestions(int $schedOpId): array
     {
-        $schedOp = ProductionScheduleOperation::findOrFail($schedOpId);
-        $tenantId = require_tenant_id();
-
-        // Get alternate machines in the same work center
-        $machines = Machine::whereHas('section', fn ($q) => $q->where('work_center_id', $schedOp->work_center_id))
-            ->where('status', 'active')
-            ->where('id', '!=', $schedOp->machine_id)
-            ->get();
-
-        $suggestions = [];
-
-        foreach ($machines as $m) {
-            // Check original slot overlap
-            $hasOverlap = ProductionScheduleOperation::where('machine_id', $m->id)
-                ->where('planned_start', '<', $schedOp->planned_finish)
-                ->where('planned_finish', '>', $schedOp->planned_start)
-                ->whereNotIn('status', ['cancelled', 'skipped'])
-                ->exists();
-
-            if (!$hasOverlap) {
-                $suggestions[] = [
-                    'machine' => $m,
-                    'suggested_start' => $schedOp->planned_start,
-                    'suggested_finish' => $schedOp->planned_finish,
-                    'conflict_resolved' => true,
-                    'warning' => null,
-                ];
-            } else {
-                // Find next free slot on this machine starting from now
-                $searchStart = now();
-                $duration = (int) $schedOp->planned_duration_minutes;
-                
-                $bookings = ProductionScheduleOperation::where('machine_id', $m->id)
-                    ->where('planned_finish', '>', $searchStart)
-                    ->whereNotIn('status', ['cancelled', 'skipped'])
-                    ->orderBy('planned_start')
-                    ->get();
-
-                $slotStart = $searchStart->copy();
-                $foundSlot = false;
-
-                foreach ($bookings as $b) {
-                    if ($slotStart->copy()->addMinutes($duration)->lte($b->planned_start)) {
-                        $foundSlot = true;
-                        break;
-                    }
-                    $slotStart = $b->planned_finish->copy();
-                }
-
-                if (!$foundSlot) {
-                    $slotStart = $bookings->isEmpty() ? $searchStart : $bookings->last()->planned_finish->copy();
-                }
-
-                $suggestions[] = [
-                    'machine' => $m,
-                    'suggested_start' => $slotStart,
-                    'suggested_finish' => $slotStart->copy()->addMinutes($duration),
-                    'conflict_resolved' => false,
-                    'warning' => 'Machine has existing bookings. Placed in next available slot.',
-                ];
-            }
+        $schedOp = ProductionScheduleOperation::with(['machine', 'manualProduction', 'orderOperation'])->findOrFail($schedOpId);
+        $resource = $this->describeResource($schedOp, $schedOp->orderOperation);
+        if ($resource['resource_type'] === 'none' || !$schedOp->planned_start) {
+            return [];
         }
 
-        return $suggestions;
+        $duration = (float) $schedOp->planned_duration_minutes;
+        $slot = $this->schedulingService->calculateAvailableSlot(
+            $schedOp->work_center_id,
+            $schedOp->machine_id,
+            $schedOp->planned_start->copy(),
+            $duration,
+            true,
+            [$schedOp->id],
+            [],
+            $this->schedulingService->resourceContext($schedOp)
+        );
+        if (empty($slot['start']) || empty($slot['finish'])) {
+            return [];
+        }
+
+        $subject = $schedOp->machine ?? (object) [
+            'id' => $resource['section_manual_production_id'],
+            'name' => $resource['resource_name'],
+            'code' => 'Manual batch',
+        ];
+        $moved = !$slot['start']->equalTo($schedOp->planned_start);
+
+        return [[
+            'machine' => $subject,
+            'resource_type' => $resource['resource_type'],
+            'resource_key' => $resource['resource_key'],
+            'suggested_start' => $slot['start'],
+            'suggested_finish' => $slot['finish'],
+            'conflict_resolved' => true,
+            'warning' => $moved ? 'The resource has other bookings. Placed in its next free slot.' : null,
+        ]];
     }
 
     public function resolveCalendarForWorkCenter($wc, $tenantId)

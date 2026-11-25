@@ -715,6 +715,7 @@
                                                 'in_progress' => 'bg-soft-primary text-primary border border-primary-subtle',
                                                 'released' => 'bg-soft-info text-info border border-info-subtle',
                                                 'draft' => 'bg-soft-secondary text-secondary border border-secondary-subtle',
+                                                'locked' => 'bg-soft-warning text-dark border border-warning-subtle',
                                                 default => 'bg-soft-dark text-dark border',
                                             };
                                         @endphp

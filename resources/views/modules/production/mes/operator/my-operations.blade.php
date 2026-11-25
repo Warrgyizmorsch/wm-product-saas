@@ -44,7 +44,7 @@
                         
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search_keywords') }}</label>
-                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Operation name, code, machine..." value="{{ request('search') }}" />
+                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Operation name, code, machine, manual batch..." value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
@@ -222,6 +222,9 @@
                                                     @if($assign->operation->machine)
                                                         <span class="text-muted opacity-50 mx-1">|</span>
                                                         <span>Machine: <strong class="text-dark">{{ $assign->operation->machine->name }}</strong></span>
+                                                    @elseif($assign->operation->manualProduction)
+                                                        <span class="text-muted opacity-50 mx-1">|</span>
+                                                        <span>Manual batch: <strong class="text-dark">{{ $assign->operation->manualProduction->batch_name }}</strong></span>
                                                     @endif
                                                 </div>
                                             </div>

@@ -595,14 +595,26 @@ class ProductionOrderEngineeringService
     // ------------------------------------------------------------------ PO-08 / PO-10 multi-level plan
 
     /**
-     * @return array{rows: array, child_summaries: array, consolidated_materials: array, snapshot_tree_operations: array}
+     * UR-10 (M-22 .. M-24): every operation that needs a sub-assembly gets its OWN set of maker operations, for its OWN quantity
+     * (each child BOM separately, the sub-assemblies of one operation in BOM order). The user can later choose to "produce all at one
+     * level": then one set serves that operation AND the later ones and the quantities are added up ($merges).
+     *
+     * Operation keys ("plan keys") say where an operation sits in the tree: "r12" = routing operation 12 of the order's own BOM,
+     * "r12>7/55" = routing operation 55 of child BOM 7, made for operation r12, "r12>7/55>3/60" = a sub-sub-assembly (child BOM 3) made for that one.
+     *
+     * @param array<int, array{bom: int, owner: string, serves: array<int, string>}> $merges  "produce all at one level" choices
+     * @param array<int|string, float>|null $stockOverride  the stock the plan was first made with, so a later re-plan does not drift with today's stock
+     * @return array{rows: array, child_summaries: array, consolidated_materials: array, snapshot_tree_operations: array, demands: array, stock_snapshot: array}
      */
-    public function computeMultiLevelPlan(ProductionBom $parentBom, array $chosenOpIds, array $chosenMaterialIds, float $orderQty, int $tenantId, ?int $branchId): array
+    public function computeMultiLevelPlan(ProductionBom $parentBom, array $chosenOpIds, array $chosenMaterialIds, float $orderQty, int $tenantId, ?int $branchId, array $merges = [], ?array $stockOverride = null): array
     {
         $chosenOpIds = array_map('intval', $chosenOpIds);
         $chosenMaterialIds = array_map('intval', $chosenMaterialIds);
         $rows = [];
         $stock = [];
+        foreach ((array) $stockOverride as $overrideProductId => $overrideQty) {
+            $stock[(int) $overrideProductId] = (float) $overrideQty;
+        }
         $stockFor = function (int $productId) use (&$stock, $tenantId, $branchId): float {
             if (!array_key_exists($productId, $stock)) {
                 $stock += $this->getBranchAvailableStockMap($tenantId, $branchId, [$productId]) + [$productId => 0.0];
@@ -635,19 +647,49 @@ class ProductionOrderEngineeringService
             return $id;
         };
 
-        $pending = [];   // child_bom_id => [product_id, level, required (not yet processed), requested_by[]]
-        $register = function (int $childBomId, int $productId, int $level, float $qty, string $by) use (&$pending): void {
+        // The operations that can need a sub-assembly ("consumers"), each with its place in the tree, and — per consumer — the
+        // position of every sub-assembly among its sub-assemblies, in BOM order (the semi listed first in the BOM is produced first).
+        $consumerPath = ['r0' => [[0, 0, 0]]];
+        $groupIndexes = [];
+        $groupOf = function (string $consumerKey, int $productId) use (&$groupIndexes): int {
+            $groupIndexes[$consumerKey] ??= [];
+            if (!array_key_exists($productId, $groupIndexes[$consumerKey])) {
+                $groupIndexes[$consumerKey][$productId] = count($groupIndexes[$consumerKey]);
+            }
+
+            return $groupIndexes[$consumerKey][$productId];
+        };
+        $bomOrder = fn ($a, $b) => [(int) ($a->bom_item_id ?? 0), (int) ($a->sequence ?? 0), (int) $a->id] <=> [(int) ($b->bom_item_id ?? 0), (int) ($b->sequence ?? 0), (int) $b->id];
+
+        $pending = [];   // child_bom_id => [product_id, level, queued qty, requested_by[], demands[consumer, qty, by]]
+        $register = function (int $childBomId, int $productId, int $level, float $qty, string $by, string $consumerKey) use (&$pending, $groupOf): void {
             if (!isset($pending[$childBomId])) {
-                $pending[$childBomId] = ['product_id' => $productId, 'level' => $level, 'queued' => 0.0, 'requested_by' => []];
+                $pending[$childBomId] = ['product_id' => $productId, 'level' => $level, 'queued' => 0.0, 'requested_by' => [], 'demands' => []];
             }
             $pending[$childBomId]['queued'] += $qty;
             $pending[$childBomId]['level'] = max($pending[$childBomId]['level'], $level);
             $pending[$childBomId]['requested_by'][] = ['by' => $by, 'qty' => $qty];
+            $groupOf($consumerKey, $productId);
+            foreach ($pending[$childBomId]['demands'] as $i => $existing) {
+                if ($existing['consumer'] === $consumerKey) {
+                    $pending[$childBomId]['demands'][$i]['qty'] += $qty;
+
+                    return;
+                }
+            }
+            $pending[$childBomId]['demands'][] = ['consumer' => $consumerKey, 'qty' => $qty, 'by' => $by];
         };
 
         $snapshotOps = [];
         $parentRouting = $parentBom->routing_id ? Routing::withoutGlobalScopes()->find($parentBom->routing_id) : null;
         $parentScale = $orderQty / ((float) $parentBom->base_quantity > 0 ? (float) $parentBom->base_quantity : 1.0);
+        $parentOps = $parentRouting
+            ? $parentRouting->operations()->whereIn('id', $chosenOpIds)->orderBy('sequence')->get()
+            : collect();
+        foreach ($parentOps as $pOp) {
+            $consumerPath['r' . $pOp->id] = [[0, (int) $pOp->sequence, (int) $pOp->id]];
+        }
+        $firstRootKey = $parentOps->isNotEmpty() ? 'r' . $parentOps->first()->id : 'r0';
 
         // ---- Level 1: selected parent operations + selected materials
         $parentAllocs = RoutingOperationMaterial::withoutGlobalScopes()
@@ -656,8 +698,8 @@ class ProductionOrderEngineeringService
             ->get();
 
         if ($parentAllocs->isEmpty()) {
-            // Legacy BOM with master rows only — no operation mapping
-            foreach ($parentBom->items()->with('material.uom')->get() as $item) {
+            // Legacy BOM with master rows only — no operation mapping: the sub-assembly is needed by the first operation
+            foreach ($parentBom->items()->with('material.uom')->orderBy('id')->get() as $item) {
                 if (!$item->material || (int) $item->material_id === (int) $parentBom->product_id) {
                     continue;
                 }
@@ -668,15 +710,22 @@ class ProductionOrderEngineeringService
                 $rows[$pid]['bom_item_id'] ??= $item->id;
                 $rows[$pid]['parent_sources'][] = ['level' => 1, 'bom_id' => $parentBom->id, 'operation_id' => null, 'operation' => null, 'selection' => 'Primary', 'net_qty' => $net, 'scrap_pct' => (float) ($item->material_scrap_percentage ?? 0), 'gross_qty' => $gross];
                 if ($item->child_bom_id) {
-                    $register((int) $item->child_bom_id, $pid, 2, $gross, $parentBom->bom_number);
+                    $register((int) $item->child_bom_id, $pid, 2, $gross, $parentBom->bom_number, $firstRootKey);
                 }
             }
         }
 
         if ($parentRouting) {
-            foreach ($parentRouting->operations()->whereIn('id', $chosenOpIds)->orderBy('sequence')->get() as $op) {
-                $selected = $parentAllocs->where('routing_operation_id', $op->id)->filter(fn ($a) => in_array((int) $a->id, $chosenMaterialIds, true));
-                $snapshotOps[] = $this->snapshotEntry($op, $parentBom, $parentRouting, $parentBom->product_id, 1, $orderQty, false, $selected->pluck('id')->map(fn ($v) => (int) $v)->values()->all());
+            foreach ($parentOps as $op) {
+                $rootKey = 'r' . $op->id;
+                $selected = $parentAllocs->where('routing_operation_id', $op->id)
+                    ->filter(fn ($a) => in_array((int) $a->id, $chosenMaterialIds, true))
+                    ->sort($bomOrder)
+                    ->values();
+                $snapshotOps[] = array_merge(
+                    $this->snapshotEntry($op, $parentBom, $parentRouting, $parentBom->product_id, 1, $orderQty, false, $selected->pluck('id')->map(fn ($v) => (int) $v)->values()->all()),
+                    ['op_key' => $rootKey, 'set_key' => null, 'owner_key' => null, 'serves_keys' => [], 'group_index' => 0, 'exec_path' => $consumerPath[$rootKey]]
+                );
 
                 foreach ($selected as $alloc) {
                     if (!$alloc->material || (int) $alloc->material_id === (int) $parentBom->product_id) {
@@ -698,22 +747,81 @@ class ProductionOrderEngineeringService
                         'gross_qty'    => $gross,
                     ];
                     if ($alloc->child_bom_id) {
-                        $register((int) $alloc->child_bom_id, $pid, 2, $gross, $parentBom->bom_number);
+                        $register((int) $alloc->child_bom_id, $pid, 2, $gross, $parentBom->bom_number, $rootKey);
                     }
                 }
             }
         }
 
-        // ---- Level 2+: BFS over child BOMs, primary operations + primary materials only
+        // ---- Level 2+: child BOMs, primary operations + primary materials only.
+        // Every child BOM is processed ONCE, after ALL the BOMs that need it ("low-level code" = its longest path from the order's BOM).
+        // Inside one child BOM, every operation that needs it (in execution order) takes from stock first-come-first-served and gets its own
+        // set of operations for what is still missing. (Before M-22 one set was made for the sum of all the operations that need it.)
         $remaining = [];
         $summaries = [];
-        $snapshotIndex = [];  // child bom id => [snapshot op indexes]
-        for ($level = 2; $level <= self::MAX_LEVELS + 1; $level++) {
-            $batch = array_filter($pending, fn ($p) => $p['level'] <= $level && $p['queued'] > 0);
-            if ($batch === []) {
-                if (collect($pending)->every(fn ($p) => $p['queued'] <= 0)) {
-                    break;
+        $demandRecords = [];
+
+        $childData = [];      // child bom id => bom, routing, allocations, lines (loaded once)
+        $loadChild = function (int $childBomId) use (&$childData, $tenantId, $bomOrder): array {
+            if (!isset($childData[$childBomId])) {
+                $child = ProductionBom::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($childBomId);
+                $childAllocs = $child
+                    ? RoutingOperationMaterial::withoutGlobalScopes()
+                        ->where('bom_id', $child->id)
+                        ->where('is_alternative', false)
+                        ->with(['material.uom', 'routingOperation'])
+                        ->get()
+                        ->filter(fn ($a) => !$a->routingOperation || !$a->routingOperation->is_alternative)
+                        ->sort($bomOrder)
+                        ->values()
+                    : collect();
+
+                $childRouting = ($child && $child->routing_id) ? Routing::withoutGlobalScopes()->find($child->routing_id) : null;
+                $childData[$childBomId] = [
+                    'bom'     => $child,
+                    'routing' => $childRouting,
+                    'ops'     => $childRouting ? $childRouting->operations()->where('is_alternative', false)->orderBy('sequence')->get() : collect(),
+                    'allocs'  => $childAllocs,
+                    'lines'   => $child ? ($childAllocs->isNotEmpty() ? $childAllocs : $child->items()->with('material.uom')->orderBy('id')->get()) : collect(),
+                ];
+            }
+
+            return $childData[$childBomId];
+        };
+
+        // depth of every reachable child BOM = the longest chain of BOMs above it (the order's own BOM is level 1)
+        $depth = [];
+        $walk = [];
+        foreach (array_keys($pending) as $rootChildId) {
+            $depth[$rootChildId] = 2;
+            $walk[] = $rootChildId;
+        }
+        while ($walk !== []) {
+            $id = (int) array_shift($walk);
+            $data = $loadChild($id);
+            if (!$data['bom']) {
+                continue;
+            }
+            foreach ($data['lines'] as $line) {
+                if (!$line->child_bom_id || !$line->material || (int) $line->material_id === (int) $data['bom']->product_id) {
+                    continue;
                 }
+                $cid = (int) $line->child_bom_id;
+                $d = $depth[$id] + 1;
+                if ($d > self::MAX_LEVELS + 1) {
+                    continue; // a loop or too deep: reported below if it ever has demand
+                }
+                if (!isset($depth[$cid]) || $depth[$cid] < $d) {
+                    $depth[$cid] = $d;
+                    $walk[] = $cid;
+                }
+            }
+        }
+
+        $maxDepth = $depth === [] ? 1 : max($depth);
+        for ($level = 2; $level <= $maxDepth; $level++) {
+            $batch = array_filter($pending, fn ($p, $id) => ($depth[$id] ?? $p['level']) === $level && $p['queued'] > 0, ARRAY_FILTER_USE_BOTH);
+            if ($batch === []) {
                 continue;
             }
             if ($level > self::MAX_LEVELS) {
@@ -721,15 +829,34 @@ class ProductionOrderEngineeringService
             }
 
             foreach ($batch as $childBomId => $entry) {
-                $qty = $entry['queued'];
+                $demands = $entry['demands'];   // complete: every BOM that needs this one sits at a smaller level and is already processed
                 $pending[$childBomId]['queued'] = 0.0;
+                $pending[$childBomId]['demands'] = [];
                 $productId = $entry['product_id'];
-                $remaining[$productId] ??= $stockFor($productId);
-                $fromStock = min($qty, max(0.0, $remaining[$productId]));
-                $remaining[$productId] -= $fromStock;
-                $toProduce = max(0.0, $qty - $fromStock);
 
-                $child = ProductionBom::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($childBomId);
+                // the operations that need this sub-assembly, in execution order: the one that runs first takes from stock first
+                usort($demands, fn ($a, $b) => self::comparePlanPaths($consumerPath[$a['consumer']] ?? [[0, 0, 0]], $consumerPath[$b['consumer']] ?? [[0, 0, 0]]));
+                $remaining[$productId] ??= $stockFor($productId);
+                $qty = 0.0;
+                $fromStock = 0.0;
+                $toProduce = 0.0;
+                foreach ($demands as $i => $demand) {
+                    $take = min($demand['qty'], max(0.0, $remaining[$productId]));
+                    $remaining[$productId] -= $take;
+                    $demands[$i]['from_stock'] = $take;
+                    $demands[$i]['to_produce'] = max(0.0, round($demand['qty'] - $take, 6));
+                    $qty += $demand['qty'];
+                    $fromStock += $take;
+                    $toProduce += $demands[$i]['to_produce'];
+                }
+
+                $demandRecords[$childBomId] = ['order' => array_column($demands, 'consumer'), 'by' => []];
+                foreach ($demands as $demand) {
+                    $demandRecords[$childBomId]['by'][$demand['consumer']] = [round($demand['qty'], 6), round($demand['from_stock'], 6), round($demand['to_produce'], 6)];
+                }
+
+                $data = $loadChild((int) $childBomId);
+                $child = $data['bom'];
                 $summaries[$childBomId] ??= [
                     'child_bom_id' => $childBomId,
                     'bom_number'   => $child?->bom_number,
@@ -752,56 +879,97 @@ class ProductionOrderEngineeringService
                     continue;
                 }
 
-                $cScale = $toProduce / ((float) $child->base_quantity > 0 ? (float) $child->base_quantity : 1.0);
-                $childRouting = $child->routing_id ? Routing::withoutGlobalScopes()->find($child->routing_id) : null;
-                $childAllocs = RoutingOperationMaterial::withoutGlobalScopes()
-                    ->where('bom_id', $child->id)
-                    ->where('is_alternative', false)
-                    ->with(['material.uom', 'routingOperation'])
-                    ->get()
-                    ->filter(fn ($a) => !$a->routingOperation || !$a->routingOperation->is_alternative);
-
-                $lines = $childAllocs->isNotEmpty()
-                    ? $childAllocs
-                    : $child->items()->with('material.uom')->get();
-
-                if ($childRouting) {
-                    foreach ($childRouting->operations()->where('is_alternative', false)->orderBy('sequence')->get() as $cOp) {
-                        if (isset($snapshotIndex[$childBomId][$cOp->id])) {
-                            $snapshotOps[$snapshotIndex[$childBomId][$cOp->id]]['target_produced_qty'] += $toProduce;
-                            continue;
-                        }
-                        $snapshotIndex[$childBomId][$cOp->id] = count($snapshotOps);
-                        $snapshotOps[] = $this->snapshotEntry($cOp, $child, $childRouting, $productId, $level, $toProduce, true, $childAllocs->where('routing_operation_id', $cOp->id)->pluck('id')->map(fn ($v) => (int) $v)->values()->all());
-                    }
-                }
-
-                foreach ($lines as $line) {
-                    if (!$line->material || (int) $line->material_id === (int) $child->product_id) {
+                // "produce all at one level" choices of the user: an operation whose need is made together with an EARLIER operation's
+                $demandIndex = array_flip(array_column($demands, 'consumer'));
+                $toProduceOf = array_column($demands, 'to_produce', 'consumer');
+                $mergedInto = [];
+                foreach ($merges as $mergeGroup) {
+                    if ((int) ($mergeGroup['bom'] ?? 0) !== (int) $childBomId) {
                         continue;
                     }
-                    $net = (float) $line->quantity * $cScale;
-                    $gross = $this->grossUnit($line) * $cScale;
-                    $pid = $ensureRow($line->material, $line->uom_id, $line->child_bom_id);
-                    $rows[$pid]['child_qty'] += $gross;
-                    $rows[$pid]['bom_item_id'] ??= $line instanceof RoutingOperationMaterial ? $line->bom_item_id : $line->id;
-                    $cOpModel = $line instanceof RoutingOperationMaterial ? $line->routingOperation : null;
-                    $rows[$pid]['child_sources'][] = [
-                        'level'         => $level,
-                        'bom_id'        => $child->id,
-                        'bom_number'    => $child->bom_number,
-                        'producing_qty' => $toProduce,
-                        'operation_id'  => $cOpModel?->id,
-                        'operation'     => $cOpModel ? trim($cOpModel->operation_number . ' · ' . $cOpModel->name) : null,
-                        'selection'     => 'Primary Auto',
-                        'net_qty'       => $net,
-                        'scrap_pct'     => (float) ($line->material_scrap_percentage ?? 0),
-                        'gross_qty'     => $gross,
-                    ];
-                    if ($line->child_bom_id) {
-                        $register((int) $line->child_bom_id, $pid, $level + 1, $gross, $child->bom_number);
+                    foreach ((array) ($mergeGroup['serves'] ?? []) as $served) {
+                        if ($served !== ($mergeGroup['owner'] ?? null)) {
+                            $mergedInto[$served] = $mergeGroup['owner'];
+                        }
                     }
                 }
+
+                $instances = [];   // consumer key that owns the set => ['target' => qty to make, 'serves' => [consumer keys]]
+                foreach ($demands as $demand) {
+                    if ($demand['to_produce'] <= 0) {
+                        continue;
+                    }
+                    $owner = $demand['consumer'];
+                    $wanted = $mergedInto[$demand['consumer']] ?? null;
+                    if ($wanted !== null && isset($demandIndex[$wanted]) && $demandIndex[$wanted] < $demandIndex[$demand['consumer']] && ($toProduceOf[$wanted] ?? 0.0) > 0) {
+                        $owner = $wanted;
+                    }
+                    $instances[$owner]['target'] = ($instances[$owner]['target'] ?? 0.0) + $demand['to_produce'];
+                    $instances[$owner]['serves'][] = $demand['consumer'];
+                }
+
+                $childRouting = $data['routing'];
+                $childAllocs = $data['allocs'];
+                $lines = $data['lines'];
+
+                foreach ($instances as $ownerKey => $instance) {
+                    $target = (float) $instance['target'];
+                    $cScale = $target / ((float) $child->base_quantity > 0 ? (float) $child->base_quantity : 1.0);
+                    $setKey = $ownerKey . '>' . $childBomId;
+                    $ownerPath = $consumerPath[$ownerKey] ?? [[0, 0, 0]];
+                    $group = $groupOf($ownerKey, $productId);
+                    $firstOpKey = null;
+
+                    if ($childRouting) {
+                        foreach ($data['ops'] as $cOp) {
+                            $opKey = $setKey . '/' . $cOp->id;
+                            $path = array_merge($ownerPath, [[$group, (int) $cOp->sequence, (int) $cOp->id]]);
+                            $consumerPath[$opKey] = $path;
+                            $firstOpKey ??= $opKey;
+                            $snapshotOps[] = array_merge(
+                                $this->snapshotEntry($cOp, $child, $childRouting, $productId, $level, $target, true, $childAllocs->where('routing_operation_id', $cOp->id)->pluck('id')->map(fn ($v) => (int) $v)->values()->all()),
+                                ['op_key' => $opKey, 'set_key' => $setKey, 'owner_key' => $ownerKey, 'serves_keys' => array_values($instance['serves']), 'group_index' => $group, 'exec_path' => $path]
+                            );
+                        }
+                    }
+                    // a child BOM without operations: its own sub-assemblies hang from a place-holder (they stay visible as top-level rows)
+                    $lineConsumerFallback = $firstOpKey ?? ($setKey . '/0');
+                    $consumerPath[$lineConsumerFallback] ??= array_merge($ownerPath, [[$group, 0, 0]]);
+
+                    foreach ($lines as $line) {
+                        if (!$line->material || (int) $line->material_id === (int) $child->product_id) {
+                            continue;
+                        }
+                        $net = (float) $line->quantity * $cScale;
+                        $gross = $this->grossUnit($line) * $cScale;
+                        $pid = $ensureRow($line->material, $line->uom_id, $line->child_bom_id);
+                        $rows[$pid]['child_qty'] += $gross;
+                        $rows[$pid]['bom_item_id'] ??= $line instanceof RoutingOperationMaterial ? $line->bom_item_id : $line->id;
+                        $cOpModel = $line instanceof RoutingOperationMaterial ? $line->routingOperation : null;
+                        $rows[$pid]['child_sources'][] = [
+                            'level'         => $level,
+                            'bom_id'        => $child->id,
+                            'bom_number'    => $child->bom_number,
+                            'producing_qty' => $target,
+                            'operation_id'  => $cOpModel?->id,
+                            'operation'     => $cOpModel ? trim($cOpModel->operation_number . ' · ' . $cOpModel->name) : null,
+                            'selection'     => 'Primary Auto',
+                            'net_qty'       => $net,
+                            'scrap_pct'     => (float) ($line->material_scrap_percentage ?? 0),
+                            'gross_qty'     => $gross,
+                        ];
+                        if ($line->child_bom_id) {
+                            $lineConsumer = ($cOpModel && $childRouting && isset($consumerPath[$setKey . '/' . $cOpModel->id])) ? $setKey . '/' . $cOpModel->id : $lineConsumerFallback;
+                            $register((int) $line->child_bom_id, $pid, $level + 1, $gross, $child->bom_number, $lineConsumer);
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach ($pending as $leftoverId => $leftover) {
+            if ($leftover['queued'] > 0) {
+                throw new InvalidArgumentException('BOM tree is deeper than ' . self::MAX_LEVELS . ' levels or contains a loop.');
             }
         }
 
@@ -834,7 +1002,32 @@ class ProductionOrderEngineeringService
             'child_summaries'          => $summaries,
             'consolidated_materials'   => $consolidated,
             'snapshot_tree_operations' => $snapshotOps,
+            'demands'                  => $demandRecords,
+            'stock_snapshot'           => $stock,
         ];
+    }
+
+    /**
+     * Where two operations of the plan tree stand in the execution order. A path is a list of [group, sequence, id] steps from the order's
+     * own operation down to the operation; an operation comes AFTER everything inside its drawer (the operations that make what it needs).
+     *
+     * @param array<int, array<int, int>> $a
+     * @param array<int, array<int, int>> $b
+     */
+    public static function comparePlanPaths(array $a, array $b): int
+    {
+        $steps = min(count($a), count($b));
+        for ($i = 0; $i < $steps; $i++) {
+            for ($k = 0; $k < 3; $k++) {
+                $left = (int) ($a[$i][$k] ?? 0);
+                $right = (int) ($b[$i][$k] ?? 0);
+                if ($left !== $right) {
+                    return $left <=> $right;
+                }
+            }
+        }
+
+        return count($b) <=> count($a);
     }
 
     private function snapshotEntry(RoutingOperation $op, ProductionBom $bom, Routing $routing, int $productId, int $level, float $target, bool $intermediate, array $materialIds): array

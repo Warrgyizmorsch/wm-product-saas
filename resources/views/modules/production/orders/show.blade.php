@@ -193,48 +193,48 @@
             {{ __('production.print_label') }}
         </x-ui.button>
 
-        @if($order->isDraft())
-            @php
-                $latestSlip = $order->requisitionSlips->last();
-                $slipStatusLower = strtolower($latestSlip?->status ?? '');
-                // Temp no-BOM flow: no requisition slip exists, so there is no material issue to wait for
-                $hasIssuedMaterial = config('production.temp_flow')
-                    || in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
-            @endphp
-
-            @if($hasIssuedMaterial)
-                {{-- Release & Plan Button (Enabled) --}}
-                <x-ui.button type="button" variant="success" icon="feather-play-circle" data-bs-toggle="modal"
-                    data-bs-target="#scheduleModal">
-                    {{ __('production.release_and_plan') }}
-                </x-ui.button>
-            @else
-                {{-- Release & Plan Button (Disabled until store issues raw materials) --}}
-                <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="{{ __('production.material_issue_required_tooltip') }}">
-                    <x-ui.button type="button" variant="secondary" icon="feather-lock" class="opacity-65" disabled>
-                        {{ __('production.release_and_plan') }}
-                    </x-ui.button>
-                </span>
-            @endif
+        @if($order->isPreRelease())
+            {{-- UR-12 (M-24): Release & Plan is always possible. Material not issued yet is a SOFT warning that is confirmed in the dialog
+                 ("The materials are not released. Do you still want to schedule it?"), not a block. --}}
+            <x-ui.button type="button" variant="{{ !empty($materialsNotReleased) ? 'warning' : 'success' }}" icon="feather-play-circle" data-bs-toggle="modal"
+                data-bs-target="#scheduleModal" title="{{ !empty($materialsNotReleased) ? __('production.materials_not_released_confirm') : '' }}">
+                {{ __('production.release_and_plan') }}
+            </x-ui.button>
 
             {{-- Grouped Header Actions Dropdown --}}
             <x-ui.action-dropdown id="headerActionsDropdownDraft">
-                <li>
-                    <a href="{{ route('production.orders.edit', $order->id) }}" class="dropdown-item py-1.5 fs-12">
-                        <i class="feather-edit me-2 text-primary fs-12"></i>{{ __('production.edit_order') }}
-                    </a>
-                </li>
-                <li>
-                    <form method="POST" action="{{ route('production.orders.destroy', $order->id) }}"
-                        onsubmit="return confirm('{{ __('production.confirm_delete_draft') }}');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
-                            <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete_order') }}
-                        </button>
-                    </form>
-                </li>
+                @if($order->isDraft())
+                    <li>
+                        <a href="{{ route('production.orders.edit', $order->id) }}" class="dropdown-item py-1.5 fs-12">
+                            <i class="feather-edit me-2 text-primary fs-12"></i>{{ __('production.edit_order') }}
+                        </a>
+                    </li>
+                    <li>
+                        <form method="POST" action="{{ route('production.orders.destroy', $order->id) }}"
+                            onsubmit="return confirm('{{ __('production.confirm_delete_draft') }}');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
+                                <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete_order') }}
+                            </button>
+                        </form>
+                    </li>
+                @else
+                    {{-- Locked: a material request was sent — no edit, no delete; only cancel (or release) is left --}}
+                    <li>
+                        <span class="dropdown-item-text py-1.5 fs-11 text-muted"><i class="feather-lock me-2"></i>{{ __('production.locked_order_note') }}</span>
+                    </li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li>
+                        <form method="POST" action="{{ route('production.orders.cancel', $order->id) }}"
+                            onsubmit="return confirm('{{ __('production.confirm_cancel_order') }}');">
+                            @csrf
+                            <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
+                                <i class="feather-slash me-2 text-danger fs-12"></i>{{ __('production.cancel_order') }}
+                            </button>
+                        </form>
+                    </li>
+                @endif
             </x-ui.action-dropdown>
         @endif
 
@@ -307,10 +307,22 @@
         @endif
 
         @if($order->isCompleted())
+            @php $pendingFg = $order->pendingFgQuantity(); @endphp
+            @if($pendingFg > 0)
+                {{-- PX-19: the order auto-completes with its last operation; finished goods are received afterwards --}}
+                <button type="button" class="btn btn-sm btn-warning d-inline-flex align-items-center gap-1.5"
+                    data-bs-toggle="modal" data-bs-target="#receiptModal">
+                    <i class="feather-download"></i> {{ __('production.receive_fg') }} ({{ qty_format($pendingFg) }})
+                </button>
+            @endif
             {{-- Close & Archive Order Button --}}
             <form method="POST" action="{{ route('production.orders.close', $order->id) }}"
-                onsubmit="return confirm('{{ __('production.confirm_close_order') }}');" class="d-inline">
+                onsubmit="return confirm('{{ __('production.confirm_close_order') }}');" class="d-inline-flex align-items-center gap-2">
                 @csrf
+                @if($pendingFg > 0 || $order->receivedFgQuantity() <= 0)
+                    <input type="text" name="no_fg_reason" class="form-control form-control-sm" style="width:220px"
+                        placeholder="Reason, only if closing without finished goods">
+                @endif
                 <button type="submit" class="btn btn-sm btn-secondary d-inline-flex align-items-center gap-1.5">
                     <i class="feather-archive"></i> {{ __('production.close_archive_order') }}
                 </button>
@@ -324,8 +336,12 @@
     {{-- ── Workflow Next Step Guidance Component (Placed outside panel, matching mockup) ── --}}
     <x-ui.workflow-guide :title="__('production.whats_next')">
         @if($order->isDraft())
+            {{-- UR-11 / UR-12: the order stays a draft until the first material request is sent --}}
+            {{ __('production.draft_next_step') }} <a href="?tab=vtab-procurement"
+                class="fw-bold text-primary text-decoration-underline">{{ __('production.material_requisitions') }}</a> tab ("{{ __('production.request_materials_btn') }}").
+        @elseif($order->isLocked())
             {{ __('production.requisition_sent_store_notice') }} <a href="?tab=vtab-reservations"
-                class="fw-bold text-primary text-decoration-underline">{{ __('production.material_status') }}</a>. {{ __('production.once_items_issued_click_release') }} <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold">{{ __('production.release_order') }}</span>.
+                class="fw-bold text-primary text-decoration-underline">{{ __('production.material_status') }}</a>. {{ __('production.once_items_issued_click_release') }} <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold">{{ __('production.release_and_plan') }}</span>.
         @elseif($order->isReleased())
             @php
                 $existingSchedule = $order->schedules->whereNotIn('status', ['cancelled'])->first();
@@ -406,6 +422,8 @@
             <div>
                 @if($order->isDraft())
                     <span class="erp-badge-draft">{{ __('production.draft') }}</span>
+                @elseif($order->isLocked())
+                    <span class="badge bg-soft-warning text-dark" title="{{ __('production.locked_order_note') }}"><i class="feather-lock me-1"></i>{{ __('production.locked') }}</span>
                 @elseif($order->isReleased())
                     <span class="erp-badge-pending">{{ __('production.released') }}</span>
                 @elseif($order->isInProgress())
@@ -726,6 +744,9 @@
                                     @elseif(($readiness['overall_status'] ?? '') === 'PARTIALLY_READY')
                                         <span class="badge bg-warning text-dark fs-13 px-3 py-2"><i
                                                 class="feather-alert-circle me-1"></i>{{ __('production.partially_ready') }}</span>
+                                    @elseif(($readiness['overall_status'] ?? '') === 'WAITING_PREDECESSOR')
+                                        <span class="badge bg-info fs-13 px-3 py-2"><i
+                                                class="feather-clock me-1"></i>{{ __('production.waiting_predecessor') }}</span>
                                     @else
                                         <span class="badge bg-danger fs-13 px-3 py-2"><i
                                                 class="feather-x-circle me-1"></i>{{ __('production.blocked') }}</span>
@@ -760,14 +781,18 @@
                                 </div>
                                 <div class="col-md-3">
                                     <div class="card border border-danger-subtle bg-soft-danger p-3 text-center">
-                                        <span class="text-danger text-uppercase fs-11 fw-bold">{{ __('production.actionable_blockers') }}</span>
+                                        <span class="text-danger text-uppercase fs-11 fw-bold">{{ __('production.blocked') }}</span>
                                         <h3 class="fw-bold text-danger mb-0 mt-1">
-                                            {{ $readiness['actionable_blockers_count'] ?? 0 }}
+                                            {{ $readiness['blocked_operations_count'] ?? 0 }}
                                         </h3>
+                                        <small class="text-muted fs-10">{{ __('production.actionable_blockers') }}: {{ $readiness['actionable_blockers_count'] ?? 0 }}</small>
                                     </div>
                                 </div>
                             </div>
 
+                            @if($order->isPreRelease())
+                                <div class="alert alert-secondary border-secondary-subtle mb-4 fs-13"><i class="feather-info me-2"></i>{{ __('production.draft_readiness_note') }}</div>
+                            @else
                             @if(!empty($readiness['actionable_blockers']))
                                 <div class="alert alert-danger border-danger mb-4">
                                     <h6 class="fw-bold text-danger mb-2"><i class="feather-slash me-2"></i>{{ __('production.active_production_blockers') }} ({{ count($readiness['actionable_blockers']) }})</h6>
@@ -789,6 +814,7 @@
                                         {{ __('production.initial_operations_ready_desc') }}
                                     </p>
                                 </div>
+                            @endif
                             @endif
 
                             @if(!empty($readiness['warnings']))
@@ -814,8 +840,8 @@
                                             <th style="width:5%">{{ __('production.seq') }}</th>
                                             <th style="width:20%">{{ __('production.operation') }}</th>
                                             <th style="width:12%">{{ __('production.material') }}</th>
-                                            <th style="width:14%">{{ __('production.operation_wip') }}</th>
-                                            <th style="width:12%">{{ __('production.machine') }}</th>
+                                            <th style="width:14%">{{ __('production.operation_flow') }}</th>
+                                            <th style="width:16%">{{ __('production.resources') }}</th>
                                             <th style="width:12%">{{ __('production.subcontract') }}</th>
                                             <th style="width:12%">{{ __('production.quality') }}</th>
                                             <th style="width:13%">{{ __('production.batch_lot') }}</th>
@@ -833,59 +859,28 @@
                                                     default => $st ?? __('production.not_applicable'),
                                                 };
                                             };
+                                            // UR-01..UR-04: the four columns carry their own label + tone from the readiness service
+                                            $toneClass = fn (?string $tone) => match($tone) {
+                                                'success' => 'bg-soft-success text-success',
+                                                'warning' => 'bg-soft-warning text-dark',
+                                                'danger' => 'bg-soft-danger text-danger',
+                                                'info' => 'bg-soft-info text-info',
+                                                'primary' => 'bg-soft-primary text-primary',
+                                                default => 'bg-soft-secondary text-muted',
+                                            };
+                                            $toneOfStatus = fn (?string $st) => match($st) {
+                                                'READY' => 'success',
+                                                'PARTIALLY_READY' => 'warning',
+                                                'WAITING_PREDECESSOR' => 'info',
+                                                default => 'danger',
+                                            };
                                         @endphp
-                                        @forelse(($readiness['operations'] ?? []) as $opEval)
-                                            <tr>
-                                                <td class="fw-bold">{{ $opEval['sequence'] }}</td>
-                                                <td>
-                                                    <div class="fw-bold text-dark">{{ $opEval['operation_name'] }}</div>
-                                                    <small class="text-muted">{{ __('production.target') }}: {{ number_format($opEval['target_qty'], 2) }}
-                                                        | {{ __('production.ready') }}: {{ number_format($opEval['ready_qty'], 2) }}</small>
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        class="badge {{ ($opEval['material']['status'] ?? '') === 'READY' ? 'bg-soft-success text-success' : 'bg-soft-danger text-danger' }}">
-                                                        {{ $formatDimStatus($opEval['material']['status'] ?? null) }}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    @if(($opEval['dependency']['status'] ?? '') === 'READY')
-                                                        <span class="badge bg-soft-success text-success">{{ __('production.ready') }}</span>
-                                                    @elseif(($opEval['dependency']['status'] ?? '') === 'WAITING_PREDECESSOR')
-                                                        <span class="badge bg-soft-info text-info"><i
-                                                                class="feather-clock me-1"></i>{{ __('production.waiting_predecessor') }}</span>
-                                                    @elseif(($opEval['dependency']['status'] ?? '') === 'BLOCKED')
-                                                        <span class="badge bg-soft-danger text-danger">{{ __('production.blocked') }}</span>
-                                                    @else
-                                                        <span
-                                                            class="badge bg-soft-danger text-danger">{{ $formatDimStatus($opEval['dependency']['status'] ?? null) }}</span>
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        class="badge {{ ($opEval['machine']['status'] ?? '') === 'READY' ? 'bg-soft-success text-success' : 'bg-soft-danger text-danger' }}">
-                                                        {{ $formatDimStatus($opEval['machine']['status'] ?? null) }}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        class="badge {{ ($opEval['subcontract']['status'] ?? '') === 'READY' ? 'bg-soft-success text-success' : 'bg-soft-secondary text-muted' }}">
-                                                        {{ $formatDimStatus($opEval['subcontract']['status'] ?? null) }}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        class="badge {{ ($opEval['quality']['status'] ?? '') === 'READY' ? 'bg-soft-success text-success' : 'bg-soft-warning text-dark' }}">
-                                                        {{ $formatDimStatus($opEval['quality']['status'] ?? null) }}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        class="badge {{ ($opEval['tracking']['status'] ?? '') === 'READY' ? 'bg-soft-success text-success' : 'bg-soft-secondary text-muted' }}">
-                                                        {{ $formatDimStatus($opEval['tracking']['status'] ?? null) }}
-                                                    </span>
-                                                </td>
-                                            </tr>
+                                        @php
+                                            $opEvalById = collect($readiness['operations'] ?? [])->keyBy('operation_id');
+                                            $readinessTop = $opTree['top']->map(fn ($o) => $opEvalById->get($o->id))->filter()->values();
+                                        @endphp
+                                        @forelse($readinessTop as $opEval)
+                                            @include('modules.production.orders.partials.readiness-row', ['opEval' => $opEval, 'depth' => 0])
                                         @empty
                                             <tr>
                                                 <td colspan="8" class="text-center text-muted py-3">{{ __('production.no_operation_readiness_details') }}</td>
@@ -1607,7 +1602,7 @@
                                             <th style="width:5%" class="text-center">{{ __('production.seq') }}</th>
                                             <th style="width:18%">{{ __('production.operation') }}</th>
                                             <th style="width:12%">{{ __('production.work_center') }}</th>
-                                            <th style="width:10%">{{ __('production.machine') }}</th>
+                                            <th style="width:12%">{{ __('production.resources') }}</th>
                                             <th style="width:15%">{{ __('production.operator') }}</th>
                                             <th style="width:10%" class="text-center">{{ __('production.planned_setup_run') }}
                                             </th>
@@ -1625,260 +1620,10 @@
                                                 ? $activeSchedule->operations->keyBy('production_order_operation_id')
                                                 : ($activeSchedule ? $activeSchedule->operations()->get()->keyBy('production_order_operation_id') : collect());
 
-                                            $sortedRoutingOps = $order->operations->sort(function ($a, $b) use ($schedOpsMap, $order) {
-                                                $aStart = $schedOpsMap->get($a->id)?->planned_start;
-                                                $bStart = $schedOpsMap->get($b->id)?->planned_start;
-                                                if ($aStart && $bStart && !$aStart->equalTo($bStart)) {
-                                                    return $aStart <=> $bStart;
-                                                }
-                                                if ($aStart && !$bStart) return -1;
-                                                if (!$aStart && $bStart) return 1;
-
-                                                $aIsSfg = ($a->source_product_id && (int) $a->source_product_id !== (int) $order->product_id) || ($a->is_intermediate ?? false);
-                                                $bIsSfg = ($b->source_product_id && (int) $b->source_product_id !== (int) $order->product_id) || ($b->is_intermediate ?? false);
-
-                                                if ($aIsSfg !== $bIsSfg) {
-                                                    return $aIsSfg ? -1 : 1;
-                                                }
-
-                                                return $a->sequence <=> $b->sequence;
-                                            });
+                                            $opEvalById = collect($readiness['operations'] ?? [])->keyBy('operation_id');
                                         @endphp
-                                        @foreach($sortedRoutingOps as $op)
-                                            <tr>
-                                                <td class="text-center fw-semibold text-muted">{{ $loop->iteration }}</td>
-                                                <td>
-                                                    @if($op->sourceProduct && (int) $op->source_product_id !== (int) $order->product_id)
-                                                        <span class="badge bg-soft-info text-info border border-info-subtle font-monospace mb-1" style="font-size: 10px;"><i
-                                                                class="feather-box me-1"></i>{{ $op->sourceProduct->name }} ({{ __('production.level') }}
-                                                            {{ $op->bom_level ?? 1 }})</span><br>
-                                                    @elseif(($op->bom_level ?? 1) > 1)
-                                                        <span class="badge bg-soft-secondary text-secondary font-monospace mb-1" style="font-size: 10px;">{{ __('production.level') }}
-                                                            {{ $op->bom_level }}</span><br>
-                                                    @endif
-                                                    <span class="fw-semibold text-dark">{{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}</span>
-                                                    <br><small class="text-muted font-monospace">{{ $op->operation_number }}</small>
-                                                    @php
-                                                        $opIsQcRequired = (bool) ($op->quality_required || ($op->routingOperation?->quality_required ?? false));
-                                                    @endphp
-                                                    @if($opIsQcRequired)
-                                                        <span class="badge bg-soft-info text-info border border-info-subtle font-monospace ms-1"
-                                                            title="Quality Check Required for this operation">
-                                                            <i class="feather-shield me-1"></i>{{ __('production.qc_required') }}
-                                                        </span>
-                                                    @endif
-                                                    @if($op->is_external)
-                                                        <span class="badge bg-soft-warning text-dark border border-warning ms-1"><i
-                                                                class="feather-external-link me-1"></i>{{ __('production.subcontract') }}</span>
-                                                        @if($op->purchaseOrder)
-                                                            @if($op->purchaseOrder->status === 'Approved')
-                                                                <a href="{{ route('purchase.orders.show', $op->purchaseOrder->id) }}"
-                                                                    class="badge bg-soft-success text-success border border-success-subtle text-decoration-none ms-1"
-                                                                    title="Subcontract PO Approved">
-                                                                    <i class="feather-check-circle me-1"></i>{{ __('production.po_approved') }}
-                                                                    (#{{ $op->purchaseOrder->purchase_order_number }})
-                                                                </a>
-                                                            @else
-                                                                <a href="{{ route('purchase.orders.show', $op->purchaseOrder->id) }}"
-                                                                    class="badge bg-soft-info text-info border border-info-subtle text-decoration-none ms-1"
-                                                                    title="Subcontract PO {{ $op->purchaseOrder->status }}">
-                                                                    <i class="feather-file-text me-1"></i>PO {{ $op->purchaseOrder->status }}
-                                                                    (#{{ $op->purchaseOrder->purchase_order_number }})
-                                                                </a>
-                                                            @endif
-                                                        @endif
-                                                        @if(($op->material_supply_type ?? 'company_supplied') === 'company_supplied')
-                                                            <div class="mt-1">
-                                                                @php
-                                                                    $existingChallan = $op->latestDeliveryChallan;
-                                                                @endphp
-                                                                @if($existingChallan)
-                                                                    @if($existingChallan->status === 'draft')
-                                                                        <a href="{{ route('production.subcontract.delivery-challans.show', $existingChallan->id) }}"
-                                                                            class="badge bg-soft-warning text-dark border border-warning fs-10 text-decoration-none"
-                                                                            title="Draft Gate Pass pending dispatch">
-                                                                            <i class="feather-clock me-1"></i>{{ __('production.draft_gate_pass') }}
-                                                                            (#{{ $existingChallan->challan_number }})
-                                                                        </a>
-                                                                    @elseif($existingChallan->status === 'dispatched')
-                                                                        <a href="{{ route('production.subcontract.delivery-challans.show', $existingChallan->id) }}"
-                                                                            class="badge bg-soft-info text-info border border-info-subtle fs-10 text-decoration-none"
-                                                                            title="Material Dispatched to Vendor">
-                                                                            <i class="feather-truck me-1"></i>{{ __('production.dispatched') }}
-                                                                            (#{{ $existingChallan->challan_number }})
-                                                                        </a>
-                                                                    @else
-                                                                        <a href="{{ route('production.subcontract.delivery-challans.show', $existingChallan->id) }}"
-                                                                            class="badge bg-soft-success text-success border border-success-subtle fs-10 text-decoration-none"
-                                                                            title="Delivery Challan Completed">
-                                                                            <i class="feather-check-circle me-1"></i>{{ __('production.challan_completed') }}
-                                                                            (#{{ $existingChallan->challan_number }})
-                                                                        </a>
-                                                                    @endif
-                                                                @else
-                                                                    <a href="{{ route('production.subcontract.delivery-challans.create', ['production_order_id' => $order->id, 'operation_id' => $op->id]) }}"
-                                                                        class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 text-decoration-none"
-                                                                        title="Generate Subcontract Material Delivery Challan / Gate Pass to Vendor">
-                                                                        <i class="feather-truck me-1"></i>{{ __('production.dispatch_material_challan') }}
-                                                                    </a>
-                                                                @endif
-                                                            </div>
-                                                        @endif
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    @if($op->is_external)
-                                                        <span class="fw-semibold text-dark"><i
-                                                                class="feather-truck me-1 text-primary"></i>{{ $op->vendor->name ?? __('production.subcontract_vendor') }}</span>
-                                                        <div class="fs-10 text-muted">{{ __('production.lead') }}: {{ $op->subcontract_lead_time_days ?? 0 }}d
-                                                        </div>
-                                                    @else
-                                                        {{ $op->workCenter?->name ?? 'Unassigned' }}
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    @if($op->is_external)
-                                                        <span class="badge bg-light text-muted">N/A (Subcontract)</span>
-                                                    @else
-                                                        {{ $op->machine->name ?? 'Any' }}
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    @if($op->is_external)
-                                                        <span class="text-muted fs-11"><i class="feather-user-check me-1"></i>External
-                                                            Vendor</span>
-                                                    @else
-                                                        @php
-                                                            $activeAssignment = $op->operatorAssignments->whereIn('status', ['assigned', 'accepted'])->first();
-                                                            $schedOp = $schedOpsMap->get($op->id);
-                                                            $isOpStarted = in_array($op->status, ['running', 'paused', 'completed'])
-                                                                || ($schedOp && in_array($schedOp->status, ['running', 'paused', 'completed']))
-                                                                || !empty($op->actual_start_time)
-                                                                || ($schedOp && !empty($schedOp->actual_start))
-                                                                || ((float) ($op->quantity_produced ?? 0) > 0);
-                                                        @endphp
-                                                        @if($activeAssignment)
-                                                            <div>
-                                                                <span
-                                                                    class="fw-semibold text-dark fs-12">{{ $activeAssignment->user->name }}</span>
-                                                                <div class="d-flex align-items-center gap-1.5">
-                                                                    @if($activeAssignment->status === 'accepted')
-                                                                        <span
-                                                                            class="badge bg-soft-success text-success fs-9 py-0.5 px-1">Accepted</span>
-                                                                    @else
-                                                                        <span
-                                                                            class="badge bg-soft-warning text-warning fs-9 py-0.5 px-1">Pending</span>
-                                                                    @endif
-                                                                    @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed' && !$isOpStarted)
-                                                                        @if($order->schedules->isNotEmpty())
-                                                                            <button type="button"
-                                                                                class="btn btn-xs btn-outline-secondary p-0.5 border-0"
-                                                                                title="Reassign" data-bs-toggle="modal"
-                                                                                data-bs-target="#orderAssignOperatorModal"
-                                                                                onclick="document.getElementById('assign_op_id').value = '{{ $op->id }}';">
-                                                                                <i class="feather-edit fs-11"></i>
-                                                                            </button>
-                                                                        @else
-                                                                            <button type="button"
-                                                                                class="btn btn-xs btn-outline-secondary p-0.5 border-0" disabled
-                                                                                title="Generate a schedule first to enable operator assignment"
-                                                                                data-bs-toggle="tooltip">
-                                                                                <i class="feather-edit fs-11"></i>
-                                                                            </button>
-                                                                        @endif
-                                                                    @endif
-                                                                </div>
-                                                            </div>
-                                                        @else
-                                                            <div class="d-flex align-items-center gap-1.5">
-                                                                <span class="text-muted fs-12">—</span>
-                                                                @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
-                                                                    @if($order->schedules->isNotEmpty())
-                                                                        <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-1.5"
-                                                                            data-bs-toggle="modal" data-bs-target="#orderAssignOperatorModal"
-                                                                            onclick="document.getElementById('assign_op_id').value = '{{ $op->id }}';">
-                                                                            <i class="feather-user-plus me-1"></i> Assign
-                                                                        </button>
-                                                                    @else
-                                                                        <button type="button" class="btn btn-xs btn-outline-secondary py-0.5 px-1.5"
-                                                                            disabled title="Generate a schedule first to enable operator assignment"
-                                                                            data-bs-toggle="tooltip">
-                                                                            <i class="feather-user-plus me-1"></i> Assign
-                                                                        </button>
-                                                                    @endif
-                                                                @endif
-                                                            </div>
-                                                        @endif
-                                                    @endif
-                                                </td>
-                                                <td class="text-center text-muted">
-                                                    @if($op->is_external)
-                                                        Lead: {{ $op->subcontract_lead_time_days ?? 0 }}d
-                                                    @else
-                                                        {{ $op->setup_time_planned }}m / {{ $op->processing_time_planned }}m
-                                                    @endif
-                                                </td>
-                                                <td class="text-center fw-semibold text-dark">
-                                                    @if($op->is_external)
-                                                        Disp: {{ $op->dispatch_buffer_days ?? 0 }}d / Ret:
-                                                        {{ $op->return_buffer_days ?? 0 }}d
-                                                    @else
-                                                        {{ $op->setup_time_actual }}m / {{ $op->processing_time_actual }}m
-                                                    @endif
-                                                </td>
-                                                <td class="text-center">
-                                                    <span
-                                                        class="text-success fw-bold">{{ number_format($op->quantity_produced, 2) }}</span>
-                                                    /
-                                                    <span
-                                                        class="text-danger">{{ number_format($op->quantity_scrapped + $op->quantity_rejected, 2) }}</span>
-                                                </td>
-                                                <td>
-                                                    @if($op->status === 'waiting')
-                                                        <span class="badge bg-secondary text-white">Waiting</span>
-                                                    @elseif($op->status === 'ready')
-                                                        <span class="badge bg-primary text-white">Ready</span>
-                                                    @elseif($op->status === 'running')
-                                                        <span class="badge bg-info text-white">Running</span>
-                                                    @elseif($op->status === 'vendor_dispatched')
-                                                        <span class="badge bg-soft-info text-info border border-info-subtle"><i
-                                                                class="feather-truck me-1"></i>At Vendor (Dispatched)</span>
-                                                    @elseif($op->status === 'paused')
-                                                        <span class="badge bg-warning text-dark">Paused</span>
-                                                    @elseif($op->status === 'completed')
-                                                        <span
-                                                            class="badge bg-success text-white">{{ __('production.completed') }}</span>
-                                                    @else
-                                                        <span
-                                                            class="badge bg-light text-dark">{{ ucfirst(str_replace('_', ' ', $op->status)) }}</span>
-                                                    @endif
-
-                                                    @if($op->scheduleOperation && ($op->scheduleOperation->status === 'running' || $op->scheduleOperation->status === 'paused'))
-                                                        <div class="live-timer" data-status="{{ $op->scheduleOperation->status }}"
-                                                            data-start="{{ $op->scheduleOperation->actual_start ? $op->scheduleOperation->actual_start->toIso8601String() : '' }}"
-                                                            data-paused-at="{{ $op->scheduleOperation->last_paused_at ? $op->scheduleOperation->last_paused_at->toIso8601String() : '' }}"
-                                                            data-accumulated-paused="{{ $op->scheduleOperation->accumulated_paused_seconds ?? 0 }}">
-                                                        </div>
-                                                    @endif
-                                                </td>
-                                                <td class="text-end">
-                                                    @if($op->is_external)
-                                                        <a href="?tab=vtab-subcontract"
-                                                            class="btn btn-sm btn-outline-warning py-1 px-2 fs-11 d-inline-flex align-items-center gap-1">
-                                                            <i class="feather-truck"></i> Subcontract
-                                                        </a>
-                                                    @elseif(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
-                                                        <button type="button"
-                                                            class="btn btn-sm btn-outline-primary py-1 px-2 fs-11 d-inline-flex align-items-center gap-1"
-                                                            data-bs-toggle="modal" data-bs-target="#progressModal"
-                                                            onclick="var selectEl = document.getElementById('op_select_id'); if (selectEl) { selectEl.value = '{{ $op->id }}'; selectEl.dispatchEvent(new Event('change')); if (window.jQuery && jQuery().select2) { $(selectEl).trigger('change'); } }">
-                                                            <i class="feather-edit-3"></i> {{ __('production.log_progress') }}
-                                                        </button>
-                                                    @else
-                                                        —
-                                                    @endif
-                                                </td>
-                                            </tr>
+                                        @foreach($opTree['top'] as $op)
+                                            @include('modules.production.orders.partials.operations-row', ['op' => $op, 'depth' => 0])
                                         @endforeach
                                     </tbody>
                                 </table>
@@ -1929,6 +1674,9 @@
                                                     <div class="p-2 border rounded bg-white">
                                                         <span class="text-muted d-block fs-10 text-uppercase fw-semibold">{{ __('production.total_operations') }}</span>
                                                         <span class="fw-bold fs-13 text-dark">{{ $cTotalOps }}</span>
+                                                        @if($cTotalOps > $opTree['top']->count())
+                                                            <small class="text-muted d-block fs-10">{{ __('production.incl_sub_assembly_ops', ['n' => $cTotalOps - $opTree['top']->count()]) }}</small>
+                                                        @endif
                                                     </div>
                                                 </div>
                                                 <div class="col-3">
@@ -1980,6 +1728,21 @@
                                 button:not(.collapsed) .accordion-rotate-icon {
                                     transform: rotate(90deg);
                                 }
+
+                                /* UR-07: the drawer of the sub-assembly operations opens ABOVE the operation (they are executed first):
+                                   arrow up = "open above", arrow down = "close". Used on the Operations, Component Plan and Readiness tables. */
+                                .sub-rotate-icon {
+                                    transition: transform 0.25s ease-in-out;
+                                    display: inline-block;
+                                }
+
+                                .sub-toggle.collapsed .sub-rotate-icon {
+                                    transform: rotate(0deg);
+                                }
+
+                                .sub-toggle:not(.collapsed) .sub-rotate-icon {
+                                    transform: rotate(180deg);
+                                }
                             </style>
 
                             {{-- Sub-view Navigation Toggle: Matrix View vs Hierarchical Tree View --}}
@@ -2021,313 +1784,8 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                @foreach($order->operations as $cOp)
-                                                    @php
-                                                        $itemProduct = $cOp->sourceProduct ?? $order->product;
-                                                        $bomItemRatio = 1.0;
-                                                        if ($itemProduct && (int) $itemProduct->id !== (int) $order->product_id) {
-                                                            $bItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $cOp->tenant_id)
-                                                                ->where('bom_id', $order->bom_id)
-                                                                ->where('material_id', $itemProduct->id)
-                                                                ->first();
-                                                            if ($bItem && (float) $bItem->quantity > 0) {
-                                                                $bBase = $order->bom?->base_quantity > 0 ? (float) $order->bom->base_quantity : 1.0;
-                                                                $bomItemRatio = (float) $bItem->quantity / $bBase;
-                                                            }
-                                                        }
-                                                        $targetQty = (float) ($cOp->target_produced_qty > 0 ? $cOp->target_produced_qty : ($order->quantity_ordered * $bomItemRatio));
-                                                        $doneQty = (float) $cOp->quantity_produced;
-                                                        $rejectedQty = (float) $cOp->quantity_rejected;
-                                                        $scrappedQty = (float) $cOp->quantity_scrapped;
-                                                        $reworkQty = (float) ($cOp->quantity_rework ?? 0);
-                                                        $pendingQty = max(0.0, $targetQty - $doneQty);
-                                                        $pct = $targetQty > 0 ? min(100.0, ($doneQty / $targetQty) * 100) : 0.0;
-                                                        $itemUom = $itemProduct?->uom?->code ?? 'Pcs';
-
-                                                        $isSfg = ($itemProduct && (int) $itemProduct->id !== (int) $order->product_id);
-                                                        $isExternal = (bool) $cOp->is_external;
-                                                        $level = $cOp->bom_level ?? ($isSfg ? 2 : 1);
-                                                    @endphp
-                                                    <tr class="bg-white">
-                                                        {{-- Cell 1: Item / Component --}}
-                                                        <td class="bg-white">
-                                                            <div class="d-flex align-items-start gap-2">
-                                                                <button type="button"
-                                                                    class="btn btn-xs btn-outline-primary p-1 border-0 text-primary bg-transparent rounded-2 shadow-none me-1 collapsed"
-                                                                    data-bs-toggle="collapse"
-                                                                    data-bs-target="#op-detail-{{ $cOp->id }}" aria-expanded="false"
-                                                                    aria-controls="op-detail-{{ $cOp->id }}"
-                                                                    title="Toggle operation details">
-                                                                    <i
-                                                                        class="feather-chevron-right fs-12 accordion-rotate-icon"></i>
-                                                                </button>
-                                                                <div>
-                                                                    <div class="d-flex align-items-center gap-2 mb-0.5">
-                                                                        <span
-                                                                            class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 py-0.5 px-1.5 fw-bold me-1">
-                                                                            {{ $level > 1 ? 'L' . $level . ' SFG' : 'L1 FG' }}
-                                                                        </span>
-                                                                        <span
-                                                                            class="fw-bold text-dark fs-12">{{ $itemProduct->name }}</span>
-                                                                    </div>
-                                                                    <div
-                                                                        class="fs-10 text-muted font-monospace d-flex align-items-center gap-2">
-                                                                        <span><i
-                                                                                class="feather-tag me-0.5"></i>{{ $itemProduct->sku ?? 'SKU-N/A' }}</span>
-                                                                        <span>&bull;</span>
-                                                                        <span
-                                                                            class="text-secondary fw-semibold">{{ number_format($bomItemRatio, 2) }}
-                                                                            {{ $itemUom }}/FG</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-
-                                                        {{-- Cell 2: Operation --}}
-                                                        <td class="bg-white">
-                                                            <div class="fw-bold text-primary fs-12">
-                                                                OP{{ $cOp->sequence ?? $loop->iteration * 10 }} &middot;
-                                                                {{ $cOp->name }}
-                                                            </div>
-                                                            <div class="fs-10 text-muted">
-                                                                @if($isExternal)
-                                                                    <span
-                                                                        class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1.5 py-0.5">
-                                                                        <i class="feather-truck me-1"></i>External Subcontract
-                                                                    </span>
-                                                                @else
-                                                                    <span
-                                                                        class="badge bg-soft-secondary text-secondary border fs-10 px-1.5 py-0.5">
-                                                                        <i class="feather-cpu me-1"></i>Internal Routing
-                                                                    </span>
-                                                                @endif
-                                                            </div>
-                                                        </td>
-
-                                                        {{-- Cell 3: Resource --}}
-                                                        <td class="bg-white">
-                                                            @if($isExternal)
-                                                                <div class="fw-semibold text-dark fs-11"><i
-                                                                        class="feather-users me-1 text-primary"></i>{{ $cOp->vendor->name ?? 'Outsourced Vendor' }}
-                                                                </div>
-                                                                <div class="fs-10 text-muted">Subcontract Vendor</div>
-                                                            @else
-                                                                <div class="fw-semibold text-dark fs-11"><i
-                                                                        class="feather-grid me-1 text-primary"></i>{{ $cOp->workCenter->name ?? 'Workstation Unassigned' }}
-                                                                </div>
-                                                                <div class="fs-10 text-muted">
-                                                                    @if($cOp->machine)
-                                                                        <i class="feather-cpu me-1"></i>{{ $cOp->machine->name }}
-                                                                    @else
-                                                                        <span class="fst-italic">Machine not assigned</span>
-                                                                    @endif
-                                                                </div>
-                                                            @endif
-                                                        </td>
-
-                                                        {{-- Cell 4: Requirement --}}
-                                                        <td class="text-end bg-white">
-                                                            <div class="fw-bold text-dark fs-13 font-monospace">
-                                                                {{ number_format($targetQty, 2) }} <small
-                                                                    class="text-muted fs-10">{{ $itemUom }}</small>
-                                                            </div>
-                                                            <div class="fs-10 text-muted">
-                                                                {{ number_format($bomItemRatio, 2) }} &times;
-                                                                {{ number_format($order->quantity_ordered, 0) }} FG
-                                                            </div>
-                                                        </td>
-
-                                                        {{-- Cell 5: Schedule --}}
-                                                        <td class="fs-11 text-muted bg-white">
-                                                            @if($cOp->scheduleOperation)
-                                                                @php
-                                                                    $isOverdue = $cOp->scheduleOperation->planned_finish && $cOp->scheduleOperation->planned_finish->isPast() && $cOp->status !== 'completed';
-                                                                @endphp
-                                                                <div class="{{ $isOverdue ? 'text-danger fw-bold' : '' }}">
-                                                                    <i
-                                                                        class="feather-calendar me-1"></i>{{ $cOp->scheduleOperation->planned_start ? $cOp->scheduleOperation->planned_start->format('d M H:i') : '-' }}
-                                                                </div>
-                                                                <div class="{{ $isOverdue ? 'text-danger fw-bold' : '' }}">
-                                                                    <i
-                                                                        class="feather-flag me-1"></i>{{ $cOp->scheduleOperation->planned_finish ? $cOp->scheduleOperation->planned_finish->format('d M H:i') : '-' }}
-                                                                </div>
-                                                            @else
-                                                                <span class="badge bg-soft-secondary text-secondary border fs-10">Not
-                                                                    Scheduled</span>
-                                                            @endif
-                                                        </td>
-
-                                                        {{-- Cell 6: Execution Progress --}}
-                                                        <td class="bg-white">
-                                                            <div class="d-flex justify-content-between fs-11 mb-1">
-                                                                <span
-                                                                    class="fw-bold text-success font-monospace">{{ number_format($doneQty, 1) }}</span>
-                                                                <span class="text-muted font-monospace">/
-                                                                    {{ number_format($targetQty, 0) }} {{ $itemUom }}</span>
-                                                            </div>
-                                                            <div class="progress style-3" style="height: 6px;">
-                                                                <div class="progress-bar {{ $pct >= 100 ? 'bg-success' : ($pct > 0 ? 'bg-primary' : 'bg-secondary') }}"
-                                                                    role="progressbar" style="width: {{ $pct }}%"
-                                                                    aria-valuenow="{{ $pct }}" aria-valuemin="0"
-                                                                    aria-valuemax="100"></div>
-                                                            </div>
-                                                            @if($rejectedQty > 0 || $scrappedQty > 0 || $reworkQty > 0)
-                                                                <div class="fs-10 mt-1 d-flex flex-wrap gap-1">
-                                                                    @if($rejectedQty > 0)
-                                                                        <span class="badge bg-soft-danger text-danger fs-9 p-0.5 px-1">Rej:
-                                                                            {{ number_format($rejectedQty, 0) }}</span>
-                                                                    @endif
-                                                                    @if($scrappedQty > 0)
-                                                                        <span class="badge bg-soft-dark text-dark fs-9 p-0.5 px-1">Scrap:
-                                                                            {{ number_format($scrappedQty, 0) }}</span>
-                                                                    @endif
-                                                                    @if($reworkQty > 0)
-                                                                        <span
-                                                                            class="badge bg-soft-warning text-warning fs-9 p-0.5 px-1">Rework:
-                                                                            {{ number_format($reworkQty, 0) }}</span>
-                                                                    @endif
-                                                                </div>
-                                                            @endif
-                                                        </td>
-
-                                                        {{-- Cell 7: Status --}}
-                                                        <td class="text-center bg-white">
-                                                            @if($cOp->status === 'completed')
-                                                                <span
-                                                                    class="badge bg-soft-success text-success border border-success-subtle px-2 py-1 fs-11"><i
-                                                                        class="feather-check-circle me-1"></i>Completed</span>
-                                                            @elseif($cOp->status === 'running')
-                                                                <span
-                                                                    class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-1 fs-11"><i
-                                                                        class="feather-play me-1"></i>Running</span>
-                                                            @elseif($cOp->status === 'ready')
-                                                                <span
-                                                                    class="badge bg-soft-info text-info border border-info-subtle px-2 py-1 fs-11"><i
-                                                                        class="feather-clock me-1"></i>Ready</span>
-                                                            @elseif($cOp->status === 'qc_hold')
-                                                                <span
-                                                                    class="badge bg-soft-warning text-warning border border-warning-subtle px-2 py-1 fs-11"><i
-                                                                        class="feather-shield me-1"></i>QC Hold</span>
-                                                            @elseif($cOp->status === 'rework')
-                                                                <span
-                                                                    class="badge bg-soft-danger text-danger border border-danger-subtle px-2 py-1 fs-11"><i
-                                                                        class="feather-alert-triangle me-1"></i>Rework</span>
-                                                            @else
-                                                                <span
-                                                                    class="badge bg-soft-secondary text-secondary border border-secondary-subtle px-2 py-1 fs-11">{{ ucfirst($cOp->status) }}</span>
-                                                            @endif
-                                                        </td>
-                                                    </tr>
-
-                                                    {{-- Expandable Drawer Detail Panel --}}
-                                                    <tr id="op-detail-{{ $cOp->id }}" class="collapse bg-white border-bottom">
-                                                        <td colspan="7" class="p-3 bg-white">
-                                                            <div
-                                                                class="card border border-light-subtle shadow-sm mb-0 rounded-3 bg-light-subtle">
-                                                                <div class="card-body p-3">
-                                                                    <div class="row g-3 fs-11">
-                                                                        {{-- Column 1: Material Inputs Required --}}
-                                                                        <div class="col-md-4 border-end">
-                                                                            <h6
-                                                                                class="fw-bold text-dark fs-12 mb-2 d-flex align-items-center gap-1">
-                                                                                <i class="feather-box text-primary"></i>Material
-                                                                                Inputs Required
-                                                                            </h6>
-                                                                            @php
-                                                                                $bomMaterials = \App\Domains\Production\Models\RoutingOperationMaterial::where('routing_operation_id', $cOp->routing_operation_id)->get();
-                                                                            @endphp
-                                                                            @if($bomMaterials->isNotEmpty())
-                                                                                <ul
-                                                                                    class="list-group list-group-flush border rounded-2 fs-11">
-                                                                                    @foreach($bomMaterials as $bMat)
-                                                                                        @php
-                                                                                            $matProd = \App\Domains\Inventory\Models\Product::find($bMat->material_id);
-                                                                                        @endphp
-                                                                                        <li
-                                                                                            class="list-group-item d-flex justify-content-between align-items-center py-1.5 px-2 bg-white">
-                                                                                            <span>{{ $matProd->name ?? 'Material Item' }}</span>
-                                                                                            <span
-                                                                                                class="fw-bold text-dark font-monospace">{{ number_format($bMat->quantity * $order->quantity_ordered, 2) }}
-                                                                                                {{ $matProd?->uom?->code ?? 'units' }}</span>
-                                                                                        </li>
-                                                                                    @endforeach
-                                                                                </ul>
-                                                                            @else
-                                                                                <div class="text-muted fs-11 fst-italic">Standard BOM
-                                                                                    component routing operation</div>
-                                                                            @endif
-                                                                        </div>
-
-                                                                        {{-- Column 2: Execution & Quality Metrics --}}
-                                                                        <div class="col-md-4 border-end">
-                                                                            <h6
-                                                                                class="fw-bold text-dark fs-12 mb-2 d-flex align-items-center gap-1">
-                                                                                <i
-                                                                                    class="feather-check-square text-success"></i>Execution
-                                                                                & Quality Summary
-                                                                            </h6>
-                                                                            <div class="bg-white p-2 border rounded-2">
-                                                                                <div class="d-flex justify-content-between mb-1">
-                                                                                    <span class="text-muted">Assigned
-                                                                                        Operator:</span>
-                                                                                    <strong
-                                                                                        class="text-dark">{{ $cOp->operator->name ?? 'Unassigned' }}</strong>
-                                                                                </div>
-                                                                                <div class="d-flex justify-content-between mb-1">
-                                                                                    <span class="text-muted">Target
-                                                                                        Requirement:</span>
-                                                                                    <strong
-                                                                                        class="text-dark">{{ number_format($targetQty, 2) }}
-                                                                                        {{ $itemUom }}</strong>
-                                                                                </div>
-                                                                                <div class="d-flex justify-content-between mb-1">
-                                                                                    <span class="text-muted">Good Output
-                                                                                        Produced:</span>
-                                                                                    <strong
-                                                                                        class="text-success">{{ number_format($doneQty, 2) }}
-                                                                                        {{ $itemUom }}</strong>
-                                                                                </div>
-                                                                                <div class="d-flex justify-content-between">
-                                                                                    <span class="text-muted">Pending Balance:</span>
-                                                                                    <strong
-                                                                                        class="text-primary">{{ number_format($pendingQty, 2) }}
-                                                                                        {{ $itemUom }}</strong>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        {{-- Column 3: Contextual Quick Actions --}}
-                                                                        <div class="col-md-4">
-                                                                            <h6
-                                                                                class="fw-bold text-dark fs-12 mb-2 d-flex align-items-center gap-1">
-                                                                                <i class="feather-command text-info"></i>Contextual
-                                                                                Action Shortcuts
-                                                                            </h6>
-                                                                            <div class="d-flex flex-wrap gap-2">
-                                                                                <a href="{{ route('production.mes.dashboard') }}"
-                                                                                    class="btn btn-sm btn-outline-primary fs-11 py-1 px-2">
-                                                                                    <i class="feather-play me-1"></i>Open MES
-                                                                                    Console
-                                                                                </a>
-                                                                                @if($isExternal)
-                                                                                    <a href="{{ route('production.subcontract.delivery-challans.index') }}"
-                                                                                        class="btn btn-sm btn-outline-primary fs-11 py-1 px-2">
-                                                                                        <i class="feather-file-text me-1"></i>Manage
-                                                                                        Subcontract
-                                                                                    </a>
-                                                                                @endif
-                                                                                <a href="{{ route('production.orders.show', ['order' => $order->id, 'tab' => 'vtab-operations']) }}"
-                                                                                    class="btn btn-sm btn-outline-secondary fs-11 py-1 px-2">
-                                                                                    <i class="feather-edit me-1"></i>View Operations
-                                                                                    Tab
-                                                                                </a>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
+                                                @foreach($opTree['top'] as $cOp)
+                                                @include('modules.production.orders.partials.operation-tracking-row', ['cOp' => $cOp, 'depth' => 0, 'rowNo' => $loop->iteration])
                                                 @endforeach
                                             </tbody>
                                         </x-ui.odoo-form-ui>
@@ -2348,11 +1806,14 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                @foreach($order->operations as $opIndex => $treeOp)
+                                                @foreach($opTree['flat'] as $opIndex => $treeItem)
                                                     @php
-                                                        $opSrNo = $opIndex + 1; // 1, 2, 3, 4...
+                                                        $treeOp = $treeItem['op'];
+                                                        $treeDepth = $treeItem['depth'];   // sub-assembly operations come first (execution order) and are indented
+                                                        $opSrNo = $opTree['exec'][$treeOp->id] ?? ($opIndex + 1);
                                                         $opProduct = $treeOp->sourceProduct ?? $order->product;
-                                                        $bomMaterials = \App\Domains\Production\Models\RoutingOperationMaterial::where('routing_operation_id', $treeOp->routing_operation_id)->get();
+                                                        $treeMat = $opDescribe[$treeOp->id] ?? app(\App\Domains\Production\Services\OperationMaterialService::class)->describe($treeOp);
+                                                        $bomMaterials = collect($treeMat['materials'])->concat(collect($treeMat['sub_assemblies'])->map(fn ($s) => $s + ['is_sub_assembly' => true]));
                                                         $targetQty = (float) ($treeOp->target_produced_qty > 0 ? $treeOp->target_produced_qty : $order->quantity_ordered);
                                                     @endphp
 
@@ -2360,7 +1821,7 @@
                                                     <tr class="fw-semibold bg-light-subtle">
                                                         <td class="ps-3 text-dark fw-bold font-monospace fs-12">{{ $opSrNo }}</td>
                                                         <td>
-                                                            <div class="d-flex align-items-center gap-1.5">
+                                                            <div class="d-flex align-items-center gap-1.5" style="padding-left: {{ $treeDepth * 20 }}px">
                                                                 <i class="feather-cpu text-primary fs-13"></i>
                                                                 <span class="fw-bold text-dark fs-12">{{ $treeOp->name }}</span>
                                                                 <span
@@ -2375,8 +1836,8 @@
                                                             @endif
                                                         </td>
                                                         <td class="text-end font-monospace fw-bold">
-                                                            {{ number_format($targetQty, 2) }}
-                                                            {{ $opProduct?->uom?->code ?? 'Pcs' }}
+                                                            {{ qty_format($targetQty) }}
+                                                            {{ $opProduct?->uom?->code ?? "" }}
                                                         </td>
                                                         <td class="text-center">
                                                             @if($treeOp->status === 'completed')
@@ -2402,31 +1863,33 @@
                                                     @forelse($bomMaterials as $matIdx => $bMat)
                                                         @php
                                                             $subSrNo = $opSrNo . "." . ($matIdx + 1); // 1.1, 1.2, 2.1, 2.2...
-                                                            $matProd = \App\Domains\Inventory\Models\Product::find($bMat->material_id);
-                                                            $reqQty = (float) $bMat->quantity * $order->quantity_ordered;
+                                                            $reqQty = (float) $bMat['required'];
                                                         @endphp
                                                         <tr>
                                                             <td class="ps-4 text-muted font-monospace fs-11">{{ $subSrNo }}</td>
                                                             <td class="ps-4 text-muted fs-11">
                                                                 <i class="feather-corner-down-right text-secondary me-1"></i>
-                                                                {{ $treeOp->name }} (Input Material)
+                                                                {{ $treeOp->name }} ({{ !empty($bMat['is_sub_assembly']) ? 'Sub-assembly' : 'Input Material' }})
                                                             </td>
                                                             <td class="ps-4 fw-medium text-dark fs-11">
                                                                 <i class="feather-box text-primary me-1 fs-11"></i>
-                                                                <span>{{ $matProd->name ?? 'Material Component' }}</span>
-                                                                @if($matProd?->sku)
+                                                                <span>{{ $bMat['name'] }}</span>
+                                                                @if(!empty($bMat['sku']))
                                                                     <small
-                                                                        class="text-muted font-monospace fs-10">({{ $matProd->sku }})</small>
+                                                                        class="text-muted font-monospace fs-10">({{ $bMat['sku'] }})</small>
+                                                                @endif
+                                                                @if(!empty($bMat['is_sub_assembly']))
+                                                                    <small class="text-muted fs-10">made by {{ implode(', ', $bMat['produced_by']) }}</small>
                                                                 @endif
                                                             </td>
-                                                            <td class="text-end font-monospace fs-11">{{ number_format($reqQty, 2) }}
-                                                                {{ $matProd?->uom?->code ?? 'units' }}
+                                                            <td class="text-end font-monospace fs-11">{{ qty_format($reqQty) }}
+                                                                {{ $bMat['uom'] }}
                                                             </td>
                                                             <td class="text-center fs-11">
                                                                 @if(($treeOp->quantity_scrapped + $treeOp->quantity_rejected) > 0)
                                                                     <span
                                                                         class="badge bg-soft-danger text-danger border border-danger-subtle fs-10">Scrap:
-                                                                        {{ number_format($treeOp->quantity_scrapped + $treeOp->quantity_rejected, 1) }}</span>
+                                                                        {{ qty_format($treeOp->quantity_scrapped + $treeOp->quantity_rejected) }}</span>
                                                                 @else
                                                                     <span class="text-muted fs-10">OK</span>
                                                                 @endif
@@ -2459,14 +1922,14 @@
                                                             Output</span>
                                                     </td>
                                                     <td class="text-end font-monospace text-dark fw-bold">
-                                                        {{ number_format($order->quantity_ordered, 2) }}
-                                                        {{ $order->product?->uom?->code ?? 'Pcs' }}
+                                                        {{ qty_format($order->quantity_ordered) }}
+                                                        {{ $order->product?->uom?->code ?? "" }}
                                                     </td>
                                                     <td class="text-center">
                                                         <span
                                                             class="badge bg-soft-success text-success border border-success-subtle px-2 py-1 fs-11">
                                                             <i
-                                                                class="feather-check-circle me-1"></i>{{ number_format($order->quantity_produced, 2) }}
+                                                                class="feather-check-circle me-1"></i>{{ qty_format($order->quantity_produced) }}
                                                             Received
                                                         </span>
                                                     </td>
@@ -2586,8 +2049,19 @@
                                                     $lineStatusBadge = 'bg-soft-warning text-warning';
                                                     $lineStatusText = __('production.partial_reserved');
                                                 } else {
-                                                    $lineStatusBadge = 'bg-soft-danger text-danger';
-                                                    $lineStatusText = __('production.store_request_sent');
+                                                    // M-31: requests are sent by hand now — say what was really requested for THIS material
+                                                    $lineRequested = (float) (isset($materialRequestLines) ? ($materialRequestLines->firstWhere('product_id', (int) $res->product_id)['requested'] ?? 0) : 0)
+                                                        + (float) ($res->quantity_additional_requested ?? 0);
+                                                    if ($lineRequested <= 0) {
+                                                        $lineStatusBadge = 'bg-soft-secondary text-muted';
+                                                        $lineStatusText = __('production.not_requested');
+                                                    } elseif ($lineRequested + 0.00005 < $totalDemand) {
+                                                        $lineStatusBadge = 'bg-soft-warning text-warning';
+                                                        $lineStatusText = __('production.partly_requested');
+                                                    } else {
+                                                        $lineStatusBadge = 'bg-soft-danger text-danger';
+                                                        $lineStatusText = __('production.store_request_sent');
+                                                    }
                                                 }
                                             @endphp
                                             <tr>
@@ -2838,23 +2312,22 @@
                                                 <td>
                                                     <span class="fw-semibold text-dark">{{ $log->operation->name ?? '—' }}</span>
                                                     <small class="text-muted d-block font-monospace fs-10">Op:
-                                                        {{ $log->operation->operation_number ?? '—' }}</small>
+                                                        {{ $log->operation->operation_number ?? '—' }}@if(($log->operation->bom_level ?? 1) > 1) · {{ $log->operation->sourceProduct?->name }} (L{{ $log->operation->bom_level }})@endif</small>
                                                     @foreach(($consumedByLog[$log->id]['lines'] ?? []) as $line)
                                                         <small class="text-muted d-block fs-10">Consumed: {{ $line['product_name'] }} — {{ rtrim(rtrim(number_format($line['quantity'], 4, '.', ''), '0'), '.') }}</small>
                                                     @endforeach
                                                 </td>
                                                 <td class="text-center text-success fw-bold">
-                                                    {{ number_format($log->quantity_produced, 2) }}
+                                                    {{ qty_format($log->quantity_produced) }}
                                                 </td>
                                                 <td class="text-center text-warning fw-bold">
-                                                    {{ number_format($log->quantity_rejected, 2) }}
+                                                    {{ qty_format($log->quantity_rejected) }}
                                                 </td>
                                                 <td class="text-center text-danger fw-bold">
-                                                    {{ number_format($log->quantity_scrapped, 2) }}
+                                                    {{ qty_format($log->quantity_scrapped) }}
                                                 </td>
                                                 <td class="text-center">
-                                                    {{ number_format(($log->setup_minutes_logged + $log->run_minutes_logged) / 60, 2) }}
-                                                    hrs
+                                                    {{ format_duration($log->setup_minutes_logged + $log->run_minutes_logged) }}
                                                 </td>
                                                 <td>{{ $log->user->name ?? 'Operator' }}</td>
                                             </tr>
@@ -3776,8 +3249,105 @@
                                 <h5 class="fw-bold text-dark mb-0"><i class="feather-truck text-primary me-2"></i>
                                     {{ __('production.procurement_status') }}
                                 </h5>
-                                <span class="fs-12 text-muted">{{ __('production.procurement_status_desc') }}</span>
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="fs-12 text-muted">{{ __('production.procurement_status_desc') }}</span>
+                                    {{-- UR-11 (M-23 / M-24, M-30): material requests are sent BY HAND from here — the button opens the request form in a modal --}}
+                                    @php
+                                        $smrAllowed = !$order->isCompleted() && !$order->isClosed() && !$order->isCancelled() && isset($materialRequestLines);
+                                        $smrOpen = $smrAllowed ? $materialRequestLines->filter(fn ($l) => $l['remaining'] > 0) : collect();
+                                    @endphp
+                                    @if($smrAllowed)
+                                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#sendMaterialRequestModal"
+                                            @disabled($smrOpen->isEmpty()) title="{{ $smrOpen->isEmpty() ? __('production.fully_requested') : __('production.send_material_request_hint') }}">
+                                            <i class="feather-send me-1"></i>{{ __('production.request_materials_btn') }}
+                                        </button>
+                                    @endif
+                                </div>
                             </div>
+
+                            @if($smrAllowed)
+                                <x-ui.modal id="sendMaterialRequestModal" title="{{ __('production.send_material_request') }}" size="xl" class="text-start"
+                                    :formAction="route('production.orders.send-material-request', $order->id)">
+                                    <div class="text-muted fs-12 mb-3">{{ __('production.send_material_request_hint') }}</div>
+                                    @if($materialRequestLines->isEmpty())
+                                        <div class="text-muted fs-12 fst-italic">{{ __('production.no_planned_materials') }}</div>
+                                    @else
+                                        <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+                                            <label class="d-flex align-items-center gap-1 fs-12 mb-0">
+                                                <input type="checkbox" class="form-check-input mt-0" id="smrSelectAll"> {{ __('production.select_all') }}
+                                            </label>
+                                            <input type="text" name="notes" class="form-control form-control-sm" style="max-width:320px" maxlength="500"
+                                                placeholder="{{ __('production.note_for_store') }}">
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="erp-thin-table mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="width:4%"></th>
+                                                        <th style="width:34%">{{ __('production.material_component') }}</th>
+                                                        <th style="width:14%" class="text-center">{{ __('production.planned_qty') }}</th>
+                                                        <th style="width:16%" class="text-center">{{ __('production.already_requested') }}</th>
+                                                        <th style="width:20%" class="text-center">{{ __('production.quantity_to_request') }}</th>
+                                                        <th style="width:12%">{{ __('production.uom') }}</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach($materialRequestLines as $smr)
+                                                        @php
+                                                            $smrRes = $smr['reservation'];
+                                                            $smrDone = $smr['remaining'] <= 0;
+                                                        @endphp
+                                                        <tr class="{{ $smrDone ? 'text-muted' : '' }}">
+                                                            <td>
+                                                                @if(!$smrDone)
+                                                                    <input type="hidden" name="items[{{ $smr['product_id'] }}][product_id]" value="{{ $smr['product_id'] }}">
+                                                                    <input type="checkbox" class="form-check-input smr-check" name="items[{{ $smr['product_id'] }}][selected]" value="1">
+                                                                @else
+                                                                    <i class="feather-check-circle text-success" title="{{ __('production.fully_requested') }}"></i>
+                                                                @endif
+                                                            </td>
+                                                            <td>
+                                                                <div class="fw-bold fs-13">{{ $smrRes->product?->name }}</div>
+                                                                <small class="text-muted font-monospace fs-10">{{ $smrRes->product?->sku }}</small>
+                                                            </td>
+                                                            <td class="text-center font-monospace">{{ qty_format($smr['planned']) }}</td>
+                                                            <td class="text-center font-monospace {{ $smr['requested'] > 0 ? 'text-primary fw-bold' : 'text-muted' }}">{{ $smr['requested'] > 0 ? qty_format($smr['requested']) : '—' }}</td>
+                                                            <td class="text-center">
+                                                                @if(!$smrDone)
+                                                                    <input type="number" step="any" min="0" max="{{ $smr['remaining'] }}" name="items[{{ $smr['product_id'] }}][quantity]"
+                                                                        value="{{ $smr['remaining'] }}" class="form-control form-control-sm text-center font-monospace d-inline-block smr-qty" style="width:120px">
+                                                                @else
+                                                                    <span class="badge bg-soft-success text-success fs-10 text-uppercase">{{ __('production.fully_requested') }}</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="fs-12">{{ $smrRes->uom?->name ?? $smrRes->uom?->code ?? $smrRes->product?->uom?->name ?? $smrRes->product?->uom?->code ?? 'PCS' }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @endif
+                                    <x-slot name="footer">
+                                        <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
+                                        <button type="submit" class="btn btn-primary fw-bold" id="smrSubmit" disabled>
+                                            <i class="feather-send me-1"></i>{{ __('production.send_request_to_store') }}
+                                        </button>
+                                    </x-slot>
+                                </x-ui.modal>
+                                <script>
+                                    document.addEventListener('DOMContentLoaded', function () {
+                                        const modal = document.getElementById('sendMaterialRequestModal');
+                                        if (!modal) { return; }
+                                        const checks = Array.from(modal.querySelectorAll('.smr-check'));
+                                        const submit = modal.querySelector('#smrSubmit');
+                                        const all = modal.querySelector('#smrSelectAll');
+                                        const refresh = () => { if (submit) { submit.disabled = !checks.some(c => c.checked); } };
+                                        checks.forEach(c => c.addEventListener('change', refresh));
+                                        if (all) { all.addEventListener('change', () => { checks.forEach(c => { c.checked = all.checked; }); refresh(); }); }
+                                        refresh();
+                                    });
+                                </script>
+                            @endif
 
                             @php
                                 $slips = $order->requisitionSlips;
@@ -3992,11 +3562,14 @@
 
                     <x-ui.odoo-form-ui type="select" label="{{ __('production.select_operation') }}" name="operation_id"
                         id="op_select_id" :required="true">
-                        @foreach($order->operations as $op)
-                            @if($op->status !== 'completed')
-                                <option value="{{ $op->id }}">{{ $op->operation_number }} —
-                                    {{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}
-                                </option>
+                        {{-- only operations that can take a log now (not completed, not subcontracted, not waiting), in execution order --}}
+                        @foreach($opTree['flat'] as $flatItem)
+                            @php
+                                $logOp = $flatItem['op'];
+                                $logFlow = ($opEvalById ?? collect())->get($logOp->id)['dependency'] ?? null;
+                            @endphp
+                            @if($logOp->status !== 'completed' && !$logOp->is_external && ($logFlow['state'] ?? '') !== 'waiting')
+                                <option value="{{ $logOp->id }}">{{ $logOp->contextLabel() }}</option>
                             @endif
                         @endforeach
                     </x-ui.odoo-form-ui>
@@ -4118,6 +3691,15 @@
                     const warningBox = document.getElementById('modal_validation_warning');
                     const submitBtn = document.getElementById('btn_save_progress');
 
+                    // whole number, otherwise 4 decimals (the project's number rule)
+                    const fmtQty = (n) => {
+                        const v = Number(n);
+                        if (!isFinite(v)) { return '0'; }
+                        return Math.abs(v - Math.round(v)) < 0.00005
+                            ? Math.round(v).toLocaleString('en-US')
+                            : v.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+                    };
+
                     function updateStatsAndValidation(shouldAutofill = false) {
                         const opId = parseInt(opSelect.value);
                         const op = operationsData.find(o => o.id === opId);
@@ -4131,7 +3713,7 @@
 
                         // Calculate cumulative scrap from preceding operations in sequence order
                         const precedingScrap = operationsData
-                            .filter(o => o.sequence < op.sequence)
+                            .filter(o => o.sequence < op.sequence && o.source_product_id === op.source_product_id && o.source_bom_id === op.source_bom_id)
                             .reduce((acc, o) => acc + parseFloat(o.quantity_scrapped || 0), 0);
 
                         // Operation target: use operation-level computed target (for SFGs/subassemblies) if available, minus preceding scrap
@@ -4148,11 +3730,11 @@
                         const processed = produced + rejected + scrapped;
                         const remaining = Math.max(0, opTarget - processed);
 
-                        statPlanned.textContent = opTarget.toFixed(2);
-                        statRemaining.textContent = remaining.toFixed(2);
-                        statProduced.textContent = produced.toFixed(2);
-                        statRejected.textContent = rejected.toFixed(2);
-                        statScrapped.textContent = scrapped.toFixed(2);
+                        statPlanned.textContent = fmtQty(opTarget);
+                        statRemaining.textContent = fmtQty(remaining);
+                        statProduced.textContent = fmtQty(produced);
+                        statRejected.textContent = fmtQty(rejected);
+                        statScrapped.textContent = fmtQty(scrapped);
 
                         if (shouldAutofill && inputProduced) {
                             inputProduced.value = remaining.toFixed(4);
@@ -4194,7 +3776,7 @@
 
                         if (sum > remaining) {
                             warningBox.classList.remove('d-none');
-                            warningBox.querySelector('span').textContent = `The sum of Entered Quantities (${sum.toFixed(2)}) exceeds the remaining limit of ${remaining.toFixed(2)}!`;
+                            warningBox.querySelector('span').textContent = `The sum of Entered Quantities (${fmtQty(sum)}) exceeds the remaining limit of ${fmtQty(remaining)}!`;
                             submitBtn.disabled = true;
                         } else {
                             warningBox.classList.add('d-none');
@@ -4405,7 +3987,7 @@
                             <x-ui.odoo-form-ui type="select" label="{{ __('production.operation') }}">
                                 <option value="">{{ __('production.order_header_whole_assembly') }}</option>
                                 @foreach($order->operations as $op)
-                                    <option value="{{ $op->id }}">Op {{ $op->operation_number }} — {{ $op->name }}</option>
+                                    <option value="{{ $op->id }}">{{ $op->contextLabel() }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
@@ -4439,7 +4021,7 @@
                             <x-ui.odoo-form-ui type="select" label="{{ __('production.rework_target') }}" name="operation_id"
                                 :required="true">
                                 @foreach($order->operations as $op)
-                                    <option value="{{ $op->id }}">Op {{ $op->operation_number }} — {{ $op->name }}</option>
+                                    <option value="{{ $op->id }}">{{ $op->contextLabel() }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
@@ -4732,10 +4314,10 @@
                 </x-slot>
             </x-ui.modal>
 
-            @if($order->isDraft() || $order->schedules->isEmpty())
+            @if($order->isPreRelease() || $order->schedules->isEmpty())
                 {{-- Generate Schedule / Release & Plan Modal --}}
                 <x-ui.modal id="scheduleModal"
-                    title="{{ $order->isDraft() ? 'Release & Plan Production Schedule' : __('production.generate_schedule') }}"
+                    title="{{ $order->isPreRelease() ? 'Release & Plan Production Schedule' : __('production.generate_schedule') }}"
                     class="text-start">
                     <form method="POST" action="{{ route('production.schedules.store') }}" id="scheduleForm">
                         @csrf
@@ -4767,14 +4349,38 @@
 
                         <x-ui.odoo-form-ui type="textarea" :label="__('production.description') ?? 'Notes'" name="notes"
                             placeholder="Optional scheduling notes or remarks..." :value="old('notes')" />
+
+                        @if($order->isPreRelease() && !empty($readiness['actionable_blockers']))
+                            {{-- PX-09: releasing with blocked operations needs an explicit confirmation --}}
+                            <div class="alert alert-warning fs-12 mb-0">
+                                <strong>These operations are blocked right now:</strong>
+                                <ul class="mb-2 ps-3">
+                                    @foreach(collect($readiness['actionable_blockers'])->take(6) as $b)
+                                        <li>Op #{{ $b['sequence'] ?? '—' }}: {{ $b['message'] ?? 'Blocker' }}</li>
+                                    @endforeach
+                                </ul>
+                                <label class="d-flex align-items-center gap-2 mb-0">
+                                    <input type="checkbox" name="confirm_blocked" value="1" class="form-check-input mt-0">
+                                    Release anyway
+                                </label>
+                            </div>
+                        @endif
+                        @if($order->isPreRelease() && !empty($materialsNotReleased))
+                            {{-- UR-12 (M-24): a SOFT warning — the order can still be scheduled, even with 0 material issued, after the user says OK --}}
+                            <div class="alert alert-warning fs-12 mt-3 mb-0">
+                                <strong><i class="feather-alert-triangle me-1"></i>{{ __('production.materials_not_released_confirm') }}</strong>
+                                <div class="text-muted mt-1">{{ __('production.materials_not_released_hint') }}</div>
+                                <input type="hidden" name="confirm_materials" value="0" id="confirmMaterialsInput">
+                            </div>
+                        @endif
                     </form>
                     <x-slot name="footer">
                         <button type="button" class="btn btn-light-brand"
                             data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
                         <button type="submit" class="btn btn-success text-white"
-                            onclick="document.getElementById('scheduleForm').submit();">
+                            onclick="var c = document.getElementById('confirmMaterialsInput'); if (c) { if (!confirm({{ json_encode(__('production.materials_not_released_confirm')) }})) { return false; } c.value = 1; } document.getElementById('scheduleForm').submit();">
                             <i class="feather-check-circle me-1"></i>
-                            {{ $order->isDraft() ? 'Release & Generate Schedule' : __('production.generate_schedule') }}
+                            {{ $order->isPreRelease() ? 'Release & Generate Schedule' : __('production.generate_schedule') }}
                         </button>
                     </x-slot>
                 </x-ui.modal>
