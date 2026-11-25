@@ -203,6 +203,10 @@ class GoalRepository implements GoalRepositoryInterface
         ->where('tenant_id', $tenantId)
         ->findOrFail($id);
 
+        if (!$this->canViewGoal($user, $goal)) {
+            abort(403, 'Unauthorized access to goal.');
+        }
+
         $parentGoalOptions = Goal::where('tenant_id', $tenantId)
             ->where('id', '!=', $goal->id)
             ->where('status', 'active')
@@ -430,6 +434,75 @@ class GoalRepository implements GoalRepositoryInterface
             $user->hasHrPermission('hr.settings.manage') ||
             $user->hasHrPermission('hrms.goals.manage') ||
             $user->hasHrPermission('hrms.performance.manage');
+    }
+
+    /**
+     * Determine whether the user is authorized to view a specific goal.
+     */
+    public function canViewGoal(?User $user, Goal $goal): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if ($this->canManageGoals($user) || $this->scopeService->isCompanyAdmin($user)) {
+            return true;
+        }
+
+        // Company-wide goals are visible to all employees in the tenant
+        if ($goal->owner_type === 'company') {
+            return true;
+        }
+
+        $employee = $this->scopeService->resolveEmployee($user, $goal->tenant_id);
+        if (!$employee) {
+            return false;
+        }
+
+        // Creator of the goal
+        if ($goal->created_by && (int) $goal->created_by === (int) $user->id) {
+            return true;
+        }
+
+        // Assigned primary employee
+        if ($goal->employee_id && (int) $goal->employee_id === (int) $employee->id) {
+            return true;
+        }
+
+        // Co-owner in pivot table
+        if ($goal->relationLoaded('employees') 
+            ? $goal->employees->contains('id', $employee->id) 
+            : $goal->employees()->where('employees.id', $employee->id)->exists()) {
+            return true;
+        }
+
+        // Reporting manager or organizational head who has scope access to the goal's owner
+        if ($goal->employee_id && $this->scopeService->canAccessEmployee($user, $goal->employee_id)) {
+            return true;
+        }
+
+        // Any co-owner accessible in manager's scope
+        $coOwnerIds = $goal->relationLoaded('employees') 
+            ? $goal->employees->pluck('id')->toArray() 
+            : $goal->employees()->pluck('employees.id')->toArray();
+        foreach ($coOwnerIds as $coOwnerId) {
+            if ($this->scopeService->canAccessEmployee($user, (int) $coOwnerId)) {
+                return true;
+            }
+        }
+
+        // Department Head or member of the goal's department
+        if ($goal->owner_type === 'department' && $goal->department_id) {
+            if ($employee->department_id && (int) $goal->department_id === (int) $employee->department_id) {
+                return true;
+            }
+            $summary = $this->scopeService->getScopeSummary($user);
+            if (in_array((int) $goal->department_id, array_map('intval', $summary['department_ids'] ?? []), true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

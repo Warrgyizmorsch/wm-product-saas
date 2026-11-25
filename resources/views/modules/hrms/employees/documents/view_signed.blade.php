@@ -76,7 +76,14 @@
     @php
         $metadata = $document->signature_metadata ?? [];
         $sigPath = $metadata['signature_path'] ?? null;
-        $sigUrl = $sigPath ? asset('storage/' . $sigPath) : null;
+        $sigUrl = null;
+        if ($sigPath) {
+            if (\Illuminate\Support\Facades\Storage::disk('local')->exists($sigPath)) {
+                $sigUrl = 'data:image/png;base64,' . base64_encode(\Illuminate\Support\Facades\Storage::disk('local')->get($sigPath));
+            } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($sigPath)) {
+                $sigUrl = asset('storage/' . $sigPath);
+            }
+        }
         $signerName = $metadata['signed_by_name'] ?? ($document->signedBy?->name ?? 'Authorized Signer');
         $signedAtStr = $document->signed_at ? $document->signed_at->format('d M, Y H:i T') : 'N/A';
 
@@ -99,7 +106,7 @@
         }
 
         $originalFile = $document->file_path ?? '';
-        $originalFileUrl = asset('storage/' . $originalFile);
+        $originalFileUrl = route('hrms.employees.documents.file', $document->id);
         $ext = strtolower(pathinfo($originalFile, PATHINFO_EXTENSION));
         $isImage = in_array($ext, ['png', 'jpg', 'jpeg', 'webp', 'gif']);
     @endphp
@@ -122,11 +129,11 @@
         </div>
 
         <div class="d-flex align-items-center gap-2">
-            <a href="{{ $originalFileUrl }}" download class="btn btn-outline-secondary btn-sm fw-semibold d-inline-flex align-items-center gap-1.5">
+            <a href="{{ route('hrms.employees.documents.download', $document->id) }}" class="btn btn-outline-secondary btn-sm fw-semibold d-inline-flex align-items-center gap-1.5">
                 <i data-feather="download" style="width: 14px; height: 14px;"></i> Download Original
             </a>
             @if($document->signed_file_path)
-                <a href="{{ asset('storage/' . $document->signed_file_path) }}" download class="btn btn-primary btn-sm fw-bold d-inline-flex align-items-center gap-1.5">
+                <a href="{{ route('hrms.employees.documents.download', ['document' => $document->id, 'type' => 'signed']) }}" class="btn btn-primary btn-sm fw-bold d-inline-flex align-items-center gap-1.5">
                     <i data-feather="file-text" style="width: 14px; height: 14px;"></i> Download Signed PDF
                 </a>
             @endif

@@ -452,6 +452,11 @@ class PayrollRunApiController extends Controller
             return $authError;
         }
 
+        if (! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll.manage', ['tenant_id' => require_tenant_id()])
+            && ! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll_runs.create', ['tenant_id' => require_tenant_id()])) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $validated = $request->validate([
             'payroll_month' => 'required|string|regex:/^\d{4}-\d{2}$/',
             'pay_group_id'  => 'nullable|exists:pay_groups,id',
@@ -535,6 +540,11 @@ class PayrollRunApiController extends Controller
             return $authError;
         }
 
+        if (! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll.manage', ['tenant_id' => require_tenant_id()])
+            && ! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll_runs.approve', ['tenant_id' => require_tenant_id()])) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $pending = $this->getPendingIssues($run);
         if ($pending['total'] > 0) {
             return $this->sendError(
@@ -560,6 +570,10 @@ class PayrollRunApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll.manage', ['tenant_id' => require_tenant_id()])) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $validated = $request->validate([
@@ -665,6 +679,11 @@ class PayrollRunApiController extends Controller
             return $authError;
         }
 
+        if (! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll.manage', ['tenant_id' => require_tenant_id()])
+            && ! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll_runs.process', ['tenant_id' => require_tenant_id()])) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $validated = $request->validate([
             'bank_account_id' => ['nullable', 'integer'],
             'payout_date' => ['nullable', 'date'],
@@ -689,6 +708,10 @@ class PayrollRunApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll.manage', ['tenant_id' => require_tenant_id()])) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $validated = $request->validate([
@@ -948,6 +971,11 @@ class PayrollRunApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+        if (! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll.manage', ['tenant_id' => $tenantId])) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $validated = $request->validate([

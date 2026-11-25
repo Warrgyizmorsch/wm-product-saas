@@ -2307,7 +2307,7 @@ return array (
   'system_detected_existing_record' => 'सिस्टम को :matched से मेल खाता हुआ एक मौजूदा रिकॉर्ड मिला।',
   'company_name_label' => 'कंपनी का नाम',
   'revenue_label' => 'राजस्व',
-  'active_deals_count' => 'सक्रिय: :count डील्स',
+  'active_deals_count' => 'सक्रिय डील संख्या',
   'date_label' => 'दिनांक',
   'meetings_geo_verification' => 'भू-सत्यापन (Geo-Verification):',
   'download_pdf' => 'PDF डाउनलोड करें',

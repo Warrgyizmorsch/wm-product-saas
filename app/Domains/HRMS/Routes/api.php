@@ -210,7 +210,7 @@ Route::prefix('api/hrms/roster')
 // 6. ASSET MANAGEMENT API ROUTES
 // ==========================================
 Route::prefix('api/hrms/assets')
-    ->middleware(['auth:sanctum', 'throttle:100,1'])
+    ->middleware(['auth:sanctum', 'throttle:hrms-api'])
     ->name('api.hrms.assets.')
     ->group(function () {
 
@@ -283,7 +283,7 @@ Route::prefix('api/hrms/employees/profile-requests')
 // 7B. EMPLOYEE DIRECTORY & PROFILE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/employees')
-    ->middleware(['auth:sanctum', 'throttle:100,1'])
+    ->middleware(['auth:sanctum', 'throttle:hrms-api'])
     ->name('api.hrms.employees.')
     ->group(function () {
 
@@ -460,7 +460,7 @@ Route::prefix('api/hrms/attendance-corrections')
 // 11. ATTENDANCE & BIOMETRIC INTEGRATION API ROUTES
 // ==========================================
 Route::prefix('api/hrms/attendance')
-    ->middleware(['auth:sanctum', 'throttle:100,1'])
+    ->middleware(['auth:sanctum', 'throttle:hrms-api'])
     ->name('api.hrms.attendance.')
     ->group(function () {
         Route::post('/biometric-sync', [BiometricWebhookController::class, 'syncLogs'])->name('biometric-sync');
@@ -498,6 +498,8 @@ Route::prefix('api/hrms/documents')
         Route::post('/{document}/approve', [DocumentApiController::class, 'approve'])->name('approve');
         Route::post('/{document}/reject', [DocumentApiController::class, 'reject'])->name('reject');
         Route::put('/{document}/status', [DocumentApiController::class, 'updateStatus'])->name('status.update');
+        Route::get('/{document}/file', [DocumentApiController::class, 'viewFile'])->name('file');
+        Route::get('/{document}/download', [DocumentApiController::class, 'downloadFile'])->name('download');
 
         // Document Digital Signature APIs
         Route::post('/{document}/sign', [DocumentApiController::class, 'sign'])->name('sign');
@@ -527,7 +529,7 @@ Route::prefix('api/hrms/documents-master')
 // 14. TRAVEL & EXPENSE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/travel-expense')
-    ->middleware(['auth:sanctum', 'throttle:100,1'])
+    ->middleware(['auth:sanctum', 'throttle:hrms-api'])
     ->name('api.hrms.travel-expense.')
     ->group(function () {
         // Summary & Dashboard
@@ -576,7 +578,7 @@ Route::prefix('api/hrms/travel-expense')
 // 15. PAYROLL API ROUTES
 // ==========================================
 Route::prefix('api/hrms/payroll')
-    ->middleware(['auth:sanctum', 'throttle:100,1'])
+    ->middleware(['auth:sanctum', 'throttle:hrms-api'])
     ->name('api.hrms.payroll.')
     ->group(function () {
         Route::get('/', [PayrollRunApiController::class, 'index'])->name('index');

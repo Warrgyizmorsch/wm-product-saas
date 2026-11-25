@@ -100,6 +100,18 @@ class Employee extends BaseModel
      */
     protected $hidden = [
         'employee_id',
+        'aadhaar_card_number',
+        'pan_card_number',
+        'account_number',
+        'ifsc_code',
+        'bank_name',
+        'current_salary',
+        'date_of_birth',
+        'personal_mobile_number',
+        'present_address',
+        'permanent_address',
+        'uan_number',
+        'esi_ip_number',
     ];
 
     /**
@@ -189,6 +201,11 @@ class Employee extends BaseModel
         });
 
         static::saving(function (self $employee) {
+            if (empty($employee->full_name)) {
+                $nameParts = array_filter([$employee->first_name ?? null, $employee->last_name ?? null]);
+                $employee->full_name = !empty($nameParts) ? implode(' ', $nameParts) : ($employee->name ?? 'Employee');
+            }
+
             if ($employee->user_id) {
                 $user = $employee->user ?: \App\Models\User::find($employee->user_id);
                 if ($user && !empty($user->email)) {

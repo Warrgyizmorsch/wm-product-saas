@@ -37,7 +37,8 @@ class SessionConflictChecker
         $leaveQuery = LeaveRequest::where('employee_id', $employeeId)
             ->whereIn('status', ['pending', 'approved', 'cancellation_requested'])
             ->where('end_date', '>=', $newStart->toDateString())
-            ->where('start_date', '<=', $newEnd->toDateString());
+            ->where('start_date', '<=', $newEnd->toDateString())
+            ->lockForUpdate();
 
         if ($excludeLeaveId) {
             $leaveQuery->where('id', '!=', $excludeLeaveId);
@@ -61,7 +62,8 @@ class SessionConflictChecker
         $wfhQuery = WfhRequest::where('employee_id', $employeeId)
             ->whereIn('status', ['pending', 'approved', 'cancellation_requested'])
             ->where('end_date', '>=', $newStart->toDateString())
-            ->where('start_date', '<=', $newEnd->toDateString());
+            ->where('start_date', '<=', $newEnd->toDateString())
+            ->lockForUpdate();
 
         if ($excludeWfhId) {
             $wfhQuery->where('id', '!=', $excludeWfhId);

@@ -38,7 +38,9 @@ class EnsureBillingActive
             return $next($request);
         }
 
-        $message = 'Your subscription has lapsed — renew it to use the workspace again. Your data is safe.';
+        $message = $tenant->isTrialExpired()
+            ? 'Your trial period has expired — upgrade to a paid plan to use the workspace again. Your data is safe.'
+            : 'Your subscription has lapsed — renew it to use the workspace again. Your data is safe.';
 
         if ($request->expectsJson()) {
             return response()->json(['message' => $message], Response::HTTP_PAYMENT_REQUIRED);

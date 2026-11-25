@@ -528,7 +528,7 @@
                                             $itemName = $orderOp->sourceProduct->name ?? $order->product->name ?? 'Item';
                                             $itemNotes = $orderOp->notes ?? $op->remarks ?? '';
 
-                                            $isOutsourced = (bool) ($orderOp->is_external || $orderOp->isOutsourced() || $op->work_center_id === null);
+                                            $isOutsourced = (bool) ($orderOp->is_external || $orderOp->isOutsourced() || ($op->work_center_id === null && !config('production.temp_flow')));
                                             $vendorName = $orderOp->vendor->name ?? $orderOp->vendor_name ?? 'Outsourced Vendor';
                                             $challans = $orderOp->relationLoaded('deliveryChallans') ? $orderOp->deliveryChallans : ($orderOp->deliveryChallans ?? collect());
                                             $latestChallan = $orderOp->relationLoaded('latestDeliveryChallan') ? $orderOp->latestDeliveryChallan : ($orderOp->latestDeliveryChallan ?? $challans->first());
@@ -1016,7 +1016,7 @@
                         @php
                             $activeOrderOp = $activeOp->orderOperation ?? $activeOp;
                             $activeOrder = $activeOp->schedule->order ?? $activeOp->order;
-                            $isActiveOutsourced = (bool) ($activeOrderOp->is_external || $activeOrderOp->isOutsourced() || $activeOp->work_center_id === null);
+                            $isActiveOutsourced = (bool) ($activeOrderOp->is_external || $activeOrderOp->isOutsourced() || ($activeOp->work_center_id === null && !config('production.temp_flow')));
                         @endphp
 
                         @php
@@ -1231,6 +1231,12 @@
                                                 </div>
                                             </div>
                                         @endif
+
+                                        @unless($activeOrderOp->is_external)
+                                            <div class="col-md-12">
+                                                @include('modules.production.partials.consumed-materials', ['cmId' => 'cmMesDash' . $activeOp->id])
+                                            </div>
+                                        @endunless
 
                                         <div class="col-md-12">
                                             <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks"
@@ -1511,7 +1517,7 @@
                                     </div>
 
                                     @php
-                                        $isOutsourcedOp = (bool) ($activeOrderOp->is_external || $activeOrderOp->isOutsourced() || $activeOp->work_center_id === null);
+                                        $isOutsourcedOp = (bool) ($activeOrderOp->is_external || $activeOrderOp->isOutsourced() || ($activeOp->work_center_id === null && !config('production.temp_flow')));
                                         $vendorName = $activeOrderOp->vendor->name ?? 'Subcontract Vendor';
                                     @endphp
 

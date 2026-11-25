@@ -336,6 +336,14 @@
     .so-status-pipeline .pipeline-step:first-child::before {
         display: none;
     }
+    .so-status-pipeline .pipeline-step:last-child::after {
+        display: none !important;
+    }
+    .so-status-pipeline .pipeline-step:last-child {
+        padding-right: 18px !important;
+        border-top-right-radius: 4px;
+        border-bottom-right-radius: 4px;
+    }
     .so-status-pipeline .pipeline-step.active {
         background-color: var(--bs-primary, #1e40af);
         color: #ffffff;
@@ -1460,7 +1468,7 @@
                         </span>
                         
                         @if($deal->account)
-                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold text-truncate d-inline-block align-middle ms-1" style="max-width: 180px;" title="{{ $deal->account->name }}">
+                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold text-truncate d-inline-block align-middle ms-1" style="max-width: 280px;" title="{{ $deal->account->name }}">
                                 <i class="feather-briefcase me-1"></i>{{ $deal->account->name }}
                             </span>
                         @endif
@@ -1695,46 +1703,46 @@
                         
                         <!-- ZOHO DEAL KPI METRICS CARDS STRIP -->
                         <div class="row g-2 g-md-3 mb-3 align-items-stretch">
-                            <div class="col-6 col-md-3 d-flex">
+                            <div class="col-12 col-sm-6 col-xxl-3 col-xl-6 col-lg-6 d-flex">
                                 <div class="deal-metric-card d-flex align-items-center gap-2 gap-sm-3 w-100">
                                     <div class="deal-metric-icon bg-soft-success text-success">
                                         <i class="feather-dollar-sign"></i>
                                     </div>
                                      <div class="min-w-0 flex-grow-1">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.estimated_deal_value') }}</span>
-                                        <span class="fs-13 fs-sm-14 fw-extrabold text-dark d-block text-truncate">{{ format_currency($effectiveDealValue) }}</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block" title="{{ __('crm.estimated_deal_value') }}">{{ __('crm.estimated_deal_value') }}</span>
+                                        <span class="fs-13 fs-sm-14 fw-extrabold text-dark d-block text-truncate" title="{{ format_currency($effectiveDealValue) }}">{{ format_currency($effectiveDealValue) }}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3 d-flex">
+                            <div class="col-12 col-sm-6 col-xxl-3 col-xl-6 col-lg-6 d-flex">
                                 <div class="deal-metric-card d-flex align-items-center gap-2 gap-sm-3 w-100">
                                     <div class="deal-metric-icon bg-soft-primary text-primary">
                                         <i class="feather-pie-chart"></i>
                                     </div>
                                     <div class="min-w-0 flex-grow-1">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.expected_revenue') }}</span>
-                                        <span class="fs-13 fs-sm-14 fw-extrabold text-primary d-block text-truncate">{{ format_currency($expectedRevenue) }} <span class="fs-10 text-muted d-none d-sm-inline">({{ $deal->probability }}%)</span></span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block" title="{{ __('crm.expected_revenue') }}">{{ __('crm.expected_revenue') }}</span>
+                                        <span class="fs-13 fs-sm-14 fw-extrabold text-primary d-block text-truncate">{{ format_currency($expectedRevenue) }} <span class="fs-10 text-muted d-inline">({{ $deal->probability }}%)</span></span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3 d-flex">
+                            <div class="col-12 col-sm-6 col-xxl-3 col-xl-6 col-lg-6 d-flex">
                                 <div class="deal-metric-card d-flex align-items-center gap-2 gap-sm-3 w-100">
                                     <div class="deal-metric-icon bg-soft-warning text-warning">
                                         <i class="feather-calendar"></i>
                                     </div>
                                     <div class="min-w-0 flex-grow-1">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.target_closing_date') }}</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block" title="{{ __('crm.target_closing_date') }}">{{ __('crm.target_closing_date') }}</span>
                                         <span class="fs-13 fs-sm-14 fw-extrabold text-dark d-block text-truncate">{{ $deal->closing_date ? $deal->closing_date->format('d M Y') : __('crm.not_set') }}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3 d-flex">
+                            <div class="col-12 col-sm-6 col-xxl-3 col-xl-6 col-lg-6 d-flex">
                                 <div class="deal-metric-card d-flex align-items-center gap-2 gap-sm-3 w-100 overflow-hidden" style="min-width: 0;">
                                     <div class="deal-metric-icon bg-soft-purple text-purple flex-shrink-0">
                                         <i class="feather-briefcase"></i>
                                     </div>
                                     <div class="min-w-0 flex-grow-1 overflow-hidden">
-                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.customer_account') }}</span>
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block" title="{{ __('crm.customer_account') }}">{{ __('crm.customer_account') }}</span>
                                         <span class="fs-13 fw-extrabold text-dark text-truncate d-block" title="{{ $deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A') }}">
                                             {{ $deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A') }}
                                         </span>
@@ -1760,23 +1768,23 @@
                         @endphp
                         <div class="card border shadow-sm mb-3" style="border-radius: 6px; border-color: #cbd5e1 !important; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);">
                             <div class="card-body p-3">
-                                <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
-                                    <h5 class="fs-13 text-dark fw-bold mb-0 d-flex align-items-center gap-1.5">
+                                <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3 flex-wrap gap-2">
+                                    <h5 class="fs-13 text-dark fw-bold mb-0 d-flex align-items-center gap-2 flex-shrink-0 text-nowrap">
                                         <i class="feather-cpu text-primary fs-16"></i>
                                         <span>{{ __('crm.ai_deal_health') }}</span>
                                     </h5>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <a href="https://love14-deal-health-scoring.hf.space/auth/login?user_id={{ auth()->id() ?? 1 }}&next={{ urlencode(url()->current()) }}" 
+                                    <div class="d-flex align-items-center flex-nowrap flex-shrink-0" style="gap: 8px;">
+                                        <a href="{{ config('services.deal_health.base_url') }}/auth/login?user_id={{ auth()->id() ?? 1 }}&next={{ urlencode(url()->current()) }}" 
                                             id="googleAuthBadge" 
                                             target="_blank" 
-                                            class="badge bg-secondary text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center"
+                                            class="badge bg-secondary text-white text-decoration-none px-2.5 py-1.5 fs-11 fw-semibold d-inline-flex align-items-center text-nowrap"
                                             title="Google OAuth Connection Status">
-                                            <i class="feather-loader spin me-1"></i>Checking Gmail Auth...
+                                            <i class="feather-loader spin me-1"></i>Checking Gmail...
                                         </a>
-                                        <button type="button" id="btnSyncHealth" class="btn btn-xs btn-outline-primary fw-bold px-2.5 py-1 fs-11 rounded-1">
+                                        <button type="button" id="btnSyncHealth" class="btn btn-sm btn-outline-primary fw-semibold px-2.5 py-1 fs-11 rounded-1 text-nowrap d-inline-flex align-items-center">
                                             <i class="feather-refresh-cw me-1"></i>{{ __('crm.sync_ai_health') }}
                                         </button>
-                                        <button type="button" id="btnGenerateDraft" class="btn btn-xs btn-primary fw-bold px-2.5 py-1 fs-11 rounded-1">
+                                        <button type="button" id="btnGenerateDraft" class="btn btn-sm btn-primary fw-semibold px-2.5 py-1 fs-11 rounded-1 text-nowrap d-inline-flex align-items-center">
                                             <i class="feather-mail me-1"></i>{{ __('crm.generate_ai_draft') }}
                                         </button>
                                     </div>
@@ -2080,7 +2088,7 @@
                                                 </div>
                                             @endif
                                             @if($cEmail)
-                                                <div class="fs-12 text-primary mt-1"><i class="feather-mail me-1 text-muted"></i>{{ $cEmail }}</div>
+                                                <div class="fs-12 text-primary mt-1 text-break"><i class="feather-mail me-1 text-muted"></i>{{ $cEmail }}</div>
                                             @endif
                                         </div>
                                     </div>
@@ -4117,8 +4125,9 @@
         // Auto-check Google Auth Status on Page Load (Direct browser cookie check + backend sync)
         function checkGoogleAuthStatus() {
             const badge = $('#googleAuthBadge');
-            const hfAuthUrl = "https://love14-deal-health-scoring.hf.space/auth/me";
-            const fallbackLoginUrl = "https://love14-deal-health-scoring.hf.space/auth/login?user_id={{ auth()->id() ?? 1 }}&next=" + encodeURIComponent(window.location.href);
+            const dealHealthBaseUrl = @json(config('services.deal_health.base_url'));
+            const hfAuthUrl = dealHealthBaseUrl + "/auth/me";
+            const fallbackLoginUrl = dealHealthBaseUrl + "/auth/login?user_id={{ auth()->id() ?? 1 }}&next=" + encodeURIComponent(window.location.href);
 
             // Attempt direct browser fetch with credentials (sends SameSite=None / cross-origin cookie)
             // Give up after 8 s so a sleeping integration doesn't leave the badge spinning forever.
@@ -4141,11 +4150,11 @@
             .then(data => {
                 if (data && (data.email || data.id || data.authenticated || (data.user && data.user.email))) {
                     const email = data.email || (data.user ? data.user.email : 'Connected');
-                    const emailLabel = email ? ' (' + email + ')' : '';
-                    badge.attr('class', 'badge bg-success text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                    const emailTooltip = (email && email !== 'Connected' && email.includes('@')) ? ' (' + email + ')' : '';
+                    badge.attr('class', 'badge bg-success text-white text-decoration-none px-2.5 py-1.5 fs-11 fw-semibold d-inline-flex align-items-center text-nowrap')
                          .attr('href', fallbackLoginUrl)
-                         .attr('title', 'Connected Email: ' + email + ' (Click to Re-connect or Manage)')
-                         .html('<i class="feather-check-circle me-1"></i>Gmail Connected' + emailLabel);
+                         .attr('title', 'Connected' + emailTooltip + ' - Click to Manage')
+                         .html('<i class="feather-check-circle me-1"></i>Gmail Connected');
 
                     // Sync state with Laravel session
                     $.post("{{ route('crm.deals.googleAuthSync') }}", {
@@ -4167,23 +4176,23 @@
                     },
                     success: function (res) {
                         if (res && res.is_connected) {
-                            const emailLabel = res.connected_email ? ' (' + res.connected_email + ')' : '';
-                            badge.attr('class', 'badge bg-success text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                            const emailTooltip = (res.connected_email && res.connected_email.includes('@')) ? ' (' + res.connected_email + ')' : '';
+                            badge.attr('class', 'badge bg-success text-white text-decoration-none px-2.5 py-1.5 fs-11 fw-semibold d-inline-flex align-items-center text-nowrap')
                                  .attr('href', (res && res.login_url) ? res.login_url : fallbackLoginUrl)
-                                 .attr('title', 'Connected Email: ' + (res.connected_email || 'Google Workspace') + ' (Click to Re-connect or Manage)')
-                                 .html('<i class="feather-check-circle me-1"></i>Gmail Connected' + emailLabel);
+                                 .attr('title', 'Connected' + emailTooltip + ' - Click to Manage')
+                                 .html('<i class="feather-check-circle me-1"></i>Gmail Connected');
                         } else {
-                            badge.attr('class', 'badge bg-danger text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                            badge.attr('class', 'badge bg-danger text-white text-decoration-none px-2.5 py-1.5 fs-11 fw-semibold d-inline-flex align-items-center text-nowrap')
                                  .attr('href', (res && res.login_url) ? res.login_url : fallbackLoginUrl)
                                  .attr('title', 'Click to authenticate Google Account')
-                                 .html('<i class="feather-alert-triangle me-1"></i>Gmail Disconnected (Click to Connect)');
+                                 .html('<i class="feather-alert-triangle me-1"></i>Gmail Disconnected');
                         }
                     },
                     error: function () {
-                        badge.attr('class', 'badge bg-danger text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                        badge.attr('class', 'badge bg-danger text-white text-decoration-none px-2.5 py-1.5 fs-11 fw-semibold d-inline-flex align-items-center text-nowrap')
                              .attr('href', fallbackLoginUrl)
                              .attr('title', 'Click to authenticate Google Account')
-                             .html('<i class="feather-alert-triangle me-1"></i>Gmail Disconnected (Click to Connect)');
+                             .html('<i class="feather-alert-triangle me-1"></i>Gmail Disconnected');
                     }
                 });
             });

@@ -15,10 +15,18 @@ class BiometricDevice extends BaseModel
         'branch_id',
         'name',
         'device_serial',
+        'webhook_secret',
         'ip_address',
         'port',
         'status',
         'last_ping_at',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     */
+    protected $hidden = [
+        'webhook_secret',
     ];
 
     protected $casts = [
@@ -26,6 +34,26 @@ class BiometricDevice extends BaseModel
         'port' => 'integer',
         'last_ping_at' => 'datetime',
     ];
+
+    public function getWebhookSecretAttribute($value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        try {
+            return \Illuminate\Support\Facades\Crypt::decryptString($value);
+        } catch (\Throwable) {
+            return $value;
+        }
+    }
+
+    public function setWebhookSecretAttribute(?string $value): void
+    {
+        $this->attributes['webhook_secret'] = !empty($value)
+            ? \Illuminate\Support\Facades\Crypt::encryptString($value)
+            : null;
+    }
 
     public function company(): BelongsTo
     {

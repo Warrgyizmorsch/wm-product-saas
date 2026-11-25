@@ -36,6 +36,12 @@ class AccessService
     /** @var array<int, Collection<int, UserPermissionOverride>> user id => overrides */
     private array $overrideCache = [];
 
+    /** @var array<string, bool> */
+    private array $decisionCache = [];
+
+    /** @var array<string, bool> */
+    private array $hasRoleCache = [];
+
     public function flush(): void
     {
         $this->roleIdCache = [];
@@ -43,6 +49,8 @@ class AccessService
         $this->platformAdminCache = [];
         $this->grantCache = [];
         $this->overrideCache = [];
+        $this->decisionCache = [];
+        $this->hasRoleCache = [];
     }
 
     /**
@@ -56,6 +64,12 @@ class AccessService
      */
     public function allows(User $user, string $permissionName, array $context = []): bool
     {
+        $cacheKey = $user->id . '|' . $permissionName . '|' . ($context['tenant_id'] ?? $user->tenant_id ?? '') . '|' . ($context['company_id'] ?? $user->company_id ?? '') . '|' . ($context['branch_id'] ?? $user->branch_id ?? '') . '|' . ($context['department_id'] ?? $user->department_id ?? '') . '|' . ($context['owner_id'] ?? '');
+
+        if (array_key_exists($cacheKey, $this->decisionCache)) {
+            return $this->decisionCache[$cacheKey];
+        }
+
         // ── Plan features ──
         // The tenant's plan comes before every grant and override: a feature the
         // plan leaves out is view-only for everyone in that tenant, its owner
@@ -66,7 +80,7 @@ class AccessService
         if (! $gate->allows($permissionName, $planTenantId)) {
             $gate->noteDenial($gate->featureFor($permissionName));
 
-            return false;
+            return $this->decisionCache[$cacheKey] = false;
         }
 
         $allowed = $this->decide($user, $permissionName, $context);
@@ -75,7 +89,7 @@ class AccessService
             $gate->noteDenial(null);
         }
 
-        return $allowed;
+        return $this->decisionCache[$cacheKey] = $allowed;
     }
 
     /**
@@ -345,7 +359,9 @@ class AccessService
             return false;
         }
 
-        return Role::query()->whereIn('id', $roleIds)->where('slug', $roleSlug)->exists();
+        $cacheKey = $roleIds->sort()->implode(',') . '|' . $roleSlug;
+
+        return $this->hasRoleCache[$cacheKey] ??= Role::query()->whereIn('id', $roleIds)->where('slug', $roleSlug)->exists();
     }
 
     /**

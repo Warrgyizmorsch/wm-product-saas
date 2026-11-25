@@ -180,13 +180,6 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
         $categoryName = !empty($validated['category_name']) ? trim($validated['category_name']) : $meta['name'];
         $companyId = !empty($validated['company_id']) ? (int)$validated['company_id'] : null;
 
-        if ($tenantId) {
-            $tenantHasTemplates = ExitClearanceTemplate::where('tenant_id', $tenantId)->exists();
-            if (!$tenantHasTemplates) {
-                $this->clearanceService->resetTemplatesToDefaults($tenantId, $companyId);
-            }
-        }
-
         return DB::transaction(function () use ($validated, $tenantId, $companyId, $categoryKey, $categoryName, $request) {
             $createdCount = 0;
 

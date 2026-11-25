@@ -105,7 +105,16 @@ class DocumentMasterRepository implements DocumentMasterRepositoryInterface
 
         $companies = \App\Domains\HRMS\Models\Company::query()->orderBy('company_name')->get();
         $allDocumentMasters = DocumentMaster::query()->where('status', 'active')->orderBy('name')->get();
-        $allEmployees = \App\Domains\HRMS\Models\Employee::query()->orderBy('full_name')->get();
+        $user = auth()->user();
+        $isHrOrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hrms.documents.manage')
+            || $user->hasHrPermission('hrms.employees.manage')
+            || $user->hasHrPermission('hr.employees.manage')
+        );
+        $allEmployees = $isHrOrAdmin
+            ? \App\Domains\HRMS\Models\Employee::query()->orderBy('full_name')->get(['id', 'employee_id', 'full_name', 'department_id'])
+            : collect();
 
         return [
             'categories' => $categories,

@@ -229,16 +229,16 @@ class DocumentController extends Controller
             $hrSigUrl = null;
             if ($request->hasFile('hr_signature_file') && $request->file('hr_signature_file')->isValid()) {
                 $file = $request->file('hr_signature_file');
-                $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'public');
-                $hrSigUrl = asset('storage/' . $hrSigPath);
+                $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'local');
+                $hrSigUrl = 'data:' . ($file->getClientMimeType() ?: 'image/png') . ';base64,' . base64_encode(file_get_contents($file->getRealPath()));
             } elseif ($request->filled('hr_signature_data')) {
                 $hrSigData = $request->input('hr_signature_data');
                 if (str_starts_with($hrSigData, 'data:image')) {
                     $image = str_replace(' ', '+', preg_replace('/^data:image\/\w+;base64,/', '', $hrSigData));
                     $imageName = 'hr_sig_' . time() . '_' . \Illuminate\Support\Str::random(6) . '.png';
                     $hrSigPath = "signatures/hr_tenant_{$tenantId}/{$imageName}";
-                    tenant_storage()->put('public', $hrSigPath, base64_decode($image));
-                    $hrSigUrl = asset('storage/' . $hrSigPath);
+                    tenant_storage()->put('local', $hrSigPath, base64_decode($image));
+                    $hrSigUrl = $hrSigData;
                 } else {
                     $hrSigUrl = $hrSigData;
                 }
@@ -272,11 +272,11 @@ class DocumentController extends Controller
                         ->setPaper('a4', 'portrait')
                         ->setWarnings(false);
                     $pdfContent = $pdf->output();
-                    tenant_storage()->put('public', $path, $pdfContent);
+                    tenant_storage()->put('local', $path, $pdfContent);
                 } catch (\Throwable $e) {
                     // Fallback to storing standalone HTML if DomPDF is unavailable
                     $htmlPath = "documents/tenant_{$tenantId}/employee_{$employee->id}/" . \Illuminate\Support\Str::slug($docTemplate->name . '-' . $employee->full_name) . '-' . time() . '.html';
-                    tenant_storage()->put('public', $htmlPath, $templateService->toPrintableDocument($renderedContent, $title));
+                    tenant_storage()->put('local', $htmlPath, $templateService->toPrintableDocument($renderedContent, $title));
                     $path = $htmlPath;
                 }
 
@@ -328,7 +328,9 @@ class DocumentController extends Controller
                     'name'                  => $title,
                     'file_path'             => $path,
                     'file_type'             => pathinfo($path, PATHINFO_EXTENSION),
-                    'file_size'             => \Illuminate\Support\Facades\Storage::disk('public')->exists($path) ? \Illuminate\Support\Facades\Storage::disk('public')->size($path) : 0,
+                    'file_size'             => \Illuminate\Support\Facades\Storage::disk('local')->exists($path)
+                        ? \Illuminate\Support\Facades\Storage::disk('local')->size($path)
+                        : (\Illuminate\Support\Facades\Storage::disk('public')->exists($path) ? \Illuminate\Support\Facades\Storage::disk('public')->size($path) : 0),
                     'status'                => $docStatus,
                     'requires_signature'    => (bool) $docTemplate->requires_signature,
                     'is_signed'             => false,
@@ -357,7 +359,7 @@ class DocumentController extends Controller
             return redirect()->back()->withErrors(['expiry_date' => __('hrms.documents.error_expiry_required')])->withInput();
         }
 
-        $baseStoredPath = $file->storeTenantFile("documents/tenant_{$tenantId}/bulk_temp", 'public');
+        $baseStoredPath = $file->storeTenantFile("documents/tenant_{$tenantId}/bulk_temp", 'local');
         $originalName = $file->getClientOriginalName();
         $originalExt = $file->getClientOriginalExtension();
         $fileSize = $file->getSize();
@@ -374,7 +376,7 @@ class DocumentController extends Controller
             }
 
             $empPath = "documents/tenant_{$tenantId}/employee_{$employee->id}/" . time() . '_' . \Illuminate\Support\Str::random(6) . '.' . $originalExt;
-            \Illuminate\Support\Facades\Storage::disk('public')->copy($baseStoredPath, $empPath);
+            \Illuminate\Support\Facades\Storage::disk('local')->copy($baseStoredPath, $empPath);
 
             Document::create([
                 'tenant_id'          => $tenantId,
@@ -404,11 +406,121 @@ class DocumentController extends Controller
             $count++;
         }
 
-        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($baseStoredPath)) {
+        if (\Illuminate\Support\Facades\Storage::disk('local')->exists($baseStoredPath)) {
+            \Illuminate\Support\Facades\Storage::disk('local')->delete($baseStoredPath);
+        } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($baseStoredPath)) {
             \Illuminate\Support\Facades\Storage::disk('public')->delete($baseStoredPath);
         }
 
         return redirect()->back()->with('success', __('hrms.documents.bulk_upload_success', ['count' => $count]));
+    }
+
+    /**
+     * View document file securely through authorized stream response.
+     */
+    public function viewFile(Request $request, Document $document)
+    {
+        $this->authorizeDocumentAccess($document);
+
+        $type = $request->query('type');
+        $path = match ($type) {
+            'signed' => $document->signed_file_path ?: $document->file_path,
+            'signature' => $document->signature_metadata['signature_path'] ?? null,
+            default => $document->file_path,
+        };
+
+        return $this->streamFile($path, $document->file_name ?? basename($path ?? 'document'), false);
+    }
+
+    /**
+     * Download document file securely through authorized download response.
+     */
+    public function downloadFile(Request $request, Document $document)
+    {
+        $this->authorizeDocumentAccess($document);
+
+        $type = $request->query('type');
+        $path = match ($type) {
+            'signed' => $document->signed_file_path ?: $document->file_path,
+            'signature' => $document->signature_metadata['signature_path'] ?? null,
+            default => $document->file_path,
+        };
+
+        return $this->streamFile($path, $document->file_name ?? basename($path ?? 'document'), true);
+    }
+
+    /**
+     * Authorize access to document file.
+     */
+    private function authorizeDocumentAccess(Document $document): void
+    {
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+
+        $tenantId = tenant_id() ?? $user->tenant_id;
+        if ($document->tenant_id && $tenantId && (int) $document->tenant_id !== (int) $tenantId) {
+            abort(403, 'Unauthorized tenant access.');
+        }
+
+        $isOwner = false;
+        if ($document->documentable_type === Employee::class || !$document->documentable_type) {
+            $currentEmployee = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->resolveEmployee($user);
+            if ($currentEmployee && (int) $document->documentable_id === (int) $currentEmployee->id) {
+                $isOwner = true;
+            } elseif ($user->employee?->id === (int) $document->documentable_id || $user->id === $document->documentable?->user_id) {
+                $isOwner = true;
+            }
+        }
+
+        if (!$isOwner) {
+            $access = app(\App\Services\Access\AccessService::class);
+            $canView = $access->allows($user, 'hrms.documents.view', ['tenant_id' => $tenantId])
+                || $access->allows($user, 'hrms.documents.manage', ['tenant_id' => $tenantId])
+                || $access->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
+                || $access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
+                || ($user->isCompanyAdmin() ?? false);
+
+            if (!$canView) {
+                abort(403, 'You do not have permission to view or download this document.');
+            }
+        }
+    }
+
+    /**
+     * Stream or download a file from local or fallback public disk.
+     */
+    private function streamFile(?string $path, string $fileName, bool $isDownload)
+    {
+        if (!$path) {
+            abort(404, 'File not specified.');
+        }
+
+        $disk = null;
+        if (\Illuminate\Support\Facades\Storage::disk('local')->exists($path)) {
+            $disk = 'local';
+        } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+            $disk = 'public';
+        }
+
+        if (!$disk) {
+            abort(404, 'Document file not found.');
+        }
+
+        $storage = \Illuminate\Support\Facades\Storage::disk($disk);
+        $mimeType = $storage->mimeType($path) ?: 'application/octet-stream';
+
+        if ($isDownload) {
+            return $storage->download($path, $fileName, [
+                'Content-Type' => $mimeType,
+            ]);
+        }
+
+        return $storage->response($path, $fileName, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . addslashes($fileName) . '"',
+        ]);
     }
 
     /**

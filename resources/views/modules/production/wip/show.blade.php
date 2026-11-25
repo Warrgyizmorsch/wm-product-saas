@@ -215,6 +215,15 @@
                 </div>
             </div>
 
+            @if(config('production.temp_flow') && $wip->order)
+                {{-- Temp no-BOM flow: raw materials consumed on this WIP's order, by operation / material / log --}}
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm"><div class="card-body">
+                        @include('modules.production.partials.consumed-materials-report', ['order' => $wip->order])
+                    </div></div>
+                </div>
+            @endif
+
             {{-- WIP Transactions History Logs --}}
             <div class="col-12">
                 <div class="card border-0 shadow-sm">

@@ -72,20 +72,26 @@ class HelpdeskTicket extends BaseModel
     public static function generateTicketNumber(int $tenantId, bool $lock = false): string
     {
         $year = date('Y');
-        $query = static::where('tenant_id', $tenantId)
-            ->where('ticket_number', 'like', "TICK-{$year}-%");
 
-        if ($lock) {
-            $query->lockForUpdate();
-        }
-
-        $latest = $query->latest('id')->first();
-
-        if ($latest && preg_match('/TICK-\d{4}-(\d+)/', $latest->ticket_number, $matches)) {
-            $nextSeq = intval($matches[1]) + 1;
-        } else {
-            $nextSeq = 1;
-        }
+        $nextSeq = \App\Support\TenantSequence::next(
+            tenantId: $tenantId,
+            key: "helpdesk_ticket:{$year}",
+            initial: function () use ($tenantId, $year) {
+                $maxSeq = 0;
+                $existingTicketNumbers = static::where('tenant_id', $tenantId)
+                    ->where('ticket_number', 'like', "TICK-{$year}-%")
+                    ->pluck('ticket_number');
+                foreach ($existingTicketNumbers as $num) {
+                    if (preg_match('/TICK-\d{4}-.*?(\d+)/', $num, $matches)) {
+                        $seq = (int) $matches[1];
+                        if ($seq > $maxSeq) {
+                            $maxSeq = $seq;
+                        }
+                    }
+                }
+                return $maxSeq;
+            }
+        );
 
         return sprintf("TICK-%s-%05d", $year, $nextSeq);
     }

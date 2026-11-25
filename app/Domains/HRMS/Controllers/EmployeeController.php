@@ -194,52 +194,69 @@ class EmployeeController extends Controller
     {
         $this->authorizeHrms('hrms.employees.create');
 
-        $userIdInput = $request->input('user_id');
-        if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
-            $userEmail = $request->input('office_email') ?: $request->input('personal_email');
-            if (!empty($userEmail)) {
-                $existingUser = \App\Models\User::where('email', $userEmail)->first();
-                if ($existingUser) {
-                    $request->merge(['user_id' => $existingUser->id]);
-                    if (!$request->filled('office_email')) {
-                        $request->merge(['office_email' => $existingUser->email]);
-                    }
-                } else {
-                    $newUser = \App\Models\User::create([
-                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id') ?? 1,
-                        'company_id'    => $request->input('company_id'),
-                        'branch_id'     => $request->input('branch_id'),
-                        'department_id' => $request->input('department_id'),
-                        'role_id'       => $request->input('role_id'),
-                        'name'          => $request->input('full_name'),
-                        'email'         => $userEmail,
-                        'password'      => \Illuminate\Support\Facades\Hash::make('12345678'),
-                    ]);
-                    $request->merge(['user_id' => $newUser->id]);
-                    if (!$request->filled('office_email')) {
-                        $request->merge(['office_email' => $userEmail]);
-                    }
-                }
-            } else {
-                $request->merge(['user_id' => null]);
-            }
-        } elseif ($request->filled('user_id')) {
-            $targetUser = \App\Models\User::find($request->user_id);
-            if ($targetUser) {
-                if (!$request->filled('full_name')) {
-                    $request->merge(['full_name' => $targetUser->name]);
-                }
-                if (!$request->filled('personal_email')) {
-                    $request->merge(['personal_email' => $targetUser->email]);
-                }
-                $request->merge(['office_email' => $targetUser->email]);
-            }
-        }
-
         $validated = $this->validatePayload($request);
         $validated = $this->normalizeHierarchy($validated);
 
-        $employee = $this->employeeRepository->storeEmployee($validated, $request);
+        $setupToken = null;
+        $employee = \Illuminate\Support\Facades\DB::transaction(function () use ($request, &$validated, &$setupToken) {
+            $userIdInput = $request->input('user_id');
+            if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
+                $userEmail = $request->input('office_email') ?: $request->input('personal_email');
+                if (!empty($userEmail)) {
+                    $existingUser = \App\Models\User::where('email', $userEmail)->first();
+                    if ($existingUser) {
+                        $request->merge(['user_id' => $existingUser->id]);
+                        $validated['user_id'] = $existingUser->id;
+                        if (!$request->filled('office_email')) {
+                            $request->merge(['office_email' => $existingUser->email]);
+                            $validated['office_email'] = $existingUser->email;
+                        }
+                    } else {
+                        $newUser = \App\Models\User::create([
+                            'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id') ?? 1,
+                            'company_id'    => $validated['company_id'] ?? $request->input('company_id'),
+                            'branch_id'     => $validated['branch_id'] ?? $request->input('branch_id'),
+                            'department_id' => $validated['department_id'] ?? $request->input('department_id'),
+                            'role_id'       => $request->input('role_id'),
+                            'name'          => $validated['full_name'] ?? $request->input('full_name'),
+                            'email'         => $userEmail,
+                            'password'      => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
+                        ]);
+                        $request->merge(['user_id' => $newUser->id]);
+                        $validated['user_id'] = $newUser->id;
+                        if (!$request->filled('office_email')) {
+                            $request->merge(['office_email' => $userEmail]);
+                            $validated['office_email'] = $userEmail;
+                        }
+
+                        try {
+                            $setupToken = \Illuminate\Support\Facades\Password::broker()->createToken($newUser);
+                        } catch (\Throwable $e) {
+                            \Illuminate\Support\Facades\Log::warning("Could not issue password reset token: " . $e->getMessage());
+                        }
+                    }
+                } else {
+                    $request->merge(['user_id' => null]);
+                    $validated['user_id'] = null;
+                }
+            } elseif ($request->filled('user_id')) {
+                $targetUser = \App\Models\User::find($request->user_id);
+                if ($targetUser) {
+                    if (!$request->filled('full_name')) {
+                        $request->merge(['full_name' => $targetUser->name]);
+                        $validated['full_name'] = $targetUser->name;
+                    }
+                    if (!$request->filled('personal_email')) {
+                        $request->merge(['personal_email' => $targetUser->email]);
+                        $validated['personal_email'] = $targetUser->email;
+                    }
+                    $request->merge(['office_email' => $targetUser->email]);
+                    $validated['office_email'] = $targetUser->email;
+                }
+            }
+
+            return $this->employeeRepository->storeEmployee($validated, $request);
+        });
 
         // Process Candidate Offer Conversion link if submitted from recruitment workflow
         if ($request->filled('convert_offer_id')) {
@@ -279,12 +296,29 @@ class EmployeeController extends Controller
             // Ignore if SOP module not active
         }
 
-        // Dispatch Welcome Email with Login Credentials to Employee
+        // Dispatch Welcome Email with Secure Password Setup Link to Employee
         try {
-            $toEmail = $employee->personal_email ?: ($employee->office_email ?: $employee->user?->email);
-            if (!empty($toEmail)) {
+            // Login account username/email (Office email strictly first, fallback to personal only if office email is empty):
+            $loginEmail = $employee->user?->email ?: ($employee->office_email ?: $employee->personal_email);
+
+            // Recipient inbox for delivery (Personal email if available so they can open it on Day 0, otherwise Office email):
+            $toEmail = $employee->personal_email ?: ($employee->office_email ?: $loginEmail);
+
+            if (!empty($toEmail) && !empty($loginEmail)) {
                 $loginUrl = route('login');
                 $companyName = config('app.name', 'Our Company');
+                $setupUrl = !empty($setupToken)
+                    ? route('password.reset', ['token' => $setupToken, 'email' => $loginEmail])
+                    : $loginUrl;
+                $actionText = !empty($setupToken) ? 'Set Up Your Password' : 'Login to Employee Portal';
+                $passwordNote = !empty($setupToken)
+                    ? "<p style='margin: 0;'><strong>Password Setup:</strong> For security reasons, temporary passwords are not sent via email. Please click the button below to set up your secure password.</p>"
+                    : "<p style='margin: 0;'><strong>Password:</strong> You can log in using your existing account password, or use the 'Forgot Password' link on the login page.</p>";
+
+                $deliveryNote = ($toEmail !== $loginEmail)
+                    ? "<p style='margin: 4px 0 0 0; font-size: 12px; color: #64748b;'><em>(Notice sent to your personal inbox: {$toEmail})</em></p>"
+                    : "";
+
                 $welcomeHtml = "
                     <div style='font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6; padding: 20px; background-color: #f8fafc;'>
                         <div style='max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;'>
@@ -294,15 +328,15 @@ class EmployeeController extends Controller
                             <div style='padding: 24px;'>
                                 <p>Dear <strong>{$employee->full_name}</strong>,</p>
                                 <p>We are delighted to welcome you to the team as <strong>" . ($employee->designation?->name ?? 'Employee') . "</strong>!</p>
-                                <p>Your Employee Profile and ESS Self-Service Portal account have been set up. Here are your account login details:</p>
+                                <p>Your Employee Profile and ESS Self-Service Portal account have been set up. Here are your account details:</p>
                                 <div style='background-color: #f1f5f9; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0; border-radius: 4px;'>
                                     <p style='margin: 0 0 8px 0;'><strong>Portal Link:</strong> <a href='{$loginUrl}' style='color: #2563eb;'>{$loginUrl}</a></p>
-                                    <p style='margin: 0 0 8px 0;'><strong>Username / Email:</strong> <code>{$toEmail}</code></p>
-                                    <p style='margin: 0;'><strong>Initial Password:</strong> <code>12345678</code></p>
+                                    <p style='margin: 0 0 8px 0;'><strong>Login Username / Email:</strong> <code>{$loginEmail}</code></p>
+                                    {$deliveryNote}
+                                    {$passwordNote}
                                 </div>
-                                <p>Please log in to your Employee Portal and update your password under Account Settings upon first login.</p>
                                 <div style='text-align: center; margin-top: 25px;'>
-                                    <a href='{$loginUrl}' style='background-color: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;'>Login to Employee Portal</a>
+                                    <a href='{$setupUrl}' style='background-color: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;'>{$actionText}</a>
                                 </div>
                                 <br>
                                 <p style='color: #64748b; font-size: 13px;'>If you have any questions, please contact the HR Department.</p>
@@ -315,7 +349,7 @@ class EmployeeController extends Controller
                 $emailService = app(\App\Services\EmailService::class);
                 $emailService->sendEmail([
                     'to'         => $toEmail,
-                    'subject'    => "Welcome to {$companyName} — Your Employee Login Credentials",
+                    'subject'    => "Welcome to {$companyName} — Set Up Your Employee Account",
                     'body_html'  => $welcomeHtml,
                     'account_id' => $request->account_id,
                 ]);
@@ -611,11 +645,11 @@ class EmployeeController extends Controller
                     ->whereNull('deleted_at')
                     ->ignore($employeeId),
             ],
-            'company_id' => ['required', 'exists:companies,id'],
-            'business_unit_id' => ['nullable', 'exists:business_units,id'],
-            'branch_id' => ['nullable', 'exists:branches,id'],
-            'department_id' => ['required', 'exists:departments,id'],
-            'designation_id' => ['required', 'exists:designations,id'],
+            'company_id' => ['required', tenant_exists('companies')],
+            'business_unit_id' => ['nullable', tenant_exists('business_units')],
+            'branch_id' => ['nullable', tenant_exists('branches')],
+            'department_id' => ['required', tenant_exists('departments')],
+            'designation_id' => ['required', tenant_exists('designations')],
             'reporting_manager_id' => ['nullable', 'exists:employees,id'],
             'pay_group_id' => ['nullable', 'exists:pay_groups,id'],
             'salary_structure_id' => ['nullable', 'exists:salary_structures,id'],
@@ -624,6 +658,8 @@ class EmployeeController extends Controller
             'shift_id' => ['nullable', 'exists:production_shifts,id'],
             'employment_type' => ['nullable', 'string', 'max:100'],
             'employee_stage' => ['nullable', 'string', 'max:100'],
+            'job_title' => ['nullable', 'string', 'max:255'],
+            'role' => ['nullable', 'string', 'max:255'],
             'office' => ['nullable', 'string', 'in:office,wfh,onsite'],
             'timezone' => ['nullable', 'string', 'max:64'],
             'time_zone' => ['nullable', 'string', 'max:64'],
@@ -645,8 +681,20 @@ class EmployeeController extends Controller
             'postal_code' => ['nullable', 'string', 'max:20'],
             'present_address' => ['nullable', 'string', 'max:500'],
             'permanent_address' => ['nullable', 'string', 'max:500'],
-            'aadhaar_card_number' => ['nullable', 'string', 'max:50'],
-            'pan_card_number' => ['nullable', 'string', 'max:50'],
+            'aadhaar_card_number' => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('employees', 'aadhaar_card_number')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->ignore($employeeId),
+            ],
+            'pan_card_number' => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('employees', 'pan_card_number')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->ignore($employeeId),
+            ],
             'uan_number' => ['nullable', 'digits:12'],
             'esi_ip_number' => ['nullable', 'digits:10'],
             'bank_name' => ['nullable', 'string', 'max:150'],
@@ -655,7 +703,7 @@ class EmployeeController extends Controller
             'qualification' => ['nullable', 'string', 'max:255'],
             'source_of_hire' => ['nullable', 'string', 'max:255'],
             'skill_set' => ['nullable', 'string', 'max:1000'],
-            'current_salary' => ['nullable', 'numeric', 'min:0'],
+            'current_salary' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'notes' => ['nullable', 'string'],
         ]);
     }
@@ -833,14 +881,22 @@ class EmployeeController extends Controller
             }
 
             // Clean up previous files if replacing/re-uploading
-            if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
+            if ($document->file_path) {
+                if (\Illuminate\Support\Facades\Storage::disk('local')->exists($document->file_path)) {
+                    \Illuminate\Support\Facades\Storage::disk('local')->delete($document->file_path);
+                } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
+                }
             }
-            if ($document->signed_file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->signed_file_path)) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($document->signed_file_path);
+            if ($document->signed_file_path) {
+                if (\Illuminate\Support\Facades\Storage::disk('local')->exists($document->signed_file_path)) {
+                    \Illuminate\Support\Facades\Storage::disk('local')->delete($document->signed_file_path);
+                } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($document->signed_file_path)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($document->signed_file_path);
+                }
             }
 
-            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'local');
 
             $approvalRequired = true;
             $requiresSignature = false;
@@ -874,7 +930,7 @@ class EmployeeController extends Controller
                 return redirect()->back()->withErrors(['expiry_date' => 'Expiry date is required for this document template.'])->withInput();
             }
 
-            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'local');
 
             $approvalRequired = (bool) $documentMaster->approval_required;
             $requiresSignature = (bool) $documentMaster->requires_signature;
@@ -889,11 +945,19 @@ class EmployeeController extends Controller
                 ->first();
 
             if ($existingDoc) {
-                if ($existingDoc->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($existingDoc->file_path)) {
-                    \Illuminate\Support\Facades\Storage::disk('public')->delete($existingDoc->file_path);
+                if ($existingDoc->file_path) {
+                    if (\Illuminate\Support\Facades\Storage::disk('local')->exists($existingDoc->file_path)) {
+                        \Illuminate\Support\Facades\Storage::disk('local')->delete($existingDoc->file_path);
+                    } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($existingDoc->file_path)) {
+                        \Illuminate\Support\Facades\Storage::disk('public')->delete($existingDoc->file_path);
+                    }
                 }
-                if ($existingDoc->signed_file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($existingDoc->signed_file_path)) {
-                    \Illuminate\Support\Facades\Storage::disk('public')->delete($existingDoc->signed_file_path);
+                if ($existingDoc->signed_file_path) {
+                    if (\Illuminate\Support\Facades\Storage::disk('local')->exists($existingDoc->signed_file_path)) {
+                        \Illuminate\Support\Facades\Storage::disk('local')->delete($existingDoc->signed_file_path);
+                    } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($existingDoc->signed_file_path)) {
+                        \Illuminate\Support\Facades\Storage::disk('public')->delete($existingDoc->signed_file_path);
+                    }
                 }
 
                 $existingDoc->update([
@@ -975,12 +1039,20 @@ class EmployeeController extends Controller
             return redirect()->back()->with('error', 'Self-deletion is prohibited. You cannot delete documents from your own employee profile.');
         }
 
-        if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
+        if ($document->file_path) {
+            if (\Illuminate\Support\Facades\Storage::disk('local')->exists($document->file_path)) {
+                \Illuminate\Support\Facades\Storage::disk('local')->delete($document->file_path);
+            } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
+            }
         }
 
-        if ($document->signed_file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->signed_file_path)) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($document->signed_file_path);
+        if ($document->signed_file_path) {
+            if (\Illuminate\Support\Facades\Storage::disk('local')->exists($document->signed_file_path)) {
+                \Illuminate\Support\Facades\Storage::disk('local')->delete($document->signed_file_path);
+            } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($document->signed_file_path)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($document->signed_file_path);
+            }
         }
 
         $document->delete();

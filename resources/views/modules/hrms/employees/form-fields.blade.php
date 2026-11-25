@@ -226,7 +226,7 @@
                         <i class="feather-lock me-1"></i>{{ __('hrms.employees.synced_from_user') }}
                     </small>
                     <small id="{{ $prefix }}_office_email_autocreate_help" class="text-primary fs-11 mt-1 d-block {{ !$isExistingUserLinked ? '' : 'd-none' }}">
-                        <i class="feather-user-plus me-1"></i>Auto-creates user (Pass: 12345678)
+                        <i class="feather-user-plus me-1"></i>Auto-creates user account
                     </small>
                 </div>
                 <div class="col-md-6">

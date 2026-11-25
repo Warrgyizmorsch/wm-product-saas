@@ -111,7 +111,7 @@ class CrmDealController extends Controller
             }
         }
 
-        $deals = $query->orderBy('id', 'desc')->paginate(100);
+        $deals = $query->orderBy('id', 'desc')->paginate(10)->withQueryString();
         $users = \App\Models\User::orderBy('name')->get();
 
         return view('modules.crm.deals.index', compact('deals', 'users', 'search', 'stage', 'stageCounts', 'dateFrom', 'dateTo', 'dealStatuses'));

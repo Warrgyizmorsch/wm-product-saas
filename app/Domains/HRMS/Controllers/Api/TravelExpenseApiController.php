@@ -811,9 +811,9 @@ class TravelExpenseApiController extends Controller
             'destination'      => 'required|string|max:255',
             'start_date'       => 'required|date',
             'end_date'         => 'required|date|after_or_equal:start_date',
-            'estimated_budget' => 'required|numeric|min:0',
+            'estimated_budget' => 'required|numeric|min:0|max:99999999.99',
             'request_advance'  => 'nullable|boolean',
-            'advance_amount'   => 'nullable|required_if:request_advance,1|numeric|min:1',
+            'advance_amount'   => 'nullable|required_if:request_advance,1|numeric|min:1|max:99999999.99',
         ]);
 
         [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
@@ -1040,7 +1040,7 @@ class TravelExpenseApiController extends Controller
         $validated = $request->validate([
             'employee_id'       => 'nullable|integer|exists:employees,id',
             'travel_request_id' => 'nullable|exists:travel_requests,id',
-            'amount'            => 'required|numeric|min:1',
+            'amount'            => 'required|numeric|min:1|max:99999999.99',
             'purpose'           => 'required|string|max:255',
         ]);
 
@@ -1298,8 +1298,8 @@ class TravelExpenseApiController extends Controller
             'claims'            => 'required|array|min:1',
             'claims.*.category_id' => 'required|exists:expense_categories,id',
             'claims.*.date'        => 'required|date',
-            'claims.*.amount'      => 'required|numeric|min:0.01',
-            'claims.*.tax'         => 'nullable|numeric|min:0',
+            'claims.*.amount'      => 'required|numeric|min:0.01|max:99999999.99',
+            'claims.*.tax'         => 'nullable|numeric|min:0|max:99999999.99',
             'claims.*.merchant'    => 'nullable|string|max:255',
             'claims.*.desc'        => 'nullable|string|max:1000',
             'claims.*.receipt'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
@@ -1537,8 +1537,8 @@ class TravelExpenseApiController extends Controller
             'claims'                     => 'required|array|min:1',
             'claims.*.category_id'       => 'required|exists:expense_categories,id',
             'claims.*.date'              => 'required|date',
-            'claims.*.amount'            => 'required|numeric|min:0.01',
-            'claims.*.tax'               => 'nullable|numeric|min:0',
+            'claims.*.amount'            => 'required|numeric|min:0.01|max:99999999.99',
+            'claims.*.tax'               => 'nullable|numeric|min:0|max:99999999.99',
             'claims.*.merchant'          => 'nullable|string|max:255',
             'claims.*.desc'              => 'nullable|string|max:1000',
             'claims.*.receipt'           => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
@@ -1782,6 +1782,10 @@ class TravelExpenseApiController extends Controller
         $isOwner = $authEmployee && (int)$expenseReport->employee_id === (int)$authEmployee->id;
         if (!$isAdmin && !$isOwner) {
             return $this->sendError('Unauthorized access to submit this expense report.', 403);
+        }
+
+        if (!in_array($expenseReport->status, ['draft', 'rejected'], true)) {
+            return $this->sendError('Only draft or rejected expense reports can be submitted.', 422);
         }
 
         $expenseReport->update(['status' => 'submitted']);

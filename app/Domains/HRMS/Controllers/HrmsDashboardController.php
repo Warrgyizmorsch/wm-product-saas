@@ -119,16 +119,21 @@ class HrmsDashboardController extends Controller
                 }
             }
 
-            // 7-day recent punch history (for 7-day visual mini-strip)
+            // 7-day recent punch history (pre-loaded in 1 query)
+            $pastSevenDaysStart = $now->copy()->subDays(6)->format('Y-m-d');
+            $pastAttendancesMap = Attendance::where('tenant_id', $tenantId)
+                ->where('employee_id', $currentEmployee->id)
+                ->whereDate('date', '>=', $pastSevenDaysStart)
+                ->whereDate('date', '<=', $today)
+                ->get()
+                ->keyBy(fn($a) => $a->date instanceof Carbon ? $a->date->format('Y-m-d') : (string)$a->date);
+
             for ($i = 6; $i >= 0; $i--) {
                 $pastDate = $now->copy()->subDays($i);
                 $pastDateStr = $pastDate->format('Y-m-d');
                 $isWeekend = $pastDate->isWeekend();
 
-                $att = Attendance::where('tenant_id', $tenantId)
-                    ->where('employee_id', $currentEmployee->id)
-                    ->whereDate('date', $pastDateStr)
-                    ->first();
+                $att = $pastAttendancesMap->get($pastDateStr);
 
                 $status = 'unmarked';
                 if ($att) {
@@ -212,14 +217,13 @@ class HrmsDashboardController extends Controller
             $planTypesCollection = LeaveType::where('tenant_id', $tenantId)->where('status', true)->get();
         }
 
+        $employeeBalancesMap = $currentEmployee ? LeaveBalance::where('tenant_id', $tenantId)
+            ->where('employee_id', $currentEmployee->id)
+            ->get()
+            ->keyBy('leave_type_id') : collect();
+
         foreach ($planTypesCollection as $type) {
-            $bal = null;
-            if ($currentEmployee) {
-                $bal = LeaveBalance::where('tenant_id', $tenantId)
-                    ->where('employee_id', $currentEmployee->id)
-                    ->where('leave_type_id', $type->id)
-                    ->first();
-            }
+            $bal = $employeeBalancesMap->get($type->id);
 
             $allocated = $bal ? floatval($bal->allocated) : floatval($type->quota ?? 12);
             $used = $bal ? floatval($bal->used) : 0;
@@ -372,7 +376,8 @@ class HrmsDashboardController extends Controller
             ->get();
 
         // 9. Celebrations (Birthdays & Work Anniversaries from real active employees for current month)
-        $allActiveEmployees = Employee::with(['department', 'designation'])
+        $allActiveEmployees = Employee::select(['id', 'full_name', 'photo', 'date_of_birth', 'date_of_joining', 'department_id', 'designation_id'])
+            ->with(['department:id,name', 'designation:id,name'])
             ->where('tenant_id', $tenantId)
             ->where('status', true)
             ->get();
@@ -1103,7 +1108,11 @@ class HrmsDashboardController extends Controller
     public function getCelebrationsData(?\App\Models\User $user, int $tenantId): array
     {
         $now = Carbon::now();
-        $allActiveEmployees = Employee::where('tenant_id', $tenantId)->where('status', true)->get();
+        $allActiveEmployees = Employee::select(['id', 'full_name', 'photo', 'date_of_birth', 'date_of_joining', 'department_id', 'designation_id'])
+            ->with(['department:id,name', 'designation:id,name'])
+            ->where('tenant_id', $tenantId)
+            ->where('status', true)
+            ->get();
 
         $upcomingBirthdays = $allActiveEmployees->filter(function ($emp) use ($now) {
             return $emp->date_of_birth && Carbon::parse($emp->date_of_birth)->month === $now->month;

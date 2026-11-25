@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->appendToGroup('web', SetLocale::class);
         $middleware->appendToGroup('web', SetCurrency::class);
+        $middleware->appendToGroup('api', \App\Http\Middleware\EnsureIdempotency::class);
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
 
         $middleware->alias([
@@ -41,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'production.api.secret' => \App\Http\Middleware\ProductionApiSecretMiddleware::class,
             'production.api.tenant' => \App\Http\Middleware\ProductionTenantEnforcementMiddleware::class,
             'production.api.idempotency' => \App\Http\Middleware\ProductionIdempotencyMiddleware::class,
+            'idempotency' => \App\Http\Middleware\EnsureIdempotency::class,
         ]);
 
         // The platform console has its own sign-in page.

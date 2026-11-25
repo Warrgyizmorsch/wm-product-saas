@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use Database\Seeders\Concerns\LoadsTestProductionData;
 use Illuminate\Database\Seeder;
 
 /**
@@ -12,14 +13,24 @@ use Illuminate\Database\Seeder;
  * - Engineering Data: Routings, Operations, Operation Materials, Approvals, BOMs, BOM Items, BOM Approvals
  * - Execution Data: Production Orders, Operations, Reservations, Requisitions, Issues, Batches, Receipts, Schedules, Schedule Operations, WIPs, WIP Transactions, Timelines
  *
- * NOTE: This seeder is deliberately isolated and is NOT called by DatabaseSeeder.
- * It is invoked by running the single-command scratch runner:
- * `php scratch_production/run_production_master_seed.php`
+ * Called by DatabaseSeeder after AddTestMastersSeeder (CleanBeforeHrmsSeeder has emptied the production and inventory
+ * tables by then, HrmsDemoSeeder has added the HR data). It can also be run on its own:
+ * `php artisan db:seed --class=ProductionE2EDemoSeeder`, or through the scratch runner
+ * `php scratch_production/run_production_master_seed.php`.
+ *
+ * The data lives in the three seeders below (one method per table, see their tables()). References to rows it does not
+ * own — units, warehouses, shifts, accounts, HRMS rows — are natural keys ('uom' => 'Pcs', 'shift' => 'DAY' ...) looked up
+ * by code, see Database\Seeders\Support\TestProductionLinks.
  */
 class ProductionE2EDemoSeeder extends Seeder
 {
-    public function run(int $tenantId = 1): void
+    use LoadsTestProductionData;
+
+    public function run(?int $tenantId = null): void
     {
+        // no id given (db:seed): the fallback tenant of this installation
+        $tenantId = $this->resolveTenantId($tenantId);
+
         $this->command?->info("========================================================");
         $this->command?->info("  STARTING PRODUCTION E2E DEMO SEEDER (Tenant: {$tenantId})");
         $this->command?->info("========================================================");

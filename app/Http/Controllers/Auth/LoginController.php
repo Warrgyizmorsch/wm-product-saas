@@ -22,6 +22,37 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
+    public function showResetForm(Request $request, ?string $token = null): View
+    {
+        return view('auth.reset-password', [
+            'token' => $token ?? $request->route('token'),
+            'email' => $request->input('email'),
+        ]);
+    }
+
+    public function resetPassword(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'token'    => 'required',
+            'email'    => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $status = \Illuminate\Support\Facades\Password::broker()->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, string $password) {
+                $user->forceFill([
+                    'password' => \Illuminate\Support\Facades\Hash::make($password),
+                ])->setRememberToken(\Illuminate\Support\Str::random(60));
+                $user->save();
+            }
+        );
+
+        return $status === \Illuminate\Support\Facades\Password::PASSWORD_RESET
+            ? redirect()->route('login')->with('success', __('Your password has been set successfully! Please log in.'))
+            : back()->withErrors(['email' => __($status)]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $credentials = $request->validate([
@@ -29,18 +60,23 @@ class LoginController extends Controller
             'password' => 'required|string',
         ]);
 
-        // On a shared host (localhost / a central domain) the URL doesn't identify
-        // the tenant, so take it from the account being signed into. TenantResolver
-        // reads it from the session on this and every following request, which also
-        // lets TenantAwareUserProvider accept the user for their own tenant.
-        if (
-            !$request->hasHeader(config('tenancy.header'))
-            && in_array($request->getHost(), config('tenancy.central_domains'), true)
-        ) {
+        // On shared hosts, central domains, or any common login entry where the URL
+        // doesn't isolate the tenant, resolve the tenant from the user account credentials.
+        if (! $request->hasHeader(config('tenancy.header'))) {
             $tenantSlug = app(LoginTenantLocator::class)->slugFor($credentials['email'], $credentials['password']);
 
             if ($tenantSlug !== null) {
                 $request->session()->put('tenant_slug', $tenantSlug);
+
+                $resolvedTenant = \App\Models\Tenant::query()
+                    ->where('slug', $tenantSlug)
+                    ->whereIn('status', \App\Models\Tenant::accessibleStatuses())
+                    ->first();
+
+                if ($resolvedTenant !== null) {
+                    app(\App\Core\Tenant\TenantContext::class)->set($resolvedTenant);
+                    app(\App\Support\Tenancy::class)->set($resolvedTenant);
+                }
             }
         }
 

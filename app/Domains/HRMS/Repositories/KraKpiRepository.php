@@ -134,7 +134,9 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         // Master Dropdown Data
         $departments = Department::where('tenant_id', $tenantId)->orderBy('name')->get();
         $designations = Designation::where('tenant_id', $tenantId)->orderBy('name')->get();
-        $employees = Employee::where('tenant_id', $tenantId)->where('status', true)->orderBy('full_name')->get();
+        $employees = $isHrOrAdmin
+            ? Employee::where('tenant_id', $tenantId)->where('status', true)->orderBy('full_name')->get(['id', 'employee_id', 'full_name', 'department_id', 'designation_id'])
+            : ($currentEmployee ? Employee::where('id', $currentEmployee->id)->get(['id', 'employee_id', 'full_name', 'department_id', 'designation_id']) : collect());
 
         // 6. Summary Statistics
         $totalPlansCount = EmployeeGoalPlan::where('tenant_id', $tenantId)->count();

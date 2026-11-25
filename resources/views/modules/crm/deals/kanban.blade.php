@@ -12,6 +12,22 @@
         overflow-x: auto;
         padding-bottom: 1.5rem;
         min-height: calc(100vh - 220px);
+        scrollbar-width: thin;
+        scrollbar-color: #94a3b8 #f1f5f9;
+    }
+    .kanban-board-container::-webkit-scrollbar {
+        height: 10px;
+    }
+    .kanban-board-container::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 6px;
+    }
+    .kanban-board-container::-webkit-scrollbar-thumb {
+        background: #94a3b8;
+        border-radius: 6px;
+    }
+    .kanban-board-container::-webkit-scrollbar-thumb:hover {
+        background: #64748b;
     }
     .kanban-column {
         flex: 0 0 320px;

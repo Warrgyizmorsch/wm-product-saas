@@ -606,6 +606,26 @@ class AppServiceProvider extends ServiceProvider
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(180)->by($productionRateLimitKey($request));
         });
 
+        // ── HRMS Module Named API Rate Limiters ─────────────────────────────
+        \Illuminate\Support\Facades\RateLimiter::for('hrms-api', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
+            $user = $request->user();
+            $isIntegration = $user && (
+                $user->tokenCan('integration') ||
+                $user->tokenCan('service-account') ||
+                $user->tokenCan('biometric-sync') ||
+                $request->header('X-Client-Type') === 'integration' ||
+                str_contains($request->path(), 'biometric')
+            );
+
+            // Integrations and automated sync machines receive 1000 requests/minute
+            if ($isIntegration) {
+                return \Illuminate\Cache\RateLimiting\Limit::perMinute(1000)->by($productionRateLimitKey($request));
+            }
+
+            // Normal clients receive 180 requests/minute to comfortably absorb bursts without 429 errors
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(180)->by($productionRateLimitKey($request));
+        });
+
         // ── Cross-module morph map (Journal.reference_type/reference_id) ───────
         // Journal::reference() is a real morphTo(); these short, stable keys are
         // what gets stored in reference_type, never the FQCN. Using morphMap()

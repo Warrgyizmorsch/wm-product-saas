@@ -61,8 +61,14 @@ class DatabaseSeeder extends Seeder
             // // Kept for future Poona Radiators demo usage:
             // // PoonaRadiatorsProductSeeder::class,
 
-            TableManufacturingProductSeeder::class,
+            // Test-data reset, in this order: empty the HR / production / inventory tables, let HRMS fill its own data
+            // into empty tables (so its ids never drift), then add our masters on top.
+            // TableManufacturingProductSeeder is no longer called: AddTestMastersSeeder provides its units and warehouses,
+            // ProductionE2EDemoSeeder (last) adds the test production data on top.
+            CleanBeforeHrmsSeeder::class,
             HrmsDemoSeeder::class,
+            AddTestMastersSeeder::class,
+            ProductionE2EDemoSeeder::class, // the test production data (products, employees, work centres, routings, BOMs, orders)
         ]);
 
         // Same default masters a tenant created from Tenant Console gets, for every

@@ -340,13 +340,13 @@ class DocumentApiController extends Controller
 
             if ($request->hasFile('hr_signature_file') && $request->file('hr_signature_file')->isValid()) {
                 $file = $request->file('hr_signature_file');
-                $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'public');
-                $hrSigUrl = asset('storage/' . $hrSigPath);
+                $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'local');
+                $hrSigUrl = $hrSigPath;
                 $hrSigImageInput = $hrSigPath;
             } elseif ($request->hasFile('signature_image') && $request->file('signature_image')->isValid()) {
                 $file = $request->file('signature_image');
-                $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'public');
-                $hrSigUrl = asset('storage/' . $hrSigPath);
+                $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'local');
+                $hrSigUrl = $hrSigPath;
                 $hrSigImageInput = $hrSigPath;
             } elseif ($request->filled('hr_signature_data') || $request->filled('signature_image')) {
                 $hrSigData = $request->input('hr_signature_data') ?? $request->input('signature_image');
@@ -354,8 +354,8 @@ class DocumentApiController extends Controller
                     $image = str_replace(' ', '+', preg_replace('/^data:image\/\w+;base64,/', '', $hrSigData));
                     $imageName = 'hr_sig_' . time() . '_' . \Str::random(6) . '.png';
                     $hrSigPath = "signatures/hr_tenant_{$tenantId}/{$imageName}";
-                    \tenant_storage()->put('public', $hrSigPath, base64_decode($image));
-                    $hrSigUrl = asset('storage/' . $hrSigPath);
+                    \tenant_storage()->put('local', $hrSigPath, base64_decode($image));
+                    $hrSigUrl = $hrSigPath;
                     $hrSigImageInput = $hrSigPath;
                 } else {
                     $hrSigUrl = $hrSigData;
@@ -393,7 +393,7 @@ class DocumentApiController extends Controller
 
                 $fileName = \Str::slug($docTemplate->name . '-' . $employee->full_name) . '-' . time() . '.pdf';
                 $path = "documents/tenant_{$tenantId}/employee_{$employee->id}/{$fileName}";
-                \tenant_storage()->put('public', $path, $pdfContent);
+                \tenant_storage()->put('local', $path, $pdfContent);
 
                 $masterId = null;
                 if ($docTemplate->document_category_id) {
@@ -475,7 +475,7 @@ class DocumentApiController extends Controller
                 continue;
             }
 
-            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'local');
 
             $document = Document::where('documentable_type', Employee::class)
                 ->where('documentable_id', $employee->id)
@@ -550,7 +550,7 @@ class DocumentApiController extends Controller
         $approvalRequired = (bool) $documentMaster->approval_required;
         $status = $requiresSignature ? 'pending_signature' : ($approvalRequired ? 'uploaded' : 'approved');
 
-        $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+        $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'local');
 
         $document = Document::where('documentable_type', Employee::class)
             ->where('documentable_id', $employee->id)
@@ -698,13 +698,13 @@ class DocumentApiController extends Controller
             $file = $request->file('signature_file');
             $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
             $userId = auth()->id() ?? 'guest';
-            $path = $file->storeTenantFile("signatures/tenant_{$tenantId}/user_{$userId}", 'public');
+            $path = $file->storeTenantFile("signatures/tenant_{$tenantId}/user_{$userId}", 'local');
             $signatureInput = $path;
         } elseif ($request->hasFile('signature_image') && $request->file('signature_image')->isValid()) {
             $file = $request->file('signature_image');
             $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
             $userId = auth()->id() ?? 'guest';
-            $path = $file->storeTenantFile("signatures/tenant_{$tenantId}/user_{$userId}", 'public');
+            $path = $file->storeTenantFile("signatures/tenant_{$tenantId}/user_{$userId}", 'local');
             $signatureInput = $path;
         } else {
             $validator = Validator::make($request->all(), [
@@ -780,7 +780,7 @@ class DocumentApiController extends Controller
             $file = $request->file('hr_signature_file');
             $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
             $userId = auth()->id() ?? 'guest';
-            $sigInput = $file->storeTenantFile("signatures/tenant_{$tenantId}/user_{$userId}", 'public');
+            $sigInput = $file->storeTenantFile("signatures/tenant_{$tenantId}/user_{$userId}", 'local');
         }
 
         // Support single or all employees
@@ -826,5 +826,160 @@ class DocumentApiController extends Controller
             'Document(s) generated and signed successfully from template.',
             201
         );
+    }
+
+    /**
+     * POST /api/hrms/documents/user/signature
+     * Update or save digital signature for the authenticated user.
+     */
+    public function updateUserSignature(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $user = auth()->user();
+        if (!$user) {
+            return $this->sendError('Unauthenticated.', 401);
+        }
+
+        $request->validate([
+            'signature_image' => 'nullable|string',
+            'signature_file'  => 'nullable|file|mimes:png,jpg,jpeg,webp|max:5120',
+        ]);
+
+        $signaturePath = null;
+        if ($request->hasFile('signature_file') && $request->file('signature_file')->isValid()) {
+            $file = $request->file('signature_file');
+            $tenantId = tenant_id() ?? $user->tenant_id ?? 1;
+            $userId = $user->id;
+            $signaturePath = $file->storeTenantFile("signatures/tenant_{$tenantId}/user_{$userId}", 'local');
+        } elseif ($request->filled('signature_image')) {
+            $signaturePath = $this->documentSignatureService->saveSignatureImage($request->input('signature_image'), $user);
+        }
+
+        if (!$signaturePath) {
+            return $this->sendError('No valid signature image or file provided.', 422);
+        }
+
+        $settings = is_array($user->settings) ? $user->settings : json_decode($user->settings ?? '{}', true) ?? [];
+        $settings['signature_path'] = $signaturePath;
+        $user->settings = $settings;
+        $user->save();
+
+        return $this->sendSuccess([
+            'signature_path' => $signaturePath,
+            'user_id'        => $user->id,
+        ], 'User signature updated successfully.');
+    }
+
+    /**
+     * Securely stream or view document file.
+     */
+    public function viewFile(Request $request, $id)
+    {
+        $document = Document::findOrFail($id);
+        $this->authorizeDocumentAccess($document);
+
+        $type = $request->query('type');
+        $path = match ($type) {
+            'signed' => $document->signed_file_path ?: $document->file_path,
+            'signature' => $document->signature_metadata['signature_path'] ?? null,
+            default => $document->file_path,
+        };
+
+        return $this->streamFile($path, $document->file_name ?? basename($path ?? 'document'), false);
+    }
+
+    /**
+     * Securely download document file.
+     */
+    public function downloadFile(Request $request, $id)
+    {
+        $document = Document::findOrFail($id);
+        $this->authorizeDocumentAccess($document);
+
+        $type = $request->query('type');
+        $path = match ($type) {
+            'signed' => $document->signed_file_path ?: $document->file_path,
+            'signature' => $document->signature_metadata['signature_path'] ?? null,
+            default => $document->file_path,
+        };
+
+        return $this->streamFile($path, $document->file_name ?? basename($path ?? 'document'), true);
+    }
+
+    /**
+     * Authorize access to document file.
+     */
+    private function authorizeDocumentAccess(Document $document): void
+    {
+        $user = auth()->user();
+        if (!$user) {
+            abort(401, 'Unauthenticated.');
+        }
+
+        $tenantId = tenant_id() ?? $user->tenant_id;
+        if ($document->tenant_id && $tenantId && (int) $document->tenant_id !== (int) $tenantId) {
+            abort(403, 'Unauthorized tenant access.');
+        }
+
+        $isOwner = false;
+        if ($document->documentable_type === Employee::class || !$document->documentable_type) {
+            $currentEmployee = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->resolveEmployee($user);
+            if ($currentEmployee && (int) $document->documentable_id === (int) $currentEmployee->id) {
+                $isOwner = true;
+            } elseif ($user->employee?->id === (int) $document->documentable_id || $user->id === $document->documentable?->user_id) {
+                $isOwner = true;
+            }
+        }
+
+        if (!$isOwner) {
+            $access = app(\App\Services\Access\AccessService::class);
+            $canView = $access->allows($user, 'hrms.documents.view', ['tenant_id' => $tenantId])
+                || $access->allows($user, 'hrms.documents.manage', ['tenant_id' => $tenantId])
+                || $access->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
+                || $access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
+                || ($user->isCompanyAdmin() ?? false);
+
+            if (!$canView) {
+                abort(403, 'You do not have permission to view or download this document.');
+            }
+        }
+    }
+
+    /**
+     * Stream or download a file from local or fallback public disk.
+     */
+    private function streamFile(?string $path, string $fileName, bool $isDownload)
+    {
+        if (!$path) {
+            abort(404, 'File path not specified.');
+        }
+
+        $disk = null;
+        if (\Illuminate\Support\Facades\Storage::disk('local')->exists($path)) {
+            $disk = 'local';
+        } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+            $disk = 'public';
+        }
+
+        if (!$disk) {
+            abort(404, 'Document file not found.');
+        }
+
+        $storage = \Illuminate\Support\Facades\Storage::disk($disk);
+        $mimeType = $storage->mimeType($path) ?: 'application/octet-stream';
+
+        if ($isDownload) {
+            return $storage->download($path, $fileName, [
+                'Content-Type' => $mimeType,
+            ]);
+        }
+
+        return $storage->response($path, $fileName, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . addslashes($fileName) . '"',
+        ]);
     }
 }

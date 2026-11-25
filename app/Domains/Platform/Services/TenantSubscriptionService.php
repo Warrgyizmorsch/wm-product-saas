@@ -397,6 +397,24 @@ class TenantSubscriptionService
             $suspended++;
         }
 
+        // Suspend tenants whose trial has expired and who have not purchased an active subscription
+        Tenant::query()
+            ->whereIn('subscription_status', [Tenant::SUBSCRIPTION_TRIAL])
+            ->whereNotNull('trial_ends_at')
+            ->where('trial_ends_at', '<=', now())
+            ->each(function (Tenant $tenant) use (&$suspended): void {
+                $hasActiveSubscription = TenantSubscription::query()
+                    ->withoutGlobalScope('tenant')
+                    ->where('tenant_id', $tenant->id)
+                    ->whereIn('status', TenantSubscription::LIVE_STATUSES)
+                    ->exists();
+
+                if (! $hasActiveSubscription) {
+                    $this->lock($tenant->id);
+                    $suspended++;
+                }
+            });
+
         // ended() leaves the tenant `cancelled` while its last paid period runs on.
         Tenant::query()
             ->where('subscription_status', Tenant::SUBSCRIPTION_CANCELLED)

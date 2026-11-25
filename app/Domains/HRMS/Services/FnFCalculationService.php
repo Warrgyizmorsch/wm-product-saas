@@ -30,12 +30,9 @@ class FnFCalculationService
         $daysInMonth = $lwdCarbon->daysInMonth;
         
         // 1. Calculate Monthly Salary & Daily Wage
-        $monthlySalary = floatval($employee->current_salary ?: 0.00);
-        // Annual CTC conversion if salary > 100,000 (often stored as annual in some orgs)
-        $monthlyGross = $monthlySalary;
-        if ($monthlySalary > 200000) {
-            $monthlyGross = round($monthlySalary / 12.0, 2);
-        }
+        // In AstraERP HRMS, employee current_salary represents Annual CTC (consistent with PayrollCalculationService)
+        $annualSalary = floatval($employee->current_salary ?: 0.00);
+        $monthlyGross = round($annualSalary / 12.0, 2);
         $dailyWage = round($monthlyGross / max(1, $daysInMonth), 2);
 
         // 2. Calculate Unpaid Days in Exit Month (from start of month up to LWD)

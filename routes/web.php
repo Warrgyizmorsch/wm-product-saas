@@ -32,8 +32,10 @@ Route::match(['get', 'post'], '/api/webhooks/meta-leadgen', [\App\Domains\Platfo
 
 // Public Biometric ADMS Webhook Route (for physical terminals pushing punch records)
 Route::match(['get', 'post'], '/api/hrms/biometric/webhook', [\App\Domains\HRMS\Controllers\Api\BiometricWebhookController::class, 'handleAdmsRequest'])
+    ->middleware('throttle:60,1')
     ->name('api.hrms.biometric.webhook');
 Route::match(['get', 'post'], '/hrms/biometric/webhook', [\App\Domains\HRMS\Controllers\Api\BiometricWebhookController::class, 'handleAdmsRequest'])
+    ->middleware('throttle:60,1')
     ->name('hrms.biometric.webhook');
 // Public Web-to-Lead Form, Floating Widget JS & API Endpoints
 Route::get('/forms/lead-capture/{tenant}', [\App\Domains\CRM\Controllers\WebToLeadController::class, 'renderForm'])
@@ -61,6 +63,9 @@ Route::middleware(['tenant'])->group(function (): void {
     Route::post('/login', [LoginController::class, 'store'])
         ->middleware('throttle:5,1')
         ->name('login.store');
+
+    Route::get('/password/reset/{token}', [LoginController::class, 'showResetForm'])->name('password.reset');
+    Route::post('/password/reset', [LoginController::class, 'resetPassword'])->name('password.update.reset');
 
     // Public RFQ Vendor Portal
     Route::middleware(['throttle:30,1'])->group(function (): void {

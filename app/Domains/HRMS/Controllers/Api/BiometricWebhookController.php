@@ -66,11 +66,25 @@ class BiometricWebhookController extends Controller
                 continue;
             }
 
+            $currentTenantId = $tenantId ?? $employee->tenant_id;
+            $punchTimeStr = $punchTime->toDateTimeString();
+
+            // De-duplicate: ignore if exact same punch time and type already exists for this employee
+            $isDuplicate = BiometricPunchLog::where('tenant_id', $currentTenantId)
+                ->where('employee_id', $employee->id)
+                ->where('punch_time', $punchTimeStr)
+                ->where('punch_type', $log['punch_type'])
+                ->exists();
+
+            if ($isDuplicate) {
+                continue;
+            }
+
             $recordsToInsert[] = [
-                'tenant_id'           => $tenantId ?? $employee->tenant_id,
+                'tenant_id'           => $currentTenantId,
                 'biometric_device_id' => $validated['biometric_device_id'] ?? null,
                 'employee_id'         => $employee->id,
-                'punch_time'          => $punchTime->toDateTimeString(),
+                'punch_time'          => $punchTimeStr,
                 'punch_type'          => $log['punch_type'],
                 'processed'           => false,
                 'raw_data'            => json_encode(array_merge($log, ['ip' => $request->ip()])),
@@ -94,10 +108,17 @@ class BiometricWebhookController extends Controller
         }
 
         foreach ($affectedPairs as $pair) {
-            \App\Domains\HRMS\Jobs\ProcessBiometricAttendance::dispatch(
-                $pair['employee_id'],
-                $pair['date']
-            )->afterResponse();
+            if (app()->environment('testing')) {
+                \App\Domains\HRMS\Jobs\ProcessBiometricAttendance::dispatchSync(
+                    $pair['employee_id'],
+                    $pair['date']
+                );
+            } else {
+                \App\Domains\HRMS\Jobs\ProcessBiometricAttendance::dispatch(
+                    $pair['employee_id'],
+                    $pair['date']
+                )->afterResponse();
+            }
         }
 
         return response()->json([
@@ -117,9 +138,28 @@ class BiometricWebhookController extends Controller
             return response("registry=not_found\n", 400);
         }
 
+        $providedSecret = $request->header('X-Device-Secret')
+            ?? $request->header('X-Webhook-Secret')
+            ?? $request->bearerToken()
+            ?? $request->query('secret')
+            ?? $request->input('secret')
+            ?? $request->query('token')
+            ?? $request->input('token')
+            ?? $request->query('key')
+            ?? $request->input('key');
+
         $device = BiometricDevice::withoutGlobalScopes()->where('device_serial', $serialNumber)->first();
+
+        // Eliminate serial oracle: reject unknown devices with the same 401 response
         if (!$device) {
-            return response("registry=not_found\n", 404);
+            return response("Unauthorized\n", 401);
+        }
+
+        $expectedSecret = $device->webhook_secret
+            ?: (config('services.biometric.webhook_secret') ?: hash_hmac('sha256', (string) $device->device_serial, (string) config('app.key')));
+
+        if (empty($providedSecret) || !hash_equals((string) $expectedSecret, (string) $providedSecret)) {
+            return response("Unauthorized\n", 401);
         }
 
         $device->update(['last_ping_at' => now()]);
@@ -189,11 +229,24 @@ class BiometricWebhookController extends Controller
                 continue;
             }
 
+            $punchTimeStr = $punchTime->toDateTimeString();
+
+            // De-duplicate: ignore if exact same punch time and type already exists
+            $isDuplicate = BiometricPunchLog::where('tenant_id', $device->tenant_id)
+                ->where('employee_id', $employee->id)
+                ->where('punch_time', $punchTimeStr)
+                ->where('punch_type', $punchType)
+                ->exists();
+
+            if ($isDuplicate) {
+                continue;
+            }
+
             $recordsToInsert[] = [
                 'tenant_id'           => $device->tenant_id,
                 'biometric_device_id' => $device->id,
                 'employee_id'         => $employee->id,
-                'punch_time'          => $punchTime->toDateTimeString(),
+                'punch_time'          => $punchTimeStr,
                 'punch_type'          => $punchType,
                 'processed'           => false,
                 'raw_data'            => json_encode(['raw_line' => $line]),
@@ -217,10 +270,17 @@ class BiometricWebhookController extends Controller
         }
 
         foreach ($affectedPairs as $pair) {
-            \App\Domains\HRMS\Jobs\ProcessBiometricAttendance::dispatch(
-                $pair['employee_id'],
-                $pair['date']
-            )->afterResponse();
+            if (app()->environment('testing')) {
+                \App\Domains\HRMS\Jobs\ProcessBiometricAttendance::dispatchSync(
+                    $pair['employee_id'],
+                    $pair['date']
+                );
+            } else {
+                \App\Domains\HRMS\Jobs\ProcessBiometricAttendance::dispatch(
+                    $pair['employee_id'],
+                    $pair['date']
+                )->afterResponse();
+            }
         }
 
         return response("OK\n");

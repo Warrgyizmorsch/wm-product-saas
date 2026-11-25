@@ -33,6 +33,7 @@ class HrmsBiometricIntegrationTest extends TestCase
             'name'      => 'Admin User',
             'email'     => 'admin@example.com',
             'password'  => bcrypt('password'),
+            'role'      => 'admin',
         ]);
     }
 
@@ -271,12 +272,13 @@ class HrmsBiometricIntegrationTest extends TestCase
         app(\App\Core\Tenant\TenantContext::class)->set($this->tenant);
 
         $device = BiometricDevice::create([
-            'tenant_id'     => $this->tenant->id,
-            'company_id'    => $employee->company_id,
-            'name'          => 'Plant ADMS Terminal',
-            'device_serial' => 'ADMS-SN-998877',
-            'status'        => true,
-            'port'          => 4370,
+            'tenant_id'      => $this->tenant->id,
+            'company_id'     => $employee->company_id,
+            'name'           => 'Plant ADMS Terminal',
+            'device_serial'  => 'ADMS-SN-998877',
+            'webhook_secret' => 'test-device-secret-123',
+            'status'         => true,
+            'port'           => 4370,
         ]);
 
         // Push tab-separated records via ADMS webhook
@@ -284,7 +286,7 @@ class HrmsBiometricIntegrationTest extends TestCase
 
         $response = $this->call(
             'POST',
-            route('api.hrms.biometric.webhook', ['SN' => 'ADMS-SN-998877']),
+            route('api.hrms.biometric.webhook', ['SN' => 'ADMS-SN-998877', 'secret' => 'test-device-secret-123']),
             [],
             [],
             [],

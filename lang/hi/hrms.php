@@ -1838,7 +1838,7 @@ return [
         'lbl_search_wfh_location' => 'पता या उप-क्षेत्र खोजें (Enter दबाएं)...',
         'edit_profile' => 'प्रोफ़ाइल संपादित करें',
         'frm_user_account' => 'उपयोगकर्ता खाता',
-        'frm_auto_create_user' => 'स्वतः नया उपयोगकर्ता बनाएं (पासवर्ड: 12345678)',
+        'frm_auto_create_user' => 'स्वतः नया उपयोगकर्ता बनाएं',
         'lbl_no_email' => 'कोई ईमेल नहीं',
         'lbl_no_employees_found' => 'कोई कर्मचारी नहीं मिला।',
         'lbl_no_employees_hint' => 'अपना पहला कर्मचारी रिकॉर्ड बनाएं या फ़िल्टर विस्तृत करें।',

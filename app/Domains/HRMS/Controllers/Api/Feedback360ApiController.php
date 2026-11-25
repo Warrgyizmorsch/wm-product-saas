@@ -231,7 +231,8 @@ class Feedback360ApiController extends Controller
                 'end_date'   => $cycle->end_date ? (is_string($cycle->end_date) ? substr($cycle->end_date, 0, 10) : $cycle->end_date->format('Y-m-d')) : null,
             ], 'Feedback cycle created successfully.', 201);
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -283,7 +284,8 @@ class Feedback360ApiController extends Controller
                 'end_date'   => $cycle->end_date ? (is_string($cycle->end_date) ? substr($cycle->end_date, 0, 10) : $cycle->end_date->format('Y-m-d')) : null,
             ], 'Feedback cycle updated successfully.');
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -329,7 +331,8 @@ class Feedback360ApiController extends Controller
                 'status' => $cycle->status,
             ], "Cycle stage updated to '{$request->input('status')}'.");
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -355,7 +358,8 @@ class Feedback360ApiController extends Controller
                 'enrolled_count' => $count,
             ], "{$count} participant(s) enrolled into the feedback cycle.");
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -376,7 +380,8 @@ class Feedback360ApiController extends Controller
                 'reminded_count' => $count,
             ], "Reminders sent to {$count} reviewer(s) with pending feedback.");
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -386,6 +391,28 @@ class Feedback360ApiController extends Controller
     public function nominatePeers(Request $request, int $participantId): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+
+        $participant = \App\Domains\HRMS\Models\Feedback360Participant::where('tenant_id', $tenantId)->find($participantId);
+        if (!$participant) {
+            return $this->sendError("Participant not found.", 404);
+        }
+
+        $currentEmployee = $this->feedbackRepository->resolveEmployee($user, $tenantId);
+        $isHrAdmin = $this->feedbackRepository->isHrAdminUser($user, $tenantId);
+        $isDirectManager = $currentEmployee && (
+            $participant->manager_id === $currentEmployee->id ||
+            $participant->employee?->reporting_manager_id === $currentEmployee->id
+        );
+        $isScopedManager = false;
+        if ($currentEmployee && $participant->employee_id && (int) $participant->employee_id !== (int) $currentEmployee->id) {
+            $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $participant->employee_id);
+        }
+        $isManager = $isDirectManager || $isScopedManager;
+        $isSelf = $currentEmployee && ($participant->employee_id === $currentEmployee->id);
+
+        if (!$isHrAdmin && !$isManager && !$isSelf) {
+            return $this->sendError("Unauthorized to nominate reviewers for this employee.", 403);
+        }
 
         $request->validate([
             'peer_ids'            => 'nullable|array',
@@ -408,7 +435,8 @@ class Feedback360ApiController extends Controller
                 'nominated_count' => count($nominations),
             ], 'Reviewers nominated successfully.');
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -418,13 +446,17 @@ class Feedback360ApiController extends Controller
     public function destroyNomination(int $nominationId): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         try {
             $this->feedbackRepository->deleteNomination($nominationId, $tenantId, $user);
 
             return $this->sendSuccess(null, 'Rater successfully removed from feedback roster.');
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -434,6 +466,9 @@ class Feedback360ApiController extends Controller
     public function addRater(Request $request, int $participantId): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'reviewer_id'   => 'required|exists:employees,id',
@@ -456,7 +491,8 @@ class Feedback360ApiController extends Controller
                 'status'        => $nom->status,
             ], 'Reviewer added to evaluation roster.');
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -466,6 +502,14 @@ class Feedback360ApiController extends Controller
     public function approveNomination(Request $request, int $nominationId): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+
+        $currentEmployee = $this->feedbackRepository->resolveEmployee($user, $tenantId);
+        $isHrAdmin = $this->feedbackRepository->isHrAdminUser($user, $tenantId);
+        $isManager = $currentEmployee && $currentEmployee->directReports()->exists();
+
+        if (!$isHrAdmin && !$isManager) {
+            return $this->sendError("Unauthorized to approve nominations.", 403);
+        }
 
         $request->validate([
             'action' => 'required|in:approve,reject',
@@ -487,7 +531,8 @@ class Feedback360ApiController extends Controller
                 'status' => $nomination->status,
             ], $isApproved ? 'Nomination approved.' : 'Nomination rejected.');
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -497,6 +542,14 @@ class Feedback360ApiController extends Controller
     public function batchApproveNominations(Request $request): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+
+        $currentEmployee = $this->feedbackRepository->resolveEmployee($user, $tenantId);
+        $isHrAdmin = $this->feedbackRepository->isHrAdminUser($user, $tenantId);
+        $isManager = $currentEmployee && $currentEmployee->directReports()->exists();
+
+        if (!$isHrAdmin && !$isManager) {
+            return $this->sendError("Unauthorized to approve nominations.", 403);
+        }
 
         $request->validate([
             'nomination_ids'   => 'required|array',
@@ -520,7 +573,8 @@ class Feedback360ApiController extends Controller
                 'processed_count' => $count,
             ], "{$count} peer nomination(s) {$actionWord} successfully.");
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -592,7 +646,8 @@ class Feedback360ApiController extends Controller
                 : 'Your 360-degree feedback evaluation was submitted successfully.'
             );
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -657,7 +712,8 @@ class Feedback360ApiController extends Controller
                 'published_at' => $participant->published_at?->format('Y-m-d H:i:s'),
             ], '360° Evaluation Report has been published and made available to the employee.');
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -687,7 +743,8 @@ class Feedback360ApiController extends Controller
                 'name' => $comp->name,
             ], 'Competency created successfully.', 201);
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 
@@ -730,7 +787,8 @@ class Feedback360ApiController extends Controller
                 'question_type' => $q->question_type,
             ], 'Question added to feedback library.', 201);
         } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 422);
+            $code = str_contains($e->getMessage(), 'Unauthorized') ? 403 : 422;
+            return $this->sendError($e->getMessage(), $code);
         }
     }
 

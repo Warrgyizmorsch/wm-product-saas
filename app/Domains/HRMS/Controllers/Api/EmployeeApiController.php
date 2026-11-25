@@ -167,7 +167,14 @@ class EmployeeApiController extends Controller
         $authEmployee = $this->getAuthenticatedEmployee();
 
         $query = Employee::query()
-            ->with(['company', 'businessUnit', 'branch', 'department', 'designation', 'payGroup', 'salaryStructure', 'leavePlan', 'defaultShift', 'shift', 'user']);
+            ->with([
+                'company:id,company_name',
+                'businessUnit:id,name',
+                'branch:id,name',
+                'department:id,name',
+                'designation:id,name',
+                'user:id,name,email,avatar'
+            ]);
 
         if (!$isHrAdmin) {
             if (!$authEmployee) {
@@ -210,6 +217,36 @@ class EmployeeApiController extends Controller
         }
 
         $employees = $query->paginate($request->integer('per_page', 10));
+
+        $employees->getCollection()->transform(function (Employee $emp) {
+            return [
+                'id'                     => $emp->id,
+                'employee_code'          => $emp->employee_code,
+                'full_name'              => $emp->full_name,
+                'office_email'           => $emp->office_email,
+                'personal_email'         => $emp->personal_email,
+                'personal_mobile_number' => $emp->personal_mobile_number,
+                'job_title'              => $emp->job_title,
+                'role'                   => $emp->role,
+                'employee_stage'         => $emp->employee_stage,
+                'employment_type'        => $emp->employment_type,
+                'date_of_joining'        => $emp->date_of_joining?->format('Y-m-d'),
+                'office'                 => $emp->office,
+                'status'                 => (bool) $emp->status,
+                'avatar_url'             => $emp->avatar_url,
+                'photo'                  => $emp->photo,
+                'company_id'             => $emp->company_id,
+                'company_name'           => $emp->company?->company_name,
+                'business_unit_id'       => $emp->business_unit_id,
+                'business_unit_name'     => $emp->businessUnit?->name,
+                'branch_id'              => $emp->branch_id,
+                'branch_name'            => $emp->branch?->name,
+                'department_id'          => $emp->department_id,
+                'department_name'        => $emp->department?->name,
+                'designation_id'         => $emp->designation_id,
+                'designation_name'       => $emp->designation?->name,
+            ];
+        });
 
         return $this->sendSuccess($employees, 'Employees list retrieved successfully');
     }
@@ -321,6 +358,15 @@ class EmployeeApiController extends Controller
         ]);
 
         $shiftObj = $employee->defaultShift ?: $employee->shift;
+
+        if ($isHrAdmin || ($authEmployee && (int)$employee->id === (int)$authEmployee->id)) {
+            $employee->makeVisible([
+                'aadhaar_card_number', 'pan_card_number', 'account_number', 'ifsc_code', 'bank_name',
+                'current_salary', 'date_of_birth', 'personal_mobile_number', 'present_address', 'permanent_address',
+                'uan_number', 'esi_ip_number',
+            ]);
+        }
+
         $employeeData = $employee->toArray();
         $employeeData['shift'] = $shiftObj ? [
             'id'            => $shiftObj->id,
@@ -373,36 +419,9 @@ class EmployeeApiController extends Controller
 
         try {
             $userIdInput = $request->input('user_id');
-            if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
-                if ($request->filled('office_email')) {
-                    $existingUser = \App\Models\User::where('email', $request->office_email)->first();
-                    if ($existingUser) {
-                        $request->merge(['user_id' => $existingUser->id]);
-                    } else {
-                        $newUser = \App\Models\User::create([
-                            'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id'),
-                            'company_id'    => $request->input('company_id'),
-                            'branch_id'     => $request->input('branch_id'),
-                            'department_id' => $request->input('department_id'),
-                            'role_id'       => $request->input('role_id'),
-                            'name'          => $request->input('full_name'),
-                            'email'         => $request->input('office_email'),
-                            'password'      => \Illuminate\Support\Facades\Hash::make('12345678'),
-                        ]);
-                        $request->merge(['user_id' => $newUser->id]);
-                    }
-                }
-            } elseif ($request->filled('user_id')) {
-                $targetUser = \App\Models\User::find($request->user_id);
-                if ($targetUser) {
-                    if (!$request->filled('full_name')) {
-                        $request->merge(['full_name' => $targetUser->name]);
-                    }
-                    if (!$request->filled('personal_email')) {
-                        $request->merge(['personal_email' => $targetUser->email]);
-                    }
-                    $request->merge(['office_email' => $targetUser->email]);
-                }
+            $isAutoCreate = empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new';
+            if ($isAutoCreate) {
+                $request->merge(['user_id' => null]);
             }
 
             $validated = $this->validatePayload($request);
@@ -413,13 +432,75 @@ class EmployeeApiController extends Controller
                 $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
             }
 
-            $employee = Employee::create($validated);
+            $setupToken = null;
+            $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? $request->input('tenant_id') ?? 1;
 
-            if ($request->filled('role_id') && $employee->user) {
-                $employee->user->update(['role_id' => $request->role_id]);
+            $employee = \Illuminate\Support\Facades\DB::transaction(function () use ($request, &$validated, &$setupToken, $tenantId, $isAutoCreate) {
+                if ($isAutoCreate) {
+                    $userEmail = $request->input('office_email') ?: $request->input('personal_email');
+                    if (!empty($userEmail)) {
+                        $existingUser = \App\Models\User::where('tenant_id', $tenantId)->where('email', $userEmail)->first()
+                            ?: \App\Models\User::where('email', $userEmail)->first();
+                        if ($existingUser) {
+                            $validated['user_id'] = $existingUser->id;
+                            if (empty($validated['office_email'])) {
+                                $validated['office_email'] = $existingUser->email;
+                            }
+                        } else {
+                            $newUser = \App\Models\User::create([
+                                'tenant_id'     => $tenantId,
+                                'company_id'    => $validated['company_id'] ?? $request->input('company_id'),
+                                'branch_id'     => $validated['branch_id'] ?? $request->input('branch_id'),
+                                'department_id' => $validated['department_id'] ?? $request->input('department_id'),
+                                'role_id'       => $request->input('role_id'),
+                                'name'          => $validated['full_name'] ?? $request->input('full_name'),
+                                'email'         => $userEmail,
+                                'password'      => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
+                            ]);
+                            $validated['user_id'] = $newUser->id;
+                            if (empty($validated['office_email'])) {
+                                $validated['office_email'] = $userEmail;
+                            }
+
+                            try {
+                                $setupToken = \Illuminate\Support\Facades\Password::broker()->createToken($newUser);
+                            } catch (\Throwable $e) {
+                                \Illuminate\Support\Facades\Log::warning("Could not issue password reset token in API: " . $e->getMessage());
+                            }
+                        }
+                    }
+                } elseif ($request->filled('user_id')) {
+                    $targetUser = \App\Models\User::find($request->user_id);
+                    if ($targetUser) {
+                        $validated['user_id'] = $targetUser->id;
+                        if (empty($validated['full_name'])) {
+                            $validated['full_name'] = $targetUser->name;
+                        }
+                        if (empty($validated['personal_email'])) {
+                            $validated['personal_email'] = $targetUser->email;
+                        }
+                        if (empty($validated['office_email'])) {
+                            $validated['office_email'] = $targetUser->email;
+                        }
+                    }
+                }
+
+                $employee = Employee::create($validated);
+
+                if ($request->filled('role_id') && $employee->user) {
+                    $employee->user->update(['role_id' => $request->role_id]);
+                }
+
+                return $employee;
+            });
+
+            $responseData = $employee->load(['company', 'department', 'designation'])->toArray();
+            if ($setupToken) {
+                $userEmail = $employee->office_email ?: $employee->personal_email;
+                $responseData['setup_url'] = route('password.reset', ['token' => $setupToken, 'email' => $userEmail]);
             }
 
-            return $this->sendSuccess($employee->load(['company', 'department', 'designation']), 'Employee created successfully', 201);
+            return $this->sendSuccess($responseData, 'Employee created successfully', 201);
         } catch (ValidationException $e) {
             return $this->sendError('Validation failed', 422, $e->errors());
         }
@@ -523,6 +604,10 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
+        if (! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll.manage', ['tenant_id' => require_tenant_id()])) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $employee = $this->resolveEmployee($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
@@ -560,6 +645,10 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
+        if (! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll.manage', ['tenant_id' => require_tenant_id()])) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $adhocComponent = EmployeeAdhocComponent::find($id);
         if (!$adhocComponent) {
             return $this->sendError("Ad-hoc salary component with ID '{$id}' not found.", 404);
@@ -578,6 +667,11 @@ class EmployeeApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.penalties.manage', ['tenant_id' => require_tenant_id()])
+            && ! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll.manage', ['tenant_id' => require_tenant_id()])) {
+            return $this->sendError('Forbidden', 403);
         }
 
         $employee = $this->resolveEmployee($id);
@@ -608,6 +702,11 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
+        if (! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.penalties.manage', ['tenant_id' => require_tenant_id()])
+            && ! app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.payroll.manage', ['tenant_id' => require_tenant_id()])) {
+            return $this->sendError('Forbidden', 403);
+        }
+
         $penalty = EmployeePenalty::find($id);
         if (!$penalty) {
             return $this->sendError("Penalty instance with ID '{$id}' not found.", 404);
@@ -626,6 +725,10 @@ class EmployeeApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to manage employment history.', 403);
         }
 
         $employee = $this->resolveEmployee($id);
@@ -652,6 +755,10 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to manage employment history.', 403);
+        }
+
         $history = EmployeeEmploymentHistory::find($historyId);
         if (!$history) {
             return $this->sendError("Employment history record with ID '{$historyId}' not found.", 404);
@@ -675,6 +782,14 @@ class EmployeeApiController extends Controller
         $employee = $this->resolveEmployee($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
+        }
+
+        $user = auth()->user();
+        $authEmployee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+        $isOwner = ($authEmployee && (int)$employee->id === (int)$authEmployee->id) || ($user && (int)$employee->user_id === (int)$user->id);
+        if (!$isHrAdmin && !$isOwner) {
+            return $this->sendError('Unauthorized. You can only upload documents for your own profile or with HR Admin privileges.', 403);
         }
 
         $request->validate([
@@ -707,7 +822,7 @@ class EmployeeApiController extends Controller
                 ]);
             }
 
-            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'local');
 
             $approvalRequired = true;
             if ($document->document_master_id) {
@@ -739,7 +854,7 @@ class EmployeeApiController extends Controller
                 ]);
             }
 
-            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'local');
 
             $approvalRequired = (bool) $documentMaster->approval_required;
             $status = $approvalRequired ? 'uploaded' : 'approved';
@@ -771,13 +886,21 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin() && !auth()->user()?->hasHrPermission('hrms.documents.manage')) {
+            return $this->sendError('Unauthorized action. Admin permissions required to delete employee documents.', 403);
+        }
+
         $document = Document::find($id);
         if (!$document) {
             return $this->sendError("Document record with ID '{$id}' not found.", 404);
         }
 
-        if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
+        if ($document->file_path) {
+            if (Storage::disk('local')->exists($document->file_path)) {
+                Storage::disk('local')->delete($document->file_path);
+            } elseif (Storage::disk('public')->exists($document->file_path)) {
+                Storage::disk('public')->delete($document->file_path);
+            }
         }
 
         $document->delete();
@@ -789,6 +912,10 @@ class EmployeeApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin() && !auth()->user()?->hasHrPermission('hrms.documents.manage')) {
+            return $this->sendError('Unauthorized action. Admin permissions required to approve documents.', 403);
         }
 
         $document = Document::find($id);
@@ -809,6 +936,10 @@ class EmployeeApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin() && !auth()->user()?->hasHrPermission('hrms.documents.manage')) {
+            return $this->sendError('Unauthorized action. Admin permissions required to reject documents.', 403);
+        }
+
         $document = Document::find($id);
         if (!$document) {
             return $this->sendError("Document record with ID '{$id}' not found.", 404);
@@ -825,6 +956,10 @@ class EmployeeApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin() && !auth()->user()?->hasHrPermission('hrms.documents.manage')) {
+            return $this->sendError('Unauthorized action. Admin permissions required to update document status.', 403);
         }
 
         $document = Document::find($id);
@@ -1028,25 +1163,32 @@ class EmployeeApiController extends Controller
                 $userEmail = strtolower($rowData['employee_id']) . '@' . $appHost;
             }
 
-            if (!empty($userEmail)) {
-                $existingUser = \App\Models\User::where('tenant_id', $tenantId)->where('email', $userEmail)->first();
-                if ($existingUser) {
-                    $rowData['user_id'] = $existingUser->id;
-                } else {
-                    $newUser = \App\Models\User::create([
-                        'tenant_id'     => $tenantId,
-                        'company_id'    => $rowData['company_id'],
-                        'department_id' => $rowData['department_id'],
-                        'name'          => $rowData['full_name'],
-                        'email'         => $userEmail,
-                        'password'      => \Illuminate\Support\Facades\Hash::make('password123'),
-                    ]);
-                    $rowData['user_id'] = $newUser->id;
+            \Illuminate\Support\Facades\DB::transaction(function () use (&$rowData, $tenantId, $userEmail, &$importedCount) {
+                if (!empty($userEmail)) {
+                    $existingUser = \App\Models\User::where('tenant_id', $tenantId)->where('email', $userEmail)->first();
+                    if ($existingUser) {
+                        $rowData['user_id'] = $existingUser->id;
+                    } else {
+                        $newUser = \App\Models\User::create([
+                            'tenant_id'     => $tenantId,
+                            'company_id'    => $rowData['company_id'],
+                            'department_id' => $rowData['department_id'],
+                            'name'          => $rowData['full_name'],
+                            'email'         => $userEmail,
+                            'password'      => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
+                        ]);
+                        $rowData['user_id'] = $newUser->id;
+                        try {
+                            \Illuminate\Support\Facades\Password::broker()->createToken($newUser);
+                        } catch (\Throwable $e) {
+                            // ignore token error in bulk import
+                        }
+                    }
                 }
-            }
 
-            Employee::create($rowData);
-            $importedCount++;
+                Employee::create($rowData);
+                $importedCount++;
+            });
         }
 
         fclose($handle);
@@ -1075,18 +1217,18 @@ class EmployeeApiController extends Controller
         }
 
         return $request->validate([
-            'company_id'                  => ['required', 'exists:companies,id'],
-            'business_unit_id'            => ['nullable', 'exists:business_units,id'],
-            'branch_id'                   => ['nullable', 'exists:branches,id'],
-            'department_id'               => ['required', 'exists:departments,id'],
-            'designation_id'              => ['required', 'exists:designations,id'],
+            'company_id'                  => ['required', tenant_exists('companies')],
+            'business_unit_id'            => ['nullable', tenant_exists('business_units')],
+            'branch_id'                   => ['nullable', tenant_exists('branches')],
+            'department_id'               => ['required', tenant_exists('departments')],
+            'designation_id'              => ['required', tenant_exists('designations')],
             'pay_group_id'                => ['nullable', 'exists:pay_groups,id'],
             'leave_plan_id'               => ['nullable', 'exists:leave_plans,id'],
             'leave_transition_action'     => ['nullable', 'string', 'in:transfer,prorate'],
             'leave_transition_unused'     => ['nullable', 'string', 'in:carry,lapse'],
             'employee_id'                 => ['nullable', 'string', 'max:255', Rule::unique('employees', 'employee_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
             'employee_code'               => ['nullable', 'string', 'max:255'],
-            'user_id'                     => ['required', Rule::unique('employees', 'user_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
+            'user_id'                     => ['nullable', Rule::unique('employees', 'user_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
             // Written straight to users.role_id — only roles the acting user may hand out.
             'role_id'                     => ['nullable', Rule::in(auth()->check()
                 ? app(\App\Services\Access\AccessService::class)->assignableRoles(auth()->user(), $tenantId)->pluck('id')->all()
@@ -1107,8 +1249,8 @@ class EmployeeApiController extends Controller
             'gender'                      => ['required', Rule::in(['male', 'female', 'other', 'Male', 'Female', 'Other'])],
             'marital_status'              => ['nullable', Rule::in(['single', 'married', 'divorced', 'widowed', 'Single', 'Married', 'Divorced', 'Widowed'])],
             'diet_preference'             => ['nullable', Rule::in(['veg', 'non veg', 'vegan', 'Veg', 'Non Veg', 'Vegan'])],
-            'aadhaar_card_number'         => ['nullable', 'string', 'max:20', Rule::unique('employees', 'aadhaar_card_number')->ignore($employee?->id)],
-            'pan_card_number'             => ['nullable', 'string', 'max:20', Rule::unique('employees', 'pan_card_number')->ignore($employee?->id)],
+            'aadhaar_card_number'         => ['nullable', 'string', 'max:20', Rule::unique('employees', 'aadhaar_card_number')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
+            'pan_card_number'             => ['nullable', 'string', 'max:20', Rule::unique('employees', 'pan_card_number')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
             'photo'                       => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'present_address'             => ['nullable', 'string'],
             'permanent_address'           => ['nullable', 'string'],
@@ -1116,18 +1258,18 @@ class EmployeeApiController extends Controller
             'postal_code'                 => ['nullable', 'string', 'max:20'],
             'personal_mobile_number'      => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'home_phone'                  => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
-            'personal_email'              => ['nullable', 'email', 'max:255', Rule::unique('employees', 'personal_email')->ignore($employee?->id)],
+            'personal_email'              => ['nullable', 'email', 'max:255', Rule::unique('employees', 'personal_email')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
             'experience'                  => ['nullable', 'numeric', 'min:0'],
             'source_of_hire'              => ['nullable', 'string', 'max:255'],
             'skill_set'                   => ['nullable', 'string'],
-            'current_salary'              => ['nullable', 'numeric', 'min:0'],
+            'current_salary'              => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'qualification'               => ['nullable', 'string', 'max:255'],
             'reporting_manager_id'        => ['nullable', 'integer', 'exists:employees,id'],
             'date_of_birth'               => ['nullable', 'date', 'before_or_equal:today'],
             'probation_end_date'          => ['nullable', 'date'],
             'confirmation_date'           => ['nullable', 'date'],
             'shift_id'                    => ['nullable', 'integer', 'exists:production_shifts,id'],
-            'office_email'                => ['nullable', 'email', 'max:255', Rule::unique('employees', 'office_email')->ignore($employee?->id)],
+            'office_email'                => ['nullable', 'email', 'max:255', Rule::unique('employees', 'office_email')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
             'bank_name'                   => ['nullable', 'string', 'max:255'],
             'account_number'              => ['nullable', 'string', 'max:255'],
             'ifsc_code'                   => ['nullable', 'string', 'max:50'],
@@ -1243,6 +1385,10 @@ class EmployeeApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin() && !auth()->user()?->hasHrPermission('hrms.employees.manage')) {
+            return $this->sendError('Unauthorized action. Admin permissions required to change employee status.', 403);
         }
 
         $employee = $this->resolveEmployee($id);

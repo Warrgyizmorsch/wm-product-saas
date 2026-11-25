@@ -54,9 +54,19 @@ class AttendanceApiController extends Controller
             return false;
         }
 
-        return $user->hasHrPermission('hrms.attendance.view')
-            || $user->hasHrPermission('hrms.attendance.manage')
+        return $user->hasHrPermission('hrms.attendance.manage')
             || $user->hasHrPermission('hr.settings.manage');
+    }
+
+    private function canViewAll(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hrms.attendance.view')
+            || $this->isHrAdmin();
     }
 
     /**
@@ -101,13 +111,13 @@ class AttendanceApiController extends Controller
             return $authError;
         }
 
-        $isHrAdmin = $this->isHrAdmin();
+        $canViewAll = $this->canViewAll();
         $employee = $this->getAuthenticatedEmployee();
-        $defaultDate = (!$isHrAdmin && $employee) ? $employee->local_today : Carbon::today()->format('Y-m-d');
+        $defaultDate = (!$canViewAll && $employee) ? $employee->local_today : Carbon::today()->format('Y-m-d');
         $date = $request->query('date', $defaultDate);
 
         $baseQuery = Attendance::where('date', $date);
-        if (!$isHrAdmin && $employee) {
+        if (!$canViewAll && $employee) {
             $baseQuery->where('employee_id', $employee->id);
         }
 
@@ -197,12 +207,12 @@ class AttendanceApiController extends Controller
         $search = $filters['search'] ?? null;
         $statusFilter = $filters['status'] ?? null;
 
-        $isHrAdmin = $this->isHrAdmin();
+        $canViewAll = $this->canViewAll();
         $employee = $this->getAuthenticatedEmployee();
 
         $query = Attendance::with(['employee.department', 'breaks']);
 
-        if (!$isHrAdmin) {
+        if (!$canViewAll) {
             if (!$employee) {
                 return $this->sendError('Employee profile not found.', 404);
             }
@@ -400,7 +410,12 @@ class AttendanceApiController extends Controller
             'latitude'    => 'nullable|numeric|between:-90,90',
             'longitude'   => 'nullable|numeric|between:-180,180',
             'selfie'      => 'nullable|string',
+            'is_mocked'   => 'nullable|boolean',
         ]);
+
+        if ($request->boolean('is_mocked')) {
+            return $this->sendError('Mock/fake location detected. Please disable mock location apps to record attendance.', 422);
+        }
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
@@ -450,7 +465,7 @@ class AttendanceApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
+        if (!$isHrAdmin && (!$authEmployee || (int) $attendance->employee_id !== (int) $authEmployee->id)) {
             return $this->sendError('Unauthorized action. You can only clock out for yourself.', 403);
         }
 
@@ -459,7 +474,12 @@ class AttendanceApiController extends Controller
             'longitude'      => 'nullable|numeric|between:-180,180',
             'selfie'         => 'nullable|string',
             'route_snapshot' => 'nullable', // supports file upload (image) or base64 string from app
+            'is_mocked'      => 'nullable|boolean',
         ]);
+
+        if ($request->boolean('is_mocked')) {
+            return $this->sendError('Mock/fake location detected. Please disable mock location apps to record attendance.', 422);
+        }
 
         $routeSnapshot = $request->file('route_snapshot') ?? $request->input('route_snapshot');
 
@@ -498,7 +518,7 @@ class AttendanceApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
+        if (!$isHrAdmin && (!$authEmployee || (int) $attendance->employee_id !== (int) $authEmployee->id)) {
             return $this->sendError('Unauthorized action. You can only upload route snapshot for your own attendance.', 403);
         }
 
@@ -542,8 +562,12 @@ class AttendanceApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
+        if (!$isHrAdmin && (!$authEmployee || (int) $attendance->employee_id !== (int) $authEmployee->id)) {
             return $this->sendError('Unauthorized action. You can only manage break for yourself.', 403);
+        }
+
+        if ($request->boolean('is_mocked')) {
+            return $this->sendError('Mock/fake location detected. Please disable mock location apps to record attendance.', 422);
         }
 
         $latitude = $request->filled('latitude') ? (float) $request->input('latitude') : null;
@@ -575,8 +599,12 @@ class AttendanceApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
+        if (!$isHrAdmin && (!$authEmployee || (int) $attendance->employee_id !== (int) $authEmployee->id)) {
             return $this->sendError('Unauthorized action. You can only manage break for yourself.', 403);
+        }
+
+        if ($request->boolean('is_mocked')) {
+            return $this->sendError('Mock/fake location detected. Please disable mock location apps to record attendance.', 422);
         }
 
         $latitude = $request->filled('latitude') ? (float) $request->input('latitude') : null;
@@ -929,7 +957,12 @@ class AttendanceApiController extends Controller
             'employee_id' => 'nullable|integer|exists:employees,id',
             'latitude'    => 'required|numeric|between:-90,90',
             'longitude'   => 'required|numeric|between:-180,180',
+            'is_mocked'   => 'nullable|boolean',
         ]);
+
+        if ($request->boolean('is_mocked')) {
+            return $this->sendError('Mock/fake location detected. Please disable mock location apps to record location.', 422);
+        }
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
@@ -1105,6 +1138,14 @@ class AttendanceApiController extends Controller
      */
     public function import(Request $request): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to import attendance logs.', 403);
+        }
+
         $request->validate([
             'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240',
         ]);

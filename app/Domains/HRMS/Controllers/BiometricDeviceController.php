@@ -52,6 +52,7 @@ class BiometricDeviceController extends Controller
                 'max:255',
                 Rule::unique('biometric_devices')->where('tenant_id', $tenantId),
             ],
+            'webhook_secret'   => 'nullable|string|max:255',
             'company_id'       => 'required|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
             'branch_id'        => 'nullable|exists:branches,id',
@@ -61,6 +62,7 @@ class BiometricDeviceController extends Controller
         ]);
 
         $validated['status'] = $request->has('status') ? (bool) $request->status : true;
+        $validated['webhook_secret'] = $request->input('webhook_secret') ?: \Illuminate\Support\Str::random(32);
 
         $this->repository->storeDevice($validated);
 
@@ -82,6 +84,7 @@ class BiometricDeviceController extends Controller
                 'max:255',
                 Rule::unique('biometric_devices')->where('tenant_id', $tenantId)->ignore($biometricDevice->id),
             ],
+            'webhook_secret'   => 'nullable|string|max:255',
             'company_id'       => 'required|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
             'branch_id'        => 'nullable|exists:branches,id',
@@ -91,6 +94,9 @@ class BiometricDeviceController extends Controller
         ]);
 
         $validated['status'] = $request->has('status') ? (bool) $request->status : true;
+        if ($request->filled('webhook_secret')) {
+            $validated['webhook_secret'] = $request->input('webhook_secret');
+        }
 
         $this->repository->updateDevice($biometricDevice, $validated);
 
