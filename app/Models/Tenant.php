@@ -118,10 +118,31 @@ class Tenant extends Model
         return in_array($this->status, self::accessibleStatuses(), true);
     }
 
-    /** Subscription lapsed: everything but billing is locked until it's renewed (EnsureBillingActive). */
+    /**
+     * Checks if a tenant's trial period has expired.
+     * Paid active subscriptions are protected and will never expire via trial.
+     */
+    public function isTrialExpired(): bool
+    {
+        if ($this->subscription_status === self::SUBSCRIPTION_ACTIVE) {
+            return false;
+        }
+
+        $isTrial = $this->status === self::STATUS_TRIAL
+            || $this->subscription_status === self::SUBSCRIPTION_TRIAL;
+
+        if (! $isTrial || $this->trial_ends_at === null) {
+            return false;
+        }
+
+        return $this->trial_ends_at->isPast();
+    }
+
+    /** Subscription lapsed or trial expired: everything but billing is locked until it's renewed (EnsureBillingActive). */
     public function isBillingLocked(): bool
     {
-        return $this->subscription_status === self::SUBSCRIPTION_SUSPENDED;
+        return $this->subscription_status === self::SUBSCRIPTION_SUSPENDED
+            || $this->isTrialExpired();
     }
 
     public function owner(): BelongsTo
