@@ -354,9 +354,14 @@ class StockService
                     $existingSn = SerialNumber::query()
                         ->where('tenant_id', $tenantId)
                         ->where('product_id', $productId)
-                        ->where('serial_number', $snString)
+                        ->where(function($q) use ($snString) {
+                            $q->where('serial_number', $snString)
+                              ->orWhere('serial_number', 'like', "%-{$snString}")
+                              ->orWhere('serial_number', 'like', "%{$snString}");
+                        })
                         ->first();
 
+                    $snKey = $existingSn ? $existingSn->serial_number : $snString;
                     $purchaseRate = ($existingSn && (float)$existingSn->purchase_rate > 0)
                         ? (float)$existingSn->purchase_rate
                         : $unitCost;
@@ -365,7 +370,7 @@ class StockService
                         [
                             'tenant_id' => $tenantId,
                             'product_id' => $productId,
-                            'serial_number' => $snString,
+                            'serial_number' => $snKey,
                         ],
                         [
                             'status' => 'Available',
@@ -532,7 +537,8 @@ class StockService
         float $quantity,
         string $referenceType,
         ?int $referenceId = null,
-        array $serialNumbers = []
+        array $serialNumbers = [],
+        ?int $batchId = null
     ): StockTransaction {
         return DB::transaction(function () use (
             $tenantId,
@@ -541,7 +547,8 @@ class StockService
             $quantity,
             $referenceType,
             $referenceId,
-            $serialNumbers
+            $serialNumbers,
+            $batchId
         ) {
             $product = Product::withoutGlobalScopes()->findOrFail($productId);
 
@@ -708,11 +715,26 @@ class StockService
             }
 
             // 3. Create Outflow Ledger Record
+            $outflowBatchId = $batchId;
+            if (!$outflowBatchId && !empty($allocations)) {
+                $outflowBatchId = $allocations[0]['batch_id'] ?? null;
+            }
+
+            if ($batchId) {
+                $chosenBatch = Batch::find($batchId);
+                if ($chosenBatch) {
+                    $chosenBatch->decrement('quantity', min((float)$chosenBatch->quantity, $quantity));
+                    $chosenBatch->update([
+                        'available_qty' => max(0.0, (float)$chosenBatch->available_qty - $quantity)
+                    ]);
+                }
+            }
+
             $transaction = StockTransaction::create([
                 'tenant_id' => $tenantId,
                 'product_id' => $productId,
                 'warehouse_id' => $warehouseId,
-                'batch_id' => null,
+                'batch_id' => $outflowBatchId,
                 'type' => 'OUT',
                 'reference_type' => $referenceType,
                 'reference_id' => $referenceId,
@@ -722,7 +744,7 @@ class StockService
                 'balance_qty' => 0,
             ]);
 
-            // 4. Update Serial Number Status to Sold
+            // 4. Update Serial Number Status
             $serialIds = [];
             if ($product->track_serial_number && !empty($serialNumbers)) {
                 foreach ($serialNumbers as $snString) {
@@ -730,13 +752,22 @@ class StockService
                     $snRecord = SerialNumber::query()
                         ->where('tenant_id', $tenantId)
                         ->where('product_id', $productId)
-                        ->where('serial_number', $snString)
-                        ->whereIn('status', ['Available', 'Reserved'])
+                        ->where(function($q) use ($snString) {
+                            $q->where('serial_number', $snString)
+                              ->orWhere('serial_number', 'like', "%-{$snString}")
+                              ->orWhere('serial_number', 'like', "%{$snString}");
+                        })
+                        ->whereIn('status', ['Available', 'Reserved', 'In-Transit'])
                         ->first();
 
                     if ($snRecord) {
+                        $statusOut = match ($referenceType) {
+                            'StockTransfer' => 'In-Transit',
+                            'StockAdjustment' => 'Unavailable',
+                            default => 'Sold',
+                        };
                         $snRecord->update([
-                            'status' => 'Sold',
+                            'status' => $statusOut,
                             'stock_transaction_id_out' => $transaction->id,
                         ]);
                         $serialIds[] = $snRecord->id;

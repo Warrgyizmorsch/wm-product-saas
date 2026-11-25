@@ -106,7 +106,27 @@ class StockAdjustmentController extends Controller
             'items.*.type' => 'required|in:Addition,Deduction',
             'items.*.quantity' => 'required|numeric|gt:0',
             'items.*.unit_cost' => 'nullable|numeric|min:0',
+            'items.*.batch_id' => 'nullable',
+            'items.*.batch_number' => 'nullable|string',
+            'items.*.expiry_date' => 'nullable|date',
+            'items.*.serial_numbers' => 'nullable',
         ]);
+
+        // Validate available stock for Deduction items
+        foreach ($validated['items'] as $item) {
+            if ($item['type'] === 'Deduction') {
+                $stock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                    ->where('product_id', $item['product_id'])
+                    ->where('warehouse_id', $validated['warehouse_id'])
+                    ->first();
+                $availQty = $stock ? (float)$stock->available_qty : 0.0;
+                if ((float)$item['quantity'] > ($availQty + 0.0001)) {
+                    $product = Product::where('tenant_id', $tenantId)->find($item['product_id']);
+                    $prodName = $product ? $product->name : 'Product #' . $item['product_id'];
+                    return back()->withInput()->with('error', "Cannot deduct {$item['quantity']} units of '{$prodName}'. Only {$availQty} units available in selected warehouse.");
+                }
+            }
+        }
 
         $adjustment = DB::transaction(function () use ($validated, $tenantId) {
             $adjNumber = 'ADJ-' . strtoupper(uniqid());
@@ -129,6 +149,37 @@ class StockAdjustmentController extends Controller
                     : (float)($product?->cost_price ?? 0);
                 $total = (float)$item['quantity'] * $unitCost;
 
+                // Handle batch creation or linking for Addition items
+                $batchId = $item['batch_id'] ?? null;
+                if (!$batchId && !empty($item['batch_number'])) {
+                    $batchNumber = trim($item['batch_number']);
+                    $batch = \App\Domains\Inventory\Models\Batch::firstOrCreate(
+                        [
+                            'tenant_id' => $tenantId,
+                            'product_id' => $item['product_id'],
+                            'warehouse_id' => $validated['warehouse_id'],
+                            'batch_number' => $batchNumber,
+                        ],
+                        [
+                            'quantity' => 0,
+                            'available_qty' => 0,
+                            'manufacturing_date' => now(),
+                            'expiry_date' => !empty($item['expiry_date']) ? \Carbon\Carbon::parse($item['expiry_date']) : now()->addYear(),
+                        ]
+                    );
+                    $batchId = $batch->id;
+                }
+
+                // Handle serial numbers parsing
+                $serialNumbers = null;
+                if (!empty($item['serial_numbers'])) {
+                    if (is_array($item['serial_numbers'])) {
+                        $serialNumbers = array_values(array_filter(array_map('trim', $item['serial_numbers'])));
+                    } else {
+                        $serialNumbers = array_values(array_filter(array_map('trim', preg_split('/[\r\n,;]+/', (string)$item['serial_numbers']))));
+                    }
+                }
+
                 StockAdjustmentItem::create([
                     'stock_adjustment_id' => $adjustment->id,
                     'product_id' => $item['product_id'],
@@ -136,8 +187,8 @@ class StockAdjustmentController extends Controller
                     'quantity' => $item['quantity'],
                     'unit_cost' => $unitCost,
                     'total_amount' => $total,
-                    'batch_id' => $item['batch_id'] ?? null,
-                    'serial_numbers' => !empty($item['serial_numbers']) ? explode(',', $item['serial_numbers']) : null,
+                    'batch_id' => $batchId,
+                    'serial_numbers' => $serialNumbers,
                 ]);
             }
 
@@ -170,6 +221,10 @@ class StockAdjustmentController extends Controller
         DB::transaction(function () use ($adjustment, $tenantId) {
             foreach ($adjustment->items as $item) {
                 if ($item->type === 'Addition') {
+                    $batchNumber = $item->batch?->batch_number;
+                    $mfgDate = $item->batch?->manufacturing_date ? $item->batch->manufacturing_date->format('Y-m-d') : null;
+                    $expiryDate = $item->batch?->expiry_date ? $item->batch->expiry_date->format('Y-m-d') : null;
+
                     StockService::recordInflow(
                         tenantId: $tenantId,
                         productId: $item->product_id,
@@ -178,7 +233,10 @@ class StockAdjustmentController extends Controller
                         unitCost: (float)$item->unit_cost,
                         referenceType: 'StockAdjustment',
                         referenceId: $adjustment->id,
-                        serialNumbers: $item->serial_numbers ?? []
+                        batchNumber: $batchNumber,
+                        serialNumbers: $item->serial_numbers ?? [],
+                        mfgDate: $mfgDate,
+                        expiryDate: $expiryDate
                     );
                 } else {
                     StockService::recordOutflow(
@@ -188,7 +246,8 @@ class StockAdjustmentController extends Controller
                         quantity: (float)$item->quantity,
                         referenceType: 'StockAdjustment',
                         referenceId: $adjustment->id,
-                        serialNumbers: $item->serial_numbers ?? []
+                        serialNumbers: $item->serial_numbers ?? [],
+                        batchId: $item->batch_id
                     );
                 }
             }

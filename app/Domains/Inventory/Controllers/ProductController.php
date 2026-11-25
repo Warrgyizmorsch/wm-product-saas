@@ -676,12 +676,138 @@ class ProductController extends Controller
             }
         }
 
+        $product = Product::where('tenant_id', $tenantId)->find($productId);
+
+        $availableBatches = [];
+        if ($product && $product->track_batch) {
+            $availableBatches = \App\Domains\Inventory\Models\Batch::where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->where('warehouse_id', $warehouseId)
+                ->where('available_qty', '>', 0)
+                ->orderBy('expiry_date', 'asc')
+                ->get(['id', 'batch_number', 'available_qty', 'expiry_date'])
+                ->map(function ($b) {
+                    return [
+                        'id' => $b->id,
+                        'batch_number' => $b->batch_number,
+                        'available_qty' => (float)$b->available_qty,
+                        'expiry_date' => $b->expiry_date ? $b->expiry_date->format('d M Y') : null,
+                    ];
+                });
+        }
+
+        $serialsQuery = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('status', 'Available');
+
+        $totalSerials = $serialsQuery->count();
+        $availableSerials = (clone $serialsQuery)
+            ->orderBy('id', 'asc')
+            ->limit(20)
+            ->pluck('serial_number')
+            ->all();
+
         return response()->json([
             'success' => true,
             'physical_qty' => $physicalQty,
             'reserved_qty' => $reservedQty,
             'item_reserved_qty' => $itemReservedQty,
             'available_qty' => $availableQty,
+            'track_serial_number' => (bool)($product?->track_serial_number),
+            'track_batch' => (bool)($product?->track_batch),
+            'available_batches' => $availableBatches,
+            'available_serials' => $availableSerials,
+            'serials_total' => $totalSerials,
+            'serials_has_more' => $totalSerials > 20,
+        ]);
+    }
+
+    /**
+     * AJAX endpoint to fetch paginated available serial numbers (20 at a time with infinite scroll)
+     */
+    public function availableSerials(Request $request): JsonResponse
+    {
+        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $productId = $request->input('product_id');
+        $warehouseId = $request->input('warehouse_id');
+        $batchId = $request->input('batch_id');
+        $search = trim((string)$request->input('search', ''));
+        $page = max(1, (int)$request->input('page', 1));
+        $perPage = max(1, min(100, (int)$request->input('per_page', 20)));
+
+        if (!$productId || !$warehouseId) {
+            return response()->json(['success' => false, 'message' => 'Missing product or warehouse ID'], 400);
+        }
+
+        $query = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('status', 'Available');
+
+        if (!empty($batchId)) {
+            $query->where('batch_id', $batchId);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('serial_number', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $total = $query->count();
+        $serials = $query->orderBy('id', 'asc')
+            ->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->pluck('serial_number')
+            ->all();
+
+        return response()->json([
+            'success' => true,
+            'serials' => $serials,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total' => $total,
+            'has_more' => ($page * $perPage) < $total,
+        ]);
+    }
+
+    /**
+     * AJAX endpoint to compute next available serial sequence number for auto-generation
+     */
+    public function nextSerialSequence(Request $request): JsonResponse
+    {
+        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $productId = $request->input('product_id');
+        $prefix = (string)$request->input('prefix', '');
+
+        $product = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($productId);
+        if (empty($prefix) && $product) {
+            $prefix = ($product->sku ?: 'SN') . '-';
+        }
+
+        $serials = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->pluck('serial_number');
+
+        $maxNum = 1000;
+        foreach ($serials as $sn) {
+            if (!empty($prefix) && str_starts_with($sn, $prefix)) {
+                $rest = substr($sn, strlen($prefix));
+                if (preg_match('/^([0-9]+)$/', $rest, $m)) {
+                    $val = (int)$m[1];
+                    if ($val > $maxNum) $maxNum = $val;
+                }
+            } else if (preg_match('/(?:^|[^0-9])([0-9]+)$/', $sn, $m)) {
+                $val = (int)$m[1];
+                if ($val > $maxNum) $maxNum = $val;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'next_number' => $maxNum + 1,
+            'prefix' => $prefix,
         ]);
     }
 

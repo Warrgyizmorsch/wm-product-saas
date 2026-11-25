@@ -101,6 +101,8 @@ class StockTransferApiController extends Controller
             'items'             => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer'],
             'items.*.quantity'   => ['required', 'numeric', 'min:0.01'],
+            'items.*.serial_numbers' => ['nullable'],
+            'items.*.batch_id'   => ['nullable', 'integer'],
         ]);
 
         if ($validator->fails()) {
@@ -114,14 +116,40 @@ class StockTransferApiController extends Controller
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
         $validated = $validator->validated();
 
+        // Verify available stock in source warehouse before creating transfer
+        foreach ($validated['items'] as $item) {
+            $stock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                ->where('product_id', $item['product_id'])
+                ->where('warehouse_id', $validated['from_warehouse_id'])
+                ->first();
+
+            $reserved = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+                ->where('product_id', $item['product_id'])
+                ->where('warehouse_id', $validated['from_warehouse_id'])
+                ->where('status', 'Active')
+                ->sum('reserved_qty');
+
+            $physicalQty = (float)($stock?->quantity ?? 0);
+            $availableQty = max(0, $physicalQty - (float)$reserved);
+
+            if ((float)$item['quantity'] > $availableQty) {
+                $prod = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->find($item['product_id']);
+                $name = $prod?->name ?? 'Item';
+                return response()->json([
+                    'success' => false,
+                    'message' => "Insufficient available stock for '{$name}'. Net Available: {$availableQty}, Requested: {$item['quantity']}."
+                ], 422);
+            }
+        }
+
         $transfer = DB::transaction(function () use ($validated, $tenantId, $companyId, $branchId) {
             $lastId     = (StockTransfer::where('tenant_id', $tenantId)->max('id') ?? 0) + 1;
             $transferNo = 'TRF-' . str_pad((string)$lastId, 5, '0', STR_PAD_LEFT);
 
             $st = StockTransfer::create([
                 'tenant_id'         => $tenantId,
-                'company_id'        => $companyId,
-                'branch_id'         => $branchId,
+                'company_id'        => $companyId ?: null,
+                'branch_id'         => $branchId ?: null,
                 'transfer_number'   => $transferNo,
                 'from_warehouse_id' => $validated['from_warehouse_id'],
                 'to_warehouse_id'   => $validated['to_warehouse_id'],
@@ -132,11 +160,49 @@ class StockTransferApiController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
-                StockTransferItem::create([
+                $rawSerials = $item['serial_numbers'] ?? null;
+                $serialArray = null;
+                if (!empty($rawSerials)) {
+                    $parts = is_array($rawSerials) ? $rawSerials : explode(',', (string)$rawSerials);
+                    $resolved = [];
+                    foreach ($parts as $p) {
+                        $cleanSn = trim((string)$p);
+                        if ($cleanSn === '') continue;
+
+                        $matchedSn = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
+                            ->where('product_id', $item['product_id'])
+                            ->where('warehouse_id', $validated['from_warehouse_id'])
+                            ->where(function($q) use ($cleanSn) {
+                                $q->where('serial_number', $cleanSn)
+                                  ->orWhere('serial_number', 'like', "%-{$cleanSn}")
+                                  ->orWhere('serial_number', 'like', "%{$cleanSn}");
+                            })
+                            ->value('serial_number');
+
+                        $resolved[] = $matchedSn ?: $cleanSn;
+                    }
+                    $serialArray = !empty($resolved) ? $resolved : null;
+                }
+
+                $stItem = StockTransferItem::create([
                     'stock_transfer_id' => $st->id,
                     'product_id'        => $item['product_id'],
                     'quantity'          => $item['quantity'],
+                    'batch_id'          => $item['batch_id'] ?? null,
+                    'serial_numbers'    => $serialArray,
                 ]);
+
+                // Reserve stock in source warehouse for this transfer
+                \App\Domains\Inventory\Services\StockService::reserveStock(
+                    tenantId: $tenantId,
+                    productId: (int)$item['product_id'],
+                    warehouseId: (int)$validated['from_warehouse_id'],
+                    qty: (float)$item['quantity'],
+                    referenceType: 'StockTransfer',
+                    referenceId: $st->id,
+                    referenceItemId: $stItem->id,
+                    selectedSerials: $serialArray ?? []
+                );
             }
 
             return $st->load(['items.product', 'fromWarehouse', 'toWarehouse']);
@@ -311,6 +377,11 @@ class StockTransferApiController extends Controller
                     $product  = Product::where('tenant_id', $tenantId)->find($item->product_id);
                     $unitCost = $outTx ? (float)$outTx->unit_cost : (float)($product ? $product->cost_price : 0);
 
+                    $batch = $item->batch;
+                    $batchNumber = $batch ? $batch->batch_number : null;
+                    $mfgDate = $batch && $batch->manufacturing_date ? $batch->manufacturing_date->format('Y-m-d') : null;
+                    $expiryDate = $batch && $batch->expiry_date ? $batch->expiry_date->format('Y-m-d') : null;
+
                     \App\Domains\Inventory\Services\StockService::recordInflow(
                         tenantId: $tenantId,
                         productId: $item->product_id,
@@ -319,7 +390,10 @@ class StockTransferApiController extends Controller
                         unitCost: $unitCost,
                         referenceType: 'StockTransfer',
                         referenceId: $transfer->id,
-                        serialNumbers: $item->serial_numbers ?? []
+                        batchNumber: $batchNumber,
+                        serialNumbers: $item->serial_numbers ?? [],
+                        mfgDate: $mfgDate,
+                        expiryDate: $expiryDate
                     );
 
                     $item->update(['received_quantity' => $item->quantity]);
@@ -368,7 +442,20 @@ class StockTransferApiController extends Controller
             ], 422);
         }
 
-        $transfer->update(['status' => 'Cancelled']);
+        DB::transaction(function () use ($transfer, $tenantId) {
+            foreach ($transfer->items as $item) {
+                \App\Domains\Inventory\Services\StockService::releaseStock(
+                    tenantId: $tenantId,
+                    productId: (int)$item->product_id,
+                    warehouseId: (int)$transfer->from_warehouse_id,
+                    qty: (float)$item->quantity,
+                    referenceType: 'StockTransfer',
+                    referenceId: $transfer->id,
+                    referenceItemId: $item->id
+                );
+            }
+            $transfer->update(['status' => 'Cancelled']);
+        });
 
         return response()->json([
             'success' => true,

@@ -83,4 +83,9 @@ class StockTransferPolicy
     {
         return $this->update($user, $transfer);
     }
+
+    public function delete(User $user, StockTransfer $transfer): bool
+    {
+        return $this->update($user, $transfer);
+    }
 }
