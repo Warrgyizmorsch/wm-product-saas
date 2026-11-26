@@ -109,6 +109,40 @@ class TestProductionLinks
         return $this->find('warehouses', 'code', $code);
     }
 
+    /** The login the seeded records are created / approved by (DatabaseSeeder creates it). */
+    public const SEED_USER_EMAIL = 'admin@example.com';
+
+    public function userId(string $email): int
+    {
+        return $this->find('users', 'email', $email);
+    }
+
+    public function productId(string $sku): int
+    {
+        return $this->find('products', 'sku', $sku);
+    }
+
+    public function uomId(string $code): int
+    {
+        return $this->find('uoms', 'code', $code);
+    }
+
+    public function sectionId(string $code): int
+    {
+        return $this->find('production_work_center_sections', 'code', $code);
+    }
+
+    public function machineId(string $code): int
+    {
+        return $this->find('production_machines', 'code', $code);
+    }
+
+    /** Manual production batch by its name (test-batch-1 …). */
+    public function batchId(string $name): int
+    {
+        return $this->find('production_section_manual_productions', 'batch_name', $name);
+    }
+
     /** Creates the production designations the test employees need (added once, found again on every later run). */
     public function ensureDesignations(array $employees): void
     {

@@ -5,8 +5,9 @@ namespace Tests\Feature\Seeding;
 use App\Models\Tenant;
 use Database\Seeders\Support\TestProductionLinks;
 use Database\Seeders\TestProductionEngineeringSeeder;
-use Database\Seeders\TestProductionExecutionSeeder;
 use Database\Seeders\TestProductionMasterDataSeeder;
+use Database\Seeders\TestProductionQualitySeeder;
+use Database\Seeders\TestProductionStockSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -14,10 +15,10 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * The test production data (held inside TestProductionMasterDataSeeder / EngineeringSeeder / ExecutionSeeder) and
- * TestProductionLinks. The whole chain (HRMS data underneath it) is verified on a throw-away MySQL database; here:
- * the data fits the current schema, and every reference to a row the data does not own is a natural key that is
- * looked up by code.
+ * The test production data (docs/production_seeder_audit_2026-11-26.md) and TestProductionLinks. The master rows
+ * (TestProductionMasterDataSeeder::tables) are checked against the schema; the quality plans, routings, BOMs and
+ * opening stock are inputs written with codes, checked here to only point at codes the master data owns. The whole
+ * chain (HRMS data underneath it) is verified on a throw-away MySQL database.
  */
 class TestProductionDataTest extends TestCase
 {
@@ -29,9 +30,7 @@ class TestProductionDataTest extends TestCase
     /** @return array<string, array<int, array<string, mixed>>> */
     private function dataset(): array
     {
-        return (new TestProductionMasterDataSeeder())->tables()
-            + (new TestProductionEngineeringSeeder())->tables()
-            + (new TestProductionExecutionSeeder())->tables();
+        return (new TestProductionMasterDataSeeder())->tables();
     }
 
     private function tenant(string $slug): Tenant
@@ -39,15 +38,11 @@ class TestProductionDataTest extends TestCase
         return Tenant::create(['name' => $slug, 'slug' => $slug, 'status' => 'active', 'plan' => 'enterprise']);
     }
 
-    public function test_every_table_is_in_exactly_one_seeder_and_every_row_fits_the_current_schema(): void
+    public function test_every_master_row_fits_the_current_schema(): void
     {
-        $seen = [];
-        foreach ([new TestProductionMasterDataSeeder(), new TestProductionEngineeringSeeder(), new TestProductionExecutionSeeder()] as $seeder) {
-            foreach (array_keys($seeder->tables()) as $table) {
-                $this->assertNotContains($table, $seen, "{$table} is loaded by two seeders");
-                $seen[] = $table;
-            }
-        }
+        $this->assertArrayNotHasKey('production_work_center_calculations', $this->dataset(), 'calculation snapshots are made by the engine, never pasted');
+        $this->assertArrayNotHasKey('production_work_center_section_calculations', $this->dataset());
+        $this->assertArrayNotHasKey('production_work_center_activity_logs', $this->dataset());
 
         $unknown = [];
         foreach ($this->dataset() as $table => $rows) {
@@ -80,11 +75,85 @@ class TestProductionDataTest extends TestCase
         $this->assertSame(['1200', '4010', '5010'], [$products[0]['inventory_account'], $products[0]['sales_account'], $products[0]['purchase_account']]);
     }
 
-    public function test_bom_numbers_are_unique_and_test_employees_are_not_all_ceos(): void
+    public function test_money_is_in_inr_the_base_currency(): void
     {
-        $numbers = array_column($this->dataset()['production_boms'], 'bom_number');
-        $this->assertSame($numbers, array_values(array_unique($numbers)), 'BOM numbers must be unique');
+        $products = collect($this->dataset()['products'])->keyBy('sku');
+        $this->assertSame('6200.0000', $products['test-final-01']['selling_price']);
+        $this->assertSame('80.0000', $products['test-raw-01']['cost_price']);
+        $this->assertSame('80.0000', collect($this->dataset()['production_external_worker_pay_grades'])->firstWhere('code', 'test-pg-1')['hourly_rate']);
+        $this->assertSame('2500.0000', collect($this->dataset()['production_work_centers'])->firstWhere('code', 'TEST-WC-1')['overhead_cost']);
+        $this->assertSame('600000.00', collect($this->dataset()['employees'])->firstWhere('employee_id', 'test-emp-1')['current_salary']);
+    }
 
+    public function test_routings_boms_plans_and_stock_only_point_at_codes_the_data_owns(): void
+    {
+        $sections = collect($this->dataset()['production_work_center_sections'])->pluck('code', 'id');
+        $machineSection = collect($this->dataset()['production_machines'])->mapWithKeys(fn ($m) => [$m['code'] => $sections[$m['section_id'] ?? 0] ?? null]);
+        $batchSection = collect($this->dataset()['production_section_manual_productions'])->mapWithKeys(fn ($b) => [$b['batch_name'] => $sections[$b['section_id']]]);
+        $skus = collect($this->dataset()['products'])->pluck('type', 'sku');
+
+        $plans = collect((new TestProductionQualitySeeder())->plans())->keyBy('name');
+        $this->assertCount(26, $plans, 'plan names are unique');
+        foreach ($plans as $plan) {
+            if ($plan['scope'] === 'section') {
+                $this->assertContains($plan['section'], $sections->all(), "plan {$plan['name']}: unknown section");
+            }
+            if ($plan['scope'] === 'product') {
+                $this->assertTrue($skus->has($plan['product']), "plan {$plan['name']}: unknown product");
+            }
+        }
+        $this->assertSame(collect($plans)->where('scope', 'product')->pluck('product')->unique()->count(), collect($plans)->where('scope', 'product')->count(), 'one plan family per product (QM-14)');
+
+        $engineering = new TestProductionEngineeringSeeder();
+        $routingNumbers = array_column($engineering->routings(), 'routing_number');
+        $this->assertSame($routingNumbers, array_values(array_unique($routingNumbers)), 'routing numbers must be unique');
+        foreach ($engineering->routings() as $routing) {
+            foreach ($routing['operations'] as $op) {
+                $where = "{$routing['routing_number']} op {$op['seq']}";
+                $this->assertContains($op['section'], $sections->all(), "{$where}: unknown section");
+                $this->assertTrue(isset($op['machine']) xor isset($op['batch']), "{$where}: exactly one machine or batch");
+                if (isset($op['machine'])) {
+                    $this->assertSame($op['section'], $machineSection[$op['machine']] ?? null, "{$where}: machine is not in the section");
+                } else {
+                    $this->assertSame($op['section'], $batchSection[$op['batch']] ?? null, "{$where}: batch is not in the section");
+                }
+                foreach ($op['qc'] ?? [] as $link) {
+                    $plan = $plans[$link['plan']] ?? null;
+                    $this->assertNotNull($plan, "{$where}: unknown plan {$link['plan']}");
+                    $this->assertNotSame('product', $plan['scope'], "{$where}: product plans are never linked to a routing");
+                    if ($plan['scope'] === 'section') {
+                        $this->assertSame($op['section'], $plan['section'], "{$where}: section plan of another section");
+                    }
+                }
+            }
+        }
+
+        $seen = [];
+        foreach ($engineering->boms() as $bom) {
+            $key = $bom['bom_number'] . ' v' . ($bom['version'] ?? '1.0.0');
+            $this->assertNotContains($key, array_keys($seen), "{$key} twice");
+            $this->assertContains($bom['routing'], $routingNumbers, "{$key}: unknown routing");
+            $this->assertTrue($skus->has($bom['product']), "{$key}: unknown product");
+            foreach ($bom['materials'] as $m) {
+                $this->assertTrue($skus->has($m['material']), "{$key}: unknown material {$m['material']}");
+                $this->assertNotSame($bom['product'], $m['material'], "{$key}: a BOM cannot use its own product");
+                if (isset($m['child'])) {
+                    $this->assertSame($m['material'], collect($seen)->firstWhere('bom_number', $m['child'])['product'] ?? null, "{$key}: sub-BOM {$m['child']} must come earlier and be a BOM of {$m['material']}");
+                }
+            }
+            $seen[$key] = $bom;
+        }
+
+        $stock = TestProductionStockSeeder::openingStock();
+        foreach ($skus as $sku => $type) {
+            if ($type !== 'raw_material') {
+                $this->assertArrayHasKey($sku, $stock, "no opening stock for {$sku}");
+            }
+        }
+    }
+
+    public function test_test_employees_are_not_all_ceos(): void
+    {
         $links = new TestProductionLinks(1);
         $designations = collect($this->dataset()['employees'])->map(fn ($e) => $links->designationFor($e['job_title'])['name'])->unique();
         $this->assertGreaterThan(1, $designations->count());

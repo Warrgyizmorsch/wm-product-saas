@@ -8,10 +8,12 @@ use Illuminate\Database\Seeder;
 /**
  * ProductionE2EDemoSeeder
  *
- * Standalone Master Seeder for end-to-end production test data:
- * - Master Data: Products, Inventory, Shifts, Pay Grades, Employees, Work Centers, Sections, Machines, Batches, Staffing, Allocations, Calculations
- * - Engineering Data: Routings, Operations, Operation Materials, Approvals, BOMs, BOM Items, BOM Approvals
- * - Execution Data: Production Orders, Operations, Reservations, Requisitions, Issues, Batches, Receipts, Schedules, Schedule Operations, WIPs, WIP Transactions, Timelines
+ * Standalone Master Seeder for end-to-end production test data (docs/production_seeder_audit_2026-11-26.md):
+ * - Master Data: Products, Shifts, Pay Grades, Employees, Work Centers, Sections, Machines, Batches, Staffing,
+ *   Allocations; the calculation snapshots are made by the work-centre engine
+ * - Quality: 26 quality plans (section / process / product, every status) through QualityPlanService
+ * - Engineering Data: 9 routings (costed, QC plans linked, approved) and 13 BOMs (approved through the lifecycle)
+ * - Opening stock per product. No production orders: they are created in the UI.
  *
  * Called by DatabaseSeeder after AddTestMastersSeeder (CleanBeforeHrmsSeeder has emptied the production and inventory
  * tables by then, HrmsDemoSeeder has added the HR data). It can also be run on its own:
@@ -35,9 +37,12 @@ class ProductionE2EDemoSeeder extends Seeder
         $this->command?->info("  STARTING PRODUCTION E2E DEMO SEEDER (Tenant: {$tenantId})");
         $this->command?->info("========================================================");
 
+        // order matters: the engine calculates the work centres (master), plans exist before routings link them,
+        // child BOMs before parents; no production orders (docs/production_seeder_audit_2026-11-26.md)
         $this->callWith(TestProductionMasterDataSeeder::class, ['tenantId' => $tenantId]);
+        $this->callWith(TestProductionQualitySeeder::class, ['tenantId' => $tenantId]);
         $this->callWith(TestProductionEngineeringSeeder::class, ['tenantId' => $tenantId]);
-        $this->callWith(TestProductionExecutionSeeder::class, ['tenantId' => $tenantId]);
+        $this->callWith(TestProductionStockSeeder::class, ['tenantId' => $tenantId]);
 
         $this->command?->info("========================================================");
         $this->command?->info("  PRODUCTION E2E DEMO SEEDER COMPLETED SUCCESSFULLY!");

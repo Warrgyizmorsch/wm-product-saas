@@ -132,6 +132,7 @@ class CleanBeforeHrmsSeeder extends Seeder
             foreach ($this->productionTables() as $table) {
                 $this->wipe($table, $tenantId);
             }
+            $this->wipeProductionSequences($tenantId);
             foreach (self::INVENTORY_TABLES as $table) {
                 $this->wipe($table, $tenantId);
             }
@@ -205,6 +206,19 @@ class CleanBeforeHrmsSeeder extends Seeder
         return DB::table($table)
             ->where(fn ($q) => $q->where('tenant_id', '!=', $tenantId)->orWhereNull('tenant_id'))
             ->exists();
+    }
+
+    /** Number counters (tenant_sequences keys) of production rows wiped above, so the reseeded numbers restart at 1. */
+    public const PRODUCTION_SEQUENCE_KEYS = ['quality_plan'];
+
+    /** SR-08: QP-0001… is issued from tenant_sequences key "quality_plan"; with the plans gone, the counter goes too. */
+    private function wipeProductionSequences(int $tenantId): void
+    {
+        if (! Schema::hasTable('tenant_sequences')) {
+            return;
+        }
+
+        $this->deleteTenantRows('tenant_sequences', $tenantId, fn ($q) => $q->whereIn('key', self::PRODUCTION_SEQUENCE_KEYS));
     }
 
     /** Warehouses of the tenant except the ones InventoryMasterDemoSeeder creates. */

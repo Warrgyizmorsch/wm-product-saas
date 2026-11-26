@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 /**
- * What the three TestProduction*Seeder classes share: finding the tenant and writing their rows (with every natural
+ * What the TestProduction*Seeder classes share: finding the tenant and writing their rows (with every natural
  * key translated by TestProductionLinks).
  */
 trait LoadsTestProductionData
@@ -58,22 +58,5 @@ trait LoadsTestProductionData
                 DB::table($table)->insert($row);
             }
         }
-    }
-
-    /**
-     * Quantity the orders take out of each (product, warehouse), keyed "product:warehouse".
-     *
-     * @param  array<int, array<string, mixed>>  $issues  rows of production_order_issues (with a 'warehouse' code)
-     * @return array<string, float>
-     */
-    protected function issuedByProductWarehouse(array $issues, TestProductionLinks $links): array
-    {
-        $issued = [];
-        foreach ($issues as $issue) {
-            $key = $issue['product_id'] . ':' . $links->warehouseId($issue['warehouse']);
-            $issued[$key] = ($issued[$key] ?? 0.0) + (float) $issue['quantity_issued'];
-        }
-
-        return $issued;
     }
 }
