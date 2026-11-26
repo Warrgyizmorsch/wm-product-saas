@@ -3,24 +3,28 @@
 namespace App\Domains\Production\Controllers\Api;
 
 use App\Domains\Production\Models\ProductionQualityPlan;
-use App\Domains\Production\Models\ProductionQualityPlanParameter;
 use App\Domains\Production\Requests\StoreQualityPlanRequest;
 use App\Domains\Production\Resources\Api\QualityPlanResource;
+use App\Domains\Production\Services\QualityPlanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
  * QualityPlanApiController
  *
- * REST API controller for Production Quality Assurance Plans.
+ * REST API for Quality Plans. Every write goes through QualityPlanService so the API follows the same lifecycle as the
+ * screens (docs/production_quality_rules.md QR-07/08/10/11): draft → pending → approved → historical, automatic versions,
+ * delete only in draft.
  */
 class QualityPlanApiController extends ApiBaseController
 {
+    public function __construct(private readonly QualityPlanService $service)
+    {
+    }
+
     /**
      * GET /api/v1/production/quality-plans
-     * List quality plans with pagination and filtering.
      */
     public function index(Request $request): JsonResponse
     {
@@ -35,89 +39,53 @@ class QualityPlanApiController extends ApiBaseController
             $search = '%' . trim($request->query('search')) . '%';
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', $search)
-                  ->orWhere('code', 'like', $search);
+                  ->orWhere('plan_number', 'like', $search);
             });
         }
 
-        if ($request->filled('type')) {
-            $query->where('type', $request->query('type'));
+        foreach (['type', 'status'] as $filter) {
+            if ($request->filled($filter)) {
+                $query->where($filter, $request->query($filter));
+            }
+        }
+        foreach (['product_id', 'section_id'] as $filter) {
+            if ($request->filled($filter)) {
+                $query->where($filter, (int) $request->query($filter));
+            }
         }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->query('status'));
-        }
-
-        if ($request->filled('product_id')) {
-            $query->where('product_id', (int) $request->query('product_id'));
-        }
-
-        if ($request->filled('work_center_id')) {
-            $query->where('work_center_id', (int) $request->query('work_center_id'));
-        }
-
-        $perPage = $this->getPerPage($request);
-        $paginator = $query->orderBy('id', 'desc')->paginate($perPage);
+        $paginator = $query->orderBy('id', 'desc')->paginate($this->getPerPage($request));
 
         return $this->paginatedResponse($paginator, QualityPlanResource::class, 'Quality plans retrieved successfully.');
     }
 
     /**
      * GET /api/v1/production/quality-plans/{id}
-     * Get a single quality plan with its parameters.
      */
     public function show(int $id): JsonResponse
     {
         Gate::authorize('view', ProductionQualityPlan::class);
 
-        $tenantId = $this->getTenantId();
-
-        $plan = ProductionQualityPlan::where('tenant_id', $tenantId)
+        $plan = ProductionQualityPlan::where('tenant_id', $this->getTenantId())
             ->with(['product:id,name,sku', 'workCenter:id,name,code', 'parameters'])
             ->findOrFail($id);
 
-        return $this->successResponse(
-            new QualityPlanResource($plan),
-            'Quality plan retrieved successfully.'
-        );
+        return $this->successResponse(new QualityPlanResource($plan), 'Quality plan retrieved successfully.');
     }
 
     /**
-     * POST /api/v1/production/quality-plans
-     * Create a new quality plan and its inspection parameters.
+     * POST /api/v1/production/quality-plans — always created as Draft version 1.
      */
     public function store(StoreQualityPlanRequest $request): JsonResponse
     {
         Gate::authorize('manage', ProductionQualityPlan::class);
 
-        $tenantId = $this->getTenantId();
-        $data = $request->validated();
-        $data['tenant_id'] = $tenantId;
-        $data['created_by'] = auth()->id();
-        $data['status'] = $data['status'] ?? 'draft';
-
-        if ($data['status'] === 'approved') {
-            $data['approved_by'] = auth()->id();
-            $data['approved_at'] = now();
-        }
-
         try {
-            $plan = DB::transaction(function () use ($tenantId, $data) {
-                $plan = ProductionQualityPlan::create($data);
-
-                foreach ($data['parameters'] as $param) {
-                    $param['tenant_id'] = $tenantId;
-                    $param['quality_plan_id'] = $plan->id;
-                    $param['is_mandatory'] = filter_var($param['is_mandatory'] ?? false, FILTER_VALIDATE_BOOLEAN);
-
-                    ProductionQualityPlanParameter::create($param);
-                }
-
-                return $plan;
-            });
+            $plan = $this->service->create($this->getTenantId(), $request->validated(), (int) auth()->id());
 
             return $this->createdResponse(
                 new QualityPlanResource($plan->load(['product', 'workCenter', 'parameters'])),
-                'Quality plan created successfully.'
+                'Quality plan created as draft.'
             );
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
@@ -125,41 +93,19 @@ class QualityPlanApiController extends ApiBaseController
     }
 
     /**
-     * PUT /api/v1/production/quality-plans/{id}
-     * Update an existing quality plan and replace parameters.
+     * PUT /api/v1/production/quality-plans/{id} — Draft: edited in place; Approved: creates the next version as Draft.
      */
     public function update(StoreQualityPlanRequest $request, int $id): JsonResponse
     {
-        Gate::authorize('manage', ProductionQualityPlan::class);
-
-        $tenantId = $this->getTenantId();
-        $plan = ProductionQualityPlan::where('tenant_id', $tenantId)->findOrFail($id);
-
-        $data = $request->validated();
-
-        if (isset($data['status']) && $data['status'] === 'approved' && $plan->status !== 'approved') {
-            $data['approved_by'] = auth()->id();
-            $data['approved_at'] = now();
-        }
+        $plan = ProductionQualityPlan::where('tenant_id', $this->getTenantId())->findOrFail($id);
+        Gate::authorize('update', $plan);
 
         try {
-            DB::transaction(function () use ($tenantId, $plan, $data) {
-                $plan->update($data);
-
-                ProductionQualityPlanParameter::where('quality_plan_id', $plan->id)->delete();
-
-                foreach ($data['parameters'] as $param) {
-                    $param['tenant_id'] = $tenantId;
-                    $param['quality_plan_id'] = $plan->id;
-                    $param['is_mandatory'] = filter_var($param['is_mandatory'] ?? false, FILTER_VALIDATE_BOOLEAN);
-
-                    ProductionQualityPlanParameter::create($param);
-                }
-            });
+            $saved = $this->service->update($plan, $request->validated(), (int) auth()->id());
 
             return $this->successResponse(
-                new QualityPlanResource($plan->fresh(['product', 'workCenter', 'parameters'])),
-                'Quality plan updated successfully.'
+                new QualityPlanResource($saved->load(['product', 'workCenter', 'parameters'])),
+                $saved->id === $plan->id ? 'Quality plan updated.' : "Version {$saved->version} created as draft."
             );
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
@@ -167,23 +113,55 @@ class QualityPlanApiController extends ApiBaseController
     }
 
     /**
-     * DELETE /api/v1/production/quality-plans/{id}
-     * Delete a quality plan and associated parameters.
+     * DELETE /api/v1/production/quality-plans/{id} — Draft only (soft delete).
      */
     public function destroy(int $id): JsonResponse
     {
-        Gate::authorize('manage', ProductionQualityPlan::class);
-
-        $tenantId = $this->getTenantId();
-        $plan = ProductionQualityPlan::where('tenant_id', $tenantId)->findOrFail($id);
+        $plan = ProductionQualityPlan::where('tenant_id', $this->getTenantId())->findOrFail($id);
+        Gate::authorize('delete', $plan);
 
         try {
-            DB::transaction(function () use ($plan) {
-                ProductionQualityPlanParameter::where('quality_plan_id', $plan->id)->delete();
-                $plan->delete();
-            });
+            $this->service->delete($plan, (int) auth()->id());
 
-            return $this->successResponse(null, 'Quality plan deleted successfully.');
+            return $this->successResponse(null, 'Quality plan deleted.');
+        } catch (\Throwable $e) {
+            return $this->handleDomainException($e);
+        }
+    }
+
+    /** POST /api/v1/production/quality-plans/{id}/submit */
+    public function submit(int $id): JsonResponse
+    {
+        return $this->transition($id, 'submit', fn ($plan) => $this->service->submit($plan, (int) auth()->id()), 'Quality plan submitted for approval.');
+    }
+
+    /** POST /api/v1/production/quality-plans/{id}/approve */
+    public function approve(Request $request, int $id): JsonResponse
+    {
+        return $this->transition($id, 'approve', fn ($plan) => $this->service->approve($plan, (int) auth()->id(), $request->input('comments')), 'Quality plan approved.');
+    }
+
+    /** POST /api/v1/production/quality-plans/{id}/reject */
+    public function reject(Request $request, int $id): JsonResponse
+    {
+        return $this->transition($id, 'reject', fn ($plan) => $this->service->reject($plan, (int) auth()->id(), $request->input('comments')), 'Quality plan rejected.');
+    }
+
+    /** POST /api/v1/production/quality-plans/{id}/historical */
+    public function retire(Request $request, int $id): JsonResponse
+    {
+        return $this->transition($id, 'retire', fn ($plan) => $this->service->markHistorical($plan, (int) auth()->id(), $request->input('comments')), 'Quality plan marked historical.');
+    }
+
+    private function transition(int $id, string $ability, callable $action, string $message): JsonResponse
+    {
+        $plan = ProductionQualityPlan::where('tenant_id', $this->getTenantId())->findOrFail($id);
+        Gate::authorize($ability, $plan);
+
+        try {
+            $result = $action($plan);
+
+            return $this->successResponse(new QualityPlanResource($result->load(['product', 'workCenter', 'parameters'])), $message);
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
         }

@@ -1303,6 +1303,12 @@ class ProductionWipService
                 throw new InvalidArgumentException("Cannot convert WIP: This tracking card has no remaining completed or available quantity.");
             }
 
+            // QR-18: the whole card is received at once, so all of it must have passed the final QC
+            $order = ProductionOrder::find($wip->production_order_id);
+            if ($order) {
+                app(FinalQualityGateService::class)->assertCanReceive($order, $qtyToComplete);
+            }
+
             // Trigger FG inflow receipt
             app(ProductionExecutionService::class)->receiveFinishedGoods(
                 $wip->production_order_id,
@@ -1366,10 +1372,20 @@ class ProductionWipService
                 throw new InvalidArgumentException("No completed WIP quantities ready to transfer for Order #" . ($order->order_number ?? $orderId));
             }
 
+            // QR-18: with final QC, only the accepted (not yet received) quantity may be converted
+            $gate = app(FinalQualityGateService::class);
+            $allowed = $gate->allowedToReceive($order);
+            if ($allowed !== null && $allowed <= 0.0001) {
+                $gate->assertCanReceive($order, (float) $wips->sum(fn ($w) => (float) ($w->completed_quantity > 0 ? $w->completed_quantity : $w->available_quantity)));
+            }
+
             $totalConverted = 0.0;
 
             foreach ($wips as $wip) {
                 $qtyToComplete = (float) ($wip->completed_quantity > 0 ? $wip->completed_quantity : ($wip->status === 'completed' ? $wip->available_quantity : 0.0));
+                if ($allowed !== null) {
+                    $qtyToComplete = min($qtyToComplete, max(0.0, $allowed - $totalConverted));
+                }
                 if ($qtyToComplete <= 0) {
                     continue;
                 }

@@ -120,6 +120,17 @@
 
 
 
+        @if (!empty($qcPlanWarnings))
+            {{-- QR-09: linked QC plan versions are never updated automatically — warn only --}}
+            <div class="alert alert-soft-warning border border-warning fs-12 mb-4">
+                <div class="fw-bold mb-1"><i class="feather-alert-triangle me-1"></i>QC plan versions to review</div>
+                @foreach (array_unique($qcPlanWarnings) as $msg)
+                    <div>{{ $msg }}</div>
+                @endforeach
+                <div class="text-muted mt-1">The routing keeps using the linked version. Create a new routing version to switch to the newer plan.</div>
+            </div>
+        @endif
+
         <!-- Summary Statistics Layout -->
         <div class="row g-4 mb-4 pb-4 border-bottom">
             <!-- Left Info Panel -->
@@ -545,6 +556,20 @@
                                 <td class="text-center align-middle">
                                     @if ($op->quality_required)
                                         <span class="badge bg-soft-danger text-danger"><i class="feather-shield"></i> QC</span>
+                                        {{-- QR-09 / QR-16: the operation's QC plans, with newer-version warnings --}}
+                                        @foreach ($op->qualityPlanLinks as $qpLink)
+                                            <div class="fs-10 text-start mt-1 text-nowrap">
+                                                @if ($qpLink->plan)
+                                                    <a href="{{ route('production.quality-plans.show', $qpLink->plan->id) }}" class="text-primary">{{ $qpLink->plan->name }} v{{ $qpLink->plan->version }}</a>
+                                                @else
+                                                    <span class="text-muted">Plan #{{ $qpLink->quality_plan_id }}</span>
+                                                @endif
+                                                <span class="text-muted">{{ $qpLink->is_mandatory ? '· Mandatory' : '· Optional' }}</span>
+                                                @if (!empty($qcPlanWarnings[$qpLink->id]))
+                                                    <i class="feather-alert-triangle text-warning" title="{{ $qcPlanWarnings[$qpLink->id] }}"></i>
+                                                @endif
+                                            </div>
+                                        @endforeach
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif

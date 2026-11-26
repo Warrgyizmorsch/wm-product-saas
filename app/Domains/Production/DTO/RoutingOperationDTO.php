@@ -59,6 +59,8 @@ class RoutingOperationDTO
         public readonly ?int    $work_center_calculation_id = null,
         // RT-IMPL-09: id of the existing operation this row updates (matching only — not a column write)
         public readonly ?int    $operation_id = null,
+        // QR-15: [[id, is_mandatory], …] Quality Plans for the QC gate — saved to the mapping table, never a column
+        public readonly array   $quality_plans = [],
     ) {}
 
     public static function fromArray(array $data): self
@@ -148,6 +150,12 @@ class RoutingOperationDTO
             section_snapshot_number:       !$isExternal && !empty($data['section_snapshot_number']) ? (int) $data['section_snapshot_number'] : null,
             work_center_calculation_id:    !$isExternal && !empty($data['work_center_calculation_id']) ? (int) $data['work_center_calculation_id'] : null,
             operation_id:                  !empty($data['id']) ? (int) $data['id'] : null,
+            quality_plans:                 !empty($data['quality_required'])
+                ? collect((array) ($data['quality_plans'] ?? []))
+                    ->filter(fn($row) => !empty($row['id']))
+                    ->map(fn($row) => ['id' => (int) $row['id'], 'is_mandatory' => filter_var($row['is_mandatory'] ?? true, FILTER_VALIDATE_BOOLEAN)])
+                    ->unique('id')->values()->all()
+                : [],
         );
     }
 

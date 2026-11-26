@@ -632,7 +632,11 @@ class MesExecutionService
 
                 if ($isTargetReached && $isQcRequired && $this->qualityGateIsPendingOrFailed($orderOp)) {
                     if (!empty($data['force_complete'])) {
-                        throw new InvalidArgumentException('This operation requires an approved passed quality inspection before completion.');
+                        throw new InvalidArgumentException(
+                            app(OrderOperationQualityService::class)->isSubAssemblyQc($orderOp)
+                                ? 'This operation makes a semi used later in this order. Perform its quality check before completing it.'
+                                : 'This operation requires an approved passed quality inspection before completion.'
+                        );
                     }
                     $isTargetReached = false;
                 }
@@ -1126,6 +1130,33 @@ class MesExecutionService
                 "Machine [{$machine->name}] is not available for production (status: {$machine->status})."
             );
         }
+    }
+
+    /**
+     * QR-05 / QR-17: after work is logged on the last maker operation of a semi made inside the order, the operator is
+     * reminded that the semi needs its quality check before the next operation can use it. Null when not applicable.
+     */
+    public function pendingSemiQcMessage(int $scheduleOpId): ?string
+    {
+        $schedOp = ProductionScheduleOperation::find($scheduleOpId);
+        $orderOp = $schedOp?->orderOperation;
+        if (!$orderOp instanceof ProductionOrderOperation) {
+            return null;
+        }
+        if (!app(OrderOperationQualityService::class)->isSubAssemblyQc($orderOp)) {
+            return null;
+        }
+
+        $pending = $this->getPendingQcQuantity($orderOp->id);
+        if ($pending <= 0.0001 && $orderOp->status === ProductionOrderOperation::STATUS_COMPLETED) {
+            return null;
+        }
+
+        $product = $orderOp->source_product_id ? \App\Domains\Inventory\Models\Product::find($orderOp->source_product_id) : null;
+        $label = $product ? trim(($product->sku ? $product->sku . ' - ' : '') . $product->name) : 'this semi';
+        $qty = rtrim(rtrim(number_format($pending, 4, '.', ''), '0'), '.');
+
+        return "Semi {$label} has been produced ({$qty} unit(s) waiting for QC). Perform its quality check — it can't be used by the next operation until the check passes.";
     }
 
     private function qualityGateIsPendingOrFailed(ProductionOrderOperation $operation): bool

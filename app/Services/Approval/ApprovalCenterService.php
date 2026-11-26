@@ -159,6 +159,35 @@ class ApprovalCenterService
                 }
             }
 
+            // QR-07: Quality Plan Approvals (draft → pending_approval → approved)
+            if ($canApproveScrap) {
+                $qpCount = \App\Domains\Production\Models\ProductionQualityPlan::query()
+                    ->where('status', \App\Domains\Production\Models\ProductionQualityPlan::STATUS_PENDING_APPROVAL)
+                    ->count();
+                $totalActionableCount += $qpCount;
+
+                if ($qpCount > 0) {
+                    $qualityPlans = \App\Domains\Production\Models\ProductionQualityPlan::query()
+                        ->where('status', \App\Domains\Production\Models\ProductionQualityPlan::STATUS_PENDING_APPROVAL)
+                        ->orderBy('submitted_at', 'asc')
+                        ->take(self::MAX_HEADER_ITEMS)
+                        ->get();
+
+                    foreach ($qualityPlans as $qp) {
+                        $candidateItems[] = [
+                            'module' => 'Production',
+                            'type' => 'Quality Plan',
+                            'title' => (string) $qp->name . ' v' . $qp->version,
+                            'subtitle' => $qp->plan_number ? "Quality Plan {$qp->plan_number}" : 'Approval required',
+                            'url' => Route::has('production.quality-plans.show') ? route('production.quality-plans.show', $qp->id) : url("/production/quality-plans/{$qp->id}"),
+                            'icon' => 'feather-check-square',
+                            'time' => ($qp->submitted_at ?? $qp->created_at)?->diffForHumans(),
+                            'created_at' => ($qp->submitted_at ?? $qp->created_at)?->toIso8601String(),
+                        ];
+                    }
+                }
+            }
+
             // Production Plan Approvals
             if ($canApprovePlan) {
                 $planCount = ProductionPlan::query()->where('status', ProductionPlan::STATUS_PENDING_APPROVAL)->count();

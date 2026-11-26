@@ -3949,8 +3949,8 @@
 
                     <x-ui.odoo-form-ui type="select" label="{{ __('production.quality_status') }}" name="quality_status"
                         :required="true">
+                        {{-- QR-04: quarantine route removed — a product with a QC plan is received only after its final QC in WIP --}}
                         <option value="passed">{{ __('production.passed_inventory') }}</option>
-                        <option value="quarantine">{{ __('production.quarantine_inspection') }}</option>
                         <option value="failed">{{ __('production.failed_defective') }}</option>
                     </x-ui.odoo-form-ui>
 

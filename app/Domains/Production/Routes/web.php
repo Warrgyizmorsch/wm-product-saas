@@ -236,6 +236,7 @@ Route::prefix('production')
         Route::post('wip/{wip}/adjust', [WipController::class, 'adjust'])->name('wip.adjust');
         Route::post('wip/{wip}/convert', [WipController::class, 'convertToFg'])->name('wip.convert');
         Route::post('wip/orders/{order}/convert-fg', [WipController::class, 'convertOrderToFg'])->name('wip.convert-order');
+        Route::post('wip/orders/{order}/final-qc', [WipController::class, 'finalQc'])->name('wip.final-qc'); // QR-18
         Route::get('wip', [WipController::class, 'index'])->name('wip.index');
         Route::get('wip/{wip}', [WipController::class, 'show'])->name('wip.show');
 
@@ -276,7 +277,12 @@ Route::prefix('production')
         Route::delete('calendars/{calendar}/holidays/{holiday}', [CalendarController::class, 'destroyHoliday'])->name('calendars.holidays.destroy');
 
         // ── Quality Plans & Operator Skills ───────────────────────────────────
-        Route::resource('quality-plans', QualityPlanController::class)->except(['show']);
+        // QR-07 / QR-12 / QR-16: lifecycle actions, View screen and the routing QC modal data
+        Route::post('quality-plans/{quality_plan}/submit', [QualityPlanController::class, 'submit'])->name('quality-plans.submit');
+        Route::post('quality-plans/{quality_plan}/approve', [QualityPlanController::class, 'approve'])->name('quality-plans.approve');
+        Route::post('quality-plans/{quality_plan}/reject', [QualityPlanController::class, 'reject'])->name('quality-plans.reject');
+        Route::post('quality-plans/{quality_plan}/retire', [QualityPlanController::class, 'retire'])->name('quality-plans.retire');
+        Route::resource('quality-plans', QualityPlanController::class);
         Route::resource('operator-skills', OperatorSkillController::class)->except(['show']);
 
         // ── MES / Shop Floor ──────────────────────────────────────────────────

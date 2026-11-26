@@ -292,6 +292,7 @@ class ProductionOrderService
                     'parallel_group' => $routingOp?->parallel_group,
                     'parallel_type' => $routingOp?->parallel_type ?? 'AND',
                 ]);
+                app(OrderOperationQualityService::class)->copyRoutingPlans($op); // QR-17: snapshot the routing's QC plans
                 $createdOps[] = $op;
             }
 
@@ -1794,6 +1795,7 @@ class ProductionOrderService
                 'parallel_group' => $routingOp->parallel_group,
                 'parallel_type' => $routingOp->parallel_type ?? 'AND',
             ]);
+            app(OrderOperationQualityService::class)->copyRoutingPlans($op); // QR-17: snapshot the routing's QC plans
             $createdOps[] = $op;
         }
 
@@ -2320,6 +2322,7 @@ class ProductionOrderService
                 ]);
             } else {
                 $op = ProductionOrderOperation::create($attributes);
+                app(OrderOperationQualityService::class)->copyRoutingPlans($op); // QR-17: snapshot the routing's QC plans
                 $createdNow[] = $op;
             }
             $byKey[$entry['op_key']] = $op;
@@ -2381,6 +2384,8 @@ class ProductionOrderService
             }
             $sorted = collect($setOps)->sortBy('sequence')->values();
             $final = $sorted->last();
+            // QR-17 / QR-05: a semi made inside this order needs its product QC on the set's last operation (this order only)
+            app(OrderOperationQualityService::class)->applySubAssemblyQc($final);
             foreach ((array) ($setEntries[$groupKey]['serves_keys'] ?? []) as $consumerKey) {
                 $consumer = $byKey[$consumerKey] ?? null;
                 if (!$consumer) {
@@ -2435,7 +2440,9 @@ class ProductionOrderService
 
         $created = [];
         foreach ($entries as $entry) {
-            $created[] = ProductionOrderOperation::create($this->plannedOperationAttributes($order, $entry));
+            $newOp = ProductionOrderOperation::create($this->plannedOperationAttributes($order, $entry));
+            app(OrderOperationQualityService::class)->copyRoutingPlans($newOp); // QR-17: snapshot the routing's QC plans
+            $created[] = $newOp;
         }
 
         // Dependencies inside each BOM's routing

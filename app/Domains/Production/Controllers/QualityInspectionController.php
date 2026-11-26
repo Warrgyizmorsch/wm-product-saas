@@ -34,7 +34,8 @@ class QualityInspectionController extends Controller
     {
         $this->authorize('manage', ProductionQualityInspection::class);
         $tenantId = require_tenant_id();
-        $plans = ProductionQualityPlan::where('tenant_id', $tenantId)->get();
+        // QR-14: only Approved plans can be used for a new inspection
+        $plans = ProductionQualityPlan::where('tenant_id', $tenantId)->approved()->orderBy('name')->get();
         $orders = ProductionOrder::where('tenant_id', $tenantId)
             ->whereIn('status', [ProductionOrder::STATUS_IN_PROGRESS, ProductionOrder::STATUS_COMPLETED])
             ->with(['operations'])

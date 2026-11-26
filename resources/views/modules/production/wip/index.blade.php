@@ -412,27 +412,77 @@
                                     @endif
                                 </td>
                                 @php
-                                    $readyQtyToReceive = $totalCompleted;
+                                    // QR-18: with final QC, only the accepted (not yet received) quantity can be received
+                                    $finalQc = $finalQcMap[$orderId] ?? null;
+                                    $fqFmt = fn ($v) => rtrim(rtrim(number_format((float) $v, 4, '.', ''), '0'), '.');
+                                    $readyQtyToReceive = $finalQc ? min($totalCompleted, (float) $finalQc['summary']['allowed']) : $totalCompleted;
                                 @endphp
                                 <td class="text-end">
+                                    @if($finalQc && $finalQc['summary']['pending'] > 0.0001)
+                                        <button type="button" class="btn btn-xs btn-warning me-1 text-nowrap" data-bs-toggle="modal" data-bs-target="#finalQcModal{{ $orderId }}" title="Final quality check before warehouse receipt">
+                                            <i class="feather-shield me-1"></i> Final QC ({{ $fqFmt($finalQc['summary']['pending']) }} pending)
+                                        </button>
+                                    @endif
                                     @if($readyQtyToReceive > 0)
                                         <button type="button" class="btn btn-xs btn-success me-1 text-nowrap" data-bs-toggle="modal" data-bs-target="#bulkFgModal{{ $orderId }}" title="Receive all completed units into warehouse">
-                                            <i class="feather-arrow-down-right me-1"></i> {{ __('production.receive_completed_fg') }} ({{ number_format($readyQtyToReceive, 0) }})
+                                            <i class="feather-arrow-down-right me-1"></i> {{ __('production.receive_completed_fg') }} ({{ $fqFmt($readyQtyToReceive) }})
                                         </button>
+                                    @endif
+                                    @if($finalQc && $totalCompleted > 0 && $readyQtyToReceive <= 0)
+                                        <div class="fs-10 text-warning mt-1">Final QC pending — units can't be received yet</div>
                                     @endif
                                     <x-ui.action-dropdown :viewUrl="route('production.orders.show', $orderId)" />
 
+                                    @if($finalQc)
+                                        <!-- QR-18: Final QC Modal for the order's finished product -->
+                                        <x-ui.modal id="finalQcModal{{ $orderId }}" title="Final Quality Check - Order #{{ $order->order_number ?? $orderId }}" size="lg"
+                                            formAction="{{ route('production.wip.final-qc', $orderId) }}" submitText="Record Final QC" closeText="Cancel" class="text-start">
+                                            <div class="alert alert-warning py-2 fs-12 mb-3 text-start">
+                                                <i class="feather-shield me-1"></i>
+                                                {{ $product->name ?? 'This product' }} has an approved quality plan. Units can be received into a warehouse only after they pass this check.
+                                                <div class="mt-1">
+                                                    Waiting for final QC: <strong>{{ $fqFmt($finalQc['summary']['pending']) }}</strong> ·
+                                                    Accepted so far: <strong>{{ $fqFmt($finalQc['summary']['accepted']) }}</strong> ·
+                                                    Rejected: <strong>{{ $fqFmt($finalQc['summary']['rejected']) }}</strong> ·
+                                                    Received: <strong>{{ $fqFmt($finalQc['summary']['received']) }}</strong>
+                                                </div>
+                                            </div>
+
+                                            @include('modules.production.quality.partials.checklist-inputs', ['checklistPlans' => $finalQc['checklist'], 'idPrefix' => 'fq' . $orderId])
+
+                                            <div class="row g-3 mt-1">
+                                                <div class="col-md-4">
+                                                    <x-ui.odoo-form-ui type="input" label="Accepted Qty" name="accepted_qty" inputType="number" step="any" min="0" max="{{ (float) $finalQc['summary']['pending'] }}" value="{{ (float) $finalQc['summary']['pending'] }}" :required="true" />
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <x-ui.odoo-form-ui type="input" label="Rejected Qty" name="rejected_qty" inputType="number" step="any" min="0" max="{{ (float) $finalQc['summary']['pending'] }}" value="0" :required="true" />
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <x-ui.odoo-form-ui type="input" label="Defect Reason" name="defect_reason" placeholder="If rejected" />
+                                                </div>
+                                                <div class="col-md-12">
+                                                    <x-ui.odoo-form-ui type="input" label="Remarks" name="remarks" placeholder="Final QC notes" />
+                                                    <div class="form-check mt-2 fs-12">
+                                                        <input class="form-check-input" type="checkbox" name="confirm_failed_accept" value="1" id="fq_confirm_{{ $orderId }}">
+                                                        <label class="form-check-label" for="fq_confirm_{{ $orderId }}">I confirm accepting units even if a mandatory check fails (needed only when a mandatory check fails and 0 units are rejected)</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </x-ui.modal>
+                                    @endif
+
                                     <!-- Bulk FG Modal for Order -->
                                     <x-ui.modal id="bulkFgModal{{ $orderId }}" title="Receive Finished Goods - Order #{{ $order->order_number ?? $orderId }}"
-                                        formAction="{{ route('production.wip.convert-order', $orderId) }}" submitText="Receive {{ number_format($readyQtyToReceive, 2) }} Units into Warehouse" closeText="Cancel" class="text-start">
+                                        formAction="{{ route('production.wip.convert-order', $orderId) }}" submitText="Receive {{ $fqFmt($readyQtyToReceive) }} Units into Warehouse" closeText="Cancel" class="text-start">
                                         <div class="alert alert-info py-2 fs-12 mb-3 text-start">
-                                            <i class="feather-info me-1"></i> {{ __('production.transfer_all') }} <strong>{{ number_format($readyQtyToReceive, 2) }} completed finished units</strong> across all sub-cards for this order directly into Finished Goods warehouse inventory in one click.
+                                            <i class="feather-info me-1"></i> {{ __('production.transfer_all') }} <strong>{{ $fqFmt($readyQtyToReceive) }} completed finished units</strong> across all sub-cards for this order directly into Finished Goods warehouse inventory in one click.
+                                            @if($finalQc)
+                                                <div class="mt-1">Only units that passed final QC are received.</div>
+                                            @endif
                                         </div>
 
-                                        <x-ui.odoo-form-ui type="select" label="Quality Disposition" name="quality_status" :required="true">
-                                            <option value="passed">PASSED — Transfer directly to Finished Goods Warehouse</option>
-                                            <option value="quarantine">QUARANTINE — Send to Quality Quarantine Warehouse for inspection</option>
-                                        </x-ui.odoo-form-ui>
+                                        {{-- QR-04: quarantine route removed — finished goods are received as passed --}}
+                                        <input type="hidden" name="quality_status" value="passed">
 
                                         <x-ui.odoo-form-ui type="select" label="Destination Warehouse" name="warehouse_id" :required="true">
                                             @foreach($warehouses as $wh)

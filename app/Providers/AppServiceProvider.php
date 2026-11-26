@@ -814,9 +814,10 @@ class AppServiceProvider extends ServiceProvider
         );
 
         // Quality Management Policies
+        // QR-07: Quality Plans have their own lifecycle policy (draft → pending → approved → historical)
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionQualityPlan::class,
-            \App\Domains\Production\Policies\QualityManagementPolicy::class
+            \App\Domains\Production\Policies\QualityPlanPolicy::class
         );
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionQualityInspection::class,

@@ -811,28 +811,14 @@ class ProductionExecutionService
             // Validate completion guardrails via domain validator
             app(ProductionOrderCompletionValidator::class)->validateCompletion($order);
 
+            // QR-04 / QR-18: no quarantine route any more — a product with an approved plan is received only up to
+            // the quantity accepted by its final QC in WIP
             if ($qualityStatus === 'quarantine') {
-                $quarantineWarehouse = Warehouse::where('tenant_id', $order->tenant_id)
-                    ->where(function ($q) {
-                        $q->where('code', 'QUARANTINE')
-                            ->orWhere('name', 'LIKE', '%Quarantine%');
-                    })
-                    ->first();
-
-                if (!$quarantineWarehouse) {
-                    $quarantineWarehouse = Warehouse::create([
-                        'tenant_id'  => $order->tenant_id,
-                        'name'       => 'Quality Quarantine Warehouse',
-                        'code'       => 'QUARANTINE',
-                        'status'     => 'active',
-                        'address'    => 'Quality Assurance Quarantine Area',
-                        'is_default' => false,
-                    ]);
-                }
-                $warehouseId = $quarantineWarehouse->id;
-            } else {
-                $warehouseId = $warehouseId ?: $this->defaultWarehouseId($order->tenant_id);
+                throw new InvalidArgumentException('Receiving into quarantine is no longer available. Perform the final quality check in WIP, then receive the accepted units.');
             }
+            app(FinalQualityGateService::class)->assertCanReceive($order, $quantity);
+
+            $warehouseId = $warehouseId ?: $this->defaultWarehouseId($order->tenant_id);
 
             if (!$warehouseId) {
                 throw new InvalidArgumentException('A warehouse is required before receiving finished goods.');
@@ -910,38 +896,8 @@ class ProductionExecutionService
                 'remarks' => $remarks,
             ]);
 
-            // If quality status is quarantine, automatically raise a pending Quality Inspection for QA
-            if ($qualityStatus === 'quarantine') {
-                $plan = ProductionQualityPlan::where('tenant_id', $order->tenant_id)
-                    ->where('product_id', $order->product_id)
-                    ->first()
-                    ?? ProductionQualityPlan::where('tenant_id', $order->tenant_id)->first();
-
-                if (!$plan) {
-                    $plan = ProductionQualityPlan::create([
-                        'tenant_id' => $order->tenant_id,
-                        'name' => 'Default FG Receiving Quality Plan',
-                        'code' => 'QP-FG-' . rand(1000, 9999),
-                        'type' => 'final',
-                        'product_id' => $order->product_id,
-                        'status' => 'active',
-                        'created_by' => $userId ?? 1,
-                    ]);
-                }
-
-                ProductionQualityInspection::create([
-                    'tenant_id'           => $order->tenant_id,
-                    'company_id'          => $order->company_id ?? company_id(),
-                    'branch_id'           => $order->branch_id ?? branch_id(),
-                    'quality_plan_id'     => $plan->id,
-                    'stage'               => 'final',
-                    'status'              => 'submitted',
-                    'result'              => 'quarantine',
-                    'production_order_id' => $order->id,
-                    'operator_id'         => $userId,
-                    'remarks'             => "Quarantine Inspection raised automatically upon FG receipt of {$quantity} units into Quality Quarantine Warehouse (Order #{$order->order_number}). {$remarks}",
-                ]);
-            }
+            // QR-04 (QM-02 "Remove it"): the quarantine route and its auto-created inspection / empty plan are gone —
+            // final QC is done in WIP before receipt (FinalQualityGateService).
 
             // ── Step 7: Write FG genealogy trace ─────────────────────────────
             // Link ProductionBatch → Inventory::Batch for full forward traceability.

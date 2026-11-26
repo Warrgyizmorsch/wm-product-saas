@@ -177,7 +177,7 @@ class MesController extends Controller
         // Operators list for shopfloor operator assignment, Quality Plans, Work Centers, & Machines
         $operators = \App\Models\User::where('tenant_id', $tenantId)->get();
         $qualityPlans = \App\Domains\Production\Models\ProductionQualityPlan::where('tenant_id', $tenantId)
-            ->whereIn('status', ['approved', 'draft', 'active'])
+            ->approved() // QR-14
             ->with('parameters')
             ->get();
         $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->where(function($q) { $q->where('status', 'active')->orWhereNull('status'); })->get();
@@ -254,7 +254,12 @@ class MesController extends Controller
 
         try {
             $this->mesService->completeOperation($op, $data, auth()->id());
-            return redirect()->back()->with('success', 'Operation completed and progress logged.');
+            $redirect = redirect()->back()->with('success', 'Operation completed and progress logged.');
+            // QR-05: a semi made inside the order must pass its QC before the next operation can use it
+            if ($semiQc = $this->mesService->pendingSemiQcMessage($op)) {
+                $redirect->with('warning', $semiQc);
+            }
+            return $redirect;
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -268,7 +273,11 @@ class MesController extends Controller
 
         try {
             $this->mesService->logPartialProgress($op, $data, auth()->id());
-            return redirect()->back()->with('success', 'Daily progress logged successfully.');
+            $redirect = redirect()->back()->with('success', 'Daily progress logged successfully.');
+            if ($semiQc = $this->mesService->pendingSemiQcMessage($op)) {
+                $redirect->with('warning', $semiQc);
+            }
+            return $redirect;
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -336,6 +345,13 @@ class MesController extends Controller
             'audited_by' => 'nullable|integer',
             'defect_reason' => 'nullable|string|max:255',
             'remarks' => 'nullable|string|max:500',
+            // QR-16 / QP-04: checklist readings per plan — saved and evaluated (mandatory checks enforced in the service)
+            'parameter_values' => 'nullable|array',
+            'parameter_values.*' => 'nullable|array',
+            'parameter_values.*.*' => 'nullable|string|max:1000',
+            'inspected_plans' => 'nullable|array',
+            'inspected_plans.*' => 'integer',
+            'confirm_failed_accept' => 'nullable|boolean',
         ]);
 
         try {
@@ -374,11 +390,15 @@ class MesController extends Controller
                 'defect_reason' => $request->input('defect_reason'),
                 'batch_id' => $batchId,
                 'remarks' => $request->input('remarks'),
+                'parameter_values' => (array) $request->input('parameter_values', []),
+                'inspected_plans' => (array) $request->input('inspected_plans', []),
+                'confirm_failed_accept' => $request->boolean('confirm_failed_accept'),
+                'enforce_checklist' => true,
             ], $request->input('audited_by') ?? auth()->id());
 
             return redirect()->back()->with('success', 'Shopfloor Quality Inspection recorded successfully.');
         } catch (InvalidArgumentException $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
     }
 
@@ -937,11 +957,17 @@ class MesController extends Controller
         // Try mapping the schedule operation if it exists
         $scheduleOp = ProductionScheduleOperation::where('production_order_operation_id', $opId)->first();
 
-        // Shared MES Master Data for aligned QC, Scrap, and Rework workflows
+        // Shared MES Master Data for aligned QC, Scrap, and Rework workflows — QR-14: approved plans only
         $qualityPlans = \App\Domains\Production\Models\ProductionQualityPlan::where('tenant_id', $tenantId)
-            ->whereIn('status', ['approved', 'draft', 'active'])
+            ->approved()
             ->with('parameters')
             ->get();
+
+        // QR-16 / QR-17: the plans this operation must run (order snapshot). Orders built before the snapshot existed get
+        // their routing operation's plans copied on first view.
+        $qcService = app(\App\Domains\Production\Services\OrderOperationQualityService::class);
+        $checklistPlans = $qcService->checklistFor($op); // existing order: linked versions kept as they are (QM-13)
+        $checklistPlans = $checklistPlans->map(fn ($link) => ['plan' => $link->plan, 'is_mandatory' => (bool) $link->is_mandatory, 'source' => $link->source])->values();
         $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->where(function($q) { $q->where('status', 'active')->orWhereNull('status'); })->get();
         $machines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->get();
         $warehouses = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
@@ -989,6 +1015,7 @@ class MesController extends Controller
             'operators',
             'scheduleOp',
             'qualityPlans',
+            'checklistPlans',
             'workCenters',
             'machines',
             'warehouses',

@@ -34,6 +34,6 @@ class ProductionQualityInspectionResult extends BaseModel
 
     public function parameter(): BelongsTo
     {
-        return $this->belongsTo(ProductionQualityPlanParameter::class, 'quality_plan_parameter_id');
+        return $this->belongsTo(ProductionQualityPlanParameter::class, 'quality_plan_parameter_id')->withTrashed();
     }
 }

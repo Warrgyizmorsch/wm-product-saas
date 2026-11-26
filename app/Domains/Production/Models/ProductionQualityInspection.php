@@ -71,7 +71,13 @@ class ProductionQualityInspection extends BaseModel
 
     public function plan(): BelongsTo
     {
-        return $this->belongsTo(ProductionQualityPlan::class, 'quality_plan_id');
+        return $this->belongsTo(ProductionQualityPlan::class, 'quality_plan_id')->withTrashed();
+    }
+
+    /** QR-16: every plan this inspection covered. */
+    public function planLinks(): HasMany
+    {
+        return $this->hasMany(ProductionQualityInspectionPlan::class, 'quality_inspection_id');
     }
 
     public function order(): BelongsTo

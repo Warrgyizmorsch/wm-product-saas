@@ -75,7 +75,10 @@ class SubcontractReceiptOrchestrator
                 if ($isQcRequired === null) {
                     $productId = $op->order?->product_id;
                     if ($productId) {
+                        // QR-14: only an Approved product plan switches QC on (drafts never count)
                         $isQcRequired = \App\Domains\Production\Models\ProductionQualityPlan::where('tenant_id', $grn->tenant_id)
+                            ->approved()
+                            ->where('type', \App\Domains\Production\Models\ProductionQualityPlan::SCOPE_PRODUCT)
                             ->where('product_id', $productId)
                             ->exists();
                     } else {

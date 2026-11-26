@@ -129,8 +129,9 @@
             <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') }}: {{ $errors->first() }}" />
         @endif
 
-        <form method="POST" action="{{ route('production.routing.store') }}" x-data="routingForm()">
+        <form method="POST" action="{{ route('production.routing.store') }}" x-data="routingQcMixin(routingForm(), @js($qcPlanCatalog ?? []), @js($qcInitial ?? []))">
             @csrf
+            @include('modules.production.routing.partials.qc-plan-modal')
             
             <x-ui.odoo-form-ui type="sheet">
                 <!-- Header with Close Button -->
@@ -582,8 +583,18 @@
                                         </td>
                                         
                                         <!-- Quality Required -->
-                                        <td class="text-center align-middle" style="width: 45px; min-width: 45px;">
-                                            <input type="checkbox" class="form-check-input ms-0 mt-0" x-model="operation.quality_required" x-bind:name="'operations['+index+'][quality_required]'" value="1" />
+                                        <td class="text-center align-middle text-nowrap" style="width: 60px; min-width: 60px;">
+                                            <!-- QR-16: QC gate + eye icon (reopens the QC plan modal); plans posted as hidden fields -->
+                                            <input type="checkbox" class="form-check-input ms-0 mt-0" x-model="operation.quality_required" @change="qcToggle(operation)" x-bind:name="'operations['+index+'][quality_required]'" value="1" />
+                                            <button type="button" class="rqc-eye" x-show="operation.quality_required" x-cloak @click="qcOpen(operation)" :title="qcCountLabel(operation)" aria-label="Review QC plans">
+                                                <i class="feather-eye fs-12"></i>
+                                            </button>
+                                            <template x-for="(qp, qi) in (operation.quality_required ? (operation.quality_plans || []) : [])" :key="'qp-' + operation.uid + '-' + qp.id">
+                                                <span>
+                                                    <input type="hidden" :name="'operations['+index+'][quality_plans]['+qi+'][id]'" :value="qp.id" />
+                                                    <input type="hidden" :name="'operations['+index+'][quality_plans]['+qi+'][is_mandatory]'" :value="qp.is_mandatory ? 1 : 0" />
+                                                </span>
+                                            </template>
                                         </td>
 
                                         <!-- Type / Alternative -->

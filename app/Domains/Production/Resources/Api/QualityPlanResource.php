@@ -20,7 +20,8 @@ class QualityPlanResource extends JsonResource
         return [
             'id'             => $this->id,
             'name'           => $this->name,
-            'code'           => $this->code,
+            'plan_number'    => $this->plan_number,
+            'root_plan_id'   => $this->root_plan_id,
             'version'        => $this->version,
             'type'           => $this->type,
             'status'         => $this->status,
@@ -30,6 +31,7 @@ class QualityPlanResource extends JsonResource
                 'name' => $this->product->name,
                 'sku'  => $this->product->sku ?? null,
             ]),
+            'section_id'     => $this->section_id,
             'work_center_id' => $this->work_center_id,
             'work_center'    => $this->whenLoaded('workCenter', fn () => [
                 'id'   => $this->workCenter->id,
@@ -42,8 +44,9 @@ class QualityPlanResource extends JsonResource
                 'type'            => $p->type,
                 'min_value'       => $p->min_value !== null ? (float) $p->min_value : null,
                 'max_value'       => $p->max_value !== null ? (float) $p->max_value : null,
-                'target_value'    => $p->target_value !== null ? (float) $p->target_value : null,
+                'uom_id'          => $p->uom_id,
                 'unit_of_measure' => $p->unit_of_measure,
+                'basis'           => $p->basis,
                 'sampling_type'   => $p->sampling_type,
                 'sampling_value'  => $p->sampling_value !== null ? (float) $p->sampling_value : null,
                 'is_mandatory'    => (bool) $p->is_mandatory,

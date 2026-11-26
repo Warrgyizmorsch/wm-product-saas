@@ -698,54 +698,8 @@
             <span class="badge bg-warning text-dark fs-12 px-3 py-2 font-monospace">Pending QC: {{ number_format($touchPendingQcQty, 0) }}</span>
         </div>
 
-        @php
-            $selectedPlanId = null;
-            // 1. Prioritize source product quality plan if operation processes an SFG
-            if ($op->source_product_id) {
-                foreach ($qualityPlans ?? [] as $qp) {
-                    if ($qp->product_id == $op->source_product_id) {
-                        $selectedPlanId = $qp->id;
-                        break;
-                    }
-                }
-            }
-            // 2. Prioritize in_process quality plan for order finished good
-            if (!$selectedPlanId) {
-                foreach ($qualityPlans ?? [] as $qp) {
-                    if ($qp->product_id == $order->product_id && ($qp->type ?? '') === 'in_process') {
-                        $selectedPlanId = $qp->id;
-                        break;
-                    }
-                }
-            }
-            // 3. Match any plan for order finished good
-            if (!$selectedPlanId) {
-                foreach ($qualityPlans ?? [] as $qp) {
-                    if ($qp->product_id == $order->product_id) {
-                        $selectedPlanId = $qp->id;
-                        break;
-                    }
-                }
-            }
-            // 4. Default to first available plan
-            if (!$selectedPlanId && count($qualityPlans ?? []) > 0) {
-                $selectedPlanId = $qualityPlans->first()->id;
-            }
-        @endphp
-
+        {{-- QR-16 / QP-04: the operation's own Quality Plans (order snapshot) — every value is saved and checked --}}
         <div class="row g-3 text-start">
-            <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Quality Plan" name="quality_plan_id"
-                    id="quality_plan_id_{{ $op->id }}" class="quality-plan-select"
-                    data-op-id="{{ $op->id }}" :required="true">
-                    <option value="">-- Select Quality Plan --</option>
-                    @foreach($qualityPlans ?? [] as $qp)
-                        <option value="{{ $qp->id }}" @selected($selectedPlanId == $qp->id)>
-                            {{ $qp->name }} ({{ strtoupper($qp->type ?? 'in_process') }})
-                        </option>
-                    @endforeach
-                </x-ui.odoo-form-ui>
-            </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="select" label="Quality Auditor / Inspector" name="audited_by" :required="true">
                     @foreach($operators as $opUser)
@@ -755,66 +709,24 @@
                     @endforeach
                 </x-ui.odoo-form-ui>
             </div>
+            <div class="col-md-6 fs-12 text-muted d-flex align-items-center">
+                {{ ($checklistPlans ?? collect())->count() }} quality plan(s) ·
+                {{ ($checklistPlans ?? collect())->where('is_mandatory', true)->count() }} mandatory
+            </div>
 
             <div class="col-md-12">
                 <label class="form-label fw-semibold fs-11 text-uppercase text-dark mb-1">
                     <i class="feather-check-square text-primary me-1"></i>Quality Specification Checklist Parameters
                 </label>
-                <div class="p-3 border rounded bg-light fs-11" id="qualityChecklistContainer_{{ $op->id }}">
-                    {{-- Standard Fallback Checklist (Uses odoo-form-ui) --}}
-                    <div class="qc-plan-group" id="qc_plan_group_{{ $op->id }}_none" style="{{ empty($selectedPlanId) ? '' : 'display: none;' }}">
-                        <x-ui.odoo-form-ui type="checkbox" label="Visual Finish" name="parameter_values[visual]" value="pass" placeholder="Visual Surface Finish & Coating Inspection (Pass)" :checked="true" :disabled="!empty($selectedPlanId)" />
-                        <x-ui.odoo-form-ui type="checkbox" label="Dimensional Spec" name="parameter_values[dimensional]" value="pass" placeholder="Dimensional & Thickness Tolerance Within Specification (Pass)" :checked="true" :disabled="!empty($selectedPlanId)" />
-                        <x-ui.odoo-form-ui type="checkbox" label="Structural Test" name="parameter_values[structural]" value="pass" placeholder="Assembly & Structural Integrity Test (Pass)" :checked="true" :disabled="!empty($selectedPlanId)" />
-                    </div>
-
-                    {{-- Dynamic Quality Plan Checklist Parameters (All using odoo-form-ui) --}}
-                    @foreach($qualityPlans ?? [] as $qp)
-                        @php
-                            $isThisPlanActive = ($selectedPlanId == $qp->id);
-                        @endphp
-                        <div class="qc-plan-group" id="qc_plan_group_{{ $op->id }}_{{ $qp->id }}" style="{{ $isThisPlanActive ? '' : 'display: none;' }}">
-                            @forelse($qp->parameters as $param)
-                                @php
-                                    $uom = $param->unit_of_measure ?? '';
-                                    $hasMin = $param->min_value !== null && $param->min_value !== '';
-                                    $hasMax = $param->max_value !== null && $param->max_value !== '';
-                                    $specInfo = ($hasMin || $hasMax) ? ' [Spec: ' . ($hasMin ? $param->min_value : '') . ' - ' . ($hasMax ? $param->max_value : '') . ($uom ? ' ' . $uom : '') . ']' : ($uom ? ' (' . $uom . ')' : '');
-                                    $paramLabel = $param->name . $specInfo;
-                                    $measuredPlaceholder = 'Enter measured value' . ($uom ? ' (' . $uom . ')' : '');
-                                @endphp
-                                @if($param->type === 'numeric')
-                                    <x-ui.odoo-form-ui type="input" inputType="number" step="any"
-                                        label="{{ $paramLabel }}"
-                                        name="parameter_values[{{ $param->id }}]"
-                                        id="param_{{ $op->id }}_{{ $param->id }}"
-                                        :placeholder="$measuredPlaceholder"
-                                        :required="$param->is_mandatory"
-                                        :disabled="!$isThisPlanActive" />
-                                @elseif($param->type === 'text')
-                                    <x-ui.odoo-form-ui type="input" inputType="text"
-                                        label="{{ $paramLabel }}"
-                                        name="parameter_values[{{ $param->id }}]"
-                                        id="param_{{ $op->id }}_{{ $param->id }}"
-                                        placeholder="Enter observation / inspection notes..."
-                                        :required="$param->is_mandatory"
-                                        :disabled="!$isThisPlanActive" />
-                                @else
-                                    <x-ui.odoo-form-ui type="checkbox"
-                                        label="{{ $param->name }}"
-                                        name="parameter_values[{{ $param->id }}]"
-                                        id="param_{{ $op->id }}_{{ $param->id }}"
-                                        value="pass"
-                                        placeholder="{{ $param->name }} (Pass)"
-                                        :checked="true"
-                                        :disabled="!$isThisPlanActive" />
-                                @endif
-                            @empty
-                                <div class="text-muted fs-12 py-1">
-                                    <i class="feather-info text-primary me-1"></i>{{ __('production.quality_plan') }}<strong>{{ $qp->name }}</strong>{{ __('production.no_checklist_parameters') }}</div>
-                            @endforelse
-                        </div>
-                    @endforeach
+                @include('modules.production.quality.partials.checklist-inputs', ['checklistPlans' => $checklistPlans ?? collect(), 'idPrefix' => 'op' . $op->id])
+                @if ($errors->has('parameter_values'))
+                    <div class="text-danger fs-12 mt-1">{{ $errors->first('parameter_values') }}</div>
+                @endif
+                <div class="form-check mt-2 fs-12">
+                    <input class="form-check-input" type="checkbox" name="confirm_failed_accept" value="1" id="confirm_failed_accept_{{ $op->id }}">
+                    <label class="form-check-label" for="confirm_failed_accept_{{ $op->id }}">
+                        I confirm accepting units even if a mandatory check fails (needed only when a mandatory check fails and 0 units are rejected)
+                    </label>
                 </div>
             </div>
 

@@ -538,6 +538,16 @@
             </x-ui.toast>
         @endif
 
+        @if (session('warning'))
+            <x-ui.toast :auto="true" title="{{ session('warning') }}" type="warning" delay="8000">
+            </x-ui.toast>
+        @endif
+
+        @if (session('info'))
+            <x-ui.toast :auto="true" title="{{ session('info') }}" type="info" delay="6000">
+            </x-ui.toast>
+        @endif
+
         @if ($errors->any())
             <x-ui.toast :auto="true" title="{{ $errors->first() }}" type="error" delay="5000">
             </x-ui.toast>

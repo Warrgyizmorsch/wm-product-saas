@@ -65,12 +65,39 @@ class RoutingController extends Controller
 
             return view('modules.production.routing.edit', compact(
                 'routing', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'copyMode', 'newVersion', 'keptResources'
-            ));
+            ) + $this->qcFormData($routing));
         }
 
         return view('modules.production.routing.create', compact(
             'workCenters', 'vendors', 'serviceProducts', 'operationTypes'
-        ));
+        ) + $this->qcFormData(null));
+    }
+
+    /**
+     * QR-16: data for the routing QC modal — the plan catalog (Approved section / process plans + plans already linked)
+     * and each operation row's saved choices, in the same order the form builds its rows (old input wins).
+     */
+    private function qcFormData(?Routing $routing): array
+    {
+        $oldOps = old('operations');
+        if (is_array($oldOps) && !empty($oldOps)) {
+            $qcInitial = collect(array_values($oldOps))->map(fn($op) => !empty($op['quality_required'])
+                ? collect((array) ($op['quality_plans'] ?? []))->filter(fn($r) => !empty($r['id']))
+                    ->map(fn($r) => ['id' => (int) $r['id'], 'is_mandatory' => filter_var($r['is_mandatory'] ?? true, FILTER_VALIDATE_BOOLEAN)])->values()->all()
+                : [])->all();
+        } elseif ($routing) {
+            $routing->loadMissing('operations.qualityPlanLinks');
+            $qcInitial = $routing->operations->map(fn($op) => $op->quality_required
+                ? $op->qualityPlanLinks->map(fn($l) => ['id' => (int) $l->quality_plan_id, 'is_mandatory' => (bool) $l->is_mandatory])->values()->all()
+                : [])->values()->all();
+        } else {
+            $qcInitial = [];
+        }
+
+        $includeIds = collect($qcInitial)->flatten(1)->pluck('id')->filter()->unique()->values()->all();
+        $qcPlanCatalog = app(\App\Domains\Production\Services\QualityPlanService::class)->routingCatalog(require_tenant_id(), $includeIds);
+
+        return compact('qcPlanCatalog', 'qcInitial');
     }
 
     public function store(StoreRoutingRequest $request): RedirectResponse
@@ -138,7 +165,10 @@ class RoutingController extends Controller
         // RT-IMPL-06: linked BOMs and the effect of Retire / Cancel, shown in the confirmations
         $bomImpact = app(\App\Domains\Production\Services\RoutingLifecycleService::class)->bomImpact($routing);
 
-        return view('modules.production.routing.show', compact('routing', 'costSummary', 'costStatus', 'bomImpact'));
+        // QR-09: QC plans per operation + "newer version" warnings (never auto-updated)
+        $qcPlanWarnings = app(\App\Domains\Production\Services\QualityPlanService::class)->routingPlanWarnings($routing);
+
+        return view('modules.production.routing.show', compact('routing', 'costSummary', 'costStatus', 'bomImpact', 'qcPlanWarnings'));
     }
 
     public function edit(int $id): View
@@ -178,7 +208,7 @@ class RoutingController extends Controller
 
         return view('modules.production.routing.edit', compact(
             'routing', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'operationBomUsage', 'keptResources'
-        ));
+        ) + $this->qcFormData($routing));
     }
 
     public function update(UpdateRoutingRequest $request, int $id): RedirectResponse

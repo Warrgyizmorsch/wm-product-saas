@@ -307,6 +307,12 @@ class ProductionOrderOperation extends BaseModel
         return $this->belongsTo(RoutingOperation::class, 'routing_operation_id');
     }
 
+    /** QR-17: snapshot of the Quality Plans this order operation must run (routing copy + looped-semi plans). */
+    public function qualityPlanLinks(): HasMany
+    {
+        return $this->hasMany(ProductionOrderOperationQualityPlan::class, 'production_order_operation_id')->orderBy('sort_order')->orderBy('id');
+    }
+
     public function previousOperation(): BelongsTo
     {
         return $this->belongsTo(self::class, 'previous_operation_id');

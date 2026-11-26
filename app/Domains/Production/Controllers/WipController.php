@@ -53,10 +53,21 @@ class WipController extends Controller
         // Pre-aggregate Work-Center summaries & Batch Pipeline data for orders on the current page
         $orderSummariesMap = [];
         $orderBatchPipelinesMap = [];
+        $finalQcMap = []; // QR-18: final QC status per order whose product has approved plans
+        $finalGate = app(\App\Domains\Production\Services\FinalQualityGateService::class);
         foreach ($ordersPaginator->items() as $order) {
             $summaries = $this->wipService->getWorkCenterWipSummaries($tenantId, $order->id, $workCenterIdFilter);
             $orderSummariesMap[$order->id] = $summaries;
             $orderBatchPipelinesMap[$order->id] = $this->wipService->getBatchPipelineData($order->id);
+
+            $orderModel = $order instanceof \App\Domains\Production\Models\ProductionOrder ? $order : \App\Domains\Production\Models\ProductionOrder::find($order->id);
+            $finalPlans = $orderModel ? $finalGate->plans($orderModel) : collect();
+            if ($finalPlans->isNotEmpty()) {
+                $finalQcMap[$order->id] = [
+                    'summary' => $finalGate->summary($orderModel),
+                    'checklist' => $finalPlans->map(fn ($plan) => ['plan' => $plan, 'is_mandatory' => true, 'source' => 'final'])->values(),
+                ];
+            }
         }
 
         // Flat card fallback view query
@@ -80,10 +91,50 @@ class WipController extends Controller
             'ordersPaginator',
             'orderSummariesMap',
             'orderBatchPipelinesMap',
+            'finalQcMap',
             'workCenters',
             'workCenterIdFilter',
             'warehouses'
         ));
+    }
+
+    /**
+     * QR-18: final QC of the finished product, recorded from the WIP section. Only the accepted quantity can then be
+     * received into a warehouse.
+     */
+    public function finalQc(Request $request, int $orderId)
+    {
+        abort_unless(auth()->user() && (auth()->user()->role === 'admin' || auth()->user()->hasProductionPermission('production.mes.execute')), 403);
+
+        $request->validate([
+            'accepted_qty' => 'required|numeric|min:0',
+            'rejected_qty' => 'required|numeric|min:0',
+            'defect_reason' => 'nullable|string|max:255',
+            'remarks' => 'nullable|string|max:500',
+            'parameter_values' => 'nullable|array',
+            'parameter_values.*' => 'nullable|array',
+            'parameter_values.*.*' => 'nullable|string|max:1000',
+            'confirm_failed_accept' => 'nullable|boolean',
+        ]);
+
+        $order = \App\Domains\Production\Models\ProductionOrder::where('tenant_id', require_tenant_id())->findOrFail($orderId);
+
+        try {
+            $inspection = app(\App\Domains\Production\Services\QualityInspectionService::class)->recordFinalInspection($order, [
+                'accepted_qty' => $request->input('accepted_qty'),
+                'rejected_qty' => $request->input('rejected_qty'),
+                'defect_reason' => $request->input('defect_reason'),
+                'remarks' => $request->input('remarks'),
+                'parameter_values' => (array) $request->input('parameter_values', []),
+                'confirm_failed_accept' => $request->boolean('confirm_failed_accept'),
+            ], auth()->id());
+
+            $fmt = fn ($v) => rtrim(rtrim(number_format((float) $v, 4, '.', ''), '0'), '.');
+
+            return redirect()->back()->with('success', "Final QC recorded: {$fmt($inspection->passed_qty)} accepted, {$fmt($inspection->failed_qty)} rejected. Accepted units can now be received.");
+        } catch (InvalidArgumentException $e) {
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
+        }
     }
 
     /**

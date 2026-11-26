@@ -426,6 +426,10 @@ class RoutingService
                 'wait_time_minutes'              => (float) ($op->wait_time_minutes ?? 0),
                 'expected_yield_percentage'      => (float) $op->expected_yield_percentage,
                 'quality_required'               => (bool) $op->quality_required,
+                // QR-16: Duplicate Version copies the QC plan choices too
+                'quality_plans'                  => $op->quality_required
+                    ? $op->qualityPlanLinks()->get()->map(fn($l) => ['id' => $l->quality_plan_id, 'is_mandatory' => (bool) $l->is_mandatory])->values()->all()
+                    : [],
                 'is_external'                    => (bool) $op->is_external,
                 'vendor_id'                      => $op->vendor_id,
                 'material_supply_type'           => $op->material_supply_type,
@@ -544,6 +548,24 @@ class RoutingService
      *
      * @return array<int, string> warnings for removed operations that BOMs still use
      */
+    /**
+     * QR-15: replace a routing operation's Quality Plan links with the given rows ([['id' => …, 'is_mandatory' => …], …]).
+     */
+    private function syncOperationQualityPlans(RoutingOperation $operation, array $rows, int $tenantId): void
+    {
+        \App\Domains\Production\Models\RoutingOperationQualityPlan::where('routing_operation_id', $operation->id)->delete();
+
+        foreach (array_values($rows) as $i => $row) {
+            \App\Domains\Production\Models\RoutingOperationQualityPlan::create([
+                'tenant_id'            => $tenantId,
+                'routing_operation_id' => $operation->id,
+                'quality_plan_id'      => (int) $row['id'],
+                'is_mandatory'         => (bool) ($row['is_mandatory'] ?? true),
+                'sort_order'           => $i + 1,
+            ]);
+        }
+    }
+
     private function syncOperations(Routing $routing, array $operationDTOs, int $tenantId): array
     {
         $existing = $routing->operations()->get()->keyBy('id');
@@ -640,6 +662,11 @@ class RoutingService
         }
 
         $idsOfThisRouting = collect($createdOps)->map(fn($c) => $c['model']->id)->all();
+
+        // QR-15: the QC gate's Quality Plans live in the mapping table (gate off → no rows)
+        foreach ($createdOps as $item) {
+            $this->syncOperationQualityPlans($item['model'], $item['dto']->quality_required ? $item['dto']->quality_plans : [], $tenantId);
+        }
 
         // Pass 2 (RT-IMPL-08): bind alternatives unambiguously, only to operations of THIS routing
         foreach ($createdOps as $item) {

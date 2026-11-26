@@ -360,6 +360,19 @@ Route::middleware([
         Route::delete('/{qualityPlan}', [QualityPlanApiController::class, 'destroy'])
             ->middleware('throttle:production-api-write')
             ->name('api.v1.production.quality_plans.destroy');
+        // QR-07: lifecycle transitions
+        Route::post('/{qualityPlan}/submit', [QualityPlanApiController::class, 'submit'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.quality_plans.submit');
+        Route::post('/{qualityPlan}/approve', [QualityPlanApiController::class, 'approve'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.quality_plans.approve');
+        Route::post('/{qualityPlan}/reject', [QualityPlanApiController::class, 'reject'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.quality_plans.reject');
+        Route::post('/{qualityPlan}/historical', [QualityPlanApiController::class, 'retire'])
+            ->middleware('throttle:production-api-write')
+            ->name('api.v1.production.quality_plans.historical');
     });
 
     // --- Work-In-Progress (WIP) ---

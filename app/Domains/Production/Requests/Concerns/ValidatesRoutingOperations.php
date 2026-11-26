@@ -70,6 +70,10 @@ trait ValidatesRoutingOperations
             'operations.*.description'                    => 'nullable|string',
             'operations.*.instructions'                   => 'nullable|string',
             'operations.*.quality_required'               => 'nullable|boolean',
+            // QR-15 / QR-16: Quality Plans run when the QC gate is on (checked in validateRoutingOperationQualityPlans)
+            'operations.*.quality_plans'                  => 'nullable|array',
+            'operations.*.quality_plans.*.id'             => ['required', 'integer', $this->tenantExists('production_quality_plans')],
+            'operations.*.quality_plans.*.is_mandatory'   => 'nullable|boolean',
             'operations.*.is_external'                    => 'nullable|boolean',
             'operations.*.vendor_id'                      => ['nullable', 'integer', $this->tenantExists('vendors')],
             'operations.*.subcontract_lead_time_days'     => 'nullable|numeric|min:0',
@@ -88,6 +92,60 @@ trait ValidatesRoutingOperations
             'operations.*.predecessor_sequence'           => 'nullable',
             'operations.*.previous_operation_id'          => 'nullable|integer',
         ];
+    }
+
+    /**
+     * QR-16: a ticked QC gate needs at least one plan; each plan must be Approved and either Process General or a
+     * Section plan of the operation's own section. A plan already linked to the same saved operation may stay even if
+     * it has since become historical (the routing shows a "newer version" warning instead — QR-09).
+     */
+    protected function validateRoutingOperationQualityPlans($validator, array $operations): void
+    {
+        $tenantId = tenant_id() ?? 0;
+        $planIds = collect($operations)
+            ->flatMap(fn($op) => collect($op['quality_plans'] ?? [])->pluck('id'))
+            ->filter()->map(fn($id) => (int) $id)->unique()->values();
+
+        $plans = $planIds->isEmpty() ? collect() : \App\Domains\Production\Models\ProductionQualityPlan::withTrashed()
+            ->where('tenant_id', $tenantId)->whereIn('id', $planIds)->get()->keyBy('id');
+
+        $opIds = collect($operations)->pluck('id')->filter()->map(fn($id) => (int) $id)->values();
+        $existingLinks = $opIds->isEmpty() ? collect() : \App\Domains\Production\Models\RoutingOperationQualityPlan::whereIn('routing_operation_id', $opIds)
+            ->get()->groupBy('routing_operation_id')->map(fn($rows) => $rows->pluck('quality_plan_id')->map(fn($id) => (int) $id)->all());
+
+        foreach ($operations as $index => $op) {
+            if (!filter_var($op['quality_required'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                continue;
+            }
+
+            $label = 'Operation ' . ($op['sequence'] ?? ($index + 1)) . (!empty($op['name']) ? ' (' . $op['name'] . ')' : '');
+            $rows = array_values((array) ($op['quality_plans'] ?? []));
+            if (count($rows) === 0) {
+                $validator->errors()->add("operations.{$index}.quality_plans", "{$label}: QC is ticked — add at least one quality plan, or untick QC.");
+                continue;
+            }
+
+            $sectionId = !empty($op['section_id']) ? (int) $op['section_id'] : null;
+            $keepIds = !empty($op['id']) ? ($existingLinks[(int) $op['id']] ?? []) : [];
+
+            foreach ($rows as $row) {
+                $plan = $plans[(int) ($row['id'] ?? 0)] ?? null;
+                if (!$plan) {
+                    continue; // the exists rule reports it
+                }
+                $alreadyLinked = in_array($plan->id, $keepIds, true);
+
+                if (!$plan->isApproved() && !$alreadyLinked) {
+                    $validator->errors()->add("operations.{$index}.quality_plans", "{$label}: quality plan '{$plan->name}' v{$plan->version} is not approved.");
+                    continue;
+                }
+                if ($plan->type === \App\Domains\Production\Models\ProductionQualityPlan::SCOPE_SECTION && (int) $plan->section_id !== (int) $sectionId) {
+                    $validator->errors()->add("operations.{$index}.quality_plans", "{$label}: quality plan '{$plan->name}' belongs to another section.");
+                } elseif ($plan->type === \App\Domains\Production\Models\ProductionQualityPlan::SCOPE_PRODUCT) {
+                    $validator->errors()->add("operations.{$index}.quality_plans", "{$label}: product plans can't be linked to a routing (routings are general).");
+                }
+            }
+        }
     }
 
     protected function routingOperationMessages(): array
@@ -115,6 +173,8 @@ trait ValidatesRoutingOperations
      */
     protected function validateRoutingOperations($validator, array $operations): void
     {
+        $this->validateRoutingOperationQualityPlans($validator, $operations);
+
         usort($operations, fn($a, $b) => ($a['sequence'] ?? 0) <=> ($b['sequence'] ?? 0));
 
         // Rule 1: unique sequences; Rule 2: queue threshold

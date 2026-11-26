@@ -24,6 +24,10 @@ class QualityInspectionService
     {
         return DB::transaction(function () use ($tenantId, $data) {
             $plan = ProductionQualityPlan::where('tenant_id', $tenantId)->findOrFail($data['quality_plan_id']);
+            if (!$plan->isApproved()) {
+                // QR-14: draft / pending / historical versions are never used for a new inspection
+                throw new \InvalidArgumentException("Quality plan '{$plan->name}' v{$plan->version} is not approved and cannot be used for a new inspection.");
+            }
 
             $order = !empty($data['production_order_id'])
                 ? \App\Domains\Production\Models\ProductionOrder::withoutGlobalScopes()->find($data['production_order_id'])
@@ -84,30 +88,20 @@ class QualityInspectionService
             $result = $data['result'] ?? 'passed'; // passed, hold, failed
             $remarks = $data['remarks'] ?? 'Quick operator inspection completed.';
 
-            // Look up existing quality plan for product or fallback
-            $planId = $data['quality_plan_id'] ?? null;
-            if (!$planId && $orderId) {
-                $order = \App\Domains\Production\Models\ProductionOrder::find($orderId);
-                $planId = ProductionQualityPlan::where('tenant_id', $tenantId)
-                    ->where('product_id', $order?->product_id)
+            // QR-14: only an Approved plan is used — the operation's own plan first, then the product's approved plan.
+            // No "first plan of the tenant" fallback and no auto-created empty plans: without a plan the QC is quantity-only.
+            $order = $orderId ? \App\Domains\Production\Models\ProductionOrder::find($orderId) : null;
+            $planId = !empty($data['quality_plan_id'])
+                ? ProductionQualityPlan::where('tenant_id', $tenantId)->approved()->whereKey($data['quality_plan_id'])->value('id')
+                : null;
+            if (!$planId && $orderOp) {
+                $planId = app(OrderOperationQualityService::class)->checklistFor($orderOp)->first()?->quality_plan_id;
+            }
+            if (!$planId && $order) {
+                $planId = ProductionQualityPlan::where('tenant_id', $tenantId)->approved()
+                    ->where('type', ProductionQualityPlan::SCOPE_PRODUCT)
+                    ->where('product_id', $orderOp?->source_product_id ?: $order->product_id)
                     ->value('id');
-            }
-
-            if (!$planId) {
-                $planId = ProductionQualityPlan::where('tenant_id', $tenantId)->value('id');
-            }
-
-            // Create quality plan if none exists for tenant
-            if (!$planId) {
-                $plan = ProductionQualityPlan::create([
-                    'tenant_id' => $tenantId,
-                    'name' => 'Standard In-Process Quality Plan',
-                    'code' => 'QP-STD-' . rand(100, 999),
-                    'type' => $data['stage'] ?? 'in_process',
-                    'status' => 'approved',
-                    'created_by' => $userId ?? auth()->id() ?? 1,
-                ]);
-                $planId = $plan->id;
             }
 
             $inspection = ProductionQualityInspection::create([
@@ -363,26 +357,27 @@ class QualityInspectionService
                 }
             }
 
-            $result = ($rejectedQty > 0) ? ($acceptedQty > 0 ? 'partially_passed' : 'failed') : 'passed';
-
-            // Find or fallback Quality Plan
-            $planId = !empty($data['quality_plan_id']) ? (int) $data['quality_plan_id'] : (
-                ProductionQualityPlan::where('tenant_id', $tenantId)
-                    ->where('product_id', $orderOp->order?->product_id)
-                    ->value('id') ?? ProductionQualityPlan::where('tenant_id', $tenantId)->value('id')
+            // QR-16 / QP-04: the operation's own plans (order snapshot) — readings are saved and evaluated
+            $checklist = app(OrderOperationQualityService::class)->checklistFor($orderOp)
+                ->map(fn ($link) => ['plan' => $link->plan, 'is_mandatory' => (bool) $link->is_mandatory])
+                ->values();
+            $evaluation = $this->evaluateChecklist(
+                $checklist,
+                (array) ($data['parameter_values'] ?? []),
+                (array) ($data['inspected_plans'] ?? []),
+                !empty($data['enforce_checklist'])
             );
-
-            if (!$planId) {
-                $plan = ProductionQualityPlan::create([
-                    'tenant_id' => $tenantId,
-                    'name' => 'Standard In-Process Quality Plan',
-                    'code' => 'QP-STD-' . rand(100, 999),
-                    'type' => 'in_process',
-                    'status' => 'approved',
-                    'created_by' => $userId ?? auth()->id() ?? 1,
-                ]);
-                $planId = $plan->id;
+            // A3: a failed mandatory check with nothing rejected needs the inspector's explicit confirmation
+            if (!empty($data['enforce_checklist']) && $evaluation['mandatory_failed'] && $rejectedQty <= 0 && empty($data['confirm_failed_accept'])) {
+                throw new \InvalidArgumentException(
+                    'A mandatory check failed (' . implode(', ', $evaluation['failed_names']) . '). Reject the affected units, or tick the confirmation to accept them anyway.'
+                );
             }
+
+            $result = ($rejectedQty > 0 || $evaluation['mandatory_failed'])
+                ? ($acceptedQty > 0 ? 'partially_passed' : 'failed')
+                : 'passed';
+            $planId = $evaluation['plans'][0]['plan']->id ?? null;
 
             $inspection = ProductionQualityInspection::create([
                 'tenant_id' => $tenantId,
@@ -406,6 +401,8 @@ class QualityInspectionService
                 'audited_by' => $userId ?? auth()->id() ?? 1,
                 'audited_at' => now(),
             ]);
+
+            $this->storeChecklistResults($inspection, $evaluation);
 
             // Increment good output quantity_produced on operation for accepted units
             if ($acceptedQty > 0) {
@@ -486,6 +483,200 @@ class QualityInspectionService
                 'title' => 'Shopfloor QC Inspection Recorded',
                 'description' => "Inspection recorded: {$acceptedQty} accepted, {$rejectedQty} rejected for Op #{$orderOp->operation_number}.",
                 'severity' => ($result === 'passed') ? 'success' : 'warning',
+                'event_source' => 'QualityInspectionService',
+            ]);
+
+            return $inspection;
+        });
+    }
+
+    /**
+     * QR-16 / QP-04 / QP-05: evaluate the submitted checklist against the plans.
+     *  - mandatory plans are always inspected; optional plans only when ticked (inspected_plans[])
+     *  - when $enforce is true, mandatory parameters of an inspected plan must have a value
+     *  - numeric: outside min/max = failed; pass/fail: "fail" = failed; text: always passed
+     *
+     * @param  \Illuminate\Support\Collection  $checklist  items ['plan' => ProductionQualityPlan, 'is_mandatory' => bool]
+     * @return array{plans: array, results: array, mandatory_failed: bool, failed_names: array<int, string>}
+     */
+    public function evaluateChecklist(\Illuminate\Support\Collection $checklist, array $values, array $inspectedPlanIds, bool $enforce): array
+    {
+        $inspectedPlanIds = array_map('intval', $inspectedPlanIds);
+        $plans = [];
+        $results = [];
+        $mandatoryFailed = false;
+        $failedNames = [];
+        $missing = [];
+
+        foreach ($checklist as $entry) {
+            $plan = $entry['plan'];
+            if (!$plan) {
+                continue;
+            }
+            $planMandatory = (bool) $entry['is_mandatory'];
+            if (!$planMandatory && !in_array((int) $plan->id, $inspectedPlanIds, true)) {
+                continue; // optional plan not inspected this time
+            }
+            $plans[] = ['plan' => $plan, 'is_mandatory' => $planMandatory];
+            $planValues = (array) ($values[$plan->id] ?? []);
+
+            foreach ($plan->parameters as $param) {
+                $raw = $planValues[$param->id] ?? null;
+                $hasValue = $raw !== null && $raw !== '';
+
+                if (!$hasValue) {
+                    if ($param->is_mandatory) {
+                        $missing[] = "{$plan->name}: {$param->name}";
+                    }
+                    continue;
+                }
+
+                $row = ['parameter' => $param, 'numeric' => null, 'pass' => null, 'text' => null, 'passed' => true];
+                if ($param->type === \App\Domains\Production\Models\ProductionQualityPlanParameter::TYPE_NUMERIC) {
+                    if (!is_numeric($raw)) {
+                        $missing[] = "{$plan->name}: {$param->name} (not a number)";
+                        continue;
+                    }
+                    $val = (float) $raw;
+                    $row['numeric'] = $val;
+                    $row['passed'] = !(($param->min_value !== null && $val < (float) $param->min_value) || ($param->max_value !== null && $val > (float) $param->max_value));
+                } elseif ($param->type === \App\Domains\Production\Models\ProductionQualityPlanParameter::TYPE_PASS_FAIL) {
+                    $row['pass'] = in_array(strtolower((string) $raw), ['pass', '1', 'true', 'yes'], true);
+                    $row['passed'] = $row['pass'];
+                } else {
+                    $row['text'] = (string) $raw;
+                }
+
+                if (!$row['passed'] && $param->is_mandatory) {
+                    $mandatoryFailed = true;
+                    $failedNames[] = $param->name;
+                }
+                $results[] = $row;
+            }
+        }
+
+        if ($enforce && !empty($missing)) {
+            throw new \InvalidArgumentException('Enter every mandatory check before submitting: ' . implode('; ', array_slice($missing, 0, 6)) . (count($missing) > 6 ? '…' : '') . '.');
+        }
+
+        return [
+            'plans'            => $plans,
+            'results'          => $results,
+            'mandatory_failed' => $mandatoryFailed,
+            'failed_names'     => array_values(array_unique($failedNames)),
+        ];
+    }
+
+    /** Persist the evaluated checklist on an inspection: covered plans + one result row per recorded parameter. */
+    public function storeChecklistResults(ProductionQualityInspection $inspection, array $evaluation): void
+    {
+        foreach ($evaluation['plans'] as $entry) {
+            \App\Domains\Production\Models\ProductionQualityInspectionPlan::firstOrCreate(
+                ['quality_inspection_id' => $inspection->id, 'quality_plan_id' => $entry['plan']->id],
+                ['tenant_id' => $inspection->tenant_id, 'is_mandatory' => (bool) $entry['is_mandatory']]
+            );
+        }
+
+        foreach ($evaluation['results'] as $row) {
+            ProductionQualityInspectionResult::create([
+                'tenant_id'                 => $inspection->tenant_id,
+                'quality_inspection_id'     => $inspection->id,
+                'quality_plan_parameter_id' => $row['parameter']->id,
+                'recorded_value_numeric'    => $row['numeric'],
+                'recorded_value_pass'       => $row['pass'],
+                'recorded_value_text'       => $row['text'],
+                'result'                    => $row['passed'] ? 'passed' : 'failed',
+            ]);
+        }
+    }
+
+    /**
+     * QR-18: final QC of the order's finished product, done in the WIP section. Runs every approved product plan of
+     * the product (A4, all mandatory). Only the accepted quantity can then be received into a warehouse.
+     */
+    public function recordFinalInspection(\App\Domains\Production\Models\ProductionOrder $order, array $data, ?int $userId = null): ProductionQualityInspection
+    {
+        return DB::transaction(function () use ($order, $data, $userId) {
+            $gate = app(FinalQualityGateService::class);
+            $plans = $gate->plans($order);
+            if ($plans->isEmpty()) {
+                throw new \InvalidArgumentException('This product has no approved quality plan, so no final QC is needed.');
+            }
+
+            $acceptedQty = max(0.0, (float) ($data['accepted_qty'] ?? 0));
+            $rejectedQty = max(0.0, (float) ($data['rejected_qty'] ?? 0));
+            $inspectedQty = $acceptedQty + $rejectedQty;
+            if ($inspectedQty <= 0) {
+                throw new \InvalidArgumentException('Inspected quantity (accepted + rejected) must be greater than zero.');
+            }
+
+            $pending = (float) $gate->summary($order)['pending'];
+            if ($inspectedQty > $pending + 0.0001) {
+                $fmt = rtrim(rtrim(number_format($pending, 4, '.', ''), '0'), '.');
+                throw new \InvalidArgumentException("Only {$fmt} unit(s) are waiting for final QC.");
+            }
+
+            $checklist = $plans->map(fn ($plan) => ['plan' => $plan, 'is_mandatory' => true])->values();
+            $evaluation = $this->evaluateChecklist(
+                $checklist,
+                (array) ($data['parameter_values'] ?? []),
+                $plans->pluck('id')->all(),
+                true
+            );
+            if ($evaluation['mandatory_failed'] && $rejectedQty <= 0 && empty($data['confirm_failed_accept'])) {
+                throw new \InvalidArgumentException(
+                    'A mandatory check failed (' . implode(', ', $evaluation['failed_names']) . '). Reject the affected units, or tick the confirmation to accept them anyway.'
+                );
+            }
+
+            $result = ($rejectedQty > 0 || $evaluation['mandatory_failed'])
+                ? ($acceptedQty > 0 ? 'partially_passed' : 'failed')
+                : 'passed';
+
+            $inspection = ProductionQualityInspection::create([
+                'tenant_id' => $order->tenant_id,
+                'company_id' => $order->company_id ?? company_id(),
+                'branch_id' => $order->branch_id ?? branch_id(),
+                'quality_plan_id' => $plans->first()->id,
+                'inspection_number' => 'INSP-FQ-' . date('Ymd') . '-' . rand(1000, 9999),
+                'stage' => 'final',
+                'status' => 'approved',
+                'result' => $result,
+                'inspected_quantity' => $inspectedQty,
+                'passed_qty' => $acceptedQty,
+                'failed_qty' => $rejectedQty,
+                'production_order_id' => $order->id,
+                'production_order_operation_id' => null,
+                'operator_id' => $userId ?? auth()->id(),
+                'remarks' => $data['remarks'] ?? "Final QC in WIP: {$acceptedQty} accepted, {$rejectedQty} rejected.",
+                'inspected_at' => now(),
+                'audited_by' => $data['audited_by'] ?? $userId ?? auth()->id(),
+                'audited_at' => now(),
+            ]);
+
+            $this->storeChecklistResults($inspection, $evaluation);
+
+            if ($rejectedQty > 0) {
+                $ncr = \App\Domains\Production\Models\ProductionNcr::create([
+                    'tenant_id' => $order->tenant_id,
+                    'ncr_number' => 'NCR-FQ-' . strtoupper(uniqid()),
+                    'category' => 'process',
+                    'status' => 'open',
+                    'disposition_type' => 'pending',
+                    'production_order_id' => $order->id,
+                    'operator_id' => $userId ?? auth()->id(),
+                    'description' => "Final QC rejected {$rejectedQty} finished unit(s) of order {$order->order_number}." . (!empty($data['defect_reason']) ? ' Reason: ' . $data['defect_reason'] : ''),
+                ]);
+                app(ProductionNotificationService::class)->notifyNcrCreated($ncr);
+            }
+
+            $this->eventService->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'operator_id' => $userId ?? auth()->id(),
+                'event_type' => 'Final QC Inspection',
+                'title' => 'Final QC Recorded in WIP',
+                'description' => "Final QC: {$acceptedQty} accepted, {$rejectedQty} rejected.",
+                'severity' => $result === 'passed' ? 'success' : 'warning',
                 'event_source' => 'QualityInspectionService',
             ]);
 

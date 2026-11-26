@@ -153,6 +153,12 @@ class RoutingOperation extends BaseModel
         return $this->belongsTo(WorkCenterSection::class, 'section_id');
     }
 
+    /** QR-15: Quality Plans this operation runs when its QC gate (quality_required) is on. */
+    public function qualityPlanLinks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(RoutingOperationQualityPlan::class, 'routing_operation_id')->orderBy('sort_order')->orderBy('id');
+    }
+
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
