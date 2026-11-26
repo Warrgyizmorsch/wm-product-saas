@@ -240,9 +240,8 @@
                     <h4 class="fw-bold text-dark mb-0">{{ __('inventory.new_stock_transfer') }}</h4>
                     <span class="fs-12 text-muted">{{ __('inventory.new_stock_transfer_help') }}</span>
                 </div>
-                <div class="d-flex gap-2">
-                    <x-ui.button href="{{ route('inventory.transfers.index') }}" variant="light" class="border">{{ __('inventory.discard') }}</x-ui.button>
-                    <x-ui.button type="submit" variant="primary" icon="feather-check" id="submitBtn">{{ __('inventory.create_transfer') }}</x-ui.button>
+                <div>
+                    <x-ui.button href="{{ route('inventory.transfers.index') }}" variant="light" class="border" icon="feather-arrow-left">{{ __('inventory.back_to_transfers') ?? 'Back to Transfers' }}</x-ui.button>
                 </div>
             </div>
 

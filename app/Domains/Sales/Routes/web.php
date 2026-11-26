@@ -23,7 +23,7 @@ Route::prefix('sales')
         Route::get('orders/{order}/download', [SalesOrderController::class, 'downloadPdf'])->name('orders.download');
 
         // Material Requirements Routes (Alias Redirects to /inventory/material-requirements)
-        Route::get('material-requirements', fn() => redirect()->route('inventory.material-requirements.index'))->name('material-requirements.index');
+        Route::get('material-requirements', [MaterialRequirementController::class, 'index'])->name('material-requirements.index');
         Route::get('material-requirements/create', fn(\Illuminate\Http\Request $request) => redirect()->route('inventory.material-requirements.create', $request->query()))->name('material-requirements.create');
         Route::post('material-requirements', [MaterialRequirementController::class, 'store'])->name('material-requirements.store');
         Route::get('material-requirements/{delivery}', fn($delivery) => redirect()->route('inventory.material-requirements.show', $delivery))->name('material-requirements.show');

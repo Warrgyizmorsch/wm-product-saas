@@ -14,6 +14,8 @@ class StockTransactionController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', StockTransaction::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         $query = StockTransaction::query()
@@ -66,13 +68,21 @@ class StockTransactionController extends Controller
             });
         }
 
-        // Summary calculations
-        $totalInQty = (float)(clone $query)->where('type', 'IN')->sum('quantity');
-        $totalInValue = (float)(clone $query)->where('type', 'IN')->sum('total_value');
-        $totalOutQty = (float)(clone $query)->where('type', 'OUT')->sum('quantity');
-        $totalOutValue = (float)(clone $query)->where('type', 'OUT')->sum('total_value');
+        // Summary calculations - single consolidated aggregation query
+        $aggregates = (clone $query)->selectRaw("
+            COALESCE(SUM(CASE WHEN type = 'IN' THEN quantity ELSE 0 END), 0) as total_in_qty,
+            COALESCE(SUM(CASE WHEN type = 'IN' THEN total_value ELSE 0 END), 0) as total_in_value,
+            COALESCE(SUM(CASE WHEN type = 'OUT' THEN quantity ELSE 0 END), 0) as total_out_qty,
+            COALESCE(SUM(CASE WHEN type = 'OUT' THEN total_value ELSE 0 END), 0) as total_out_value,
+            COUNT(*) as total_count
+        ")->first();
+
+        $totalInQty = (float)($aggregates->total_in_qty ?? 0);
+        $totalInValue = (float)($aggregates->total_in_value ?? 0);
+        $totalOutQty = (float)($aggregates->total_out_qty ?? 0);
+        $totalOutValue = (float)($aggregates->total_out_value ?? 0);
         $netQty = $totalInQty - $totalOutQty;
-        $totalTransactionsCount = (clone $query)->count();
+        $totalTransactionsCount = (int)($aggregates->total_count ?? 0);
 
         $sortBy = $request->input('sort_by', 'created_at');
         $sortOrder = $request->input('sort_order', 'desc');

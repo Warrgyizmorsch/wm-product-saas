@@ -26,7 +26,7 @@ use App\Domains\Inventory\Controllers\Api\TransporterApiController;
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('api/inventory')->name('api.inventory.')->group(function () {
+Route::prefix('api/inventory')->middleware(['throttle:60,1'])->name('api.inventory.')->group(function () {
 
     // Supply Chain Dashboard APIs
     Route::prefix('dashboard')->name('dashboard.')->group(function () {

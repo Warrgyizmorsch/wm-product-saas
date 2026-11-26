@@ -117,6 +117,48 @@
                     
                     <!-- Stock and Valuation Summary (Only for Goods) -->
                     @if($product->item_type === 'Goods')
+                        @php
+                            $isFifoMethod = ($product->inventory_valuation_method ?? 'FIFO') === 'FIFO';
+                            $calculatedAssetValue = 0;
+                            if ($product->variation_type === 'Variant') {
+                                foreach ($warehouses as $wh) {
+                                    $whQty = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum('quantity'));
+                                    if ($isFifoMethod) {
+                                        $whLots = $product->stockTransactions
+                                            ->where('warehouse_id', $wh->id)
+                                            ->where('type', 'IN')
+                                            ->where('balance_qty', '>', 0);
+                                        $whFifoBal = (float)$whLots->sum('balance_qty');
+                                        $whFifoVal = (float)$whLots->sum(fn($tx) => (float)$tx->balance_qty * (float)$tx->unit_cost);
+                                        if ($whFifoBal > 0) {
+                                            $calculatedAssetValue += ($whQty * ($whFifoVal / $whFifoBal));
+                                        } else {
+                                            $calculatedAssetValue += $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum(fn($ws) => $ws->quantity * $ws->unit_cost));
+                                        }
+                                    } else {
+                                        $calculatedAssetValue += $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum(fn($ws) => $ws->quantity * $ws->unit_cost));
+                                    }
+                                }
+                            } else {
+                                foreach ($product->warehouseStocks as $ws) {
+                                    if ($isFifoMethod) {
+                                        $whLots = $product->stockTransactions
+                                            ->where('warehouse_id', $ws->warehouse_id)
+                                            ->where('type', 'IN')
+                                            ->where('balance_qty', '>', 0);
+                                        $whFifoBal = (float)$whLots->sum('balance_qty');
+                                        $whFifoVal = (float)$whLots->sum(fn($tx) => (float)$tx->balance_qty * (float)$tx->unit_cost);
+                                        if ($whFifoBal > 0) {
+                                            $calculatedAssetValue += ((float)$ws->quantity * ($whFifoVal / $whFifoBal));
+                                        } else {
+                                            $calculatedAssetValue += ((float)$ws->quantity * (float)$ws->unit_cost);
+                                        }
+                                    } else {
+                                        $calculatedAssetValue += ((float)$ws->quantity * (float)$ws->unit_cost);
+                                    }
+                                }
+                            }
+                        @endphp
                         <div class="d-flex gap-4 text-end mt-3 mt-md-0">
                             <div>
                                 <span class="text-muted fs-11 text-uppercase d-block">{{ __('inventory.stock_on_hand') }}</span>
@@ -128,11 +170,7 @@
                             <div class="border-start ps-4">
                                 <span class="text-muted fs-11 text-uppercase d-block">{{ __('inventory.asset_value') }}</span>
                                 <h4 class="fw-bold text-dark mb-0">
-                                    {{ format_currency(
-                                        $product->variation_type === 'Variant' 
-                                        ? $product->variants->sum(fn($v) => $v->warehouseStocks->sum(fn($ws) => $ws->quantity * $ws->unit_cost))
-                                        : $product->warehouseStocks->sum(fn($ws) => $ws->quantity * $ws->unit_cost)
-                                    ) }}
+                                    {{ format_currency($calculatedAssetValue) }}
                                 </h4>
                             </div>
                         </div>
@@ -468,8 +506,28 @@
                                                     $qty = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum('quantity'));
                                                     $reserved = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum('reserved_qty'));
                                                     $available = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum('available_qty'));
-                                                    $totalValuation = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum(fn($ws) => $ws->quantity * $ws->unit_cost));
-                                                    $cost = $qty > 0 ? ($totalValuation / $qty) : $product->cost_price;
+                                                    
+                                                    if ($isFifoMethod) {
+                                                        $whLots = $product->stockTransactions
+                                                            ->where('warehouse_id', $wh->id)
+                                                            ->where('type', 'IN')
+                                                            ->where('balance_qty', '>', 0);
+                                                        $whFifoBal = (float)$whLots->sum('balance_qty');
+                                                        $whFifoVal = (float)$whLots->sum(fn($tx) => (float)$tx->balance_qty * (float)$tx->unit_cost);
+                                                        $distinctRates = $whLots->pluck('unit_cost')->map(fn($r) => round((float)$r, 2))->unique();
+
+                                                        if ($whFifoBal > 0) {
+                                                            $whAvgCost = $whFifoVal / $whFifoBal;
+                                                            $totalValuation = (float)$qty * $whAvgCost;
+                                                        } else {
+                                                            $totalValuation = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum(fn($ws) => $ws->quantity * $ws->unit_cost));
+                                                            $whAvgCost = $qty > 0 ? ($totalValuation / $qty) : $product->cost_price;
+                                                        }
+                                                    } else {
+                                                        $totalValuation = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum(fn($ws) => $ws->quantity * $ws->unit_cost));
+                                                        $whAvgCost = $qty > 0 ? ($totalValuation / $qty) : $product->cost_price;
+                                                        $distinctRates = collect();
+                                                    }
                                                 @endphp
                                                 <tr>
                                                     <td class="fw-semibold">{{ $wh->code }}</td>
@@ -477,21 +535,78 @@
                                                     <td class="text-end fw-bold text-dark">{{ fmod($qty, 1) == 0.0 ? number_format($qty, 0) : number_format($qty, 2) }}</td>
                                                     <td class="text-end text-warning fw-semibold">{{ fmod($reserved, 1) == 0.0 ? number_format($reserved, 0) : number_format($reserved, 2) }}</td>
                                                     <td class="text-end text-success fw-bold">{{ fmod($available, 1) == 0.0 ? number_format($available, 0) : number_format($available, 2) }}</td>
-                                                    <td class="text-end">{{ format_currency($cost) }}</td>
+                                                    <td class="text-end">
+                                                        @if($isFifoMethod)
+                                                            @if($qty <= 0)
+                                                                <span class="text-muted">—</span>
+                                                            @elseif($distinctRates->count() > 1)
+                                                                <a href="javascript:void(0)" onclick="bootstrap.Tab.getOrCreateInstance(document.getElementById('ledger-tab')).show()" class="badge bg-soft-primary text-primary text-decoration-none py-1 px-2 fs-12" title="Multiple purchase lots with different rates (Avg: {{ format_currency($whAvgCost) }}). Click to view in Stock Ledger">
+                                                                    <i class="feather-layers me-1"></i>Multiple Lots (FIFO)
+                                                                </a>
+                                                            @elseif($distinctRates->count() === 1)
+                                                                <span class="fw-semibold">{{ format_currency($distinctRates->first()) }}</span>
+                                                                <a href="javascript:void(0)" onclick="bootstrap.Tab.getOrCreateInstance(document.getElementById('ledger-tab')).show()" class="badge bg-soft-primary text-primary ms-1 fs-11 text-decoration-none" title="Active FIFO Lot Rate. Click to view Stock Ledger">FIFO</a>
+                                                            @else
+                                                                <span>{{ format_currency($whAvgCost) }}</span>
+                                                            @endif
+                                                        @else
+                                                            <span>{{ format_currency($whAvgCost) }}</span>
+                                                        @endif
+                                                    </td>
                                                     <td class="text-end fw-bold">{{ format_currency($totalValuation) }}</td>
                                                     <td>{{ number_format($product->reorder_point, 0) }}</td>
                                                 </tr>
                                             @endforeach
                                         @else
                                             @forelse($product->warehouseStocks as $ws)
+                                                @php
+                                                    if ($isFifoMethod) {
+                                                        $whLots = $product->stockTransactions
+                                                            ->where('warehouse_id', $ws->warehouse_id)
+                                                            ->where('type', 'IN')
+                                                            ->where('balance_qty', '>', 0);
+                                                        $whFifoBal = (float)$whLots->sum('balance_qty');
+                                                        $whFifoVal = (float)$whLots->sum(fn($tx) => (float)$tx->balance_qty * (float)$tx->unit_cost);
+                                                        $distinctRates = $whLots->pluck('unit_cost')->map(fn($r) => round((float)$r, 2))->unique();
+
+                                                        if ($whFifoBal > 0) {
+                                                            $whAvgCost = $whFifoVal / $whFifoBal;
+                                                            $rowAssetValue = (float)$ws->quantity * $whAvgCost;
+                                                        } else {
+                                                            $whAvgCost = (float)$ws->unit_cost;
+                                                            $rowAssetValue = (float)$ws->quantity * (float)$ws->unit_cost;
+                                                        }
+                                                    } else {
+                                                        $whAvgCost = (float)$ws->unit_cost;
+                                                        $rowAssetValue = (float)$ws->quantity * (float)$ws->unit_cost;
+                                                        $distinctRates = collect();
+                                                    }
+                                                @endphp
                                                 <tr>
                                                     <td class="fw-semibold">{{ $ws->warehouse?->code ?? 'N/A' }}</td>
                                                     <td>{{ $ws->warehouse?->name ?? 'N/A' }}</td>
                                                     <td class="text-end fw-bold text-dark">{{ fmod($ws->quantity, 1) == 0.0 ? number_format($ws->quantity, 0) : number_format($ws->quantity, 2) }}</td>
                                                     <td class="text-end text-warning fw-semibold">{{ fmod($ws->reserved_qty, 1) == 0.0 ? number_format($ws->reserved_qty, 0) : number_format($ws->reserved_qty, 2) }}</td>
                                                     <td class="text-end text-success fw-bold">{{ fmod($ws->available_qty, 1) == 0.0 ? number_format($ws->available_qty, 0) : number_format($ws->available_qty, 2) }}</td>
-                                                    <td class="text-end">{{ format_currency($ws->unit_cost) }}</td>
-                                                    <td class="text-end fw-bold">{{ format_currency($ws->quantity * $ws->unit_cost) }}</td>
+                                                    <td class="text-end">
+                                                        @if($isFifoMethod)
+                                                            @if((float)$ws->quantity <= 0)
+                                                                <span class="text-muted">—</span>
+                                                            @elseif($distinctRates->count() > 1)
+                                                                <a href="javascript:void(0)" onclick="bootstrap.Tab.getOrCreateInstance(document.getElementById('ledger-tab')).show()" class="badge bg-soft-primary text-primary text-decoration-none py-1 px-2 fs-12" title="Multiple purchase lots with different rates (Avg: {{ format_currency($whAvgCost) }}). Click to view in Stock Ledger">
+                                                                    <i class="feather-layers me-1"></i>Multiple Lots (FIFO)
+                                                                </a>
+                                                            @elseif($distinctRates->count() === 1)
+                                                                <span class="fw-semibold">{{ format_currency($distinctRates->first()) }}</span>
+                                                                <a href="javascript:void(0)" onclick="bootstrap.Tab.getOrCreateInstance(document.getElementById('ledger-tab')).show()" class="badge bg-soft-primary text-primary ms-1 fs-11 text-decoration-none" title="Active FIFO Lot Rate. Click to view Stock Ledger">FIFO</a>
+                                                            @else
+                                                                <span>{{ format_currency($ws->unit_cost) }}</span>
+                                                            @endif
+                                                        @else
+                                                            <span>{{ format_currency($ws->unit_cost) }}</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-end fw-bold">{{ format_currency($rowAssetValue) }}</td>
                                                     <td>
                                                         {{ number_format($product->reorder_point, 0) }}
                                                         @if($ws->quantity <= $product->reorder_point)

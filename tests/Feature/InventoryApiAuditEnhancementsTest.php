@@ -65,6 +65,15 @@ class InventoryApiAuditEnhancementsTest extends TestCase
             'password'   => bcrypt('secret123'),
         ]);
 
+        $invRole = \App\Models\Access\Role::query()->whereNull('tenant_id')->where('slug', 'inventory_manager')->first();
+        if ($invRole) {
+            \App\Models\Access\UserRole::create([
+                'user_id'   => $this->user->id,
+                'role_id'   => $invRole->id,
+                'tenant_id' => $this->tenant->id,
+            ]);
+        }
+
         $this->warehouse = Warehouse::create([
             'tenant_id'   => $this->tenant->id,
             'company_id'  => $this->company->id,

@@ -5,6 +5,7 @@ namespace App\Domains\Inventory\Controllers;
 use App\Http\Controllers\Controller;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\ProductWarehouseStock;
+use App\Domains\Inventory\Models\StockTransaction;
 use App\Domains\Inventory\Models\Batch;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Purchase\Models\PurchaseRequisition;
@@ -55,26 +56,13 @@ class InventoryReportController extends Controller
             });
         }
 
-        $filteredProducts = $query->sellable()->get()
-            ->filter(function ($product) {
-                $reorderPoint = (float)($product->reorder_point > 0 ? $product->reorder_point : 10);
-                return (float)$product->total_stock <= $reorderPoint;
-            })->values();
+        // Direct SQL subquery filter for high-performance scalability
+        $products = $query->sellable()
+            ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM product_warehouse_stocks WHERE product_warehouse_stocks.product_id = products.id AND product_warehouse_stocks.tenant_id = ?) <= COALESCE(products.reorder_point, 10)', [$tenantId])
+            ->paginate(15)
+            ->withQueryString();
 
-        $page = (int)$request->input('page', 1);
-        $perPage = 15;
-        $total = $filteredProducts->count();
-        $items = $filteredProducts->slice(($page - 1) * $perPage, $perPage)->values();
-
-        $products = new \Illuminate\Pagination\LengthAwarePaginator(
-            $items,
-            $total,
-            $perPage,
-            $page,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
-
-        $pageIds = $items->pluck('id')->toArray();
+        $pageIds = $products->pluck('id')->toArray();
 
         $existingPrItems = PurchaseRequisitionItem::with('requisition')
             ->where('tenant_id', $tenantId)
@@ -113,47 +101,70 @@ class InventoryReportController extends Controller
             });
         }
 
-        // Compute aggregates dynamically based on the selected scope/filters
-        $allStocks = (clone $baseQuery)->get();
+        // Fetch unconsumed active lots grouped by product_id and warehouse_id for accurate FIFO calculation
+        $activeLotsGrouped = StockTransaction::where('tenant_id', $tenantId)
+            ->where('type', 'IN')
+            ->where('balance_qty', '>', 0)
+            ->get()
+            ->groupBy(fn($tx) => "{$tx->product_id}_{$tx->warehouse_id}");
 
+        // Compute aggregates dynamically via chunks to avoid OOM on large datasets
         $totalValuation = 0.0;
         $fgValuation = 0.0;
         $rmValuation = 0.0;
-
-        $totalSkus = $allStocks->count();
+        $totalSkus = 0;
         $fgSkus = 0;
         $rmSkus = 0;
-
         $totalQty = 0.0;
         $fgQty = 0.0;
         $rmQty = 0.0;
 
-        foreach ($allStocks as $stock) {
-            $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));
-            $val = (float)$stock->quantity * $unitCost;
-            $qty = (float)$stock->quantity;
+        (clone $baseQuery)->chunk(500, function ($stocks) use (
+            &$totalValuation, &$fgValuation, &$rmValuation,
+            &$totalSkus, &$fgSkus, &$rmSkus,
+            &$totalQty, &$fgQty, &$rmQty,
+            $activeLotsGrouped
+        ) {
+            foreach ($stocks as $stock) {
+                $method = $stock->product?->inventory_valuation_method ?? 'FIFO';
+                $key = "{$stock->product_id}_{$stock->warehouse_id}";
+                $lots = $activeLotsGrouped->get($key);
 
-            $prodType = strtolower($stock->product->type ?? '');
-            $whType = strtolower($stock->warehouse->type ?? '');
-            $whName = strtolower($stock->warehouse->name ?? '');
+                $fifoBalance = $lots ? (float)$lots->sum('balance_qty') : 0.0;
+                $fifoValuation = $lots ? (float)$lots->sum(fn($tx) => (float)$tx->balance_qty * (float)$tx->unit_cost) : 0.0;
 
-            $isFg = in_array($prodType, ['finished_good', 'finished_goods', 'fg']) 
-                || str_contains($whName, 'finished goods') 
-                || in_array($whType, ['finished_goods', 'fg']);
+                if ($method === 'FIFO' && $fifoBalance > 0) {
+                    $unitCost = $fifoValuation / $fifoBalance;
+                    $val = (float)$stock->quantity * $unitCost;
+                } else {
+                    $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));
+                    $val = (float)$stock->quantity * $unitCost;
+                }
+                $qty = (float)$stock->quantity;
 
-            $totalValuation += $val;
-            $totalQty += $qty;
+                $prodType = strtolower($stock->product->type ?? '');
+                $whType = strtolower($stock->warehouse->type ?? '');
+                $whName = strtolower($stock->warehouse->name ?? '');
 
-            if ($isFg) {
-                $fgValuation += $val;
-                $fgQty += $qty;
-                $fgSkus++;
-            } else {
-                $rmValuation += $val;
-                $rmQty += $qty;
-                $rmSkus++;
+                $isFg = in_array($prodType, ['finished_good', 'finished_goods', 'fg']) 
+                    || str_contains($whName, 'finished goods') 
+                    || in_array($whType, ['finished_goods', 'fg']);
+
+                $totalValuation += $val;
+                $totalQty += $qty;
+                $totalSkus++;
+
+                if ($isFg) {
+                    $fgValuation += $val;
+                    $fgQty += $qty;
+                    $fgSkus++;
+                } else {
+                    $rmValuation += $val;
+                    $rmQty += $qty;
+                    $rmSkus++;
+                }
             }
-        }
+        });
 
         // Apply item_category filter for table list
         $query = clone $baseQuery;
@@ -184,6 +195,7 @@ class InventoryReportController extends Controller
 
         return view('modules.inventory.reports.valuation', compact(
             'stocks', 
+            'activeLotsGrouped',
             'totalValuation', 
             'fgValuation', 
             'rmValuation', 
@@ -260,7 +272,7 @@ class InventoryReportController extends Controller
 
         $fileName = 'Stock_Valuation_Report_' . date('Y-m-d_H-i') . '.csv';
 
-        return response()->streamDownload(function () use ($query, $warehouseName, $categoryLabel) {
+        return response()->streamDownload(function () use ($query, $warehouseName, $categoryLabel, $tenantId) {
             $handle = fopen('php://output', 'w');
             
             // UTF-8 BOM for Microsoft Excel compatibility
@@ -273,12 +285,20 @@ class InventoryReportController extends Controller
             fputcsv($handle, ['Category Scope', $categoryLabel]);
             fputcsv($handle, []); // Blank line
 
+            // Fetch unconsumed active lots grouped for accurate FIFO
+            $activeLotsGrouped = StockTransaction::where('tenant_id', $tenantId)
+                ->where('type', 'IN')
+                ->where('balance_qty', '>', 0)
+                ->get()
+                ->groupBy(fn($tx) => "{$tx->product_id}_{$tx->warehouse_id}");
+
             // Column Headers
             fputcsv($handle, [
                 'S.No',
                 'Product Name',
                 'SKU Code',
                 'Warehouse Location',
+                'Valuation Method',
                 'On Hand Quantity',
                 'Unit Cost Rate (INR)',
                 'Total Asset Value (INR)',
@@ -288,20 +308,40 @@ class InventoryReportController extends Controller
             $totalQty = 0.0;
             $totalValuation = 0.0;
 
-            // Fetch ALL matching records without pagination
-            $query->chunk(500, function ($stocks) use ($handle, &$index, &$totalQty, &$totalValuation) {
+            $escapeFormula = function($value) {
+                if (is_string($value) && strlen($value) > 0 && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+                    return "'" . $value;
+                }
+                return $value;
+            };
+
+            // Fetch matching records up to 10,000 max rows
+            $query->limit(10000)->chunk(500, function ($stocks) use ($handle, &$index, &$totalQty, &$totalValuation, $escapeFormula, $activeLotsGrouped) {
                 foreach ($stocks as $stock) {
-                    $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));
-                    $val = (float)$stock->quantity * $unitCost;
+                    $method = $stock->product?->inventory_valuation_method ?? 'FIFO';
+                    $key = "{$stock->product_id}_{$stock->warehouse_id}";
+                    $lots = $activeLotsGrouped->get($key);
+
+                    $fifoBalance = $lots ? (float)$lots->sum('balance_qty') : 0.0;
+                    $fifoValuation = $lots ? (float)$lots->sum(fn($tx) => (float)$tx->balance_qty * (float)$tx->unit_cost) : 0.0;
+
+                    if ($method === 'FIFO' && $fifoBalance > 0) {
+                        $unitCost = $fifoValuation / $fifoBalance;
+                        $val = (float)$stock->quantity * $unitCost;
+                    } else {
+                        $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));
+                        $val = (float)$stock->quantity * $unitCost;
+                    }
 
                     $totalQty += (float)$stock->quantity;
                     $totalValuation += $val;
 
                     fputcsv($handle, [
                         $index++,
-                        $stock->product->name ?? 'N/A',
-                        $stock->product->sku ?? '-',
-                        $stock->warehouse->name ?? 'N/A',
+                        $escapeFormula($stock->product->name ?? 'N/A'),
+                        $escapeFormula($stock->product->sku ?? '-'),
+                        $escapeFormula($stock->warehouse->name ?? 'N/A'),
+                        $method === 'FIFO' ? 'FIFO' : 'Weighted Average',
                         number_format($stock->quantity, 2, '.', ''),
                         number_format($unitCost, 2, '.', ''),
                         number_format($val, 2, '.', ''),
