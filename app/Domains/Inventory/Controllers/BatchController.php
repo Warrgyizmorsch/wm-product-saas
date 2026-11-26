@@ -83,6 +83,7 @@ class BatchController extends Controller
 
     public function export(Request $request)
     {
+        $this->authorize('viewAny', Batch::class);
         $tenantId = require_tenant_id();
 
         return \Maatwebsite\Excel\Facades\Excel::download(

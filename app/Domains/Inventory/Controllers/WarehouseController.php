@@ -59,9 +59,9 @@ class WarehouseController extends Controller
 
         $isDefault = !empty($validated['is_default']);
         if ($isDefault) {
-            Warehouse::query()->where('is_default', true)->update(['is_default' => false]);
+            Warehouse::query()->where('tenant_id', $tenantId)->where('is_default', true)->update(['is_default' => false]);
         }
-        if (Warehouse::query()->count() === 0) {
+        if (Warehouse::query()->where('tenant_id', $tenantId)->count() === 0) {
             $isDefault = true;
         }
 
@@ -96,7 +96,7 @@ class WarehouseController extends Controller
 
         $isDefault = !empty($validated['is_default']);
         if ($isDefault) {
-            Warehouse::query()->where('is_default', true)->update(['is_default' => false]);
+            Warehouse::query()->where('tenant_id', $tenantId)->where('is_default', true)->update(['is_default' => false]);
         }
 
         $this->warehouseRepo->update($warehouse, [
@@ -107,8 +107,8 @@ class WarehouseController extends Controller
             'status' => $validated['status'],
         ]);
 
-        if (!Warehouse::query()->where('is_default', true)->exists()) {
-            $first = Warehouse::query()->first();
+        if (!Warehouse::query()->where('tenant_id', $tenantId)->where('is_default', true)->exists()) {
+            $first = Warehouse::query()->where('tenant_id', $tenantId)->first();
             if ($first) {
                 $first->update(['is_default' => true]);
             }
@@ -151,7 +151,7 @@ class WarehouseController extends Controller
             'name' => $validated['name'],
             'code' => strtoupper($validated['code']),
             'address' => $validated['address'] ?? null,
-            'is_default' => Warehouse::query()->count() === 0,
+            'is_default' => Warehouse::query()->where('tenant_id', $tenantId)->count() === 0,
             'status' => 'active',
         ]);
 

@@ -268,6 +268,9 @@
 
         </x-ui.odoo-form-ui>
     </div>
+
+    {{-- Universal confirmation modal for transfer dispatch, receipt, and cancellation --}}
+    <x-ui.confirmation-modal />
 @endsection
 
 @push('styles')

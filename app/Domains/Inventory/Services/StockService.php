@@ -16,12 +16,18 @@ class StockService
     /**
      * Get the net available stock for a product in a warehouse (quantity - reserved_qty).
      */
-    public static function getAvailableStock(int $productId, int $warehouseId): float
+    public static function getAvailableStock(int $productId, int $warehouseId, ?int $tenantId = null): float
     {
-        $stock = ProductWarehouseStock::query()
+        $tenantId = $tenantId ?? (tenant_id() ?? current_tenant_id() ?? auth()->user()?->tenant_id);
+        $query = ProductWarehouseStock::query()
             ->where('product_id', $productId)
-            ->where('warehouse_id', $warehouseId)
-            ->first();
+            ->where('warehouse_id', $warehouseId);
+
+        if ($tenantId !== null) {
+            $query->where('tenant_id', $tenantId);
+        }
+
+        $stock = $query->first();
 
         return $stock ? max(0.0, (float)$stock->available_qty) : 0.0;
     }
@@ -399,7 +405,7 @@ class StockService
 
                 // Weighted Average cost recalculation only for non-FIFO products
                 if ($product->inventory_valuation_method === 'FIFO') {
-                    $newCost = $currentCost > 0 ? $currentCost : $unitCost;
+                    $newCost = ($currentQty <= 0) ? $unitCost : ($currentCost > 0 ? $currentCost : $unitCost);
                 } else {
                     $newCost = $newQty > 0 
                         ? (($currentQty * $currentCost) + ($quantity * $unitCost)) / $newQty 
@@ -538,7 +544,8 @@ class StockService
         string $referenceType,
         ?int $referenceId = null,
         array $serialNumbers = [],
-        ?int $batchId = null
+        ?int $batchId = null,
+        ?int $referenceItemId = null
     ): StockTransaction {
         return DB::transaction(function () use (
             $tenantId,
@@ -548,13 +555,14 @@ class StockService
             $referenceType,
             $referenceId,
             $serialNumbers,
-            $batchId
+            $batchId,
+            $referenceItemId
         ) {
             $product = Product::withoutGlobalScopes()->findOrFail($productId);
 
             // 1. Consume reservation if one existed for this document
             if ($referenceId) {
-                self::releaseStock($tenantId, $productId, $warehouseId, $quantity, $referenceType, $referenceId);
+                self::releaseStock($tenantId, $productId, $warehouseId, $quantity, $referenceType, $referenceId, $referenceItemId);
             }
 
             $stock = ProductWarehouseStock::query()
@@ -578,6 +586,7 @@ class StockService
             $remainingToDeduct = $quantity;
 
             $allocations = [];
+            $decrementedBatches = [];
 
             // 2. Valuation calculation (FIFO lot depletion vs Weighted Average cost pricing)
             if ($product->inventory_valuation_method === 'FIFO') {
@@ -607,6 +616,7 @@ class StockService
                                 $batch->update([
                                     'available_qty' => max(0.0, (float)$batch->available_qty - $remainingToDeduct)
                                 ]);
+                                $decrementedBatches[$lot->batch_id] = ($decrementedBatches[$lot->batch_id] ?? 0.0) + $remainingToDeduct;
                             }
                         }
 
@@ -632,6 +642,7 @@ class StockService
                                 $batch->update([
                                     'available_qty' => max(0.0, (float)$batch->available_qty - $lotBalance)
                                 ]);
+                                $decrementedBatches[$lot->batch_id] = ($decrementedBatches[$lot->batch_id] ?? 0.0) + $lotBalance;
                             }
                         }
 
@@ -680,6 +691,7 @@ class StockService
                                 $batch->update([
                                     'available_qty' => max(0.0, (float)$batch->available_qty - $remainingToDeduct)
                                 ]);
+                                $decrementedBatches[$lot->batch_id] = ($decrementedBatches[$lot->batch_id] ?? 0.0) + $remainingToDeduct;
                             }
                         }
                         if ($lot->batch_id) {
@@ -700,6 +712,7 @@ class StockService
                                 $batch->update([
                                     'available_qty' => max(0.0, (float)$batch->available_qty - $lotBalance)
                                 ]);
+                                $decrementedBatches[$lot->batch_id] = ($decrementedBatches[$lot->batch_id] ?? 0.0) + $lotBalance;
                             }
                         }
                         if ($lot->batch_id) {
@@ -721,12 +734,17 @@ class StockService
             }
 
             if ($batchId) {
-                $chosenBatch = Batch::find($batchId);
-                if ($chosenBatch) {
-                    $chosenBatch->decrement('quantity', min((float)$chosenBatch->quantity, $quantity));
-                    $chosenBatch->update([
-                        'available_qty' => max(0.0, (float)$chosenBatch->available_qty - $quantity)
-                    ]);
+                $alreadyDecremented = (float)($decrementedBatches[$batchId] ?? 0.0);
+                $remainingBatchDeduct = max(0.0, $quantity - $alreadyDecremented);
+                if ($remainingBatchDeduct > 0.0001) {
+                    $chosenBatch = Batch::find($batchId);
+                    if ($chosenBatch) {
+                        $deductQty = min((float)$chosenBatch->quantity, $remainingBatchDeduct);
+                        $chosenBatch->decrement('quantity', $deductQty);
+                        $chosenBatch->update([
+                            'available_qty' => max(0.0, (float)$chosenBatch->available_qty - $remainingBatchDeduct)
+                        ]);
+                    }
                 }
             }
 
@@ -778,10 +796,25 @@ class StockService
             // 5. Update Warehouse Stock totals
             if ($stock) {
                 $newQty = max(0.0, $currentQty - $quantity);
-                $stock->update([
+                $updateData = [
                     'quantity' => $newQty,
                     'available_qty' => max(0.0, $newQty - (float)$stock->reserved_qty)
-                ]);
+                ];
+
+                if ($product && $product->inventory_valuation_method === 'FIFO') {
+                    $nextLot = StockTransaction::where('tenant_id', $tenantId)
+                        ->where('product_id', $productId)
+                        ->where('warehouse_id', $warehouseId)
+                        ->where('type', 'IN')
+                        ->where('balance_qty', '>', 0)
+                        ->orderBy('created_at', 'asc')
+                        ->first();
+                    if ($nextLot) {
+                        $updateData['unit_cost'] = (float)$nextLot->unit_cost;
+                    }
+                }
+
+                $stock->update($updateData);
             }
 
             // Attach details of allocations and serials consumed to transaction

@@ -204,13 +204,19 @@ class RbacSeeder extends Seeder
         // another form" helper (used from Sales Order and BOM screens) — it's a
         // low-risk additive action, not full catalog management, so it's granted
         // to any role that references products in its own workflow.
-        foreach (['production_manager', 'production_engineer', 'sales_manager', 'sales_executive'] as $roleSlug) {
+        foreach (['production_manager', 'production_engineer', 'sales_manager'] as $roleSlug) {
             $this->grant($roles[$roleSlug], [
                 'inventory.products.view' => $permissions['inventory.products.view'],
                 'inventory.products.create' => $permissions['inventory.products.create'],
                 'inventory.uoms.manage' => $permissions['inventory.uoms.manage'],
             ], RolePermission::SCOPE_TENANT);
         }
+
+        // sales_executive gets create & uoms for quick-create without full inventory catalog view access
+        $this->grant($roles['sales_executive'], [
+            'inventory.products.create' => $permissions['inventory.products.create'],
+            'inventory.uoms.manage' => $permissions['inventory.uoms.manage'],
+        ], RolePermission::SCOPE_TENANT);
 
         $this->grant($roles['purchase_manager'], [
             'purchase.orders.view' => $permissions['purchase.orders.view'],

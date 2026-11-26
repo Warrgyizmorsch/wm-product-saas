@@ -12,6 +12,7 @@ class BarcodeController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Product::class);
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
         $products = Product::where('tenant_id', $tenantId)->sellable()->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
@@ -21,6 +22,7 @@ class BarcodeController extends Controller
 
     public function getSerials(Request $request, Product $product)
     {
+        $this->authorize('view', $product);
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
         $serials = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
             ->where('product_id', $product->id)
@@ -32,11 +34,16 @@ class BarcodeController extends Controller
 
     public function print(Request $request)
     {
+        $this->authorize('viewAny', Product::class);
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => [
+                'required',
+                \Illuminate\Validation\Rule::exists('products', 'id')->where(fn($q) => $q->where('tenant_id', $tenantId)),
+            ],
             'print_type' => 'nullable|string|in:product,serial',
+            'copies'     => 'nullable|integer|min:1|max:500',
         ]);
 
         $product = Product::where('tenant_id', $tenantId)->findOrFail($request->product_id);
@@ -67,7 +74,7 @@ class BarcodeController extends Controller
         }
 
         if (empty($labels)) {
-            $copies = max(1, (int)$request->input('copies', 1));
+            $copies = min(500, max(1, (int)$request->input('copies', 1)));
             $barcodeValue = ($product->barcode ?: $product->sku) . $whSuffix;
             for ($i = 0; $i < $copies; $i++) {
                 $labels[] = [

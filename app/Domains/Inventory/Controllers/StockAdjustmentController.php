@@ -256,11 +256,85 @@ class StockAdjustmentController extends Controller
                 'status' => 'Approved',
                 'approved_by' => Auth::id(),
             ]);
+
+            $this->postAdjustmentAccountingJournal($adjustment, $tenantId);
         });
 
         \App\Domains\Inventory\Services\InventoryNotificationService::notifyAdjustmentApproved($adjustment);
 
         return back()->with('success', 'Stock Adjustment Approved and inventory updated.');
+    }
+
+    protected function postAdjustmentAccountingJournal(StockAdjustment $adjustment, int $tenantId): void
+    {
+        try {
+            if (!class_exists(\App\Domains\Accounting\Services\JournalService::class) || !class_exists(\App\Domains\Accounting\Services\AccountResolverService::class)) {
+                return;
+            }
+
+            $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
+            $accountResolver = app(\App\Domains\Accounting\Services\AccountResolverService::class);
+
+            $lines = [];
+            $totalAmount = 0.0;
+
+            foreach ($adjustment->items as $item) {
+                $product = $item->product ?? Product::find($item->product_id);
+                $itemAmount = (float)($item->total_amount > 0 ? $item->total_amount : ((float)$item->quantity * (float)$item->unit_cost));
+                if ($itemAmount <= 0) continue;
+
+                $inventoryAcc = $accountResolver->resolveInventoryAccount($product, $tenantId);
+                $expenseAcc = $accountResolver->resolveCogsAccount($product, $tenantId);
+
+                if (!$inventoryAcc || !$expenseAcc) {
+                    continue;
+                }
+
+                if ($item->type === 'Addition') {
+                    // Addition: Debit Inventory Asset, Credit Inventory Adjustment Gain / Cost Expense
+                    $lines[] = [
+                        'chart_of_account_id' => $inventoryAcc->id,
+                        'debit' => $itemAmount,
+                        'credit' => 0,
+                        'description' => "Stock Adjustment Gain - {$adjustment->adjustment_number} (" . ($product?->name ?? 'Item') . ")",
+                    ];
+                    $lines[] = [
+                        'chart_of_account_id' => $expenseAcc->id,
+                        'debit' => 0,
+                        'credit' => $itemAmount,
+                        'description' => "Stock Adjustment Gain - {$adjustment->adjustment_number} (" . ($product?->name ?? 'Item') . ")",
+                    ];
+                } else {
+                    // Deduction: Debit Shrinkage/Loss Expense, Credit Inventory Asset
+                    $lines[] = [
+                        'chart_of_account_id' => $expenseAcc->id,
+                        'debit' => $itemAmount,
+                        'credit' => 0,
+                        'description' => "Stock Adjustment Loss/Shrinkage - {$adjustment->adjustment_number} (" . ($product?->name ?? 'Item') . ")",
+                    ];
+                    $lines[] = [
+                        'chart_of_account_id' => $inventoryAcc->id,
+                        'debit' => 0,
+                        'credit' => $itemAmount,
+                        'description' => "Stock Adjustment Loss/Shrinkage - {$adjustment->adjustment_number} (" . ($product?->name ?? 'Item') . ")",
+                    ];
+                }
+                $totalAmount += $itemAmount;
+            }
+
+            if (!empty($lines) && $totalAmount > 0) {
+                $journalService->postOnce($lines, [
+                    'tenant_id' => $tenantId,
+                    'journal_date' => $adjustment->adjustment_date ?? now(),
+                    'source' => defined('\App\Domains\Accounting\Models\Journal::SOURCE_INVENTORY') ? \App\Domains\Accounting\Models\Journal::SOURCE_INVENTORY : 'inventory',
+                    'reference_type' => 'StockAdjustment',
+                    'reference_id' => $adjustment->id,
+                    'notes' => 'Stock adjustment ' . $adjustment->adjustment_number . ' - ' . ($adjustment->reason ?? 'Manual Adjustment'),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("StockAdjustmentController: Accounting journal posting skipped: " . $e->getMessage());
+        }
     }
 
     public function cancel(StockAdjustment $adjustment)

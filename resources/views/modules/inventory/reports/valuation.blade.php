@@ -247,6 +247,7 @@
                         <th>{{ __('inventory.product_name') }}</th>
                         <th>{{ __('inventory.sku_code') }}</th>
                         <th>{{ __('inventory.warehouse_location') }}</th>
+                        <th>{{ __('inventory.valuation_method') }}</th>
                         <th class="text-end">{{ __('inventory.on_hand_qty') }}</th>
                         <th class="text-end">{{ __('inventory.unit_cost_rate') }}</th>
                         <th class="text-end pe-3">{{ __('inventory.total_asset_value') }}</th>
@@ -255,8 +256,23 @@
                 <tbody>
                     @forelse($stocks as $stock)
                         @php
-                            $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));
-                            $value = (float)$stock->quantity * $unitCost;
+                            $method = $stock->product?->inventory_valuation_method ?? 'FIFO';
+                            $key = "{$stock->product_id}_{$stock->warehouse_id}";
+                            $lots = isset($activeLotsGrouped) ? $activeLotsGrouped->get($key) : null;
+
+                            $fifoBalance = $lots ? (float)$lots->sum('balance_qty') : 0.0;
+                            $fifoValuation = $lots ? (float)$lots->sum(fn($tx) => (float)$tx->balance_qty * (float)$tx->unit_cost) : 0.0;
+                            $distinctRates = $lots ? $lots->pluck('unit_cost')->map(fn($r) => round((float)$r, 2))->unique() : collect();
+
+                            if ($method === 'FIFO' && $fifoBalance > 0) {
+                                $unitCost = $fifoValuation / $fifoBalance;
+                                $value = (float)$stock->quantity * $unitCost;
+                                $isMultipleLots = $distinctRates->count() > 1;
+                            } else {
+                                $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));
+                                $value = (float)$stock->quantity * $unitCost;
+                                $isMultipleLots = false;
+                            }
                         @endphp
                         <tr>
                             <td>
@@ -279,11 +295,25 @@
                                     <i class="feather-map-pin text-muted me-1 fs-11"></i>{{ $stock->warehouse->name ?? 'N/A' }}
                                 </span>
                             </td>
+                            <td>
+                                @if($method === 'FIFO')
+                                    <span class="badge bg-soft-primary text-primary fs-11" title="First-In, First-Out Costing Method">FIFO</span>
+                                @else
+                                    <span class="badge bg-soft-info text-info fs-11" title="Weighted Moving Average Costing Method">Weighted Avg</span>
+                                @endif
+                            </td>
                             <td class="text-end font-monospace fw-bold fs-13 text-dark">
                                 {{ number_format($stock->quantity, 2) }}
                             </td>
                             <td class="text-end font-monospace text-muted fs-12">
                                 {!! format_currency($unitCost) !!}
+                                @if($method === 'FIFO')
+                                    @if($isMultipleLots)
+                                        <span class="badge bg-soft-secondary text-dark ms-1 fs-10" data-bs-toggle="tooltip" title="Effective FIFO rate across multiple active purchase lots ({{ $distinctRates->map(fn($r) => '₹'.$r)->implode(', ') }})">Avg FIFO</span>
+                                    @else
+                                        <span class="badge bg-soft-primary text-primary ms-1 fs-10" title="Active FIFO Lot Rate">FIFO</span>
+                                    @endif
+                                @endif
                             </td>
                             <td class="text-end pe-3 font-monospace fw-bold fs-13 text-primary">
                                 {!! format_currency($value) !!}
@@ -291,7 +321,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
+                            <td colspan="7" class="text-center py-5 text-muted">
                                 <i class="feather-archive fs-1 d-block mb-3 text-light"></i>
                                 {{ __('inventory.no_physical_stock_valuation_data') }}
                             </td>

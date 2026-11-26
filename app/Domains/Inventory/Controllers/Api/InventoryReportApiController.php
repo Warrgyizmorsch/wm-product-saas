@@ -5,6 +5,7 @@ namespace App\Domains\Inventory\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\ProductWarehouseStock;
+use App\Domains\Inventory\Models\StockTransaction;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Purchase\Models\PurchaseRequisition;
 use App\Domains\Purchase\Models\PurchaseRequisitionItem;
@@ -207,6 +208,13 @@ class InventoryReportApiController extends Controller
 
         $allStocks = (clone $baseQuery)->get();
 
+        // Fetch unconsumed active lots grouped for accurate FIFO
+        $activeLotsGrouped = StockTransaction::where('tenant_id', $tenantId)
+            ->where('type', 'IN')
+            ->where('balance_qty', '>', 0)
+            ->get()
+            ->groupBy(fn($tx) => "{$tx->product_id}_{$tx->warehouse_id}");
+
         $totalValuation = 0.0;
         $fgValuation    = 0.0;
         $rmValuation    = 0.0;
@@ -218,8 +226,20 @@ class InventoryReportApiController extends Controller
         $rmQty          = 0.0;
 
         foreach ($allStocks as $stock) {
-            $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));
-            $val      = (float)$stock->quantity * $unitCost;
+            $method = $stock->product?->inventory_valuation_method ?? 'FIFO';
+            $key = "{$stock->product_id}_{$stock->warehouse_id}";
+            $lots = $activeLotsGrouped->get($key);
+
+            $fifoBalance = $lots ? (float)$lots->sum('balance_qty') : 0.0;
+            $fifoValuation = $lots ? (float)$lots->sum(fn($tx) => (float)$tx->balance_qty * (float)$tx->unit_cost) : 0.0;
+
+            if ($method === 'FIFO' && $fifoBalance > 0) {
+                $unitCost = $fifoValuation / $fifoBalance;
+                $val      = (float)$stock->quantity * $unitCost;
+            } else {
+                $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));
+                $val      = (float)$stock->quantity * $unitCost;
+            }
             $qty      = (float)$stock->quantity;
 
             $prodType = strtolower($stock->product->type ?? '');
@@ -354,7 +374,7 @@ class InventoryReportApiController extends Controller
 
         $fileName = 'Stock_Valuation_Report_' . date('Y-m-d_H-i') . '.csv';
 
-        return response()->streamDownload(function () use ($query, $warehouseName, $categoryLabel) {
+        return response()->streamDownload(function () use ($query, $warehouseName, $categoryLabel, $tenantId) {
             $handle = fopen('php://output', 'w');
             fputs($handle, "\xEF\xBB\xBF");
 
@@ -364,11 +384,19 @@ class InventoryReportApiController extends Controller
             fputcsv($handle, ['Category Scope', $categoryLabel]);
             fputcsv($handle, []);
 
+            // Fetch unconsumed active lots grouped for accurate FIFO
+            $activeLotsGrouped = StockTransaction::where('tenant_id', $tenantId)
+                ->where('type', 'IN')
+                ->where('balance_qty', '>', 0)
+                ->get()
+                ->groupBy(fn($tx) => "{$tx->product_id}_{$tx->warehouse_id}");
+
             fputcsv($handle, [
                 'S.No',
                 'Product Name',
                 'SKU Code',
                 'Warehouse Location',
+                'Valuation Method',
                 'On Hand Quantity',
                 'Unit Cost Rate',
                 'Total Asset Value',
@@ -378,10 +406,22 @@ class InventoryReportApiController extends Controller
             $totalQty       = 0.0;
             $totalValuation = 0.0;
 
-            $query->chunk(500, function ($stocks) use ($handle, &$index, &$totalQty, &$totalValuation) {
+            $query->chunk(500, function ($stocks) use ($handle, &$index, &$totalQty, &$totalValuation, $activeLotsGrouped) {
                 foreach ($stocks as $stock) {
-                    $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));
-                    $val      = (float)$stock->quantity * $unitCost;
+                    $method = $stock->product?->inventory_valuation_method ?? 'FIFO';
+                    $key = "{$stock->product_id}_{$stock->warehouse_id}";
+                    $lots = $activeLotsGrouped->get($key);
+
+                    $fifoBalance = $lots ? (float)$lots->sum('balance_qty') : 0.0;
+                    $fifoValuation = $lots ? (float)$lots->sum(fn($tx) => (float)$tx->balance_qty * (float)$tx->unit_cost) : 0.0;
+
+                    if ($method === 'FIFO' && $fifoBalance > 0) {
+                        $unitCost = $fifoValuation / $fifoBalance;
+                        $val      = (float)$stock->quantity * $unitCost;
+                    } else {
+                        $unitCost = (float)($stock->unit_cost > 0 ? $stock->unit_cost : ($stock->product->unit_cost ?? 0));
+                        $val      = (float)$stock->quantity * $unitCost;
+                    }
 
                     $totalQty       += (float)$stock->quantity;
                     $totalValuation += $val;
@@ -391,6 +431,7 @@ class InventoryReportApiController extends Controller
                         $stock->product->name ?? 'N/A',
                         $stock->product->sku ?? '-',
                         $stock->warehouse->name ?? 'N/A',
+                        $method === 'FIFO' ? 'FIFO' : 'Weighted Average',
                         number_format($stock->quantity, 2, '.', ''),
                         number_format($unitCost, 2, '.', ''),
                         number_format($val, 2, '.', ''),

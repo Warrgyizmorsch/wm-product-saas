@@ -62,7 +62,15 @@ class StockAdjustmentExport implements FromCollection, WithHeadings, WithMapping
             $query->orderBy('adjustment_date', 'desc');
         }
 
-        return $query->get();
+        return $query->limit(10000)->get();
+    }
+
+    private function escapeFormula(mixed $value): mixed
+    {
+        if (is_string($value) && strlen($value) > 0 && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'" . $value;
+        }
+        return $value;
     }
 
     public static function availableColumns(): array
@@ -125,7 +133,7 @@ class StockAdjustmentExport implements FromCollection, WithHeadings, WithMapping
 
         $output = [];
         foreach ($this->getActiveColumns() as $col) {
-            $output[] = $values[$col] ?? '';
+            $output[] = $this->escapeFormula($values[$col] ?? '');
         }
 
         return $output;

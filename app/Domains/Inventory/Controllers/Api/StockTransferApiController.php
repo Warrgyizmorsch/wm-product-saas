@@ -435,24 +435,56 @@ class StockTransferApiController extends Controller
 
         $this->authorize('update', $transfer);
 
-        if (in_array($transfer->status, ['Completed', 'In Transit', 'In-Transit'])) {
+        if ($transfer->status === 'Completed') {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot cancel an In-Transit or Completed transfer.',
+                'message' => 'Cannot cancel a Completed transfer.',
             ], 422);
         }
 
         DB::transaction(function () use ($transfer, $tenantId) {
-            foreach ($transfer->items as $item) {
-                \App\Domains\Inventory\Services\StockService::releaseStock(
-                    tenantId: $tenantId,
-                    productId: (int)$item->product_id,
-                    warehouseId: (int)$transfer->from_warehouse_id,
-                    qty: (float)$item->quantity,
-                    referenceType: 'StockTransfer',
-                    referenceId: $transfer->id,
-                    referenceItemId: $item->id
-                );
+            if (in_array($transfer->status, ['In Transit', 'In-Transit'])) {
+                foreach ($transfer->items as $item) {
+                    $outTx = \App\Domains\Inventory\Models\StockTransaction::where('tenant_id', $tenantId)
+                        ->where('reference_type', 'StockTransfer')
+                        ->where('reference_id', $transfer->id)
+                        ->where('product_id', $item->product_id)
+                        ->where('type', 'OUT')
+                        ->first();
+
+                    $product = Product::where('tenant_id', $tenantId)->find($item->product_id);
+                    $unitCost = $outTx ? (float)$outTx->unit_cost : (float)($product ? $product->cost_price : 0);
+                    $batch = $item->batch;
+                    $batchNumber = $batch ? $batch->batch_number : null;
+                    $mfgDate = $batch && $batch->manufacturing_date ? $batch->manufacturing_date->format('Y-m-d') : null;
+                    $expiryDate = $batch && $batch->expiry_date ? $batch->expiry_date->format('Y-m-d') : null;
+
+                    \App\Domains\Inventory\Services\StockService::recordInflow(
+                        tenantId: $tenantId,
+                        productId: (int)$item->product_id,
+                        warehouseId: (int)$transfer->from_warehouse_id,
+                        quantity: (float)$item->quantity,
+                        unitCost: $unitCost,
+                        referenceType: 'StockTransferReturn',
+                        referenceId: $transfer->id,
+                        batchNumber: $batchNumber,
+                        serialNumbers: $item->serial_numbers ?? [],
+                        mfgDate: $mfgDate,
+                        expiryDate: $expiryDate
+                    );
+                }
+            } else {
+                foreach ($transfer->items as $item) {
+                    \App\Domains\Inventory\Services\StockService::releaseStock(
+                        tenantId: $tenantId,
+                        productId: (int)$item->product_id,
+                        warehouseId: (int)$transfer->from_warehouse_id,
+                        qty: (float)$item->quantity,
+                        referenceType: 'StockTransfer',
+                        referenceId: $transfer->id,
+                        referenceItemId: $item->id
+                    );
+                }
             }
             $transfer->update(['status' => 'Cancelled']);
         });
