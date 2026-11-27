@@ -114,12 +114,9 @@ class SubcontractReceiptOrchestrator
                 } else {
                     // Support partial & complete receipts
                     $targetQty = (float) ($op->target_produced_qty ?: ($op->order?->quantity_ordered ?: 0.0));
-                    $newProducedQty = (float) $op->quantity_produced + $receivedQty;
+                    // C-02: only the accepted units are output; TF-08: nothing is backflushed (the material was issued)
+                    $newProducedQty = (float) $op->quantity_produced + $acceptedQty;
                     $op->quantity_produced = $newProducedQty;
-
-                    if ($op->material_supply_type === 'company_supplied') {
-                        $this->materialBalanceService->backflushCompanyMaterial($grn->tenant_id, $op, $acceptedQty);
-                    }
 
                     if ($targetQty > 0 && $newProducedQty < ($targetQty - 0.0001)) {
                         $op->status = ProductionOrderOperation::STATUS_RUNNING;
@@ -207,21 +204,18 @@ class SubcontractReceiptOrchestrator
                 return;
             }
 
-            if ($inspection->result === 'passed') {
+            // N-09: a partial pass books its passed units too (only a result with nothing passed books nothing)
+            if ($inspection->result === 'passed' || ($inspection->result === 'partially_passed' && (float) ($inspection->passed_qty ?? 0) > 0)) {
                 $targetQty = (float) ($op->target_produced_qty ?: ($op->order?->quantity_ordered ?: 0.0));
                 $acceptedQty = ($inspection->passed_qty && (float) $inspection->passed_qty > 0)
                     ? (float) $inspection->passed_qty
                     : ((float) ($inspection->inspected_quantity ?: ($op->order?->quantity_ordered ?: 0.0)));
 
-                if ($op->material_supply_type === 'company_supplied') {
-                    $this->materialBalanceService->backflushCompanyMaterial($inspection->tenant_id, $op, $acceptedQty);
-                }
-
-                $newProducedQty = max((float) $op->quantity_produced, $acceptedQty);
+                // TF-08: nothing is backflushed; N-09: partial passes add up instead of max()
+                $newProducedQty = round((float) $op->quantity_produced + $acceptedQty, 4);
                 $op->quantity_produced = $newProducedQty;
 
-                $totalInspected = max($newProducedQty, (float) ($inspection->inspected_quantity ?? 0));
-                if ($targetQty > 0 && $totalInspected < ($targetQty - 0.0001)) {
+                if ($targetQty > 0 && $newProducedQty < ($targetQty - 0.0001)) {
                     $op->status = ProductionOrderOperation::STATUS_RUNNING;
                 } else {
                     $op->status = ProductionOrderOperation::STATUS_COMPLETED;
@@ -273,7 +267,10 @@ class SubcontractReceiptOrchestrator
                 // Evaluate and transfer WIP to successor operation
                 $this->wipService->evaluateAndExecuteWipTransfers($op->id, null, $batchId);
             } else {
-                $op->status = 'failed';
+                // N-09 / N-12: 'failed' is not an operation status — the rejected units are recorded, the operation stays
+                // in QC-pending until the next result (rework / re-inspection)
+                $op->quantity_rejected = round((float) $op->quantity_rejected + (float) ($inspection->failed_qty ?? 0), 4);
+                $op->status = ProductionOrderOperation::STATUS_SUBCONTRACT_QC_PENDING;
                 $op->save();
             }
         });

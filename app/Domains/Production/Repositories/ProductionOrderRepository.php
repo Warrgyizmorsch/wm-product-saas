@@ -62,9 +62,21 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
 
     public function getSubcontractDashboardMetrics(int $tenantId): array
     {
-        $awaitingProcurement = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+        // H-08: counts use the statuses the flow really writes (2026-11-27 rework)
+        $Op = \App\Domains\Production\Models\ProductionOrderOperation::class;
+        $Challan = \App\Domains\Production\Models\DeliveryChallan::class;
+        $liveOrder = fn ($q) => $q->whereIn('status', [
+            \App\Domains\Production\Models\ProductionOrder::STATUS_RELEASED,
+            \App\Domains\Production\Models\ProductionOrder::STATUS_IN_PROGRESS,
+        ]);
+        $openOp = fn ($q) => $q->where('tenant_id', $tenantId)
             ->where('is_external', true)
-            ->where('status', 'ready')
+            ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
+            ->whereHas('order', $liveOrder);
+
+        // Outsourced ops of live orders with no subcontract PO yet (D-4: raised only by button)
+        $awaitingProcurement = $openOp($Op::query())
+            ->whereNull('purchase_order_id')
             ->count();
 
         $poAwaitingApproval = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
@@ -72,46 +84,47 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
             ->whereIn('status', ['Draft', 'Pending Approval', 'draft', 'pending_approval'])
             ->count();
 
-        $readyForDispatch = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
-            ->where('is_external', true)
-            ->where('material_supply_type', 'company_supplied')
-            ->whereIn('status', ['ready', 'running'])
+        // Company-material / job-work ops of live orders not yet at a vendor
+        $readyForDispatch = $openOp($Op::query())
+            ->where(fn ($q) => $q->whereNull('material_supply_type')->orWhere('material_supply_type', '!=', 'vendor_supplied'))
+            ->whereNotIn('status', [$Op::STATUS_VENDOR_DISPATCHED, $Op::STATUS_SUBCONTRACT_QC_PENDING])
+            ->whereDoesntHave('deliveryChallans', fn ($q) => $q->whereIn('status', $Challan::AT_VENDOR_STATUSES))
             ->count();
 
-        $atVendor = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
-            ->where('is_external', true)
-            ->whereIn('status', ['in_process', 'sent_to_vendor', 'dispatched'])
+        // Dispatch slips still at a vendor (dispatched / partly received)
+        $atVendor = $Challan::where('tenant_id', $tenantId)
+            ->whereIn('status', $Challan::AT_VENDOR_STATUSES)
             ->count();
 
-        $vendorDelayed = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
-            ->where('is_external', true)
-            ->whereNotIn('status', ['completed', 'cancelled'])
-            ->whereNotNull('actual_start_time')
-            ->whereDate('actual_start_time', '<', now()->subDays(3))
+        // Slips past their expected-back date
+        $vendorDelayed = $Challan::where('tenant_id', $tenantId)
+            ->whereIn('status', $Challan::AT_VENDOR_STATUSES)
+            ->whereNotNull('expected_return_date')
+            ->whereDate('expected_return_date', '<', now()->toDateString())
             ->count();
 
-        $partialReceipt = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
-            ->where('is_external', true)
-            ->where('quantity_produced', '>', 0)
-            ->whereRaw('quantity_produced < COALESCE(target_produced_qty, 1)')
+        $partialReceipt = $Challan::where('tenant_id', $tenantId)
+            ->where('status', $Challan::STATUS_PARTIALLY_RECEIVED)
             ->count();
 
-        $qcPending = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+        $qcPending = $Op::where('tenant_id', $tenantId)
             ->where('is_external', true)
-            ->where('status', 'subcontract_qc_pending')
+            ->where('status', $Op::STATUS_SUBCONTRACT_QC_PENDING)
             ->count();
 
+        // logRework still writes 'pending'; in_progress is the next state
         $vendorRework = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
-            ->where('status', 'pending')
+            ->whereIn('status', ['pending', 'in_progress'])
             ->whereHas('operation', function ($q) {
                 $q->where('is_external', true);
             })
             ->count();
 
-        $materialExceptions = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
-            ->where('is_external', true)
-            ->where('status', 'vendor_dispatched')
-            ->where('quantity_produced', '<', 1)
+        // Closed slips whose material lines were never fully accounted for (sent − used − returned − scrapped > 0)
+        $materialExceptions = $Challan::where('tenant_id', $tenantId)
+            ->where('status', $Challan::STATUS_COMPLETED)
+            ->whereHas('items', fn ($q) => $q->where(fn ($w) => $w->whereNull('item_type')->orWhere('item_type', 'material'))
+                ->whereRaw('(COALESCE(quantity,0) - COALESCE(consumed_qty,0) - COALESCE(returned_qty,0) - COALESCE(scrapped_qty,0)) > 0.0001'))
             ->count();
 
         return [

@@ -20,8 +20,9 @@ use Illuminate\Support\Facades\Schema;
  * Every plan is made through QualityPlanService exactly like the screens do — create → submit → approve, a second
  * version through createNextVersion → submit → approve (the old version becomes historical by itself) — so plan
  * numbers (QP-0001…, tenant sequence "quality_plan"), version families and the approval history come from the real
- * code. 26 plan families, 28 versions, every status and scope, chosen so the routing operations of
- * TestProductionEngineeringSeeder can carry 1–3 plans each (see the combinations table in the doc).
+ * code. 30 plan families, 32 versions, every status and scope, chosen so the routing operations of
+ * TestProductionEngineeringSeeder can carry 1–3 plans each (see the combinations table in the doc). The last four
+ * (QP-0027 … QP-0030) belong to the subcontract examples (Part C).
  *
  * Runs after TestProductionMasterDataSeeder (sections and products) and before TestProductionEngineeringSeeder (which
  * links the approved section / process plans to routing operations). Units for numeric checks (mm, µm, N·m, degree)
@@ -158,7 +159,7 @@ class TestProductionQualitySeeder extends Seeder
     }
 
     /**
-     * The plan families, in creation order (QP-0001 … QP-0026). Sections by code, products by SKU.
+     * The plan families, in creation order (QP-0001 … QP-0030). Sections by code, products by SKU.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -287,6 +288,31 @@ class TestProductionQualitySeeder extends Seeder
             ['name' => 'Steel tube incoming check', 'scope' => $product, 'product' => 'test-raw-01', 'state' => self::APPROVED, 'versions' => [[
                 self::num('Wall thickness', 1.9, 2.1, 'mm'),
                 self::passFail('Rust', 'No red rust on the outside or at the tube ends'),
+            ]]],
+
+            // ── Subcontract examples (QP-0027 … QP-0030, Part C of the doc) ─────────────
+            // an outsourced operation has no section, so only process plans can be linked to it (QR-16); its receipt
+            // waits for this inspection like any shop-floor operation (TF-10)
+            ['name' => 'Subcontract receipt check — general', 'scope' => $process, 'state' => self::APPROVED, 'versions' => [[
+                self::passFail('Count matches dispatch slip', 'Units counted back equal the units on the dispatch slip, less any reported scrap'),
+                self::passFail('Transit damage', 'No dent, bend or coating scuff from transport'),
+                self::text('Vendor remarks'),
+            ]]],
+            ['name' => 'Zinc plating check — general', 'scope' => $process, 'state' => self::APPROVED, 'versions' => [[
+                self::num('Zinc thickness', 8, 15, 'um'),
+                self::passFail('Adhesion bend test', 'No flaking or peeling after a 90° bend of a sample piece'),
+                self::passFail('White rust', 'No white rust spots on the plated surface', false),
+            ]]],
+            ['name' => 'Outdoor frame check', 'scope' => $product, 'product' => 'test-semifinal-04', 'state' => self::APPROVED, 'versions' => [[
+                self::num('Galvanised coating thickness', 45, 85, 'um'),
+                self::num('Diagonal difference', 0, 3, 'mm'),
+                self::passFail('Coating coverage', 'No bare steel or drip runs at welds and tube ends'),
+            ]]],
+            ['name' => 'Outdoor table final QC', 'scope' => $product, 'product' => 'test-final-03', 'state' => self::APPROVED, 'versions' => [[
+                self::num('Top flatness', 0, 1.5, 'mm'),
+                self::passFail('Wobble test', 'No rocking when pressed at each corner on a level floor'),
+                self::passFail('Outdoor finish', 'No bare zinc or coating gap on the frame'),
+                self::text('Remarks'),
             ]]],
         ];
     }

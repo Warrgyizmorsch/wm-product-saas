@@ -44,7 +44,8 @@ class TestProductionStockSeeder extends Seeder
         $ledgerColumns = array_flip(Schema::getColumnListing('stock_transactions'));
         $booked = 0;
 
-        foreach (DB::table('products')->where('tenant_id', $tenantId)->where('sku', 'LIKE', 'test-%')->orderBy('id')->get() as $product) {
+        // service products (the subcontract job-work charges) hold no stock
+        foreach (DB::table('products')->where('tenant_id', $tenantId)->where('sku', 'LIKE', 'test-%')->where('type', '!=', 'service')->orderBy('id')->get() as $product) {
             $qty = $this->openingQuantity($product);
             $warehouseId = $links->warehouseId(self::HOME_WAREHOUSE[$product->type] ?? 'WH-RM-TBL');
             $rate = (float) ($product->cost_price ?? 0);
@@ -109,6 +110,12 @@ class TestProductionStockSeeder extends Seeder
             'test-semifinal-03' => 150,  // top board, used by both tables
             'test-final-01' => 25,
             'test-final-02' => 25,
+            // subcontract examples (Part C of the doc): an order of the product itself always runs its own routing (and
+            // its job works); stock decides only when children are made inside a larger order
+            'test-semi-09' => 400,       // gusset plate: 100 frames' worth (4 per frame)
+            'test-semi-10' => 200,       // vendor-made support rail: 100 frames' worth (2 per frame)
+            'test-semifinal-04' => 50,   // outdoor frame: test-final-03 up to 50 runs from stock, 51+ makes frames
+            'test-final-03' => 10,
         ];
     }
 }

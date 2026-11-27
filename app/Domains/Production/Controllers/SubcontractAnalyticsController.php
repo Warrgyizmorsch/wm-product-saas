@@ -17,7 +17,9 @@ class SubcontractAnalyticsController extends Controller
 
     public function index(Request $request)
     {
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        // M-01: same permission as the Subcontracting menu (dispatch slips); never fall back to tenant 1
+        $this->authorize('viewAny', \App\Domains\Production\Models\DeliveryChallan::class);
+        $tenantId = require_tenant_id();
 
         $filters = [
             'vendor_id' => $request->query('vendor_id'),

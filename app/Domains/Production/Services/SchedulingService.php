@@ -621,7 +621,7 @@ class SchedulingService
             $inMemoryBookings = [];
 
             foreach ($reversedOps as $op) {
-                if ($op->is_external) {
+                if ($op->is_external || $op->isOutsourced()) { // H-01: same test as the forward schedule
                     $totalDays = (int) ($op->dispatch_buffer_days ?? 0) + (int) ($op->subcontract_lead_time_days ?? 0) + (int) ($op->return_buffer_days ?? 0);
                     $duration = $totalDays * 1440.0;
 
@@ -828,7 +828,16 @@ class SchedulingService
                     (float) ($schedule->order?->quantity_ordered ?? 1)
                 );
 
-                if ($orderOp) {
+                if ($orderOp && $orderOp->is_external) {
+                    // H-01: an outsourced operation has no machine / batch here — its vendor lead time runs on the calendar
+                    $duration = (float) (app(SubcontractDates::class)->totalDays($orderOp) * 1440) ?: (float) $op->planned_duration_minutes;
+                    $alloc = [
+                        'start' => $earliestStart->copy(),
+                        'finish' => $this->addWorkingMinutes(null, $earliestStart->copy(), $duration), // no work centre = calendar time
+                        'warnings' => [],
+                        'machine_id' => null,
+                    ];
+                } elseif ($orderOp) {
                     $alloc = $this->allocateOperationSlot($orderOp, $earliestStart, (float) $op->planned_duration_minutes, $schedule->tenant_id, true);
                 } else {
                     $alloc = $this->calculateAvailableSlot(
@@ -2777,8 +2786,13 @@ class SchedulingService
                     $times = $this->calculateOperationTimes($op->orderOperation, $opTarget);
                     $duration = $times['total_minutes'];
 
-                    // Find slot
-                    $alloc = $this->allocateOperationSlot($op->orderOperation, $earliestStart, $duration, $tenantId, true, [$op->id]);
+                    // Find slot (H-01: an outsourced operation keeps its vendor lead time, calendar days, no resource)
+                    if ($op->orderOperation?->is_external) {
+                        $duration = (float) (app(SubcontractDates::class)->totalDays($op->orderOperation) * 1440) ?: (float) $op->planned_duration_minutes;
+                        $alloc = ['start' => $earliestStart->copy(), 'finish' => $this->addWorkingMinutes(null, $earliestStart->copy(), $duration), 'warnings' => []];
+                    } else {
+                        $alloc = $this->allocateOperationSlot($op->orderOperation, $earliestStart, $duration, $tenantId, true, [$op->id]);
+                    }
 
                     $plannedStart = $alloc['start'] ?? $earliestStart->copy();
                     $plannedFinish = $alloc['finish'] ?? $earliestStart->copy()->addMinutes((int) ceil($duration));
@@ -2800,7 +2814,7 @@ class SchedulingService
                         'section_manual_production_id' => $batchId,
                         'priority' => $priority,
                         'warnings' => $warnings,
-                        'resource_id' => $this->resourceKey($machineId, $batchId, 'WorkCenter_' . $op->work_center_id),
+                        'resource_id' => $this->resourceKey($machineId, $batchId, ($op->orderOperation?->is_external && !$op->work_center_id ? 'Vendor_' . ($op->orderOperation?->vendor_id ?? 'External') : 'WorkCenter_' . $op->work_center_id)),
                         'status' => $isFirstPending
                             ? ProductionScheduleOperation::STATUS_READY
                             : ProductionScheduleOperation::STATUS_WAITING,
@@ -2861,7 +2875,13 @@ class SchedulingService
                     $times = $this->calculateOperationTimes($op->orderOperation, $opTarget);
                     $duration = $times['total_minutes'];
 
-                    $alloc = $this->allocateOperationSlot($op->orderOperation, $latestFinish, $duration, $tenantId, false, [$op->id]);
+                    if ($op->orderOperation?->is_external) {
+                        // H-01: vendor lead time backwards from the latest finish, calendar days, no resource
+                        $duration = (float) (app(SubcontractDates::class)->totalDays($op->orderOperation) * 1440) ?: (float) $op->planned_duration_minutes;
+                        $alloc = ['start' => $latestFinish->copy()->subMinutes((int) ceil($duration)), 'finish' => $latestFinish->copy(), 'warnings' => []];
+                    } else {
+                        $alloc = $this->allocateOperationSlot($op->orderOperation, $latestFinish, $duration, $tenantId, false, [$op->id]);
+                    }
 
                     $plannedStart = $alloc['start'] ?? $latestFinish->copy()->subMinutes((int) ceil($duration));
                     $plannedFinish = $alloc['finish'] ?? $latestFinish->copy();
@@ -2882,7 +2902,7 @@ class SchedulingService
                         'section_manual_production_id' => $batchId,
                         'priority' => $priority,
                         'warnings' => $warnings,
-                        'resource_id' => $this->resourceKey($machineId, $batchId, 'WorkCenter_' . $op->work_center_id),
+                        'resource_id' => $this->resourceKey($machineId, $batchId, ($op->orderOperation?->is_external && !$op->work_center_id ? 'Vendor_' . ($op->orderOperation?->vendor_id ?? 'External') : 'WorkCenter_' . $op->work_center_id)),
                         'status' => ProductionScheduleOperation::STATUS_WAITING,
                     ]);
 

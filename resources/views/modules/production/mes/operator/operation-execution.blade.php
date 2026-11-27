@@ -272,24 +272,30 @@
                     $canQuality = $user && $accessService->allows($user, 'production.quality.view');
                     $canInventory = $user && $accessService->allows($user, 'inventory.transfers.view');
 
-                    $poItem = $op->purchaseOrderItem ?? \App\Domains\Purchase\Models\PurchaseOrderItem::where('production_order_operation_id', $op->id)->first();
-                    $po = $poItem?->purchaseOrder ?? $op->purchaseOrder;
-                    $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::whereHas('requisition', function($q) use ($order) {
-                        $q->where('source_type', 'ProductionOrder')->where('source_id', $order->id);
-                    })->first();
+                    // N-16: this operation's PR / PO (operation link, cancelled ones never count)
+                    $poItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('production_order_operation_id', $op->id)
+                        ->whereHas('order', fn ($q) => $q->where('status', '!=', 'Cancelled'))->latest('id')->first();
+                    $po = $poItem?->order;
+                    $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::where('production_order_operation_id', $op->id)
+                        ->whereHas('requisition', fn ($q) => $q->where('status', '!=', 'Cancelled'))->latest('id')->first();
                     $pr = $prItem?->requisition;
 
-                    $opWips = $order->wips->where('current_routing_operation_id', $op->id);
-                    $sentQty = $op->quantity_transferred_out ?? 0;
-                    $atVendorQty = $opWips->sum('quantity_available');
+                    // H-06: from the dispatch slips / receipts of this operation
+                    $scBalance = app(\App\Domains\Production\Services\SubcontractMaterialBalanceService::class)->getMaterialBalance($order->tenant_id, $order->id, $op->id);
+                    $sentQty = $scBalance['units_sent'];
+                    $atVendorQty = $scBalance['units_at_vendor'];
                     $receivedQty = $op->quantity_produced ?? 0;
                     $rejectedQty = $op->quantity_rejected ?? 0;
                     $scrappedQty = $op->quantity_scrapped ?? 0;
-                    $qcPending = $order->wips->where('current_routing_operation_id', $op->id)->where('status', 'quality_hold')->sum('quantity_available');
+                    $qcPending = (float) \App\Domains\Production\Models\ProductionSubcontractReceipt::where('production_order_operation_id', $op->id)
+                        ->where('status', 'qc_pending')->get()
+                        ->sum(fn ($r) => max(0, $r->received_qty - $r->scrapped_qty - $r->rejected_qty - $r->accepted_qty));
 
-                    $plannedDispatch = $order->start_date ? \Carbon\Carbon::parse($order->start_date)->subDays($op->dispatch_buffer_days ?? 0)->format('d/m/Y') : '—';
+                    // H-02 / N-18: dates from the operation's scheduled start
+                    $scDates = app(\App\Domains\Production\Services\SubcontractDates::class);
+                    $plannedDispatch = $scDates->leavesPlant($op)->format('d/m/Y');
                     $actualDispatch = $op->actual_start_time ? $op->actual_start_time->format('d/m/Y H:i') : '—';
-                    $expectedReturn = $order->start_date ? \Carbon\Carbon::parse($order->start_date)->addDays(($op->subcontract_lead_time_days ?? 0) + ($op->return_buffer_days ?? 0))->format('d/m/Y') : '—';
+                    $expectedReturn = $scDates->expectedReturnDate($op)->format('d/m/Y');
                     $actualReceipt = $op->actual_end_time ? $op->actual_end_time->format('d/m/Y H:i') : '—';
                 @endphp
 

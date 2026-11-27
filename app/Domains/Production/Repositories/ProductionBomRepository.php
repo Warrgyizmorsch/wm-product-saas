@@ -105,11 +105,22 @@ class ProductionBomRepository implements ProductionBomRepositoryInterface
         return ProductionBom::query()
             ->with([
                 'product',
+                'baseUom',
+                'routing.operations' => fn($q) => $q->orderBy('sequence'),
+                'routing.operations.workCenter',
+                'routing.operations.section',
+                'routing.operations.machine',
+                'routing.operations.manualProduction',
+                'routing.operations.vendor',
+                'routing.operations.primaryOperation',
                 'items.material',
                 'items.uom',
                 'operationMaterials.routingOperation' => fn($q) => $q->withTrashed(),
+                'operationMaterials.material.uom',
                 'operationMaterials.uom',
                 'operationMaterials.childBom',
+                'operationMaterials.replacesMaterial.material',
+                'approvals.user',
                 'creator',
                 'approver',
             ])

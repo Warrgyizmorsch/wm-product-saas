@@ -446,7 +446,9 @@ class CapacityPlanningService
                 ->whereBetween('planned_start', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
                 ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
                 ->with('orderOperation')
-                ->get();
+                ->get()
+                // N-21: an outsourced operation runs at the vendor — its lead-time days are not this work centre's load
+                ->reject(fn ($op) => (bool) ($op->orderOperation?->is_external ?? false));
 
             $required = (float) $ops->sum('planned_duration_minutes');
             $setup = (float) $ops->sum(fn($o) => (float) ($o->orderOperation?->setup_time_planned ?? 0.0));

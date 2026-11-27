@@ -288,9 +288,16 @@ class PurchaseOrderService
                 $updateData['freight_amount'] = $freightAmt;
                 $updateData['grand_total'] = $grandTotal;
 
+                // Subcontract N-15: the lines are rebuilt from the form, which does not carry the production links —
+                // keep them per product so the PO stays tied to its production order / outsourced operation.
+                $productionLinks = $order->items()->get()
+                    ->filter(fn ($old) => $old->product_id && ($old->production_order_id || $old->production_order_operation_id))
+                    ->keyBy('product_id');
+
                 $order->items()->delete();
 
                 foreach ($validated['items'] as $item) {
+                    $link = isset($item['product_id']) ? $productionLinks->get($item['product_id']) : null;
                     $qty = (float)$item['quantity'];
                     $price = convert_to_base((float)($item['unit_price'] ?? $item['rate'] ?? 0));
                     $disc = convert_to_base((float)($item['discount'] ?? $item['discount_amount'] ?? 0));
@@ -316,14 +323,19 @@ class PurchaseOrderService
                         $igstAmt = 0;
                     }
 
-                    PurchaseOrderItem::create([
+                    $newItem = PurchaseOrderItem::create([
                         'purchase_order_id' => $order->id,
                         'product_id' => $item['product_id'] ?? null,
                         'description' => $item['description'] ?? null,
-                        'line_type' => $item['line_type'] ?? PurchaseOrderItem::LINE_TYPE_STOCK,
-                        'chart_of_account_id' => $item['chart_of_account_id'] ?? null,
+                        'line_type' => $item['line_type'] ?? $link?->line_type ?? PurchaseOrderItem::LINE_TYPE_STOCK,
+                        'chart_of_account_id' => $item['chart_of_account_id'] ?? $link?->chart_of_account_id,
                         'asset_category_id' => $item['asset_category_id'] ?? null,
                         'warehouse_id' => $item['warehouse_id'] ?? null,
+                        'production_order_id' => $link?->production_order_id,
+                        'production_order_operation_id' => $link?->production_order_operation_id,
+                        'production_batch_id' => $link?->production_batch_id,
+                        'requisition_item_allocations' => $link?->requisition_item_allocations,
+                        'received_qty' => $link?->received_qty ?? 0,
                         'quantity' => $qty,
                         'rate' => $price,
                         'amount' => $lineSubtotal,
@@ -339,6 +351,11 @@ class PurchaseOrderService
                         'tax_amount' => $lineTax,
                         'total_amount' => $lineSubtotal + $lineTax,
                     ]);
+
+                    if ($link?->production_order_operation_id) {
+                        \App\Domains\Production\Models\ProductionOrderOperation::where('id', $link->production_order_operation_id)
+                            ->update(['purchase_order_id' => $order->id, 'purchase_order_item_id' => $newItem->id]);
+                    }
                 }
             }
 

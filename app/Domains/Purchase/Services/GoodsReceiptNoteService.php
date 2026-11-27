@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\DB;
 
 class GoodsReceiptNoteService
 {
+    /** GRN created in the background by a subcontract receipt (Production), SC-03 */
+    public const SOURCE_SUBCONTRACT_RECEIPT = 'subcontract_receipt';
+
     public function __construct(
         protected GoodsReceiptNoteRepository $grnRepo
     ) {}
@@ -49,6 +52,8 @@ class GoodsReceiptNoteService
                 'transporter_name'  => $transporterName,
                 'lr_number'         => $validated['lr_number'] ?? null,
                 'status'            => 'Approved',
+                'source_type'       => $validated['source_type'] ?? null,
+                'source_id'         => $validated['source_id'] ?? null,
                 'notes'             => $validated['notes'] ?? null,
                 'created_by'        => auth()->id() ?: 1,
                 'approved_by'       => auth()->id() ?: 1,
@@ -62,6 +67,12 @@ class GoodsReceiptNoteService
 
                 $poItemId = $item['purchase_order_item_id'] ?? null;
                 $poItem = $poItemId ? PurchaseOrderItem::find($poItemId) : null;
+
+                // SC-02: outsourced production work is received from the Subcontracting menu or the shop floor; only the
+                // system GRN those receipts create may receive a subcontract line (it keeps the PO and the bill in step).
+                if ($poItem && $poItem->production_order_operation_id && ($validated['source_type'] ?? null) !== self::SOURCE_SUBCONTRACT_RECEIPT) {
+                    throw new \InvalidArgumentException('Subcontract work is received from the Subcontracting menu (dispatch slip) or on the shop floor, not with a Purchase GRN.');
+                }
 
                 $productId = $item['product_id'] ?? $poItem?->product_id;
                 $isAssetOrExpense = $poItem && in_array($poItem->line_type, ['asset', 'expense'], true);

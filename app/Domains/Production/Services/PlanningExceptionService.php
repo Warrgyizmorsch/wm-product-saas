@@ -115,7 +115,8 @@ class PlanningExceptionService
 
         $openPurchaseOrders = PurchaseOrder::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->whereIn('status', ['issued', 'confirmed', 'partially_received'])
+            // H-02 / N-23: the real open PO statuses (Title Case, see GoodsReceiptNoteService)
+            ->whereIn('status', ['Approved', 'Partially Received'])
             ->with('items')
             ->get();
 
@@ -327,15 +328,24 @@ class PlanningExceptionService
     {
         if ($purchaseOrders->isEmpty()) return;
 
+        // N-23: only POs that bring something THIS order needs (its planned materials) or that were raised for it
+        $neededProducts = \App\Domains\Production\Models\ProductionOrderReservation::where('production_order_id', $order->id)
+            ->pluck('product_id')->map(fn ($id) => (int) $id)->all();
+        $purchaseOrders = $purchaseOrders->filter(fn ($po) => (int) $po->production_order_id === (int) $order->id
+            || $po->items->contains(fn ($item) => in_array((int) $item->product_id, $neededProducts, true)));
+        if ($purchaseOrders->isEmpty()) return;
+
         foreach ($order->operations as $op) {
             if ($op->status === ProductionOrderOperation::STATUS_COMPLETED) continue;
 
             $opPlannedStart = $op->actual_start_time ?? ($order->start_date ? Carbon::parse($order->start_date) : now());
 
             foreach ($purchaseOrders as $po) {
-                $expectedDelivery = $po->expected_delivery_date ? Carbon::parse($po->expected_delivery_date) : null;
+                // H-02: the PO column is delivery_date (expected_delivery_date is only a request alias)
+                $expectedDelivery = $po->delivery_date ? Carbon::parse($po->delivery_date) : null;
                 if ($expectedDelivery && $expectedDelivery->isAfter($opPlannedStart)) {
-                    $delayDays = $expectedDelivery->diffInDays($opPlannedStart);
+                    // N-23: Carbon 3 diffInDays is signed — count the days the delivery is late, as a positive number
+                    $delayDays = (int) floor(abs($opPlannedStart->diffInDays($expectedDelivery)));
                     if ($delayDays > 0) {
                         $exceptions[] = [
                             'type' => self::TYPE_LATE_INCOMING_SUPPLY,
@@ -569,12 +579,19 @@ class PlanningExceptionService
         foreach ($order->operations as $op) {
             if (!$op->is_external || $op->status === ProductionOrderOperation::STATUS_COMPLETED) continue;
 
-            $leadTimeDays = (int) $op->subcontract_lead_time_days ?: 3;
-            $startDate = $op->actual_start_time ?? ($order->start_date ? Carbon::parse($order->start_date) : now());
-            $expectedReturn = $startDate->copy()->addDays($leadTimeDays);
+            // N-18 / H-02: one rule for the expected return (buffers + lead time from the real dispatch / scheduled start);
+            // a dispatch slip at the vendor with its own expected-back date wins
+            $leadTimeDays = app(SubcontractDates::class)->totalDays($op);
+            $slipDue = \App\Domains\Production\Models\DeliveryChallan::where('production_order_operation_id', $op->id)
+                ->whereIn('status', \App\Domains\Production\Models\DeliveryChallan::AT_VENDOR_STATUSES)
+                ->whereNotNull('expected_return_date')
+                ->min('expected_return_date');
+            $expectedReturn = $slipDue
+                ? Carbon::parse($slipDue)->endOfDay()
+                : app(SubcontractDates::class)->expectedReturnDate($op, $op->actual_start_time ? Carbon::parse($op->actual_start_time) : null);
 
             if (now()->isAfter($expectedReturn)) {
-                $overdueDays = now()->diffInDays($expectedReturn);
+                $overdueDays = (int) floor(abs(now()->diffInDays($expectedReturn)));
                 $exceptions[] = [
                     'type' => self::TYPE_SUBCONTRACT_DELAY,
                     'severity' => self::SEVERITY_HIGH,

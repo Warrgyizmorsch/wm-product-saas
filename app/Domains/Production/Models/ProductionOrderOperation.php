@@ -18,6 +18,10 @@ class ProductionOrderOperation extends BaseModel
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_SKIPPED   = 'skipped';
     public const STATUS_CANCELLED = 'cancelled';
+    // Outsourced operation states (docs/subcontracting_module_audit_2026-11-26.md N-12): set by the dispatch slip /
+    // the subcontract receipt only, never by the readiness refresh (C-01)
+    public const STATUS_VENDOR_DISPATCHED     = 'vendor_dispatched';
+    public const STATUS_SUBCONTRACT_QC_PENDING = 'subcontract_qc_pending';
 
     public const STATUSES = [
         self::STATUS_WAITING,
@@ -27,6 +31,8 @@ class ProductionOrderOperation extends BaseModel
         self::STATUS_COMPLETED,
         self::STATUS_SKIPPED,
         self::STATUS_CANCELLED,
+        self::STATUS_VENDOR_DISPATCHED,
+        self::STATUS_SUBCONTRACT_QC_PENDING,
     ];
 
     protected $fillable = [
@@ -73,6 +79,7 @@ class ProductionOrderOperation extends BaseModel
         'subcontract_service_product_id',
         'material_supply_type',
         'subcontract_input_type',
+        'uses_previous_op_output', // TF-01: BOM "Previous OP materials" — works on the previous operation's output
         'dispatch_buffer_days',
         'return_buffer_days',
         'purchase_order_id',
@@ -107,6 +114,7 @@ class ProductionOrderOperation extends BaseModel
         'processing_time_actual'  => 'float',
         'is_external'             => 'boolean',
         'quality_required'        => 'boolean',
+        'uses_previous_op_output' => 'boolean',
         'subcontract_lead_time_days'=> 'integer',
         'subcontract_cost_per_unit' => 'float',
         'dispatch_buffer_days'      => 'integer',
@@ -421,7 +429,17 @@ class ProductionOrderOperation extends BaseModel
 
     public function isWipJobWork(): bool
     {
-        return $this->isOutsourced() && ($this->subcontract_input_type === 'previous_operation_wip' || $this->routingOperation?->subcontract_input_type === 'previous_operation_wip');
+        return $this->isOutsourced() && (
+            $this->subcontract_input_type === 'previous_operation_wip'
+            || $this->routingOperation?->subcontract_input_type === 'previous_operation_wip'
+            || (bool) $this->uses_previous_op_output // TF-01 / TF-04: the dispatch slip sends the previous operation's output
+        );
+    }
+
+    /** An outsourced operation in a vendor-side state that only the dispatch slip / subcontract receipt may change (C-01). */
+    public function isAtVendorState(): bool
+    {
+        return in_array($this->status, [self::STATUS_VENDOR_DISPATCHED, self::STATUS_SUBCONTRACT_QC_PENDING], true);
     }
 
     public function getTargetProducedQtyAttribute(): float
@@ -657,6 +675,11 @@ class ProductionOrderOperation extends BaseModel
                 fn ($q) => $q->where('is_alternative', false)
             )
             ->with(['material.uom'])
-            ->get();
+            ->get()
+            // TF-02 / N-27: material the subcontract vendor brings is not this order's to issue — no reservation, no
+            // material request, no readiness block (vendor-supplied marked on the BOM, or a vendor-supplied operation)
+            ->reject(fn ($row) => ($row->supplied_by ?? 'company') === 'vendor'
+                || ($this->is_external && $this->material_supply_type === 'vendor_supplied'))
+            ->values();
     }
 }

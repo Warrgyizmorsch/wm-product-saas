@@ -330,7 +330,17 @@
 
                                 $missingVendor = $extOps->contains(fn($o) => empty($o->vendor_id));
                                 $qcHold = $extOps->contains(fn($o) => $o->status === 'subcontract_qc_pending');
-                                $delayedVendor = $extOps->contains(fn($o) => !in_array($o->status, ['completed', 'cancelled']) && $o->actual_start_time && $o->actual_start_time->lt(now()->subDays(3)));
+                                // H-02 / N-18: overdue = a dispatch slip still at the vendor past its expected-back date,
+                                // or (vendor-supplied, no slip) past the one shared date rule (buffers + lead time)
+                                $delayedVendor = $extOps->contains(function ($o) {
+                                    if (in_array($o->status, ['completed', 'cancelled', 'skipped'])) return false;
+                                    $late = $o->deliveryChallans
+                                        ->whereIn('status', \App\Domains\Production\Models\DeliveryChallan::AT_VENDOR_STATUSES)
+                                        ->contains(fn ($c) => $c->expected_return_date && $c->expected_return_date->endOfDay()->lt(now()));
+                                    if ($late) return true;
+                                    return strtolower($o->material_supply_type ?? '') === 'vendor_supplied' && $o->purchase_order_id
+                                        && app(\App\Domains\Production\Services\SubcontractDates::class)->expectedReturnDate($o)->endOfDay()->lt(now());
+                                });
                             @endphp
 
                             @if($hasExt)

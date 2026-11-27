@@ -152,12 +152,18 @@ class CleanBeforeHrmsSeeder extends Seeder
             . ($this->backupDir ? ". Backup: {$this->backupDir}" : '.'));
     }
 
-    /** Every `production_*` table plus `routings`, found at run time so a new production table is cleaned too. */
+    /**
+     * Production tables without the `production_` prefix. The dispatch slips (subcontract delivery challans) belong to
+     * production orders: left behind, they would attach to the new orders once the order ids restart at 1.
+     */
+    public const PRODUCTION_UNPREFIXED_TABLES = ['routings', 'delivery_challans', 'delivery_challan_items'];
+
+    /** Every `production_*` table plus the unprefixed ones above, found at run time so a new production table is cleaned too. */
     private function productionTables(): array
     {
         return collect(Schema::getTables())
             ->pluck('name')
-            ->filter(fn ($name) => str_starts_with($name, 'production_') || $name === 'routings')
+            ->filter(fn ($name) => str_starts_with($name, 'production_') || in_array($name, self::PRODUCTION_UNPREFIXED_TABLES, true))
             ->sort()
             ->values()
             ->all();

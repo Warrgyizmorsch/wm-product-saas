@@ -143,46 +143,9 @@ class ProductionBomController extends Controller
         $calcQty = $request->input('calc_qty') ? (float) $request->input('calc_qty') : $bom->base_quantity;
         $explosion = $this->explosionService->explodeBom($bom->id, $calcQty, $bom->tenant_id) /* BM-IMPL-16: the version being viewed */;
 
-        // BOM Cost Preview (reads operationMaterials; legacy fallback to items only if empty)
-        $costDetails = [];
-        $totalCost = 0.0;
+        ['costSummary' => $costSummary, 'rollupSummary' => $rollupSummary, 'costSimulatorData' => $costSimulatorData] = $this->buildCostSummaryPayload($bom);
+
         $costSourceRows = $bom->operationMaterials->isNotEmpty() ? $bom->operationMaterials : $bom->items;
-        foreach ($costSourceRows as $item) {
-            $qty = (float) $item->quantity;
-            $scrapPct = (float) ($item->material_scrap_percentage ?? 0.0);
-            $grossQty = isset($item->gross_quantity) && $item->gross_quantity !== null
-                ? (float) $item->gross_quantity
-                : \App\Domains\Production\Models\RoutingOperationMaterial::calculateGrossQuantity($qty, $scrapPct);
-            $unitCost = (float) ($item->material?->unit_cost ?? 0.0);
-            $itemCost = $grossQty * $unitCost;
-            $isAlt = (bool) ($item->is_alternative ?? false);
-            if (!$isAlt) {
-                $totalCost += $itemCost;
-            }
-
-            $costDetails[] = [
-                'material_name' => $item->material?->name ?? 'Unknown Material',
-                'material_sku' => $item->material?->sku ?? '—',
-                'quantity' => $qty,
-                'scrap_percentage' => $scrapPct,
-                'gross_quantity' => $grossQty,
-                'uom_code' => $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS',
-                'unit_cost' => $unitCost,
-                'total_cost' => $itemCost,
-                'is_alternative' => $isAlt,
-                'replaces_item_id' => $item->replaces_routing_material_id ?? $item->replaces_item_id ?? null,
-                'priority' => $item->priority,
-            ];
-        }
-        $costPerUnit = $bom->base_quantity > 0 ? ($totalCost / $bom->base_quantity) : 0.0;
-
-        $costCalculations = $this->costService->calculateCost($bom);
-        $costSummary = array_merge([
-            'items' => $costDetails,
-            'total_cost' => $totalCost,
-            'cost_per_unit' => $costPerUnit,
-        ], $costCalculations);
-
         $componentProductIds = $costSourceRows->pluck('material_id')->unique();
         $componentBoms = ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $bom->tenant_id)
@@ -190,9 +153,9 @@ class ProductionBomController extends Controller
             ->get()
             ->groupBy('product_id');
 
-        $materialCost = $this->costService->calculateMaterialCost($bom);
-        $routingCost = $this->costService->calculateRoutingCost($bom);
-        $totalMfgCost = $this->costService->calculateTotalManufacturingCost($bom);
+        $materialCost = $costSummary['material_cost'];
+        $routingCost = $costSummary['routing_cost'];
+        $totalMfgCost = $costSummary['total_cost'];
         $whereUsedParents = $this->whereUsedService->findParents($bom->product);
         $whereUsedBoms = $this->whereUsedService->findParentBoms($bom->product);
 
@@ -210,10 +173,326 @@ class ProductionBomController extends Controller
         }
 
         return view('modules.production.bom.show', compact(
-            'bom', 'explosion', 'calcQty', 'costSummary', 'componentBoms',
-            'materialCost', 'routingCost', 'totalMfgCost', 'whereUsedParents',
+            'bom', 'explosion', 'calcQty', 'costSummary', 'rollupSummary', 'costSimulatorData',
+            'componentBoms', 'materialCost', 'routingCost', 'totalMfgCost', 'whereUsedParents',
             'parentProduct', 'parentBom', 'whereUsedBoms'
         ));
+    }
+
+    /**
+     * Build Tab 4 cost breakdown, multi-level roll-up summary, and Alpine Simulate Cost payload.
+     */
+    private function buildCostSummaryPayload(ProductionBom $bom): array
+    {
+        $costCalculations = $this->costService->calculateCost($bom);
+        $rollupSummary = $this->costService->calculateMultiLevelRollupCost($bom);
+        $itemRollups = $rollupSummary['item_rollups'] ?? [];
+
+        $costSourceRows = $bom->operationMaterials->isNotEmpty() ? $bom->operationMaterials : $bom->items;
+        $allocById = $bom->operationMaterials->keyBy('id');
+
+        $costDetails = [];
+        foreach ($costSourceRows as $item) {
+            $qty = (float) $item->quantity;
+            $scrapPct = (float) ($item->material_scrap_percentage ?? 0.0);
+            $grossQty = isset($item->gross_quantity) && $item->gross_quantity !== null
+                ? (float) $item->gross_quantity
+                : \App\Domains\Production\Models\RoutingOperationMaterial::calculateGrossQuantity($qty, $scrapPct);
+            $unitCost = (float) ($item->material?->unit_cost ?? 0.0);
+            $itemCost = $grossQty * $unitCost;
+
+            $isOpMat = $item instanceof \App\Domains\Production\Models\RoutingOperationMaterial;
+            $op = $isOpMat ? $item->routingOperation : null;
+            $opIsAlt = (bool) ($op?->is_alternative ?? false);
+            $isAlt = (bool) ($item->is_alternative ?? false);
+            $isExcluded = $isAlt || $opIsAlt;
+
+            $rollupInfo = (!$isExcluded && $isOpMat && isset($itemRollups[$item->id]))
+                ? $itemRollups[$item->id]
+                : null;
+
+            $replacesId = $item->replaces_routing_material_id ?? $item->replaces_item_id ?? null;
+            $replacesName = ($isAlt && $replacesId && $allocById->has($replacesId))
+                ? ($allocById->get($replacesId)->material?->name ?? null)
+                : null;
+
+            $costDetails[] = [
+                'id' => $item->id,
+                'routing_operation_id' => $isOpMat ? $item->routing_operation_id : null,
+                'operation_number' => $op?->operation_number ?? ($op ? ('Op ' . $op->sequence) : '—'),
+                'operation_name' => $op?->name ?? null,
+                'operation_is_alternative' => $opIsAlt,
+                'material_name' => $item->material?->name ?? 'Unknown Material',
+                'material_sku' => $item->material?->sku ?? '—',
+                'quantity' => $qty,
+                'scrap_percentage' => $scrapPct,
+                'gross_quantity' => $grossQty,
+                'uom_code' => $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS',
+                'unit_cost' => $unitCost,
+                'total_cost' => $itemCost,
+                'has_sub_bom' => (bool) ($rollupInfo['has_sub_bom'] ?? ($isOpMat && (bool) $item->child_bom_id)),
+                'sub_bom_number' => $rollupInfo['sub_bom_number'] ?? ($isOpMat ? $item->childBom?->bom_number : null),
+                'child_bom_id' => $isOpMat ? $item->child_bom_id : null,
+                'rollup_cost' => $rollupInfo['rollup_cost'] ?? ($isExcluded ? null : $itemCost),
+                'rollup_raw_material_cost' => $rollupInfo['raw_material_cost'] ?? ($isExcluded ? null : $itemCost),
+                'rollup_sub_routing_cost' => $rollupInfo['sub_routing_cost'] ?? 0.0,
+                'is_alternative' => $isAlt,
+                'is_excluded_from_baseline' => $isExcluded,
+                'replaces_item_id' => $replacesId,
+                'replaces_material_name' => $replacesName,
+                'priority' => $item->priority,
+            ];
+        }
+
+        $costSummary = array_merge([
+            'items' => $costDetails,
+        ], $costCalculations);
+
+        $costSimulatorData = $this->buildCostSimulatorData($bom, $costCalculations, $rollupSummary, $itemRollups);
+
+        return [
+            'costSummary' => $costSummary,
+            'rollupSummary' => $rollupSummary,
+            'costSimulatorData' => $costSimulatorData,
+        ];
+    }
+
+    /**
+     * Build active-currency payload for Tab 4's Simulate Cost modal (alternative routes + alternative materials).
+     */
+    private function buildCostSimulatorData(ProductionBom $bom, array $costCalculations, array $rollupSummary, array $itemRollups): array
+    {
+        $baseQty = (float) $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
+        $ops = $bom->routing?->operations ?? collect();
+        $allAllocs = $bom->operationMaterials->isNotEmpty() ? $bom->operationMaterials : $bom->items;
+        $allocsByOp = $allAllocs->groupBy(fn ($om) => (int) ($om->routing_operation_id ?? 0));
+
+        $mapMaterialOption = function ($om) use ($bom, $itemRollups): array {
+            $qty = (float) $om->quantity;
+            $scrapPct = (float) ($om->material_scrap_percentage ?? 0.0);
+            $grossQty = isset($om->gross_quantity) && $om->gross_quantity !== null
+                ? (float) $om->gross_quantity
+                : \App\Domains\Production\Models\RoutingOperationMaterial::calculateGrossQuantity($qty, $scrapPct);
+            $unitCost = (float) ($om->material?->unit_cost ?? 0.0);
+            $directCost = $grossQty * $unitCost;
+            $scrapCost = max(0.0, $grossQty - $qty) * $unitCost;
+
+            $rollupDirect = $directCost;
+            $rollupRaw = $directCost;
+            $rollupSubRouting = 0.0;
+            $rollupSubSetup = 0.0;
+            $hasSubBom = false;
+            $subBomNumber = null;
+
+            if (isset($itemRollups[$om->id])) {
+                $r = $itemRollups[$om->id];
+                $hasSubBom = (bool) $r['has_sub_bom'];
+                $subBomNumber = $r['sub_bom_number'];
+                $rollupDirect = (float) $r['rollup_cost'];
+                $rollupRaw = (float) $r['raw_material_cost'];
+                $rollupSubRouting = (float) $r['sub_routing_cost'];
+                $rollupSubSetup = (float) $r['setup_cost_per_run'];
+            } elseif ($om instanceof \App\Domains\Production\Models\RoutingOperationMaterial && $om->child_bom_id) {
+                $childBom = ProductionBom::withoutGlobalScopes()->whereNull('deleted_at')->find($om->child_bom_id);
+                if ($childBom && (int) $om->material_id !== (int) $bom->product_id) {
+                    $sub = $this->costService->calculateMultiLevelRollupCost($childBom, $grossQty, [$bom->product_id => true]);
+                    $hasSubBom = true;
+                    $subBomNumber = $childBom->bom_number;
+                    $rollupDirect = (float) $sub['rolled_total_excl_setup'];
+                    $rollupRaw = (float) $sub['rolled_raw_material_cost'];
+                    $rollupSubRouting = (float) $sub['rolled_routing_cost'];
+                    $rollupSubSetup = (float) $sub['rolled_setup_cost_per_run'];
+                }
+            }
+
+            return [
+                'id' => $om->id,
+                'material_name' => $om->material?->name ?? 'Unknown Material',
+                'material_sku' => $om->material?->sku ?? '—',
+                'quantity' => $qty,
+                'scrap_percentage' => $scrapPct,
+                'gross_quantity' => $grossQty,
+                'uom_code' => $om->uom?->code ?? $om->material?->uom?->code ?? 'PCS',
+                'unit_cost' => round(convert_from_base($unitCost), 4),
+                'direct_cost' => round(convert_from_base($directCost), 4),
+                'scrap_cost' => round(convert_from_base($scrapCost), 4),
+                'rollup_cost' => round(convert_from_base($rollupDirect), 4),
+                'rollup_raw_material_cost' => round(convert_from_base($rollupRaw), 4),
+                'rollup_sub_routing_cost' => round(convert_from_base($rollupSubRouting), 4),
+                'rollup_sub_setup_per_run' => round(convert_from_base($rollupSubSetup), 4),
+                'has_sub_bom' => $hasSubBom,
+                'sub_bom_number' => $subBomNumber,
+                'is_alternative' => (bool) $om->is_alternative,
+                'priority' => (int) ($om->priority ?? 1),
+            ];
+        };
+
+        $buildMaterialSlots = function ($opAllocs) use ($mapMaterialOption): array {
+            $primaries = $opAllocs->where('is_alternative', false)->sortBy('sequence')->values();
+            $altsByTarget = $opAllocs->where('is_alternative', true)->groupBy(fn ($a) => $a->replaces_routing_material_id ?? $a->replaces_item_id);
+            $placedAltIds = [];
+            $slots = [];
+
+            foreach ($primaries as $prim) {
+                $alts = $altsByTarget->get($prim->id, collect())->sortBy('priority')->values();
+                foreach ($alts as $a) {
+                    $placedAltIds[$a->id] = true;
+                }
+                $options = array_merge([$mapMaterialOption($prim)], $alts->map($mapMaterialOption)->all());
+                $slots[] = [
+                    'slot_key' => 'mat_' . $prim->id,
+                    'primary_id' => $prim->id,
+                    'has_alternatives' => $alts->isNotEmpty(),
+                    'options' => $options,
+                ];
+            }
+
+            // Include any orphan alternative material rows cleanly as locked info or selectable if needed
+            $orphanAlts = $opAllocs->where('is_alternative', true)->filter(fn ($a) => !isset($placedAltIds[$a->id]))->values();
+            foreach ($orphanAlts as $oAlt) {
+                $slots[] = [
+                    'slot_key' => 'mat_' . $oAlt->id,
+                    'primary_id' => $oAlt->id,
+                    'has_alternatives' => false,
+                    'options' => [$mapMaterialOption($oAlt)],
+                ];
+            }
+
+            return $slots;
+        };
+
+        $operationsData = [];
+        foreach ($ops as $op) {
+            $u = $this->costService->resolveOperationUnitCosts($op);
+            $labor = round(convert_from_base($u['labor'] * $baseQty), 4);
+            $machine = round(convert_from_base($u['machine'] * $baseQty), 4);
+            $subcontract = round(convert_from_base($u['subcontract'] * $baseQty), 4);
+            $setupRun = round(convert_from_base($u['setup_per_run']), 4);
+
+            $resName = 'Generic Capacity';
+            if ($op->machine) {
+                $resName = $op->machine->name . ($op->machine->code ? ' (' . $op->machine->code . ')' : '');
+            } elseif ($op->manualProduction) {
+                $resName = $op->manualProduction->batch_name . ' (Manual Batch)';
+            } elseif ($op->is_external) {
+                $resName = $op->vendor?->name ?? 'External Subcontractor';
+            }
+
+            $operationsData[$op->id] = [
+                'id' => $op->id,
+                'sequence' => (int) $op->sequence,
+                'operation_number' => $op->operation_number ?? ('OP-' . $op->sequence),
+                'name' => $op->name,
+                'is_alternative' => (bool) $op->is_alternative,
+                'replaces_operation_id' => $op->replaces_operation_id,
+                'priority' => (int) ($op->priority ?? 1),
+                'work_center' => $op->workCenter?->name ?? ($op->is_external ? 'External' : '—'),
+                'section' => $op->section?->name ?? '—',
+                'resource' => $resName,
+                'labor_cost' => $labor,
+                'machine_cost' => $machine,
+                'subcontract_cost' => $subcontract,
+                'routing_cost' => round($labor + $machine + $subcontract, 4),
+                'setup_cost_per_run' => $setupRun,
+                'material_slots' => $buildMaterialSlots($allocsByOp->get($op->id, collect())),
+            ];
+        }
+
+        $stagesData = [];
+        $primaryOps = $ops->where('is_alternative', false)->sortBy('sequence')->values();
+        $allAltOps = $ops->where('is_alternative', true);
+        $claimedAltOpIds = [];
+
+        foreach ($primaryOps as $idx => $pOp) {
+            $alts = $allAltOps->where('replaces_operation_id', $pOp->id)->sortBy('priority')->values();
+            foreach ($alts as $a) {
+                $claimedAltOpIds[] = $a->id;
+            }
+            $stagesData[] = [
+                'stage_number' => $idx + 1,
+                'primary_id' => $pOp->id,
+                'has_alternatives' => $alts->isNotEmpty(),
+                'options' => array_merge([$pOp->id], $alts->pluck('id')->all()),
+            ];
+        }
+
+        // Attach orphan alternative operations to the preceding primary stage (matches routing/show)
+        $orphanAltOps = $allAltOps->whereNotIn('id', $claimedAltOpIds);
+        if ($orphanAltOps->isNotEmpty() && !empty($stagesData)) {
+            foreach ($orphanAltOps as $oAlt) {
+                $assigned = false;
+                for ($i = count($stagesData) - 1; $i >= 0; $i--) {
+                    if ($operationsData[$stagesData[$i]['primary_id']]['sequence'] < (int) $oAlt->sequence) {
+                        $stagesData[$i]['options'][] = $oAlt->id;
+                        $stagesData[$i]['has_alternatives'] = true;
+                        $assigned = true;
+                        break;
+                    }
+                }
+                if (!$assigned) {
+                    $stagesData[0]['options'][] = $oAlt->id;
+                    $stagesData[0]['has_alternatives'] = true;
+                }
+            }
+        }
+
+        // Unassigned or deleted-op allocations (if any) stay visible as a locked stage
+        $knownOpIds = $ops->pluck('id')->all();
+        $unmatchedAllocs = $allAllocs->filter(fn ($om) => !in_array((int) ($om->routing_operation_id ?? 0), $knownOpIds, true));
+        if ($unmatchedAllocs->isNotEmpty()) {
+            $operationsData[0] = [
+                'id' => 0,
+                'sequence' => 9999,
+                'operation_number' => 'UNASSIGNED',
+                'name' => 'Unassigned / Legacy Operation Materials',
+                'is_alternative' => false,
+                'replaces_operation_id' => null,
+                'priority' => 1,
+                'work_center' => '—',
+                'section' => '—',
+                'resource' => '—',
+                'labor_cost' => 0.0,
+                'machine_cost' => 0.0,
+                'subcontract_cost' => 0.0,
+                'routing_cost' => 0.0,
+                'setup_cost_per_run' => 0.0,
+                'material_slots' => $buildMaterialSlots($unmatchedAllocs),
+            ];
+            $stagesData[] = [
+                'stage_number' => count($stagesData) + 1,
+                'primary_id' => 0,
+                'has_alternatives' => false,
+                'options' => [0],
+            ];
+        }
+
+        $altOpsCount = $allAltOps->count();
+        $altMatsCount = $allAllocs->where('is_alternative', true)->count();
+
+        return [
+            'base_quantity' => $baseQty,
+            'currency_symbol' => active_currency_symbol(),
+            'alt_ops_count' => $altOpsCount,
+            'alt_mats_count' => $altMatsCount,
+            'has_alternatives' => ($altOpsCount > 0 || $altMatsCount > 0),
+            'baseline' => [
+                'material_cost' => round(convert_from_base((float) $costCalculations['material_cost']), 4),
+                'scrap_adjustment' => round(convert_from_base((float) $costCalculations['scrap_adjustment']), 4),
+                'labor_cost' => round(convert_from_base((float) $costCalculations['labor_cost']), 4),
+                'machine_cost' => round(convert_from_base((float) $costCalculations['machine_cost']), 4),
+                'subcontract_cost' => round(convert_from_base((float) $costCalculations['subcontract_cost']), 4),
+                'routing_cost' => round(convert_from_base((float) $costCalculations['routing_cost']), 4),
+                'setup_cost_per_run' => round(convert_from_base((float) $costCalculations['setup_cost_per_run']), 4),
+                'direct_total' => round(convert_from_base((float) $costCalculations['total_cost']), 4),
+                'direct_cost_per_unit' => round(convert_from_base((float) $costCalculations['cost_per_unit']), 4),
+                'rolled_raw_material' => round(convert_from_base((float) $rollupSummary['rolled_raw_material_cost']), 4),
+                'rolled_routing' => round(convert_from_base((float) $rollupSummary['rolled_routing_cost']), 4),
+                'rolled_total' => round(convert_from_base((float) $rollupSummary['rolled_total_excl_setup']), 4),
+                'rolled_cost_per_unit' => round(convert_from_base((float) $rollupSummary['rolled_cost_per_unit']), 4),
+            ],
+            'stages' => $stagesData,
+            'operations' => $operationsData,
+        ];
     }
 
     public function create(Request $request): View

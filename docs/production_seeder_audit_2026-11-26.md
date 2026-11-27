@@ -13,6 +13,11 @@
 | SR-07 | Stock seeder: opening stock per SKU (SD-03 / SD-05) | Applied (2026-11-26, not run by me) |
 | SR-08 | Cleaner resets the `quality_plan` tenant sequence | Applied (2026-11-26, not run by me) |
 | SR-09 | `TestProductionDataTest` adapted to the new structure (not run) | Applied (2026-11-26, not run by me) |
+| SR-10 | Subcontract master data: 4 job-work vendors, 4 goods + 5 service products, subcontract procurement setting (Part C) | Applied (2026-11-27, not run by me) |
+| SR-11 | Subcontract QC: 4 more plans QP-0027 … QP-0030 (2 process, 2 product) | Applied (2026-11-27, not run by me) |
+| SR-12 | Subcontract engineering: routings 010–012 with outsourced operations in every mode, BOMs semi-09 / semi-10 / semifinal-04 / final-03 (TF-01 flags, TF-02 vendor-supplied lines) | Applied (2026-11-27, not run by me) |
+| SR-13 | Opening stock of the new goods; services hold no stock | Applied (2026-11-27, not run by me) |
+| SR-14 | Cleaner also wipes `delivery_challans` / `delivery_challan_items` (dispatch slips) | Applied (2026-11-27, not run by me) |
 
 ## Context
 The user asked for a deep audit of the production test seeders, done by reading the seeder files only, not the live DB.
@@ -504,3 +509,223 @@ The finished table then needs **WIP final QC**: QP-0024 for final-01, QP-0025 v2
   - It never called the execution seeder.
   - Its wipe list doesn't include the quality tables. A rerun through it keeps existing plans, which the quality seeder then skips by name.
 - **To load:** run `php artisan db:seed`. On its own: `php artisan db:seed --class=ProductionE2EDemoSeeder`, after the base seeders.
+
+---
+
+# Part C: Subcontracting examples (2026-11-27, SR-10 … SR-14, Applied, not run by me)
+
+**Request (verbatim):** "go and check seed data, and if the data does not have sub-contracting then add it, and update the seeder with some examples of sub-contracting... so we will check these along with the QC parts.... Go and do it"
+
+**What the check found:** the test data had no subcontracting at all.
+- No routing operation was outsourced (`is_external` = 0 everywhere).
+- There was no service product and no job-work vendor. The only vendors were the trading vendors VEND-ACME, APEX and MATRIX from `InventoryMasterDemoSeeder`.
+- There was no subcontract setting.
+
+**Approach:** a new, small product tree carries the examples. The 9 routings, 13 BOMs, QC combinations and stock thresholds of Parts A–B are unchanged. The flow they test is the reworked one in `docs/subcontracting_module_audit_2026-11-26.md` §11–13:
+- the PR/PO is raised by button
+- the store issue is the only stock-out
+- the dispatch slip moves no stock
+- receipt is from the menu or the floor, with a system GRN
+- normal shop-floor QC applies
+
+### C1. Master data (`TestProductionMasterDataSeeder`)
+
+**Job-work vendors.** These are new rows, matched on `code`. The cleaner never wipes vendors, so a rerun updates the same rows.
+
+| Code | Name | Job works |
+|---|---|---|
+| VEND-JW-LASER | Laser Cut Job Works | laser cutting (RTG-010 OP-010) |
+| VEND-JW-ZINC | Zinc Plating Job Works | zinc plating (RTG-010 OP-030) |
+| VEND-JW-GALVA | Hot-Dip Galvanising Job Works | galvanising (RTG-012 OP-020) |
+| VEND-JW-COAT | Powder Coating Job Works | vendor-made rail (RTG-011) **and** powder coating (RTG-012 OP-040): one vendor, two services |
+
+All four are active, on company default / branch HQ, with `example.com` e-mails and dummy phone numbers.
+
+**Products, ids 137–145.**
+
+| SKU | Type | ₹ cost | What |
+|---|---|---|---|
+| test-semi-09 | semi, model hybrid | 95 | Laser-cut zinc-plated gusset plate |
+| test-semi-10 | semi, model subcontract_complete | 260 | Support rail the vendor makes from its own tube and powder |
+| test-semifinal-04 | semi, model hybrid | 2,100 | Galvanised outdoor table frame |
+| test-final-03 | finished | 3,700 (sell 6,400) | Outdoor café table 1200×750 |
+| test-srv-laser | **service** | 18 | Job work: laser cutting |
+| test-srv-zinc | **service** | 12 | Job work: zinc plating |
+| test-srv-galva | **service** | 180 | Job work: hot-dip galvanising |
+| test-srv-coat | **service** | 110 | Job work: powder coating (our powder) |
+| test-srv-rail | **service** | 240 | Job work: rail made from the vendor's material |
+
+The service products have:
+- `type` service and `item_type` Service, so the routing dropdown lists them and `isService()` is true
+- unit Pcs, SAC heading 9988, GST 18%
+- purchase account **1204** (TF-07) and no inventory account
+- no stock
+
+**Setting** (tenant `settings`; only these two keys are written, every other key is kept):
+- `subcontract_procurement_workflow` = `manual_pr_po`: the button raises a PR
+- `subcontract_auto_approval_limit` = 25,000: used only after switching to "Auto-approved PO". A PO above ₹25,000 then falls back to a Draft PO.
+
+### C2. QC plans (`TestProductionQualitySeeder`)
+The new plans are appended, so QP-0001 … QP-0026 keep their numbers. There are now 30 families and 32 versions.
+
+| QP | Name | Scope | Checks |
+|---|---|---|---|
+| 0027 | Subcontract receipt check — general | process | ★Count matches dispatch slip (P/F) · ★Transit damage (P/F) · Vendor remarks (text) |
+| 0028 | Zinc plating check — general | process | ★Zinc thickness 8–15 µm · ★Adhesion bend test (P/F) · White rust (P/F, optional) |
+| 0029 | Outdoor frame check | product test-semifinal-04 | ★Galvanised coating 45–85 µm · ★Diagonal difference 0–3 mm · ★Coating coverage (P/F) |
+| 0030 | Outdoor table final QC | product test-final-03 | ★Top flatness 0–1.5 mm · ★Wobble test (P/F) · ★Outdoor finish (P/F) · Remarks (text) |
+
+An outsourced operation has no section, so it can only carry **process** plans (QR-16). The seeder refuses a section plan on one.
+
+### C3. Routings (`TestProductionEngineeringSeeder`)
+
+**How an outsourced operation is saved:** exactly as `RoutingOperationDTO` saves one from the form.
+- `operation_type` outsourcing
+- no work centre, section, machine or batch
+- setup and run time 0
+- vendor, service product, rate, supply type, processing mode, lead time and buffers
+- WIP job work saved as `company_supplied`: the form hides that select but still posts it
+- cost per unit = rate × 100 ÷ yield % (the calculator's outsourced branch), with resource snapshot type `outsourced`
+
+The seeder refuses an inactive vendor, a non-service or inactive service product, and WIP job work on the first operation (M-02).
+
+**RTG-2026-000010 Gusset Plate: Job-Work Laser Cutting & Zinc Plating** (test-semi-09)
+
+| Op | Resource | Mode | Rate / lead | QC |
+|---|---|---|---|---|
+| OP-010 Laser cutting — job work | VEND-JW-LASER · test-srv-laser | company_supplied + **bom_raw_materials** (first operation: sheet sent) | ₹18, yield 98% → ₹18.3673 / good pc · lead 2, buffers 1 / 1 | ★QP-0027 + QP-0015 (opt) |
+| OP-020 Deburr plates | SEC-3 / batch-1 | in-house | | ★QP-0001 |
+| OP-030 Zinc plating — job work | VEND-JW-ZINC · test-srv-zinc | **previous_operation_wip** (deburred plates sent) | ₹12 · lead 3, buffers 0 / 1 | ★QP-0028 + ★QP-0027 |
+
+**RTG-2026-000011 Support Rail: Fully Outsourced (vendor material)** (test-semi-10)
+
+| Op | Resource | Mode | Rate / lead | QC |
+|---|---|---|---|---|
+| OP-010 Make & coat support rail — job work | VEND-JW-COAT · test-srv-rail | **vendor_supplied** + bom_raw_materials: nothing is sent, nothing is requested | ₹240 · lead 4, buffers 0 / 1 | ★QP-0016 visual |
+
+**RTG-2026-000012 Outdoor Frame: Weld, Job-Work Galvanising & Coating** (test-semifinal-04)
+
+| Op | Resource | Mode | Rate / lead | QC |
+|---|---|---|---|---|
+| OP-010 Frame welding | SEC-8 / MAH-4 | in-house | | ★QP-0004 |
+| OP-020 Hot-dip galvanising — job work | VEND-JW-GALVA · test-srv-galva | previous_operation_wip | ₹180 · lead 5, buffers 1 / 2 | **QC off** |
+| OP-030 Powder coating | SEC-8 / MAH-6 | in-house | | ★QP-0006 |
+| OP-040 Powder coating — job work (**alternative of OP-030**) | VEND-JW-COAT · test-srv-coat | previous_operation_wip **plus our powder** (company material on the slip) | ₹110 · lead 3, buffers 1 / 1 | ★QP-0027 + QP-0016 (opt) |
+
+### C4. BOMs
+- **Previous OP materials (TF-01):** every BOM now stores `operation_input_flags` for every operation of its routing, as the BOM form posts them. The default is the form's: on for an operation with a predecessor, off for the first operation. For the 13 existing BOMs this changes the stored row only; the result is the one the default rule already gave.
+- **Vendor-supplied (TF-02):** `supplied_by` = vendor on a row marked so, and on every row of a vendor_supplied operation (the form's default).
+
+| BOM | Routing | Materials |
+|---|---|---|
+| BOM-TEST-SEMI-09 | 010 | raw-14 0.125 Pcs @010 (company: requested, issued, sent to the laser cutter) · raw-25 0.01 Set @030 **Vendor-supplied** (the plater's own chemicals, on a company-supplied operation) |
+| BOM-TEST-SEMI-10 (type **subcontracting**) | 011 | raw-01 0.6 Mtr + raw-07 0.05 Kg @010: both vendor-supplied, because the operation is vendor_supplied |
+| BOM-TEST-SEMIFINAL-04 | 012 | semi-01 4 ▸child · semi-09 4 ▸child · semi-10 2 ▸child · raw-12 0.25 Kg @010 · raw-07 0.4 Kg @030 and @040 (the alternative repeats it; on the job work it is sent with the frame) |
+| BOM-TEST-FINAL-03 | 008 (final assembly) | semifinal-04 1 ▸child · semifinal-03 1 ▸child · raw-23 1 Set · raw-20 4 Pcs @010/@020 · raw-21 1 + raw-22 1 @040 |
+
+**Product tree:** final-03 → semifinal-04 → semi-01 / semi-09 / semi-10, and final-03 → semifinal-03 (top board, shared with final-01 and final-02).
+
+### C5. Opening stock
+| Product | Stock | Effect |
+|---|---|---|
+| test-semi-09 | 400 | 100 frames' worth |
+| test-semi-10 | 200 | 100 frames' worth |
+| test-semifinal-04 | 50 | final-03 up to 50 runs from stock |
+| test-final-03 | 10 | |
+| service products | none | services hold no stock |
+
+An order of a product always runs that product's own routing, so a semi-09 / semi-10 / semifinal-04 order always runs its job works. Stock decides only what a **larger** final-03 order makes inside the order:
+- **≤ 50:** frames come from stock.
+- **51–150:** frames are made in the order, together with their galvanising job work and looped QC QP-0029.
+- **Above 150:** gussets and rails are made too (laser, zinc and rail job works inside one order), and top boards above 150 (shared stock).
+
+### C6. Cases covered
+| Case | Where |
+|---|---|
+| Company raw material sent to a vendor (first operation) | 010/OP-010 |
+| WIP job work (previous operation's output sent) | 010/OP-030, 012/OP-020, 012/OP-040 |
+| WIP job work **plus** company material on the same slip | 012/OP-040 |
+| Vendor's own material, nothing sent (vendor_supplied) | 011/OP-010 |
+| A single vendor-supplied line on a company-supplied operation | BOM semi-09 raw-25 @030 |
+| Two job works with different vendors in one order (N-06 / H-04) | 010 |
+| Job work as the last operation | 010/OP-030, 011/OP-010 |
+| Job work in the middle (no FG at an intermediate op, TF-09) | 010/OP-010, 012/OP-020 |
+| Outsourced alternative of an in-house operation | 012/OP-040 |
+| Fully outsourced product (model subcontract_complete, BOM type subcontracting) | semi-10 |
+| One vendor with two different job works | VEND-JW-COAT |
+| Yield below 100% on a job work (rate × 100 ÷ 98) | 010/OP-010 |
+| External QC: 1 mandatory + 1 optional · 2 mandatory · 1 mandatory · QC off | 010/OP-010 + 012/OP-040 · 010/OP-030 · 011/OP-010 · 012/OP-020 |
+| Product QC after job works (WIP final QC / looped) | QP-0029 frame, QP-0030 table |
+| Job work inside a larger order (looped sub-assembly) | final-03 > 50 |
+| Auto-PO limit fallback (after switching the setting) | galvanising 200 frames = ₹36,000 > ₹25,000 |
+
+### C7. My own decisions (please check)
+1. **A new product tree** instead of outsourcing operations in the existing routings, so Parts A–B stay as you reviewed them.
+2. **No subcontractor warehouse.** In the reworked flow the dispatch slip moves no stock (TF-03/04) and the slip form has no warehouse field. The earlier follow-up note in the subcontract doc (§4) listed one; it is not needed now.
+3. **No inactive vendor or service product.** The routing dropdowns list only active ones. To test M-02, deactivate one in the UI.
+4. **Rates, costs, lead times and buffers** are my own figures.
+5. **Service product details:** SAC heading 9988 and GST 18% are generic values.
+6. **WIP job-work operations are saved `company_supplied`**, like the form.
+7. **Explicit TF-01 flags** on every BOM, including the existing 13 (same result as the default rule).
+8. **The setting is written on every run:** manual PR → PO, limit ₹25,000. Only those two keys are touched.
+9. **The cleaner now also wipes `delivery_challans` and `delivery_challan_items`** (SR-14). These are production tables without the prefix. Order ids restart at 1 after a reset, so old dispatch slips would otherwise attach to the new orders.
+10. **The seeder refuses vendor-supplied material on an in-house operation, and on a sub-BOM row.** This is my own guard; the BOM form does not have it.
+
+### C8. Found while doing this (not changed)
+1. **Purchase documents from old test orders survive the reset.** PRs, POs, GRNs and bills are Purchase / Accounting data and the cleaner does not touch them. After a reseed the order and operation ids restart at 1, so `SubcontractProcurementOrchestrator::existingDocument()` (which matches on `production_order_operation_id`) can return an **old** PR or PO for a new order's operation. The "Raise PR / PO" button then opens that old document.
+   - **Proposal:** the cleaner also deletes purchase documents linked to production orders (subcontract PRs/POs, their items, system GRNs and their bills).
+   - **Your call:** it touches Purchase / Accounting data.
+2. **The PR list filter "Subcontract"** (`PurchaseRequisitionRepository` line 31) filters on `products.product_type`. That column does not exist, so choosing the filter fails with an SQL error. This is pre-existing Purchase code and was not changed.
+
+### C9. How to check (after `php artisan migrate` and `php artisan db:seed`; session branch HQ)
+1. **Settings and masters**
+   - Production → Settings: Manual PR → PO, limit ₹25,000.
+   - Vendors: the 4 job-work vendors.
+   - Routing form: the 5 service products appear in "Subcontract Service Product".
+2. **Routings 010–012** are active and costed.
+   - The outsourced cards show vendor, mode, lead time and buffers. 010/OP-010 costs ₹18.3673.
+   - The routing view lists the process plans on the outsourced operations.
+3. **BOMs**
+   - semi-09: the raw-25 line is marked Vendor-supplied.
+   - semi-10: both lines are vendor's.
+   - "Previous OP materials" is on for every operation except the first.
+4. **Order of test-semi-09 (e.g. 80)**
+   1. Only raw-14 can be requested (raw-25 is the vendor's). Request and issue it.
+   2. Make the dispatch slip for OP-010 (sheets) and raise the PR/PO by button: PR → PO, or PO directly in the auto modes.
+   3. Receive from the Subcontracting menu: QP-0027 / QP-0015 inspection, then OP-020 deburr with QP-0001.
+   4. Make the dispatch slip for OP-030 with the WIP plates, raise its PR/PO and receive: QP-0028 + QP-0027.
+   5. Check that each receipt makes a system GRN and moves its PO to Partially Received / Completed.
+   6. Check the dashboard: at-vendor, delayed and partial counts.
+5. **Order of test-semi-10:** nothing to request and no dispatch slip.
+   - Raise the PR/PO.
+   - Receive on the MES floor (no slip), then QP-0016.
+6. **Order of test-semifinal-04 (e.g. 10)**
+   - The children come from stock.
+   - Weld with QP-0004.
+   - The galvanising slip carries 10 frames. It has **no QC**, so the receipt goes straight to OP-030.
+   - The order then needs the WIP final QC QP-0029.
+   - Create it again choosing **OP-040** (coating job work): raw-07 is requested and issued, and goes on the slip together with the frames.
+7. **Order of test-final-03**
+   - ≤ 50: from stock.
+   - 60: 10 frames made inside the order, with the galvanising job work and looped QP-0029.
+   - 160: gussets and rails made too.
+   - Final QC QP-0030.
+8. **Auto PO:** switch the setting to Auto-approved PO.
+   - A semifinal-04 order of 100 → galvanising PO of ₹18,000, approved directly.
+   - An order of 200 → ₹36,000 → Draft PO with the fallback note.
+
+### Files (Part C)
+- `database/seeders/TestProductionMasterDataSeeder.php`: vendors, 9 products, setting.
+- `database/seeders/TestProductionQualitySeeder.php`: QP-0027 … 0030.
+- `database/seeders/TestProductionEngineeringSeeder.php`:
+  - outsourced operations (`outsourcedOperation()`)
+  - process-plan-only QC on them
+  - `bom_type`, `operation_input_flags`, `supplied_by`
+  - routings 010–012 and the 4 BOMs
+- `database/seeders/TestProductionStockSeeder.php`: services skipped, stock for the new goods.
+- `database/seeders/Support/TestProductionLinks.php`: `vendorId()`.
+- `database/seeders/CleanBeforeHrmsSeeder.php`: dispatch-slip tables wiped.
+- `database/seeders/ProductionE2EDemoSeeder.php`: docblock.
+- `tests/Feature/Seeding/TestProductionDataTest.php`: 30 plans, vendor and outsourced-operation checks, services without stock (not run).
+
+`php -l` is clean on all 8 files. I seeded nothing, ran no tests and committed nothing.

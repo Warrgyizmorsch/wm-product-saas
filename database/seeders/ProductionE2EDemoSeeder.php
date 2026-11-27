@@ -11,8 +11,10 @@ use Illuminate\Database\Seeder;
  * Standalone Master Seeder for end-to-end production test data (docs/production_seeder_audit_2026-11-26.md):
  * - Master Data: Products, Shifts, Pay Grades, Employees, Work Centers, Sections, Machines, Batches, Staffing,
  *   Allocations; the calculation snapshots are made by the work-centre engine
- * - Quality: 26 quality plans (section / process / product, every status) through QualityPlanService
- * - Engineering Data: 9 routings (costed, QC plans linked, approved) and 13 BOMs (approved through the lifecycle)
+ * - Quality: 30 quality plans (section / process / product, every status) through QualityPlanService
+ * - Engineering Data: 12 routings (costed, QC plans linked, approved) and 17 BOMs (approved through the lifecycle)
+ * - Subcontracting (Part C of the doc): 4 job-work vendors, 5 service products, outsourced operations in every mode
+ *   (routings 010–012), the subcontract procurement setting
  * - Opening stock per product. No production orders: they are created in the UI.
  *
  * Called by DatabaseSeeder after AddTestMastersSeeder (CleanBeforeHrmsSeeder has emptied the production and inventory

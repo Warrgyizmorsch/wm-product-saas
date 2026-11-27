@@ -24,6 +24,8 @@ class ProductionBomDTO
         public readonly ?string $usage_context = 'manufacturing',
         // BM-IMPL-03: set when saving a Duplicate / Revise copy (not a column)
         public readonly ?int $source_bom_id = null,
+        // TF-01: {routing_operation_id: bool} — the operation works on the previous operation's output
+        public readonly ?array $operation_input_flags = null,
     ) {
     }
 
@@ -52,6 +54,9 @@ class ProductionBomDTO
             items: $items,
             usage_context: $data['usage_context'] ?? 'manufacturing',
             source_bom_id: !empty($data['source_bom_id']) ? (int) $data['source_bom_id'] : null,
+            operation_input_flags: isset($data['operation_input_flags']) && is_array($data['operation_input_flags'])
+                ? collect($data['operation_input_flags'])->mapWithKeys(fn ($v, $k) => [(string) (int) $k => filter_var($v, FILTER_VALIDATE_BOOLEAN)])->all()
+                : null,
         );
     }
 
@@ -71,6 +76,6 @@ class ProductionBomDTO
             'expiry_date' => $this->expiry_date,
             'notes' => $this->notes,
             'usage_context' => $this->usage_context,
-        ];
+        ] + ($this->operation_input_flags !== null ? ['operation_input_flags' => $this->operation_input_flags] : []);
     }
 }

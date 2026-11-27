@@ -101,7 +101,8 @@ class RoutingOperationDTO
             sequence:                       $sequence,
             operation_number:               $data['operation_number'] ?? 'OP-' . str_pad((string) $sequence, 3, '0', STR_PAD_LEFT),
             name:                           $data['name'] ?? $data['operation_name'] ?? 'Operation',
-            operation_type:                 $data['operation_type'] ?? ($isExternal ? 'outsourcing' : 'manufacturing'),
+            // M-02: an outsourced operation always carries the outsourcing type (web form and API alike)
+            operation_type:                 $isExternal ? 'outsourcing' : ($data['operation_type'] ?? 'manufacturing'),
             work_center_id:                 (!$isExternal && !empty($data['work_center_id'])) ? (int) $data['work_center_id'] : null,
             section_id:                     (!$isExternal && !empty($data['section_id'])) ? (int) $data['section_id'] : null,
             machine_id:                     (!$isExternal && !empty($data['machine_id'])) ? (int) $data['machine_id'] : null,

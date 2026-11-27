@@ -962,13 +962,7 @@ class ProductionWipService
                     }
                     $nextOp->save();
 
-                    if ($nextOp->is_external) {
-                        try {
-                            app(\App\Domains\Production\Services\SubcontractProcurementOrchestrator::class)->generateSubcontractRequisition($nextOp, $tenantId, $userId);
-                        } catch (\Throwable $e) {
-                            // Requisition fallback
-                        }
-                    }
+                    // SC D-4 / N-13: no automatic PR when WIP reaches an outsourced operation — the button raises it (TF-05)
 
                     ProductionScheduleOperation::where('tenant_id', $tenantId)
                         ->where('production_order_operation_id', $nextOp->id)

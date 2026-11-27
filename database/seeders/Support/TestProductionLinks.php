@@ -137,6 +137,12 @@ class TestProductionLinks
         return $this->find('production_machines', 'code', $code);
     }
 
+    /** Subcontract (job-work) vendor by its code (VEND-JW-LASER …). */
+    public function vendorId(string $code): int
+    {
+        return $this->find('vendors', 'code', $code);
+    }
+
     /** Manual production batch by its name (test-batch-1 …). */
     public function batchId(string $name): int
     {

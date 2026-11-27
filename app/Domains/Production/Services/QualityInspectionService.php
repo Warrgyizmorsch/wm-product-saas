@@ -427,6 +427,11 @@ class QualityInspectionService
             }
             $orderOp->save();
 
+            // TF-10: QC of outsourced work — the waiting subcontract receipts are booked now and get their system GRN
+            if ($orderOp->is_external) {
+                app(SubcontractReceiptService::class)->bookAfterQc($orderOp, $acceptedQty, $rejectedQty, (int) ($userId ?? auth()->id() ?? 1));
+            }
+
             // Update WIP tracking so successor operations can consume accepted WIP
             if ($acceptedQty > 0) {
                 $effectiveBatchId = $batchId ?? $inspection->batch_id;

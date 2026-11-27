@@ -49,7 +49,8 @@ class DeliveryChallanPolicy
 
     public function dispatch(User $user, DeliveryChallan $challan): bool
     {
-        if ($challan->tenant_id !== $user->tenant_id || $challan->status === 'dispatched') {
+        // C-07: only a draft can be dispatched — a dispatched / received / completed slip is never sent again
+        if ($challan->tenant_id !== $user->tenant_id || $challan->status !== DeliveryChallan::STATUS_DRAFT) {
             return false;
         }
 
@@ -70,7 +71,8 @@ class DeliveryChallanPolicy
 
     public function receive(User $user, DeliveryChallan $challan): bool
     {
-        if ($challan->tenant_id !== $user->tenant_id || $challan->status === 'completed') {
+        // C-07: work comes back only on a slip that went out — dispatched or partly received (never a draft)
+        if ($challan->tenant_id !== $user->tenant_id || !in_array($challan->status, DeliveryChallan::AT_VENDOR_STATUSES, true)) {
             return false;
         }
 

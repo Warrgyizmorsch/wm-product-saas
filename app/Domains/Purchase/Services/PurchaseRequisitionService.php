@@ -73,10 +73,15 @@ class PurchaseRequisitionService
                     'purchase_requisition_id' => $pr->id,
                     'sales_order_item_id' => $item['sales_order_item_id'] ?? null,
                     'project_task_id' => $item['project_task_id'] ?? null,
+                    // Subcontract N-15: the outsourced operation this service line is for (production PRs only)
+                    'production_order_operation_id' => $item['production_order_operation_id'] ?? null,
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $item['quantity'],
-                    'estimated_cost' => convert_to_base((float)($item['estimated_cost'] ?? 0)),
+                    // amounts already in base (the subcontract button passes the routing figure) are not converted twice
+                    'estimated_cost' => !empty($item['estimated_cost_is_base'])
+                        ? (float) ($item['estimated_cost'] ?? 0)
+                        : convert_to_base((float)($item['estimated_cost'] ?? 0)),
                 ]);
             }
 
@@ -152,6 +157,14 @@ class PurchaseRequisitionService
                     ->where('product_id', $item->product_id)
                     ->sum('quantity');
 
+                // Subcontract N-15: a subcontract service line counts every PO that is not cancelled (a Draft PO too),
+                // so clicking again cannot create a second PO for the same outsourced operation.
+                if ($item->production_order_operation_id) {
+                    $alreadyOrderedQty = (float) PurchaseOrderItem::where('production_order_operation_id', $item->production_order_operation_id)
+                        ->whereHas('order', fn ($q) => $q->where('tenant_id', $tenantId)->where('status', '!=', 'Cancelled'))
+                        ->sum('quantity');
+                }
+
                 $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
                 if ($pendingQty > 0.0001) {
                     $itemsWithQty[] = [
@@ -171,7 +184,13 @@ class PurchaseRequisitionService
                 $qty = $entry['qty'];
 
                 $vendorId = null;
-                if ($item->product->preferred_vendor_id) {
+                $subcontractOp = $item->production_order_operation_id
+                    ? \App\Domains\Production\Models\ProductionOrderOperation::find($item->production_order_operation_id)
+                    : null;
+                if ($subcontractOp?->vendor_id) {
+                    // Subcontract N-15: the vendor of the outsourced operation, not the service product's preferred vendor
+                    $vendorId = $subcontractOp->vendor_id;
+                } elseif ($item->product->preferred_vendor_id) {
                     $vendorId = $item->product->preferred_vendor_id;
                 } else {
                     $lastPoItem = PurchaseOrderItem::where('tenant_id', $tenantId)
@@ -188,7 +207,9 @@ class PurchaseRequisitionService
                     throw new \InvalidArgumentException("Product '{$item->product->name}' has no supplier assigned. Please assign a supplier for this item in Product Master before creating PO/RFQ.");
                 }
 
-                $vendorItems[$vendorId][] = [
+                // subcontract service lines get a PO of their own (never mixed with stock lines of the same vendor)
+                $groupKey = $vendorId . ($item->production_order_operation_id ? '|subcontract' : '');
+                $vendorItems[$groupKey][] = [
                     'item' => $item,
                     'qty' => $qty
                 ];
@@ -196,7 +217,8 @@ class PurchaseRequisitionService
 
             if ($actionType === 'po') {
                 $poCount = 0;
-                foreach ($vendorItems as $vendorId => $list) {
+                foreach ($vendorItems as $groupKey => $list) {
+                    $vendorId = (int) explode('|', (string) $groupKey)[0];
                     $year = now()->format('Y');
                     $prefix = "PO-{$year}-";
                     $latest = PurchaseOrder::where('tenant_id', $tenantId)
@@ -219,15 +241,16 @@ class PurchaseRequisitionService
                     $opId = null;
                     if ($firstPrItem->requisition && in_array($firstPrItem->requisition->source_type, ['mo', 'ProductionOrder'])) {
                         $moId = $firstPrItem->requisition->source_id;
-                        if ($moId) {
-                            $extOp = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $moId)
+                        if ($firstPrItem->production_order_operation_id) {
+                            // Subcontract N-15: the PR line names its outsourced operation
+                            $isSubcontract = true;
+                            $opId = (int) $firstPrItem->production_order_operation_id;
+                        } elseif ($moId && (str_contains((string)$firstPrItem->requisition->notes, 'Subcontract Service') || str_contains((string)$firstPrItem->requisition->notes, 'Subcontract PR'))) {
+                            // legacy subcontract PR without the operation link: only then fall back to the first outsourced op
+                            $isSubcontract = true;
+                            $opId = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $moId)
                                 ->where('is_external', true)
-                                ->first();
-
-                            if ($extOp || str_contains((string)$firstPrItem->requisition->notes, 'Subcontract Service') || str_contains((string)$firstPrItem->requisition->notes, 'Subcontract PR')) {
-                                $isSubcontract = true;
-                                $opId = $extOp?->id;
-                            }
+                                ->value('id');
                         }
                     }
 
@@ -261,20 +284,20 @@ class PurchaseRequisitionService
                     foreach ($list as $entry) {
                         $item = $entry['item'];
                         $qty = $entry['qty'];
-                        $rate = (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00);
+                        $itemOpId = $item->production_order_operation_id ?: $opId;
+                        // Subcontract N-15: the subcontract rate on the PR wins; a ₹0 product cost must not replace it
+                        $rate = ($isSubcontract && (float) $item->estimated_cost > 0)
+                            ? (float) $item->estimated_cost
+                            : (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00);
                         $amount = $qty * $rate;
                         $subtotal += $amount;
 
-                        $itemOpId = $opId;
-                        if ($moId && !$itemOpId && $isSubcontract) {
-                            $itemOpId = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $moId)
-                                ->where('is_external', true)
-                                ->value('id');
-                        }
-
-                        PurchaseOrderItem::create([
+                        $poItem = PurchaseOrderItem::create([
                             'purchase_order_id' => $po->id,
                             'product_id' => $item->product_id,
+                            // TF-07: a subcontract service line is not stock — the bill posts it to WIP (1204), not Inventory
+                            'line_type' => $isSubcontract ? PurchaseOrderItem::LINE_TYPE_EXPENSE : PurchaseOrderItem::LINE_TYPE_STOCK,
+                            'chart_of_account_id' => $isSubcontract ? \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1204')->value('id') : null,
                             'production_order_id' => $moId,
                             'production_order_operation_id' => $isSubcontract ? $itemOpId : null,
                             'requisition_item_allocations' => [
@@ -288,6 +311,11 @@ class PurchaseRequisitionService
                             'amount' => $amount,
                             'total_amount' => $amount,
                         ]);
+
+                        if ($isSubcontract && $itemOpId) {
+                            \App\Domains\Production\Models\ProductionOrderOperation::where('id', $itemOpId)
+                                ->update(['purchase_order_id' => $po->id, 'purchase_order_item_id' => $poItem->id]);
+                        }
                     }
 
                     $po->update([
@@ -306,7 +334,8 @@ class PurchaseRequisitionService
 
             } elseif ($actionType === 'rfq') {
                 $rfqCount = 0;
-                foreach ($vendorItems as $vendorId => $list) {
+                foreach ($vendorItems as $groupKey => $list) {
+                    $vendorId = (int) explode('|', (string) $groupKey)[0];
                     $year = now()->format('Y');
                     $prefix = "RFQ-{$year}-";
                     $latest = PurchaseRfq::where('tenant_id', $tenantId)

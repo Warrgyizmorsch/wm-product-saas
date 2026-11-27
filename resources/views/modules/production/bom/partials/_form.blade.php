@@ -434,6 +434,21 @@
 
                                 <!-- Card Body -->
                                 <div class="card-body p-3 bg-white" x-show="isOpExpanded(op.id)">
+                                    {{-- TF-01 "Previous OP materials": the operation works on the previous operation's output --}}
+                                    <input type="hidden" x-bind:name="'operation_input_flags[' + op.id + ']'" :value="usesPreviousOp(op) ? 1 : 0">
+                                    <div class="d-flex align-items-center flex-wrap gap-2 mb-2 fs-12" x-show="!op.is_deleted">
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" x-bind:id="'prev_op_' + op.id"
+                                                :checked="usesPreviousOp(op)" :disabled="!hasPreviousOp(op)"
+                                                @change="setUsesPreviousOp(op, $event.target.checked)">
+                                            <label class="form-check-label fw-semibold" x-bind:for="'prev_op_' + op.id">Previous OP materials</label>
+                                        </div>
+                                        <span class="text-muted fs-11" x-show="hasPreviousOp(op)">works on the previous operation's output (on by default for dependent operations; parallel operations may tick it)</span>
+                                        <span class="text-muted fs-11" x-show="!hasPreviousOp(op)">first operation — there is no previous output</span>
+                                        <template x-if="isExternalOpId(op.id)">
+                                            <span class="badge bg-soft-purple text-purple border fs-10"><i class="feather-truck me-1"></i>Outsourced: company materials and the previous output go to the vendor on the dispatch slip</span>
+                                        </template>
+                                    </div>
                                     <template x-if="op.is_deleted">
                                         <div class="alert alert-danger border-danger bg-soft-danger py-2 px-3 mb-3 fs-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
                                             <div class="text-dark">
@@ -589,7 +604,18 @@
                                                                 <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][row_uid]'" :value="item.uid">
                                                                 <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][is_alternative]'" :value="item.is_alternative ? 1 : 0">
                                                                 <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][replaces_row_uid]'" :value="item.is_alternative ? (item.replaces_row_uid || '') : ''">
+                                                                {{-- TF-02: on an outsourced operation a material can be brought by the vendor (never requested from the store) --}}
+                                                                <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][supplied_by]'" :value="isExternalOpId(item.routing_operation_id) && item.supplied_by === 'vendor' ? 'vendor' : 'company'">
                                                                 <div class="d-flex flex-column gap-1.5">
+                                                                    <template x-if="isExternalOpId(item.routing_operation_id)">
+                                                                        <div class="form-check form-switch mb-0">
+                                                                            <input class="form-check-input" type="checkbox" x-bind:id="'vendor_supplied_' + item.uid"
+                                                                                :checked="item.supplied_by === 'vendor'"
+                                                                                @change="item.supplied_by = $event.target.checked ? 'vendor' : 'company'; saveDraft()">
+                                                                            <label class="form-check-label fs-11 fw-semibold" x-bind:for="'vendor_supplied_' + item.uid"
+                                                                                x-text="item.supplied_by === 'vendor' ? 'Vendor-supplied (not requested)' : 'Company material (sent to vendor)'"></label>
+                                                                        </div>
+                                                                    </template>
                                                                     <div class="form-check form-switch mb-0">
                                                                         <input class="form-check-input" type="checkbox"
                                                                             x-model="item.is_alternative"
@@ -657,7 +683,11 @@
                                     </div>
 
                                     <!-- When Operation has ZERO Materials -->
-                                    <div x-show="getItemsForOp(op.id).length === 0 && !op.is_deleted">
+                                    <div x-show="getItemsForOp(op.id).length === 0 && !op.is_deleted && usesPreviousOp(op)" class="fs-12 text-muted mb-0 px-1">
+                                        <i class="feather-corner-down-right me-1"></i>Uses the previous operation's output — no own material needed.
+                                        <button type="button" class="btn btn-link btn-sm p-0 ms-2 fs-11" @click="addItemToOp(op.id)">add material anyway</button>
+                                    </div>
+                                    <div x-show="getItemsForOp(op.id).length === 0 && !op.is_deleted && !usesPreviousOp(op)">
                                         <div class="alert alert-light border border-dashed d-flex align-items-center justify-content-between p-3 mb-0 rounded-2">
                                             <div class="d-flex align-items-center text-muted fs-12">
                                                 <i class="feather-info text-secondary me-2 fs-16"></i>

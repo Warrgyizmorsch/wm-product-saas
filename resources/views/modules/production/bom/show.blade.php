@@ -477,145 +477,6 @@
                             </table>
                         </div>
                     </div>
-                @endif
-
-                <h6 class="fw-bold text-dark mb-2 mt-2">{{ __('production.bom_allocations_by_operation') }}</h6>
-                @php
-                    $opMaterials = $bom->operationMaterials;
-                    $groupedOps = $opMaterials->groupBy(fn($om) => (int) ($om->routing_operation_id ?? 0));
-                @endphp
-
-                @if($opMaterials->isNotEmpty())
-                    @foreach($groupedOps as $opId => $opRows)
-                        @php
-                            $opModel = $opRows->first()?->routingOperation;
-                            $isDeletedOp = $opModel && $opModel->trashed();
-                            $primaries = $opRows->where('is_alternative', false);
-                            $altsByTarget = $opRows->where('is_alternative', true)->groupBy('replaces_routing_material_id');
-                            $orderedRows = collect();
-                            $placedIds = [];
-                            foreach ($primaries as $prim) {
-                                $orderedRows->push($prim);
-                                $placedIds[$prim->id] = true;
-                                foreach ($altsByTarget->get($prim->id, collect())->sortBy('priority') as $altRow) {
-                                    $orderedRows->push($altRow);
-                                    $placedIds[$altRow->id] = true;
-                                }
-                            }
-                            foreach ($opRows as $rem) {
-                                if (!isset($placedIds[$rem->id])) {
-                                    $orderedRows->push($rem);
-                                }
-                            }
-                        @endphp
-                        <div class="card border shadow-none mb-3 {{ $isDeletedOp ? 'border-danger' : '' }}">
-                            <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center {{ $isDeletedOp ? 'bg-soft-danger border-danger' : 'bg-light' }}">
-                                <div class="d-flex align-items-center gap-2 flex-wrap">
-                                    <span class="badge {{ $isDeletedOp ? 'bg-danger text-white' : 'bg-primary text-white' }} font-monospace">
-                                        {{ $opModel?->operation_number ?? ('Op #' . ($opModel?->sequence ?? $opId)) }}
-                                    </span>
-                                    <span class="fw-bold text-dark fs-13">{{ $opModel?->name ?? 'Unassigned Operation' }}</span>
-                                    @if($isDeletedOp)
-                                        <span class="badge bg-danger text-white fs-10">{{ __('production.operation_deleted') }}</span>
-                                    @endif
-                                    @if($opModel?->workCenter)
-                                        <span class="badge bg-soft-secondary text-secondary border fs-11 fw-normal">
-                                            {{ $opModel->workCenter->name }}
-                                        </span>
-                                    @endif
-                                </div>
-                                <span class="badge bg-soft-primary text-primary border border-primary-subtle rounded-pill fs-11">
-                                    {{ $opRows->count() }} {{ __('production.bom_components_count') }}
-                                </span>
-                            </div>
-                            @if($isDeletedOp)
-                                <div class="px-3 py-2 bg-soft-danger border-bottom border-danger-subtle fs-12 text-danger fw-semibold">
-                                    <i class="feather-alert-octagon me-1"></i>{{ __('production.op_removed_banner') }}
-                                </div>
-                            @endif
-                            <div class="table-responsive">
-                                <x-ui.odoo-form-ui type="table" class="bom-table-enhanced mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 6%" class="text-center">{{ __('production.seq') }}</th>
-                                            <th style="width: 30%">{{ __('production.component_product') }}</th>
-                                            <th style="width: 11%" class="text-end text-nowrap">{{ __('production.net_qty') }}</th>
-                                            <th style="width: 8%" class="text-end text-nowrap">{{ __('production.scrap_percent') }}</th>
-                                            <th style="width: 11%" class="text-end text-nowrap">{{ __('production.gross_qty') }}</th>
-                                            <th style="width: 11%" class="text-end text-nowrap">{{ __('production.unit_cost') }}</th>
-                                            <th style="width: 11%" class="text-end text-nowrap">{{ __('production.net_cost') }}</th>
-                                            <th style="width: 12%" class="text-end text-nowrap">{{ __('production.gross_total') }}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($orderedRows as $idx => $opMat)
-                                            @php
-                                                $netQty = (float) $opMat->quantity;
-                                                $scrapPct = (float) ($opMat->material_scrap_percentage ?? 0.0);
-                                                $grossQty = $opMat->gross_quantity !== null
-                                                    ? (float) $opMat->gross_quantity
-                                                    : \App\Domains\Production\Models\RoutingOperationMaterial::calculateGrossQuantity($netQty, $scrapPct);
-                                                $unitCost = (float) ($opMat->material?->unit_cost ?? 0.0);
-                                                $netCost = $netQty * $unitCost;
-                                                $grossCost = $grossQty * $unitCost;
-                                                $uomCode = $opMat->uom?->code ?? $opMat->material?->uom?->code ?? 'PCS';
-                                            @endphp
-                                            <tr class="{{ $opMat->is_alternative ? 'bg-light-subtle' : '' }}">
-                                                <td class="text-center align-middle">
-                                                    @if($opMat->is_alternative)
-                                                        <span class="text-warning fw-bold">&#8627; P{{ $opMat->priority ?? 1 }}</span>
-                                                    @else
-                                                        <span class="badge bg-light text-secondary border px-2 py-1 fs-11 rounded-1 fw-medium">{{ $opMat->sequence ?: ($idx + 1) }}</span>
-                                                    @endif
-                                                </td>
-                                                <td class="align-middle" @if($opMat->is_alternative) style="padding-left: 24px; border-left: 3px solid #f59e0b;" @endif>
-                                                    <div class="d-flex flex-column">
-                                                        <span class="fw-semibold text-dark fs-13">{{ $opMat->material?->name ?? 'Unknown Component' }}</span>
-                                                        <span class="text-muted fs-11">{{ $opMat->material?->sku ?? '—' }}</span>
-                                                        @if($opMat->is_alternative)
-                                                            @php $primaryTarget = $opRows->firstWhere('id', $opMat->replaces_routing_material_id); @endphp
-                                                            <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 mt-1 d-inline-block px-1.5 py-0.5">
-                                                                <i class="feather-shuffle me-1"></i>{{ __('production.alternative_of') }}: {{ $primaryTarget?->material?->name ?? ('#' . $opMat->replaces_routing_material_id) }} • Priority {{ $opMat->priority ?? 1 }}
-                                                            </span>
-                                                        @endif
-                                                        @if($opMat->childBom)
-                                                            <a href="{{ route('production.boms.show', $opMat->child_bom_id) }}" class="sub-bom-link-box mt-1">
-                                                                <i class="feather-link fs-10"></i> Sub-BOM: {{ $opMat->childBom->bom_number }} (v{{ $opMat->childBom->version }})
-                                                            </a>
-                                                        @endif
-                                                        @if(!empty($opMat->notes))
-                                                            <small class="text-muted fst-italic fs-11 mt-0.5"><i class="feather-file-text me-1 text-secondary"></i>{{ $opMat->notes }}</small>
-                                                        @endif
-                                                    </div>
-                                                </td>
-                                                <td class="text-end align-middle text-nowrap">
-                                                    <span class="fw-semibold text-dark fs-13">{{ format_decimal($netQty) }} <span class="text-muted fw-normal fs-11 ms-1">{{ $uomCode }}</span></span>
-                                                </td>
-                                                <td class="text-end align-middle text-nowrap">
-                                                    @if($scrapPct > 0)
-                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle fs-11 fw-semibold px-2 py-0.5">+{{ format_decimal($scrapPct) }}%</span>
-                                                    @else
-                                                        <span class="text-muted fs-12">0%</span>
-                                                    @endif
-                                                </td>
-                                                <td class="text-end align-middle text-nowrap">
-                                                    <span class="fw-semibold {{ $scrapPct > 0 ? 'text-danger' : 'text-dark' }} fs-13">{{ format_decimal($grossQty) }} <span class="text-muted fw-normal fs-11 ms-1">{{ $uomCode }}</span></span>
-                                                </td>
-                                                <td class="text-end align-middle text-nowrap"><span class="text-secondary fs-12">{{ format_currency($unitCost) }}</span></td>
-                                                <td class="text-end align-middle text-nowrap"><span class="text-secondary fs-12 fw-semibold">{{ format_currency($netCost) }}</span></td>
-                                                <td class="text-end align-middle text-nowrap">
-                                                    <span class="fw-bold text-dark fs-13 d-block">{{ format_currency($grossCost) }}</span>
-                                                    @if($opMat->is_alternative)
-                                                        <span class="badge bg-soft-secondary text-muted border fs-10 mt-0.5 d-inline-block">Alternative</span>
-                                                    @endif
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </x-ui.odoo-form-ui>
-                            </div>
-                        </div>
-                    @endforeach
                 @else
                     <div class="p-4 text-center border rounded bg-light text-muted">
                         {{ __('production.no_components_spec_yet') }}
@@ -625,52 +486,106 @@
 
             <!-- Tab 2: Expanded Material Explosion -->
             <div class="tab-pane fade" id="tab-explosion" role="tabpanel" aria-labelledby="tab-explosion-tab">
-                <h5 class="fw-bold text-dark mb-3">{{ __('production.multilevel_bom_explosion') }}</h5>
-                <p class="text-muted fs-12 mb-3">{{ __('production.explosion_desc') }}</p>
-                
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                    <div>
+                        <h5 class="fw-bold text-dark mb-1">{{ __('production.multilevel_bom_explosion') }}</h5>
+                        <p class="text-muted fs-12 mb-0">
+                            {{ __('production.explosion_desc') }}
+                            <span class="ms-1 text-primary fw-medium">Default view shows L1 (Finished Good) and L2 (Direct Components). Click <strong>›</strong> on any Sub-BOM row to expand deeper levels.</span>
+                        </p>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <form method="GET" action="{{ route('production.boms.show', $bom->id) }}#tab-explosion" class="d-flex align-items-center gap-1.5">
+                            <label for="bomExplosionCalcQty" class="fs-11 text-muted fw-semibold text-nowrap mb-0">{{ __('production.qty_required') }}:</label>
+                            <input type="number" step="0.0001" min="0.0001" id="bomExplosionCalcQty" name="calc_qty" value="{{ format_decimal($calcQty) }}" class="form-control form-control-sm text-end font-monospace" style="width: 96px;">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">{{ __('production.explode_structure') }}</button>
+                        </form>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-light border fs-11 fw-semibold" onclick="expandAllBomExplosion()">
+                                <i class="feather-chevrons-down me-1"></i>Expand All
+                            </button>
+                            <button type="button" class="btn btn-light border fs-11 fw-semibold" onclick="collapseBomExplosionToL2()">
+                                <i class="feather-minimize-2 me-1"></i>Default (L1–L2 Only)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 @php
                     if (!function_exists('renderExplosionTableRows')) {
-                        function renderExplosionTableRows($node, $level = 1) {
-                            $padding = ($level - 1) * 20;
+                        function renderExplosionTableRows($node, $level = 1, $nodeId = 'exp-1', $parentId = '') {
+                            $padding = ($level - 1) * 18;
                             $isLeaf = empty($node['children']);
                             $hasSubBom = !empty($node['has_sub_bom']) && !empty($node['bom_id']);
                             $bomVersion = $node['bom_version'] ?? null;
                             $qty = $node['gross_quantity'] ?? $node['quantity'];
                             $uom = $node['uom_code'] ?? 'PCS';
                             $isAltInfo = !empty($node['is_alternative']);
+                            $isAltOp = !empty($node['is_alternative_operation']);
+                            $isHiddenByDefault = $level > 2;
+                            $isInitiallyExpanded = $level === 1 && !$isLeaf;
 
-                            echo '<tr' . ($isAltInfo ? ' class="text-muted bg-light-subtle"' : '') . '>';
-                            // 1. Level
-                            echo '<td class="text-center align-middle">';
-                            echo '<span class="badge rounded-circle ' . ($level === 1 ? 'bg-primary text-white shadow-sm' : ($level === 2 ? 'bg-info text-white' : 'bg-light text-secondary border')) . ' fs-11 fw-semibold" style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;">' . $level . '</span>';
-                            echo '</td>';
-                            
-                            // 2. Component Product
-                            echo '<td class="align-middle">';
-                            echo '<div style="padding-left: ' . $padding . 'px;" class="d-flex align-items-center">';
-                            if ($level === 1) {
-                                echo '<i class="feather-layers text-primary me-2 fs-14"></i>';
-                            } elseif (!$isLeaf) {
-                                echo '<i class="feather-package text-info me-2 fs-13"></i>';
-                            } else {
-                                echo '<i class="feather-box text-muted me-2 fs-12"></i>';
+                            $rowClasses = ['bom-exp-row'];
+                            if ($isAltInfo) {
+                                $rowClasses[] = 'text-muted bg-light-subtle';
+                            } elseif ($level === 1) {
+                                $rowClasses[] = 'bg-soft-primary bg-opacity-25';
                             }
+                            if ($isHiddenByDefault) {
+                                $rowClasses[] = 'd-none';
+                            }
+
+                            echo '<tr class="' . implode(' ', $rowClasses) . '"'
+                                . ' data-node-id="' . e($nodeId) . '"'
+                                . ' data-parent-id="' . e($parentId) . '"'
+                                . ' data-level="' . (int) $level . '"'
+                                . ' data-has-children="' . ($isLeaf ? '0' : '1') . '"'
+                                . ' data-expanded="' . ($isInitiallyExpanded ? 'true' : 'false') . '">';
+
+                            // 1. Component Product (Arrows + Subtle Level + Collapsible Child Drawer Toggle)
+                            echo '<td class="align-middle">';
+                            echo '<div style="padding-left: ' . $padding . 'px;" class="d-flex align-items-center gap-1.5">';
+
+                            if (!$isLeaf) {
+                                $chevIcon = $isInitiallyExpanded ? 'feather-chevron-down' : 'feather-chevron-right';
+                                echo '<button type="button" class="btn btn-sm btn-light border px-1 py-0 bom-exp-toggle flex-shrink-0" style="width: 22px; height: 22px; line-height: 1;" onclick="toggleBomExplosionNode(\'' . e($nodeId) . '\')" aria-expanded="' . ($isInitiallyExpanded ? 'true' : 'false') . '" title="Expand or collapse sub-BOM level">';
+                                echo '<i class="' . $chevIcon . ' fs-11"></i>';
+                                echo '</button>';
+                            } else {
+                                echo '<span class="d-inline-block flex-shrink-0" style="width: 22px;"></span>';
+                            }
+
+                            $levelBadgeClass = $level <= 2
+                                ? 'bg-soft-primary text-primary border border-primary-subtle'
+                                : 'bg-light text-secondary border';
+                            echo '<span class="badge font-monospace fs-10 px-1.5 py-0.5 flex-shrink-0 ' . $levelBadgeClass . '">L' . (int) $level . '</span>';
+
+                            if ($level === 1) {
+                                echo '<i class="feather-layers text-primary fs-13 flex-shrink-0"></i>';
+                            } else {
+                                echo '<svg class="flex-shrink-0 ' . ($isAltInfo ? 'text-warning opacity-75' : 'text-secondary') . '" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7h9"/><path d="M9.5 6.5L12 9l-2.5 2.5"/></svg>';
+                            }
+
                             echo '<div class="d-flex flex-column">';
                             echo '<div class="d-flex align-items-center flex-wrap gap-1">';
-                            echo '<span class="fw-semibold text-dark fs-13">' . e($node['product_name']) . '</span>';
+                            echo '<span class="fw-semibold ' . ($isAltInfo ? 'text-secondary' : 'text-dark') . ' fs-13">' . e($node['product_name']) . '</span>';
                             if ($level === 1) {
                                 echo '<span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 rounded-pill px-2 py-0.5 fw-semibold ms-1">' . e(__('production.bom_finished_product')) . '</span>';
                             }
                             if ($isAltInfo) {
-                                echo '<span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 ms-1">' . e(__('production.bom_alt_info_row')) . '</span>';
+                                $altLabel = __('production.bom_alt_info_row');
+                                if ($isAltOp && !empty($node['operation_number'])) {
+                                    $altLabel .= ' · ' . $node['operation_number'];
+                                }
+                                echo '<span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 ms-1">' . e($altLabel) . '</span>';
                             }
                             echo '</div>';
                             echo '<span class="text-muted fs-11">' . e($node['product_sku']) . '</span>';
                             echo '</div>';
                             echo '</div>';
                             echo '</td>';
-                            
-                            // 3. Linked Sub-BOM (Clickable Green Box)
+
+                            // 2. Linked Sub-BOM (Clickable Green Box)
                             echo '<td class="align-middle">';
                             if ($hasSubBom) {
                                 $bomTitle = $node['bom_name'] ?: $node['bom_number'];
@@ -689,8 +604,8 @@
                                 echo '<span class="text-muted fs-12 opacity-50">—</span>';
                             }
                             echo '</td>';
-                            
-                            // 4. BOM Base Qty
+
+                            // 3. BOM Base Qty
                             echo '<td class="text-end align-middle">';
                             if ($hasSubBom) {
                                 echo '<span class="text-secondary fw-semibold fs-12">' . format_decimal($node['bom_base_quantity'] ?? 1.0) . '</span>';
@@ -698,18 +613,18 @@
                                 echo '<span class="text-muted fs-12 opacity-50">—</span>';
                             }
                             echo '</td>';
-                            
-                            // 5. Qty Required for Production
+
+                            // 4. Qty Required for Production
                             echo '<td class="text-end fw-bold text-dark align-middle fs-13">';
                             echo format_decimal($qty);
                             echo '</td>';
-                            
-                            // 6. UOM
+
+                            // 5. UOM
                             echo '<td class="text-center align-middle">';
                             echo '<span class="badge bg-light text-secondary border fs-11 px-2 py-0.5 rounded-1 fw-medium">' . e($uom) . '</span>';
                             echo '</td>';
-                            
-                            // 7. Version
+
+                            // 6. Version
                             echo '<td class="text-center align-middle">';
                             if ($hasSubBom && $bomVersion) {
                                 echo '<span class="badge bg-light text-dark border fs-11 px-1.5 py-0.5 rounded-1 fw-medium">v' . e($bomVersion) . '</span>';
@@ -717,8 +632,8 @@
                                 echo '<span class="text-muted fs-12 opacity-50">—</span>';
                             }
                             echo '</td>';
-                            
-                            // 8. Lifecycle Status
+
+                            // 7. Lifecycle Status
                             echo '<td class="text-center align-middle">';
                             if ($hasSubBom) {
                                 $st = strtolower($node['bom_status'] ?? 'approved');
@@ -742,10 +657,10 @@
                             }
                             echo '</td>';
                             echo '</tr>';
-                            
+
                             if (!empty($node['children'])) {
-                                foreach ($node['children'] as $child) {
-                                    renderExplosionTableRows($child, $level + 1);
+                                foreach ($node['children'] as $childIdx => $child) {
+                                    renderExplosionTableRows($child, $level + 1, $nodeId . '-' . $childIdx, $nodeId);
                                 }
                             }
                         }
@@ -756,9 +671,8 @@
                     <x-ui.odoo-form-ui type="table" class="bom-table-enhanced">
                         <thead>
                             <tr>
-                                <th style="width: 6%" class="text-center">{{ __('production.level') }}</th>
-                                <th style="width: 27%">{{ __('production.component_product') }}</th>
-                                <th style="width: 24%">{{ __('production.linked_sub_bom') }}</th>
+                                <th style="width: 31%">{{ __('production.component_product') }}</th>
+                                <th style="width: 26%">{{ __('production.linked_sub_bom') }}</th>
                                 <th style="width: 11%" class="text-end text-nowrap">{{ __('production.bom_base_qty') }}</th>
                                 <th style="width: 14%" class="text-end text-nowrap">{{ __('production.qty_required') }}</th>
                                 <th style="width: 6%" class="text-center">{{ __('production.uom') ?? 'UOM' }}</th>
@@ -771,7 +685,7 @@
                                 @php renderExplosionTableRows($explosion['tree']) @endphp
                             @else
                                 <tr>
-                                    <td colspan="8" class="text-center py-4 text-muted">{{ __('production.no_components_spec_yet') }}</td>
+                                    <td colspan="7" class="text-center py-4 text-muted">{{ __('production.no_components_spec_yet') }}</td>
                                 </tr>
                             @endif
                         </tbody>
@@ -782,61 +696,144 @@
             <!-- Tab 3: Routing Process -->
             <div class="tab-pane fade" id="tab-routing" role="tabpanel" aria-labelledby="tab-routing-tab">
                 @if($bom->routing)
-                    <div class="mb-4 p-3 bg-light rounded border border-light">
-                        <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-1">{{ __('production.routing_reference') }}</span>
-                        <h5 class="fw-bold text-dark mb-1">{{ $bom->routing->name }} ({{ $bom->routing->routing_number }})</h5>
-                        <span class="fs-12 text-muted">{{ __('production.version') }}: v{{ $bom->routing->version }} | {{ __('production.status') }}: 
-                            <span class="badge bg-soft-success text-success text-uppercase font-monospace fs-10">{{ $bom->routing->status }}</span>
-                        </span>
+                    @php
+                        $routingPrimaryCount = $bom->routing->operations->where('is_alternative', false)->count();
+                        $routingAltCount = $bom->routing->operations->where('is_alternative', true)->count();
+                    @endphp
+                    <div class="mb-4 p-3 bg-light rounded border d-flex flex-wrap justify-content-between align-items-center gap-3">
+                        <div>
+                            <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-1">{{ __('production.routing_reference') }}</span>
+                            <h5 class="fw-bold text-dark mb-1">{{ $bom->routing->name }} ({{ $bom->routing->routing_number }})</h5>
+                            <div class="d-flex flex-wrap align-items-center gap-2 fs-12 text-muted">
+                                <span>{{ __('production.version') }}: v{{ $bom->routing->version }}</span>
+                                <span>|</span>
+                                <span>{{ __('production.status') }}:
+                                    <span class="badge bg-soft-success text-success text-uppercase font-monospace fs-10">{{ $bom->routing->status }}</span>
+                                </span>
+                                <span>|</span>
+                                <span>{{ $routingPrimaryCount }} Primary stage(s)</span>
+                                @if($routingAltCount > 0)
+                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10">+{{ $routingAltCount }} Alternative branch(es)</span>
+                                @endif
+                            </div>
+                        </div>
+                        <x-ui.button href="{{ route('production.routing.show', $bom->routing_id) }}" variant="outline-primary" class="btn-sm" icon="feather-external-link">
+                            View Routing
+                        </x-ui.button>
                     </div>
 
                     <h5 class="fw-bold text-dark mb-3">{{ __('production.workflow_routing') }}</h5>
                     <div class="table-responsive">
-                        <x-ui.odoo-form-ui type="table">
+                        <x-ui.odoo-form-ui type="table" class="bom-table-enhanced">
                             <thead>
                                 <tr>
                                     <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
-                                    <th style="width: 25%">{{ __('production.operation_stage') }}</th>
-                                    <th style="width: 15%">{{ __('production.type') }}</th>
-                                    <th style="width: 20%">{{ __('production.work_center') }}</th>
+                                    <th style="width: 30%">{{ __('production.operation_stage') }}</th>
+                                    <th style="width: 12%">{{ __('production.type') }}</th>
+                                    <th style="width: 18%">{{ __('production.work_center') }}</th>
                                     <th style="width: 15%">{{ __('production.machine') }}</th>
-                                    <th class="text-end" style="width: 10%">{{ __('production.times_yield') }}</th>
-                                    <th class="text-center" style="width: 10%">QC Gate</th>
+                                    <th class="text-end" style="width: 12%">{{ __('production.times_yield') }}</th>
+                                    <th class="text-center" style="width: 8%">QC Gate</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse ($bom->routing->operations as $op)
-                                    <tr id="bom-routing-op-{{ $op->id }}">
-                                        <td class="fw-bold text-center font-monospace align-middle">{{ $op->sequence }}</td>
+                                    @php
+                                        $isAltOp = (bool) $op->is_alternative;
+                                        $bomOpMaterials = $bom->operationMaterials
+                                            ? $bom->operationMaterials->where('routing_operation_id', $op->id)
+                                            : collect();
+                                        $opPrimaries = $bomOpMaterials->where('is_alternative', false)->sortBy('sequence');
+                                        $opAltsByTarget = $bomOpMaterials->where('is_alternative', true)->groupBy('replaces_routing_material_id');
+                                        $orderedOpMats = collect();
+                                        $placedOpMatIds = [];
+                                        foreach ($opPrimaries as $pMat) {
+                                            $orderedOpMats->push($pMat);
+                                            $placedOpMatIds[$pMat->id] = true;
+                                            foreach ($opAltsByTarget->get($pMat->id, collect())->sortBy('priority') as $aMat) {
+                                                $orderedOpMats->push($aMat);
+                                                $placedOpMatIds[$aMat->id] = true;
+                                            }
+                                        }
+                                        foreach ($bomOpMaterials as $remMat) {
+                                            if (!isset($placedOpMatIds[$remMat->id])) {
+                                                $orderedOpMats->push($remMat);
+                                            }
+                                        }
+                                    @endphp
+                                    <tr id="bom-routing-op-{{ $op->id }}" @if($isAltOp) style="background-color: rgba(245, 158, 11, 0.05);" @endif>
+                                        <td class="fw-bold text-center font-monospace align-middle" @if($isAltOp) style="border-left: 3px solid #f59e0b;" @endif>
+                                            {{ $op->sequence }}
+                                        </td>
                                         <td class="align-middle">
-                                            <span class="fw-bold text-dark">{{ $op->name }}</span>
-                                            <span class="badge bg-soft-primary text-primary font-monospace ms-1 fs-9">{{ $op->operation_number }}</span>
+                                            <div class="d-flex flex-wrap align-items-center gap-1.5">
+                                                <span class="fw-bold text-dark">{{ $op->name }}</span>
+                                                <span class="badge bg-soft-primary text-primary font-monospace fs-10">{{ $op->operation_number }}</span>
+                                                @if ($isAltOp)
+                                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10">
+                                                        <i class="feather-git-branch me-1"></i>{{ __('production.bom_alternative_operation') }}
+                                                        &middot; {{ __('production.bom_substitutes') }} {{ $op->primaryOperation?->operation_number ?? ('Op #' . $op->replaces_operation_id) }}
+                                                        &middot; Priority {{ $op->priority ?? 1 }}
+                                                    </span>
+                                                @else
+                                                    <span class="badge bg-soft-success text-success border border-success-subtle fs-10">Primary</span>
+                                                @endif
+                                                @if ($op->is_external)
+                                                    <span class="badge bg-soft-danger text-danger fs-10 text-uppercase">{{ __('production.outsourced') ?? 'Outsourced' }}</span>
+                                                @endif
+                                                @if ($bom->usesPreviousOpOutput($op))
+                                                    {{-- TF-01 --}}
+                                                    <span class="badge bg-soft-info text-info fs-10" title="Works on the previous operation's output">Previous OP materials</span>
+                                                @endif
+                                            </div>
                                             @if ($op->description)
                                                 <small class="text-muted d-block mt-1">{{ $op->description }}</small>
                                             @endif
-                                            @if ($op->is_external)
-                                                <span class="badge bg-soft-danger text-danger mt-1 fs-9 text-uppercase">{{ __('production.outsourced') ?? 'Outsourced' }}</span>
-                                            @endif
-                                            
-                                            <!-- Consumed operation-level materials -->
-                                            @php
-                                                $bomOpMaterials = $bom->operationMaterials ? $bom->operationMaterials->where('routing_operation_id', $op->id) : collect();
-                                            @endphp
-                                            @if($bomOpMaterials->count() > 0)
-                                                <div class="mt-2 bg-white p-2 rounded border border-dashed">
-                                                    <small class="fw-bold text-muted d-block mb-1 text-uppercase fs-9">{{ __('production.allocated_consumed_materials') ?? 'Allocated Consumed Materials:' }}</small>
-                                                    <ul class="mb-0 ps-3 fs-10 text-muted">
-                                                        @foreach($bomOpMaterials as $opMat)
-                                                            <li>
-                                                                 <span class="text-secondary fw-semibold">{{ __('production.seq') }} {{ $opMat->sequence }}:</span>
-                                                                <strong>{{ $opMat->material?->name ?? 'Material' }}</strong>: {{ format_decimal($opMat->quantity) }} {{ $opMat->uom?->code ?? 'PCS' }}
+
+                                            @if($orderedOpMats->isNotEmpty())
+                                                <div class="mt-2 bg-white p-2 rounded border {{ $isAltOp ? 'border-warning-subtle' : 'border-dashed' }}">
+                                                    <small class="fw-bold text-muted d-block mb-1 text-uppercase fs-10">
+                                                        {{ __('production.allocated_consumed_materials') ?? 'Allocated Consumed Materials:' }}
+                                                        @if($isAltOp)
+                                                            <span class="text-warning text-none fw-semibold ms-1">(Alternative route — used only when {{ $op->operation_number }} runs)</span>
+                                                        @endif
+                                                    </small>
+                                                    <ul class="mb-0 ps-3 fs-11 text-muted">
+                                                        @foreach($orderedOpMats as $opMat)
+                                                            @php
+                                                                $opMatScrap = (float) ($opMat->material_scrap_percentage ?? 0);
+                                                                $opMatGross = $opMat->gross_quantity !== null
+                                                                    ? (float) $opMat->gross_quantity
+                                                                    : \App\Domains\Production\Models\RoutingOperationMaterial::calculateGrossQuantity((float) $opMat->quantity, $opMatScrap);
+                                                                $opMatUom = $opMat->uom?->code ?? $opMat->material?->uom?->code ?? 'PCS';
+                                                            @endphp
+                                                            <li class="mb-0.5">
+                                                                <span class="text-secondary fw-semibold">{{ __('production.seq') }} {{ $opMat->sequence }}:</span>
+                                                                <strong class="text-dark">{{ $opMat->material?->name ?? 'Material' }}</strong>:
+                                                                {{ format_decimal($opMat->quantity) }} {{ $opMatUom }}
+                                                                @if($opMatScrap > 0)
+                                                                    <span class="text-danger fs-10">(+{{ format_decimal($opMatScrap) }}% scrap &rarr; {{ format_decimal($opMatGross) }} {{ $opMatUom }})</span>
+                                                                @endif
                                                                 @if($opMat->is_alternative)
-                                                                    <span class="badge bg-soft-warning text-warning fs-8 ms-1">Alternative (P{{ $opMat->priority }})</span>
+                                                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 ms-1">
+                                                                        Alternative (P{{ $opMat->priority ?? 1 }}) &middot; {{ __('production.bom_substitutes') }} {{ $opMat->replacesMaterial?->material?->name ?? 'Primary' }}
+                                                                    </span>
+                                                                @elseif($isAltOp)
+                                                                    <span class="badge bg-soft-warning text-warning fs-10 ms-1">Branch Primary</span>
                                                                 @else
-                                                                    <span class="badge bg-soft-primary text-primary fs-8 ms-1">Primary</span>
+                                                                    <span class="badge bg-soft-primary text-primary fs-10 ms-1">Primary</span>
+                                                                @endif
+                                                                @if($opMat->childBom)
+                                                                    <a href="{{ route('production.boms.show', $opMat->child_bom_id) }}" class="badge bg-soft-success text-success border border-success-subtle text-decoration-none fs-10 ms-1">
+                                                                        Sub-BOM: {{ $opMat->childBom->bom_number }}
+                                                                    </a>
                                                                 @endif
                                                                 @if($opMat->consumption_type)
-                                                                    <span class="badge bg-light text-dark fs-8 ms-1">{{ $opMat->consumption_type }}</span>
+                                                                    <span class="badge bg-light text-dark border fs-10 ms-1">{{ $opMat->consumption_type }}</span>
+                                                                @endif
+                                                                @if(\App\Domains\Production\Services\ProductionOrderEngineeringService::isVendorSuppliedAllocation($opMat, $op))
+                                                                    {{-- TF-02 --}}
+                                                                    <span class="badge bg-soft-purple text-purple fs-10 ms-1" title="The vendor brings it — not requested from the store">Vendor-supplied</span>
                                                                 @endif
                                                             </li>
                                                         @endforeach
@@ -855,28 +852,42 @@
                                                     <a href="{{ route('production.work-centers.show', $op->work_center_id) }}" class="fw-bold text-primary fs-13">
                                                         {{ $op->workCenter->name }}
                                                     </a>
-                                                    @if($op->workCenter->parent)
-                                                        <small class="text-muted fs-10">
-                                                            {{ $op->workCenter->parent->parent ? $op->workCenter->parent->parent->name . ' › ' : '' }}{{ $op->workCenter->parent->name }}
-                                                        </small>
+                                                    @if($op->section)
+                                                        <small class="text-dark fs-11">{{ $op->section->name }}</small>
                                                     @endif
-                                                    <small class="text-secondary font-monospace fs-10 mt-1">{{ $op->workCenter->code }}</small>
+                                                    <small class="text-secondary font-monospace fs-10 mt-0.5">{{ $op->workCenter->code }}</small>
                                                 </div>
+                                            @elseif ($op->is_external)
+                                                <span class="badge bg-soft-danger text-danger fs-10">External Vendor</span>
                                             @else
                                                 <span class="text-danger">{{ __('production.no_selection') }}</span>
                                             @endif
                                         </td>
                                         <td class="align-middle">
                                             @if ($op->machine)
-                                                <span class="fw-semibold text-dark">{{ $op->machine->name }}</span>
-                                                <small class="text-muted d-block fs-10">{{ $op->machine->code }}</small>
+                                                <span class="fw-semibold text-dark d-block">{{ $op->machine->name }}</span>
+                                                <small class="text-muted d-block font-monospace fs-10">{{ $op->machine->code }}</small>
+                                                <span class="badge bg-soft-primary text-primary fs-10 mt-0.5">Machine</span>
+                                            @elseif ($op->manualProduction)
+                                                <span class="fw-semibold text-dark d-block">{{ $op->manualProduction->batch_name }}</span>
+                                                @if($op->manualProduction->shift)
+                                                    <small class="text-muted d-block fs-10">{{ $op->manualProduction->shift->name }}</small>
+                                                @endif
+                                                <span class="badge bg-soft-info text-info fs-10 mt-0.5">Manual Batch</span>
+                                            @elseif ($op->is_external)
+                                                <span class="fw-semibold text-dark d-block">{{ $op->vendor?->name ?? 'External Subcontractor' }}</span>
+                                                <span class="badge bg-soft-danger text-danger fs-10 mt-0.5">Subcontractor</span>
                                             @else
                                                 <span class="text-muted">{{ __('production.generic_capacity') ?? 'Generic Capacity' }}</span>
                                             @endif
                                         </td>
                                         <td class="text-end align-middle font-monospace fs-11">
-                                            <div>{{ __('production.setup') }}: {{ format_duration($op->setup_time_minutes) }}</div>
+                                            <div>{{ __('production.bom_setup_per_run') }}: {{ format_duration($op->setup_time_minutes) }}</div>
+                                            @if((float) ($op->setup_time_per_piece_minutes ?? 0) > 0)
+                                                <div>{{ __('production.bom_setup_per_piece') }}: {{ format_duration($op->setup_time_per_piece_minutes) }}</div>
+                                            @endif
                                             <div>{{ __('production.run') }}: {{ format_duration($op->processing_time_minutes) }}</div>
+                                            <div class="text-success fw-semibold">{{ __('production.bom_yield') }}: {{ format_decimal($op->expected_yield_percentage > 0 ? $op->expected_yield_percentage : 100) }}%</div>
                                         </td>
                                         <td class="text-center align-middle">
                                             @if ($op->quality_required)
@@ -903,95 +914,220 @@
 
             <!-- Tab 4: Cost Summary -->
             <div class="tab-pane fade" id="tab-costing" role="tabpanel" aria-labelledby="tab-costing-tab">
-                <h5 class="fw-bold text-dark mb-3">{{ __('production.est_material_cost_summary') }}</h5>
+                @php
+                    $simAltTotalCount = (int) ($costSimulatorData['alt_ops_count'] ?? 0) + (int) ($costSimulatorData['alt_mats_count'] ?? 0);
+                    $hasSimAlternatives = !empty($costSimulatorData['has_alternatives']);
+                    $primaryCostItems = collect($costSummary['items'])->where('is_excluded_from_baseline', false)->values();
+                    $excludedCostItems = collect($costSummary['items'])->where('is_excluded_from_baseline', true)->values();
+                @endphp
+
+                <!-- Header Bar: Primary Baseline Notice + Simulate Cost Trigger -->
+                <div class="p-3 rounded border bg-light mb-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <h5 class="fw-bold text-dark mb-0">{{ __('production.est_material_cost_summary') }}</h5>
+                            @if($hasSimAlternatives)
+                                <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-11">
+                                    +{{ $simAltTotalCount }} alternative(s) available to simulate
+                                </span>
+                            @endif
+                        </div>
+                        <p class="text-muted fs-12 mb-0 mt-1">
+                            <i class="feather-info text-primary me-1"></i>Primary route &amp; primary materials baseline (excludes alternative operations &amp; alternative materials). Scaled to base quantity: <strong>{{ format_decimal($bom->base_quantity) }} {{ $bom->baseUom?->code ?? 'PCS' }}</strong>.
+                        </p>
+                    </div>
+                    @if($hasSimAlternatives)
+                        <x-ui.button type="button" variant="primary" icon="feather-sliders" data-bs-toggle="modal" data-bs-target="#bomCostSimulationModal">
+                            Simulate Cost
+                        </x-ui.button>
+                    @endif
+                </div>
+
+                {{-- Primary Cost Layer Cards --}}
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4 col-lg">
+                        <div class="bg-light p-3 rounded border text-center h-100">
+                            <span class="text-muted fs-11 text-uppercase fw-bold d-block">{{ __('production.component_cost_net') }}</span>
+                            <h4 class="text-dark fw-bold mt-1 mb-1">{{ format_currency($costSummary['net_material_cost'], 4) }}</h4>
+                            <small class="text-muted fs-11">Direct primary net (catalog unit cost)</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg">
+                        <div class="bg-light p-3 rounded border text-center h-100">
+                            <span class="text-danger fs-11 text-uppercase fw-bold d-block">{{ __('production.scrap_loss') ?? 'Scrap Loss' }}</span>
+                            <h4 class="text-danger fw-bold mt-1 mb-1">{{ format_currency($costSummary['scrap_adjustment'], 4) }}</h4>
+                            <small class="text-muted fs-11">{{ __('production.expected_scrap_desc') ?? 'Primary material scrap value' }}</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg">
+                        <div class="bg-light p-3 rounded border text-center h-100">
+                            <span class="text-muted fs-11 text-uppercase fw-bold d-block">{{ __('production.labor_cost') ?? 'Labor Cost' }}</span>
+                            <h4 class="text-dark fw-bold mt-1 mb-1">{{ format_currency($costSummary['labor_cost'], 4) }}</h4>
+                            <small class="text-muted fs-11">Saved primary labor/unit &times; base qty</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg">
+                        <div class="bg-light p-3 rounded border text-center h-100">
+                            <span class="text-muted fs-11 text-uppercase fw-bold d-block">{{ __('production.machine_cost') ?? 'Machine Cost' }}</span>
+                            <h4 class="text-dark fw-bold mt-1 mb-1">{{ format_currency($costSummary['machine_cost'], 4) }}</h4>
+                            <small class="text-muted fs-11">Saved primary machine/unit &times; base qty</small>
+                        </div>
+                    </div>
+                    @if(($costSummary['subcontract_cost'] ?? 0) > 0)
+                        <div class="col-md-4 col-lg">
+                            <div class="bg-light p-3 rounded border text-center h-100">
+                                <span class="text-muted fs-11 text-uppercase fw-bold d-block">Subcontract Cost</span>
+                                <h4 class="text-dark fw-bold mt-1 mb-1">{{ format_currency($costSummary['subcontract_cost'], 4) }}</h4>
+                                <small class="text-muted fs-11">Outsourced ops/unit &times; base qty</small>
+                            </div>
+                        </div>
+                    @endif
+                    <div class="col-md-4 col-lg">
+                        <div class="bg-light p-3 rounded border text-center h-100">
+                            <span class="text-warning fs-11 text-uppercase fw-bold d-block">Setup Cost / Run</span>
+                            <h4 class="text-dark fw-bold mt-1 mb-1">{{ format_currency($costSummary['setup_cost_per_run'] ?? 0, 4) }}</h4>
+                            <small class="text-muted fs-11">Once per run (separate from unit cost)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Direct Catalog Total vs Rolled-Up Multi-Level Total -->
                 <div class="row g-3 mb-4">
-                    <!-- Net Material Cost -->
-                    <div class="col-md-4">
-                        <div class="bg-light p-3 rounded border text-center">
-                            <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.component_cost_net') }}</span>
-                            <h4 class="text-dark fw-bold mt-1">{{ format_currency($costSummary['material_cost'] - $costSummary['scrap_adjustment']) }}</h4>
-                            <small class="text-muted">{{ __('production.net_scrap_loss_desc') ?? 'Net of scrap loss' }}</small>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded border border-primary bg-soft-primary d-flex justify-content-between align-items-center h-100">
+                            <div>
+                                <span class="text-primary fs-11 text-uppercase fw-bold d-block">Direct Product Cost Total (Catalog Basis)</span>
+                                <div class="text-muted fs-11 mt-1">
+                                    Direct Materials {{ format_currency($costSummary['material_cost'], 4) }} + Routing {{ format_currency($costSummary['routing_cost'], 4) }}
+                                    <span class="d-block">Excludes once-per-run setup ({{ format_currency($costSummary['setup_cost_per_run'] ?? 0, 4) }})</span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <h4 class="text-primary fw-bold mb-0">{{ format_currency($costSummary['total_cost'], 4) }}</h4>
+                                <small class="text-primary font-monospace fs-11">{{ format_currency($costSummary['cost_per_unit'], 4) }} / unit</small>
+                            </div>
                         </div>
                     </div>
-                    <!-- Scrap Loss -->
-                    <div class="col-md-4">
-                        <div class="bg-light p-3 rounded border text-center">
-                            <span class="text-muted fs-11 text-uppercase fw-bold text-danger">{{ __('production.scrap_loss') ?? 'Scrap Loss' }}</span>
-                            <h4 class="text-danger fw-bold mt-1">{{ format_currency($costSummary['scrap_adjustment']) }}</h4>
-                            <small class="text-muted">{{ __('production.expected_scrap_desc') ?? 'Expected material scrap value' }}</small>
-                        </div>
-                    </div>
-                    <!-- Labor Cost -->
-                    <div class="col-md-4">
-                        <div class="bg-light p-3 rounded border text-center">
-                            <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.labor_cost') ?? 'Labor Cost' }}</span>
-                            <h4 class="text-dark fw-bold mt-1">{{ format_currency($costSummary['labor_cost']) }}</h4>
-                            <small class="text-muted">{{ __('production.labor_desc') ?? 'Routing setup & run labor' }}</small>
-                        </div>
-                    </div>
-                    <!-- Machine Cost -->
-                    <div class="col-md-4">
-                        <div class="bg-light p-3 rounded border text-center">
-                            <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.machine_cost') ?? 'Machine Cost' }}</span>
-                            <h4 class="text-dark fw-bold mt-1">{{ format_currency($costSummary['machine_cost']) }}</h4>
-                            <small class="text-muted">{{ __('production.machine_desc') ?? 'Machine runtime cost' }}</small>
-                        </div>
-                    </div>
-                    <!-- Overhead Cost -->
-                    <div class="col-md-4">
-                        <div class="bg-light p-3 rounded border text-center">
-                            <span class="text-muted fs-11 text-uppercase fw-bold">Work Center Overhead</span>
-                            <h4 class="text-dark fw-bold mt-1">{{ format_currency($costSummary['overhead_cost']) }}</h4>
-                            <small class="text-muted">WC hourly overhead rate x duration</small>
-                        </div>
-                    </div>
-                    <!-- Total Mfg Cost -->
-                    <div class="col-md-4">
-                        <div class="bg-light p-3 rounded border text-center bg-soft-primary border-primary">
-                            <span class="text-primary fs-11 text-uppercase fw-bold">{{ __('production.total_mfg_cost') ?? 'Total Manufacturing Cost' }}</span>
-                            <h4 class="text-primary fw-bold mt-1">{{ format_currency($costSummary['total_cost']) }}</h4>
-                            <small class="text-primary">{{ __('production.mfg_desc') ?? 'Sum of all cost layers' }}</small>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded border border-info bg-soft-info d-flex justify-content-between align-items-center h-100">
+                            <div>
+                                <span class="text-info fs-11 text-uppercase fw-bold d-block">Rolled-Up Sub-BOM Cost Total (Multi-Level Basis)</span>
+                                <div class="text-muted fs-11 mt-1">
+                                    Raw Leaves {{ format_currency($rollupSummary['rolled_raw_material_cost'], 4) }} + All-Level Routing {{ format_currency($rollupSummary['rolled_routing_cost'], 4) }}
+                                    <span class="d-block">Combined setups across tree: {{ format_currency($rollupSummary['rolled_setup_cost_per_run'], 4) }} / run</span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <h4 class="text-info fw-bold mb-0">{{ format_currency($rollupSummary['rolled_total_excl_setup'], 4) }}</h4>
+                                <small class="text-info font-monospace fs-11">{{ format_currency($rollupSummary['rolled_cost_per_unit'], 4) }} / unit</small>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Cost Details Item Table -->
-                <h6 class="fw-bold text-dark mb-3">{{ __('production.component_cost_gross') }}</h6>
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-dark mb-0">{{ __('production.component_cost_gross') }} (Catalog vs. Sub-BOM Roll-Up)</h6>
+                    <small class="text-muted fs-11">Only primary rows on primary operations are included in baseline totals.</small>
+                </div>
                 <div class="table-responsive">
-                    <x-ui.odoo-form-ui type="table">
+                    <x-ui.odoo-form-ui type="table" class="bom-table-enhanced">
                         <thead>
                             <tr>
-                                <th style="width: 40%">{{ __('production.component_product') }}</th>
-                                <th style="width: 15%" class="text-end">{{ __('production.base_qty') }}</th>
-                                <th style="width: 10%" class="text-end">{{ __('production.scrap_percent') }}</th>
-                                <th style="width: 15%" class="text-end">{{ __('production.gross_qty_required') }}</th>
+                                <th style="width: 12%">{{ __('production.bom_operation') }}</th>
+                                <th style="width: 28%">{{ __('production.component_product') }}</th>
+                                <th style="width: 10%" class="text-end">{{ __('production.net_qty') }}</th>
+                                <th style="width: 8%" class="text-end">{{ __('production.scrap_percent') }}</th>
+                                <th style="width: 11%" class="text-end">{{ __('production.gross_qty') }}</th>
                                 <th style="width: 10%" class="text-end">{{ __('production.unit_cost') }}</th>
-                                <th style="width: 10%" class="text-end">{{ __('production.total_item_cost') }}</th>
+                                <th style="width: 10%" class="text-end">Direct Total</th>
+                                <th style="width: 11%" class="text-end">Sub-BOM Roll-Up</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($costSummary['items'] as $cItem)
+                            @forelse($primaryCostItems as $cItem)
                                 <tr>
                                     <td>
+                                        <span class="badge bg-soft-primary text-primary font-monospace fs-10">{{ $cItem['operation_number'] }}</span>
+                                    </td>
+                                    <td>
                                         <div class="d-flex flex-column">
-                                            <span class="fw-bold text-dark">{{ $cItem['material_name'] }}</span>
+                                            <div class="d-flex flex-wrap align-items-center gap-1">
+                                                <span class="fw-bold text-dark">{{ $cItem['material_name'] }}</span>
+                                                @if(!empty($cItem['has_sub_bom']) && !empty($cItem['sub_bom_number']))
+                                                    <span class="badge bg-soft-success text-success border border-success-subtle fs-10">{{ $cItem['sub_bom_number'] }}</span>
+                                                @endif
+                                            </div>
                                             <small class="text-muted font-monospace fs-10">{{ $cItem['material_sku'] }}</small>
                                         </div>
                                     </td>
                                     <td class="text-end">{{ format_decimal($cItem['quantity']) }} {{ $cItem['uom_code'] }}</td>
                                     <td class="text-end text-danger">{{ format_decimal($cItem['scrap_percentage']) }}%</td>
                                     <td class="text-end fw-bold">{{ format_decimal($cItem['gross_quantity']) }} {{ $cItem['uom_code'] }}</td>
-                                    <td class="text-end">{{ format_currency($cItem['unit_cost']) }}</td>
-                                    <td class="text-end text-dark fw-bold">{{ format_currency($cItem['total_cost']) }}</td>
+                                    <td class="text-end">{{ format_currency($cItem['unit_cost'], 4) }}</td>
+                                    <td class="text-end text-dark fw-bold">{{ format_currency($cItem['total_cost'], 4) }}</td>
+                                    <td class="text-end fw-bold text-info">
+                                        {{ format_currency($cItem['rollup_cost'] ?? $cItem['total_cost'], 4) }}
+                                        @if(!empty($cItem['has_sub_bom']))
+                                            <small class="d-block text-muted fw-normal fs-10">Sub-BOM</small>
+                                        @endif
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center py-4 text-muted">{{ __('production.no_pricing_components') }}</td>
+                                    <td colspan="8" class="text-center py-4 text-muted">{{ __('production.no_pricing_components') }}</td>
                                 </tr>
                             @endforelse
+
+                            @if($excludedCostItems->isNotEmpty())
+                                <tr class="bg-light-subtle">
+                                    <td colspan="8" class="fs-11 fw-semibold text-warning py-2">
+                                        <i class="feather-git-branch me-1"></i>Excluded from Primary Baseline (Available in Simulate Cost)
+                                    </td>
+                                </tr>
+                                @foreach($excludedCostItems as $xItem)
+                                    <tr class="text-muted bg-light-subtle">
+                                        <td>
+                                            <span class="badge bg-soft-warning text-warning font-monospace fs-10">{{ $xItem['operation_number'] }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-column">
+                                                <div class="d-flex flex-wrap align-items-center gap-1">
+                                                    <span class="fw-semibold text-secondary">{{ $xItem['material_name'] }}</span>
+                                                    @if($xItem['operation_is_alternative'])
+                                                        <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10">Excluded &mdash; Alt Op</span>
+                                                    @endif
+                                                    @if($xItem['is_alternative'])
+                                                        <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10">
+                                                            Excluded &mdash; Alt Material (P{{ $xItem['priority'] ?? 1 }})
+                                                            @if(!empty($xItem['replaces_material_name']))
+                                                                &middot; Replaces {{ $xItem['replaces_material_name'] }}
+                                                            @endif
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                <small class="text-muted font-monospace fs-10">{{ $xItem['material_sku'] }}</small>
+                                            </div>
+                                        </td>
+                                        <td class="text-end">{{ format_decimal($xItem['quantity']) }} {{ $xItem['uom_code'] }}</td>
+                                        <td class="text-end">{{ format_decimal($xItem['scrap_percentage']) }}%</td>
+                                        <td class="text-end">{{ format_decimal($xItem['gross_quantity']) }} {{ $xItem['uom_code'] }}</td>
+                                        <td class="text-end">{{ format_currency($xItem['unit_cost'], 4) }}</td>
+                                        <td class="text-end text-decoration-line-through">{{ format_currency($xItem['total_cost'], 4) }}</td>
+                                        <td class="text-end text-muted fs-11">Simulate</td>
+                                    </tr>
+                                @endforeach
+                            @endif
+
                             <tr class="table-light fw-bold">
-                                <td colspan="5" class="text-end">{{ __('production.est_total_material_cost') }}</td>
-                                <td class="text-end text-primary fs-14">{{ format_currency($materialCost) }}</td>
+                                <td colspan="6" class="text-end">{{ __('production.est_total_material_cost') }} (Primary Only)</td>
+                                <td class="text-end text-primary fs-14">{{ format_currency($materialCost, 4) }}</td>
+                                <td class="text-end text-info fs-12">
+                                    {{ format_currency($rollupSummary['rolled_raw_material_cost'], 4) }} raw
+                                    @if(($rollupSummary['rolled_sub_routing_cost'] ?? 0) > 0)
+                                        <small class="d-block text-muted fw-normal fs-10">+ {{ format_currency($rollupSummary['rolled_sub_routing_cost'], 4) }} sub-routing</small>
+                                    @endif
+                                </td>
                             </tr>
                         </tbody>
                     </x-ui.odoo-form-ui>
@@ -1130,9 +1266,497 @@
                 <x-ui.button type="submit" variant="danger" onclick="document.getElementById('cancelForm').submit();">{{ __('production.cancel_bom') }}</x-ui.button>
             </x-slot>
         </x-ui.modal>
+
+        <!-- Simulate Cost Modal (Routes + Materials) -->
+        @if(!empty($costSimulatorData['has_alternatives']))
+            <div class="modal fade" id="bomCostSimulationModal" tabindex="-1" aria-labelledby="bomCostSimulationModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"
+                     x-data="bomCostSimulator({{ Js::from($costSimulatorData) }})">
+                    <div class="modal-content border-0 shadow-lg">
+                        <div class="modal-header bg-white border-bottom py-3 px-4">
+                            <div class="d-flex align-items-center gap-2.5">
+                                <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                                    <i class="feather-sliders fs-18"></i>
+                                </div>
+                                <div>
+                                    <h5 class="modal-title fw-bold text-dark mb-0" id="bomCostSimulationModalLabel">
+                                        Simulate BOM Cost (Routes + Materials)
+                                    </h5>
+                                    <span class="fs-12 text-muted">Select alternative operations and/or alternative materials, then click "Run Calculations" to preview total cost impact</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+
+                        <div class="modal-body p-4 bg-light-subtle">
+                            <div class="alert alert-info py-2 px-3 fs-12 mb-3 d-flex align-items-center gap-2 rounded border-info-subtle">
+                                <i class="feather-info fs-16 text-primary flex-shrink-0"></i>
+                                <div>
+                                    Stages without alternatives are locked to Primary. Switching an operation variant updates both its routing cost and its consumed material list.
+                                </div>
+                            </div>
+
+                            <div class="d-flex flex-column gap-3 mb-4">
+                                <template x-for="stage in stages" :key="stage.primary_id">
+                                    <div class="card border rounded shadow-none mb-0">
+                                        <div class="card-header bg-white py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge bg-soft-primary text-primary font-monospace fw-bold fs-11">
+                                                    Stage <span x-text="stage.stage_number"></span>
+                                                </span>
+                                                <span class="fw-bold text-dark fs-12 font-monospace" x-text="ops[stage.primary_id].operation_number + ': ' + ops[stage.primary_id].name"></span>
+                                            </div>
+                                            <div>
+                                                <template x-if="!stage.has_alternatives">
+                                                    <span class="badge bg-soft-secondary text-secondary fs-10">
+                                                        <i class="feather-lock me-1"></i>Locked (Primary Route)
+                                                    </span>
+                                                </template>
+                                                <template x-if="stage.has_alternatives">
+                                                    <span class="badge bg-soft-warning text-warning fs-10">
+                                                        <i class="feather-git-branch me-1"></i>Alternative Route Available
+                                                    </span>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <div class="card-body p-3 bg-light space-y-2">
+                                            <!-- Operation Variant Selection -->
+                                            <div class="d-flex flex-column gap-2 mb-3">
+                                                <template x-for="opId in stage.options" :key="opId">
+                                                    <label class="p-2.5 rounded border d-flex justify-content-between align-items-center mb-0 bg-white"
+                                                           :class="selectedOps['stage_' + stage.primary_id] == opId ? 'border-primary shadow-sm' : 'border-light-subtle'"
+                                                           style="cursor: pointer;"
+                                                           @click="selectOp(stage.primary_id, opId)">
+                                                        <div class="d-flex align-items-start gap-2.5">
+                                                            <div class="form-check mt-0.5" x-show="stage.has_alternatives">
+                                                                <input class="form-check-input" type="radio"
+                                                                       :name="'bom_sim_stage_' + stage.primary_id"
+                                                                       :value="opId"
+                                                                       :checked="selectedOps['stage_' + stage.primary_id] == opId"
+                                                                       @change="selectOp(stage.primary_id, opId)">
+                                                            </div>
+                                                            <div>
+                                                                <div class="d-flex flex-wrap align-items-center gap-1.5 mb-0.5">
+                                                                    <template x-if="!ops[opId].is_alternative">
+                                                                        <span class="badge bg-soft-primary text-primary fs-10">Primary Route</span>
+                                                                    </template>
+                                                                    <template x-if="ops[opId].is_alternative">
+                                                                        <span class="badge bg-soft-warning text-warning fs-10">
+                                                                            <i class="feather-git-branch me-0.5"></i>Alt Route (P<span x-text="ops[opId].priority"></span>)
+                                                                        </span>
+                                                                    </template>
+                                                                    <span class="fw-bold text-dark fs-12 font-monospace" x-text="ops[opId].operation_number + ': ' + ops[opId].name"></span>
+                                                                </div>
+                                                                <small class="text-muted fs-11">
+                                                                    <span x-text="ops[opId].work_center"></span> &bull;
+                                                                    <span x-text="ops[opId].section"></span> &bull;
+                                                                    <span x-text="ops[opId].resource"></span>
+                                                                </small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="text-end font-monospace">
+                                                            <div class="fw-bold fs-12 text-dark">
+                                                                Routing: <span x-text="currencySym + fmt4(ops[opId].routing_cost)"></span>
+                                                            </div>
+                                                            <small class="text-muted fs-10">
+                                                                Setup/Run: <span x-text="currencySym + fmt4(ops[opId].setup_cost_per_run)"></span>
+                                                            </small>
+                                                        </div>
+                                                    </label>
+                                                </template>
+                                            </div>
+
+                                            <!-- Material Slots for Selected Operation -->
+                                            <template x-if="activeOpForStage(stage).material_slots.length > 0">
+                                                <div class="bg-white rounded border p-2.5">
+                                                    <div class="fs-10 fw-bold text-muted text-uppercase mb-2">
+                                                        Consumed Materials on <span class="text-primary" x-text="activeOpForStage(stage).operation_number"></span>
+                                                    </div>
+                                                    <div class="d-flex flex-column gap-2">
+                                                        <template x-for="slot in activeOpForStage(stage).material_slots" :key="slot.slot_key">
+                                                            <div class="p-2 rounded border bg-light-subtle">
+                                                                <template x-if="!slot.has_alternatives">
+                                                                    <div class="d-flex justify-content-between align-items-center fs-12">
+                                                                        <div>
+                                                                            <span class="badge bg-soft-secondary text-secondary fs-10 me-1">Fixed</span>
+                                                                            <strong class="text-dark" x-text="slot.options[0].material_name"></strong>
+                                                                            <span class="text-muted ms-1" x-text="fmt4(slot.options[0].gross_quantity) + ' ' + slot.options[0].uom_code"></span>
+                                                                            <template x-if="slot.options[0].has_sub_bom">
+                                                                                <span class="badge bg-soft-success text-success fs-10 ms-1" x-text="slot.options[0].sub_bom_number"></span>
+                                                                            </template>
+                                                                        </div>
+                                                                        <div class="text-end font-monospace">
+                                                                            <span class="fw-bold text-dark" x-text="currencySym + fmt4(slot.options[0].direct_cost)"></span>
+                                                                            <template x-if="slot.options[0].has_sub_bom">
+                                                                                <small class="d-block text-info fs-10" x-text="'Roll-up: ' + currencySym + fmt4(slot.options[0].rollup_cost)"></small>
+                                                                            </template>
+                                                                        </div>
+                                                                    </div>
+                                                                </template>
+
+                                                                <template x-if="slot.has_alternatives">
+                                                                    <div class="d-flex flex-column gap-1.5">
+                                                                        <div class="fs-11 fw-semibold text-warning mb-0.5">
+                                                                            <i class="feather-shuffle me-1"></i>Choose material variant:
+                                                                        </div>
+                                                                        <template x-for="mOpt in slot.options" :key="mOpt.id">
+                                                                            <label class="p-2 rounded border bg-white d-flex justify-content-between align-items-center mb-0 fs-12"
+                                                                                   :class="selectedMatForSlot(slot) == mOpt.id ? 'border-primary shadow-sm' : 'border-light-subtle'"
+                                                                                   style="cursor: pointer;"
+                                                                                   @click="selectMat(slot.slot_key, mOpt.id)">
+                                                                                <div class="d-flex align-items-center gap-2">
+                                                                                    <input class="form-check-input mt-0" type="radio"
+                                                                                           :name="'bom_sim_slot_' + slot.slot_key"
+                                                                                           :value="mOpt.id"
+                                                                                           :checked="selectedMatForSlot(slot) == mOpt.id"
+                                                                                           @change="selectMat(slot.slot_key, mOpt.id)">
+                                                                                    <div>
+                                                                                        <span class="badge fs-10 me-1"
+                                                                                              :class="mOpt.is_alternative ? 'bg-soft-warning text-warning' : 'bg-soft-primary text-primary'"
+                                                                                              x-text="mOpt.is_alternative ? ('Alt P' + mOpt.priority) : 'Primary'"></span>
+                                                                                        <strong class="text-dark" x-text="mOpt.material_name"></strong>
+                                                                                        <span class="text-muted ms-1" x-text="fmt4(mOpt.gross_quantity) + ' ' + mOpt.uom_code + ' @ ' + currencySym + fmt4(mOpt.unit_cost)"></span>
+                                                                                        <template x-if="mOpt.has_sub_bom">
+                                                                                            <span class="badge bg-soft-success text-success fs-10 ms-1" x-text="mOpt.sub_bom_number"></span>
+                                                                                        </template>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div class="text-end font-monospace">
+                                                                                    <span class="fw-bold text-dark" x-text="currencySym + fmt4(mOpt.direct_cost)"></span>
+                                                                                    <template x-if="mOpt.has_sub_bom">
+                                                                                        <small class="d-block text-info fs-10" x-text="'Roll-up: ' + currencySym + fmt4(mOpt.rollup_cost)"></small>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </label>
+                                                                        </template>
+                                                                    </div>
+                                                                </template>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Action Bar -->
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 bg-white rounded border mb-3 shadow-sm">
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="button" class="btn btn-primary fw-bold px-4" @click="runCalculations()">
+                                        <i class="feather-zap me-1"></i>RUN CALCULATIONS
+                                    </button>
+                                    <button type="button" class="btn btn-light border text-muted px-3 fs-12" @click="resetToPrimary()">
+                                        <i class="feather-rotate-ccw me-1"></i>Reset to Primary
+                                    </button>
+                                </div>
+                                <span class="fs-12 text-muted" x-show="!hasCalculated">
+                                    Click RUN CALCULATIONS to compare against baseline
+                                </span>
+                                <span class="badge bg-soft-success text-success fs-11 px-2 py-1" x-show="hasCalculated">
+                                    <i class="feather-check-circle me-1"></i>Scenario Calculated
+                                </span>
+                            </div>
+
+                            <!-- Results Panel -->
+                            <div x-show="hasCalculated" x-transition class="card border border-primary bg-white shadow-sm mb-0">
+                                <div class="card-header bg-soft-primary border-bottom py-2.5 px-3 d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold text-primary fs-12 text-uppercase font-monospace">
+                                        <i class="feather-activity me-1"></i>Simulated BOM Cost Scenario
+                                    </span>
+                                    <div class="d-flex gap-1.5">
+                                        <span class="badge bg-primary text-white fs-10" x-text="results.altOpsSelected + ' Alt Route(s)'"></span>
+                                        <span class="badge bg-warning text-dark fs-10" x-text="results.altMatsSelected + ' Alt Material(s)'"></span>
+                                    </div>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <div class="p-3 bg-soft-primary rounded border border-primary">
+                                                <div class="text-primary fs-10 text-uppercase fw-bold">Simulated Direct Total (Catalog Basis)</div>
+                                                <div class="d-flex justify-content-between align-items-baseline mt-1">
+                                                    <span class="fs-20 fw-bold text-primary font-monospace" x-text="currencySym + fmt4(results.directTotal)"></span>
+                                                    <span class="fs-12 text-primary font-monospace" x-text="currencySym + fmt4(results.directCostPerUnit) + ' / unit'"></span>
+                                                </div>
+                                                <div class="mt-1 fs-11">
+                                                    <template x-if="Math.abs(results.directDelta) < 0.0001">
+                                                        <span class="badge bg-soft-secondary text-secondary">Identical to Primary Baseline</span>
+                                                    </template>
+                                                    <template x-if="results.directDelta <= -0.0001">
+                                                        <span class="badge bg-soft-success text-success font-monospace fw-bold" x-text="'Saves ' + currencySym + fmt4(Math.abs(results.directDelta)) + ' vs Baseline'"></span>
+                                                    </template>
+                                                    <template x-if="results.directDelta >= 0.0001">
+                                                        <span class="badge bg-soft-danger text-danger font-monospace fw-bold" x-text="'+' + currencySym + fmt4(results.directDelta) + ' vs Baseline'"></span>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="p-3 bg-soft-info rounded border border-info">
+                                                <div class="text-info fs-10 text-uppercase fw-bold">Simulated Rolled-Up Total (Multi-Level Basis)</div>
+                                                <div class="d-flex justify-content-between align-items-baseline mt-1">
+                                                    <span class="fs-20 fw-bold text-info font-monospace" x-text="currencySym + fmt4(results.rolledTotal)"></span>
+                                                    <span class="fs-12 text-info font-monospace" x-text="currencySym + fmt4(results.rolledCostPerUnit) + ' / unit'"></span>
+                                                </div>
+                                                <div class="mt-1 fs-11">
+                                                    <template x-if="Math.abs(results.rolledDelta) < 0.0001">
+                                                        <span class="badge bg-soft-secondary text-secondary">Identical to Rolled-Up Baseline</span>
+                                                    </template>
+                                                    <template x-if="results.rolledDelta <= -0.0001">
+                                                        <span class="badge bg-soft-success text-success font-monospace fw-bold" x-text="'Saves ' + currencySym + fmt4(Math.abs(results.rolledDelta)) + ' vs Baseline'"></span>
+                                                    </template>
+                                                    <template x-if="results.rolledDelta >= 0.0001">
+                                                        <span class="badge bg-soft-danger text-danger font-monospace fw-bold" x-text="'+' + currencySym + fmt4(results.rolledDelta) + ' vs Baseline'"></span>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 text-center">
+                                        <div class="col-6 col-md-3">
+                                            <div class="p-2 bg-light rounded border">
+                                                <span class="text-muted fs-10 text-uppercase d-block">Direct Materials</span>
+                                                <span class="fw-bold text-dark font-monospace" x-text="currencySym + fmt4(results.directMaterial)"></span>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <div class="p-2 bg-light rounded border">
+                                                <span class="text-muted fs-10 text-uppercase d-block">Scrap Loss</span>
+                                                <span class="fw-bold text-danger font-monospace" x-text="currencySym + fmt4(results.scrapCost)"></span>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <div class="p-2 bg-light rounded border">
+                                                <span class="text-muted fs-10 text-uppercase d-block">Routing (Labor+Mach+Sub)</span>
+                                                <span class="fw-bold text-dark font-monospace" x-text="currencySym + fmt4(results.routingCost)"></span>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <div class="p-2 bg-light rounded border">
+                                                <span class="text-muted fs-10 text-uppercase d-block">Setup Cost / Run</span>
+                                                <span class="fw-bold text-warning font-monospace" x-text="currencySym + fmt4(results.setupCostPerRun)"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer bg-white border-top py-2 px-4 d-flex justify-content-end">
+                            <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
 
     <script>
+        window.fmt4 = function (v) {
+            const n = Math.round((parseFloat(v) || 0) * 10000) / 10000;
+            return Number.isInteger(n) ? String(n) : n.toFixed(4);
+        };
+
+        function toggleBomExplosionNode(nodeId) {
+            const row = document.querySelector('tr.bom-exp-row[data-node-id="' + nodeId + '"]');
+            if (!row) return;
+            const isExpanded = row.getAttribute('data-expanded') === 'true';
+            if (isExpanded) {
+                collapseExplosionSubtree(nodeId);
+            } else {
+                row.setAttribute('data-expanded', 'true');
+                setExplosionChevron(row, true);
+                document.querySelectorAll('tr.bom-exp-row[data-parent-id="' + nodeId + '"]').forEach(child => {
+                    child.classList.remove('d-none');
+                });
+            }
+        }
+
+        function collapseExplosionSubtree(nodeId) {
+            const row = document.querySelector('tr.bom-exp-row[data-node-id="' + nodeId + '"]');
+            if (row) {
+                row.setAttribute('data-expanded', 'false');
+                setExplosionChevron(row, false);
+            }
+            document.querySelectorAll('tr.bom-exp-row[data-parent-id="' + nodeId + '"]').forEach(child => {
+                child.classList.add('d-none');
+                const childId = child.getAttribute('data-node-id');
+                if (childId && child.getAttribute('data-has-children') === '1') {
+                    collapseExplosionSubtree(childId);
+                }
+            });
+        }
+
+        function setExplosionChevron(row, expanded) {
+            const btn = row.querySelector('.bom-exp-toggle');
+            if (!btn) return;
+            btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            const icon = btn.querySelector('i');
+            if (!icon) return;
+            icon.classList.toggle('feather-chevron-down', expanded);
+            icon.classList.toggle('feather-chevron-right', !expanded);
+        }
+
+        function expandAllBomExplosion() {
+            document.querySelectorAll('tr.bom-exp-row').forEach(row => {
+                row.classList.remove('d-none');
+                if (row.getAttribute('data-has-children') === '1') {
+                    row.setAttribute('data-expanded', 'true');
+                    setExplosionChevron(row, true);
+                }
+            });
+        }
+
+        function collapseBomExplosionToL2() {
+            document.querySelectorAll('tr.bom-exp-row').forEach(row => {
+                const lvl = parseInt(row.getAttribute('data-level') || '1', 10);
+                if (lvl > 2) {
+                    row.classList.add('d-none');
+                } else {
+                    row.classList.remove('d-none');
+                }
+                if (row.getAttribute('data-has-children') === '1') {
+                    const expanded = lvl === 1;
+                    row.setAttribute('data-expanded', expanded ? 'true' : 'false');
+                    setExplosionChevron(row, expanded);
+                }
+            });
+        }
+
+        function bomCostSimulator(data) {
+            return {
+                stages: data?.stages || [],
+                ops: data?.operations || {},
+                baseline: data?.baseline || {},
+                baseQty: parseFloat(data?.base_quantity || 1) || 1,
+                currencySym: data?.currency_symbol || '₹',
+                selectedOps: {},
+                selectedMats: {},
+                hasCalculated: false,
+                results: {
+                    directMaterial: 0,
+                    scrapCost: 0,
+                    laborCost: 0,
+                    machineCost: 0,
+                    subcontractCost: 0,
+                    routingCost: 0,
+                    setupCostPerRun: 0,
+                    directTotal: 0,
+                    directCostPerUnit: 0,
+                    directDelta: 0,
+                    rolledRawMaterial: 0,
+                    rolledSubRouting: 0,
+                    rolledTotal: 0,
+                    rolledCostPerUnit: 0,
+                    rolledSetup: 0,
+                    rolledDelta: 0,
+                    altOpsSelected: 0,
+                    altMatsSelected: 0
+                },
+
+                init() {
+                    this.resetToPrimary();
+                },
+
+                resetToPrimary() {
+                    this.selectedOps = {};
+                    this.selectedMats = {};
+                    this.stages.forEach(st => {
+                        this.selectedOps['stage_' + st.primary_id] = st.primary_id;
+                    });
+                    Object.values(this.ops).forEach(op => {
+                        (op.material_slots || []).forEach(slot => {
+                            this.selectedMats[slot.slot_key] = slot.primary_id;
+                        });
+                    });
+                    this.hasCalculated = false;
+                },
+
+                activeOpForStage(stage) {
+                    const id = this.selectedOps['stage_' + stage.primary_id] ?? stage.primary_id;
+                    return this.ops[id] || this.ops[stage.primary_id] || { material_slots: [], operation_number: '' };
+                },
+
+                selectOp(stagePrimaryId, opId) {
+                    this.selectedOps['stage_' + stagePrimaryId] = opId;
+                    this.hasCalculated = false;
+                },
+
+                selectedMatForSlot(slot) {
+                    return this.selectedMats[slot.slot_key] ?? slot.primary_id;
+                },
+
+                selectMat(slotKey, matId) {
+                    this.selectedMats[slotKey] = matId;
+                    this.hasCalculated = false;
+                },
+
+                runCalculations() {
+                    let directMaterial = 0, scrapCost = 0, labor = 0, machine = 0, subcontract = 0, setupRun = 0;
+                    let rolledRaw = 0, rolledSubRouting = 0, rolledSubSetup = 0;
+                    let altOpsSelected = 0, altMatsSelected = 0;
+
+                    this.stages.forEach(st => {
+                        const op = this.activeOpForStage(st);
+                        if (!op) return;
+                        labor += parseFloat(op.labor_cost || 0);
+                        machine += parseFloat(op.machine_cost || 0);
+                        subcontract += parseFloat(op.subcontract_cost || 0);
+                        setupRun += parseFloat(op.setup_cost_per_run || 0);
+                        if (op.is_alternative) altOpsSelected++;
+
+                        (op.material_slots || []).forEach(slot => {
+                            const chosenId = this.selectedMatForSlot(slot);
+                            const mOpt = (slot.options || []).find(o => String(o.id) === String(chosenId)) || (slot.options || [])[0];
+                            if (!mOpt) return;
+                            directMaterial += parseFloat(mOpt.direct_cost || 0);
+                            scrapCost += parseFloat(mOpt.scrap_cost || 0);
+                            rolledRaw += parseFloat(mOpt.rollup_raw_material_cost || 0);
+                            rolledSubRouting += parseFloat(mOpt.rollup_sub_routing_cost || 0);
+                            rolledSubSetup += parseFloat(mOpt.rollup_sub_setup_per_run || 0);
+                            if (mOpt.is_alternative) altMatsSelected++;
+                        });
+                    });
+
+                    const routingCost = labor + machine + subcontract;
+                    const directTotal = directMaterial + routingCost;
+                    const rolledTotal = rolledRaw + routingCost + rolledSubRouting;
+
+                    this.results = {
+                        directMaterial,
+                        scrapCost,
+                        laborCost: labor,
+                        machineCost: machine,
+                        subcontractCost: subcontract,
+                        routingCost,
+                        setupCostPerRun: setupRun,
+                        directTotal,
+                        directCostPerUnit: this.baseQty > 0 ? (directTotal / this.baseQty) : 0,
+                        directDelta: directTotal - parseFloat(this.baseline.direct_total || 0),
+                        rolledRawMaterial: rolledRaw,
+                        rolledSubRouting,
+                        rolledTotal,
+                        rolledCostPerUnit: this.baseQty > 0 ? (rolledTotal / this.baseQty) : 0,
+                        rolledSetup: setupRun + rolledSubSetup,
+                        rolledDelta: rolledTotal - parseFloat(this.baseline.rolled_total || 0),
+                        altOpsSelected,
+                        altMatsSelected
+                    };
+
+                    this.hasCalculated = true;
+                }
+            };
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.location.hash === '#tab-explosion' || new URLSearchParams(window.location.search).has('calc_qty')) {
+                document.querySelector('#tab-explosion-tab')?.click();
+            }
+        });
+
         function deleteDraftBom() {
             var message = '{{ addslashes(__('production.confirm_delete_bom') ?: 'Are you sure you want to delete this draft BOM?') }}';
             var options = {

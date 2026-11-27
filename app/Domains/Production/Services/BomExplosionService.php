@@ -180,6 +180,8 @@ class BomExplosionService
             $childTree['gross_quantity'] = $grossQty;
             $childTree['material_scrap_percentage'] = $scrapPct;
             $childTree['is_alternative'] = $isAlternative;
+            $childTree['is_alternative_operation'] = !$legacy && (bool) ($item->routingOperation?->is_alternative);
+            $childTree['operation_number'] = $legacy ? null : $item->routingOperation?->operation_number;
             $childTree['replaces_item_id'] = $legacy ? null : $item->replaces_routing_material_id;
             $childTree['priority'] = (!$legacy && $item->is_alternative) ? $item->priority : null;
             $childTree['operation_sequence'] = $legacy ? null : $item->routingOperation?->sequence;

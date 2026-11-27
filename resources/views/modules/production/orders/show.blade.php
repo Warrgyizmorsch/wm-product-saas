@@ -972,7 +972,10 @@
                                         <div class="card shadow-sm border p-3 bg-soft-warning h-100">
                                             <span class="fs-11 text-uppercase text-warning fw-bold">{{ __('production.vendor_wip_status') }}</span>
                                             @php
-                                                $vendorWipUnits = $order->wips->where('currentRoutingOperation.is_external', true)->sum('quantity_available');
+                                                // H-06: units still with vendors = sent on dispatch slips − received back (all outsourced operations)
+                                                $vendorWipUnits = (float) \App\Domains\Production\Models\DeliveryChallan::where('production_order_id', $order->id)
+                                                    ->whereIn('status', \App\Domains\Production\Models\DeliveryChallan::AT_VENDOR_STATUSES)
+                                                    ->get()->sum(fn ($c) => $c->unitsAtVendor());
                                             @endphp
                                             <div class="fs-18 fw-bold text-dark mt-1">{{ number_format($vendorWipUnits, 2) }} <small
                                                     class="fs-12 text-muted">{{ __('production.units_at_vendor') }}</small></div>
@@ -1006,24 +1009,30 @@
                                             <tbody>
                                                 @forelse($order->operations->where('is_external', true) as $extOp)
                                                     @php
-                                                        $poItem = $extOp->purchaseOrderItem ?? \App\Domains\Purchase\Models\PurchaseOrderItem::where('production_order_operation_id', $extOp->id)->first();
-                                                        $po = $poItem?->purchaseOrder ?? $extOp->purchaseOrder;
-                                                        $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::whereHas('requisition', function ($q) use ($order) {
-                                                            $q->whereIn('source_type', ['mo', 'ProductionOrder'])->where('source_id', $order->id);
-                                                        })->first();
-                                                        $pr = $prItem?->requisition ?? \App\Domains\Purchase\Models\PurchaseRequisition::whereIn('source_type', ['mo', 'ProductionOrder'])->where('source_id', $order->id)->first();
+                                                        // N-16: the PR / PO of THIS operation (operation link; cancelled ones never count)
+                                                        $poItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('production_order_operation_id', $extOp->id)
+                                                            ->whereHas('order', fn ($q) => $q->where('status', '!=', 'Cancelled'))->latest('id')->first();
+                                                        $po = $poItem?->order;
+                                                        $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::where('production_order_operation_id', $extOp->id)
+                                                            ->whereHas('requisition', fn ($q) => $q->where('status', '!=', 'Cancelled'))->latest('id')->first();
+                                                        $pr = $prItem?->requisition;
 
-                                                        $opWips = $order->wips->where('current_routing_operation_id', $extOp->id);
-                                                        $sentQty = $extOp->quantity_transferred_out ?? 0;
-                                                        $atVendorQty = $opWips->sum('quantity_available');
+                                                        // H-06: quantities from the dispatch slips and receipts of this operation
+                                                        $scBalance = $matBalanceService->getMaterialBalance($order->tenant_id, $order->id, $extOp->id);
+                                                        $sentQty = $scBalance['units_sent'];
+                                                        $atVendorQty = $scBalance['units_at_vendor'];
                                                         $receivedQty = $extOp->quantity_produced ?? 0;
                                                         $rejectedQty = $extOp->quantity_rejected ?? 0;
                                                         $scrappedQty = $extOp->quantity_scrapped ?? 0;
-                                                        $qcPending = $order->wips->where('current_routing_operation_id', $extOp->id)->where('status', 'quality_hold')->sum('quantity_available');
+                                                        $qcPending = (float) \App\Domains\Production\Models\ProductionSubcontractReceipt::where('production_order_operation_id', $extOp->id)
+                                                            ->where('status', 'qc_pending')->get()
+                                                            ->sum(fn ($r) => max(0, $r->received_qty - $r->scrapped_qty - $r->rejected_qty - $r->accepted_qty));
 
-                                                        $plannedDispatch = $order->start_date ? \Carbon\Carbon::parse($order->start_date)->subDays($extOp->dispatch_buffer_days ?? 0)->format('d/m/Y') : '—';
+                                                        // H-02 / N-18: dates from the operation's scheduled start (one rule, SubcontractDates)
+                                                        $scDates = app(\App\Domains\Production\Services\SubcontractDates::class);
+                                                        $plannedDispatch = $scDates->leavesPlant($extOp)->format('d/m/Y');
                                                         $actualDispatch = $extOp->actual_start_time ? $extOp->actual_start_time->format('d/m/Y H:i') : '—';
-                                                        $expectedReturn = $order->start_date ? \Carbon\Carbon::parse($order->start_date)->addDays(($extOp->subcontract_lead_time_days ?? 0) + ($extOp->return_buffer_days ?? 0))->format('d/m/Y') : '—';
+                                                        $expectedReturn = $scDates->expectedReturnDate($extOp)->format('d/m/Y');
                                                         $actualReturn = $extOp->actual_end_time ? $extOp->actual_end_time->format('d/m/Y H:i') : '—';
                                                     @endphp
                                                     <tr>
@@ -1074,15 +1083,16 @@
                                                                 <div class="mb-1"><span
                                                                         class="badge bg-soft-secondary text-secondary">{{ __('production.awaiting_pr') }}</span>
                                                                 </div>
-                                                                @if($canPurchase && \Illuminate\Support\Facades\Route::has('production.orders.generate-subcontract-pr'))
+                                                                @if(!$po && $canPurchase && \Illuminate\Support\Facades\Route::has('production.orders.generate-subcontract-pr'))
+                                                                    {{-- D-4 / TF-05: the only way subcontract purchasing is raised (PR / Draft PO / Approved PO per Settings) --}}
                                                                     <form
                                                                         action="{{ route('production.orders.generate-subcontract-pr', ['order' => $order->id, 'operation' => $extOp->id]) }}"
                                                                         method="POST" class="d-inline">
                                                                         @csrf
                                                                         <button type="submit"
                                                                             class="btn btn-xs btn-outline-primary py-0.5 px-1.5 shadow-sm"
-                                                                            title="Generate Purchase Requisition">
-                                                                            <i class="feather-plus-circle me-1"></i> {{ __('production.generate_pr') }}
+                                                                            title="Raise the subcontract PR / PO for this operation (follows Production → Settings)">
+                                                                            <i class="feather-plus-circle me-1"></i> Raise PR / PO
                                                                         </button>
                                                                     </form>
                                                                 @endif
@@ -1108,7 +1118,7 @@
                                                         </td>
                                                         <td class="align-top fs-11 font-monospace">
                                                             @php
-                                                                $expectedReturnDate = $order->start_date ? \Carbon\Carbon::parse($order->start_date)->addDays(($extOp->subcontract_lead_time_days ?? 0) + ($extOp->return_buffer_days ?? 0)) : null;
+                                                                $expectedReturnDate = $scDates->expectedReturnDate($extOp);
                                                                 $isOverdue = $expectedReturnDate && $expectedReturnDate->isPast() && !in_array($extOp->status, ['completed', 'cancelled']);
                                                                 $isDueToday = $expectedReturnDate && $expectedReturnDate->isToday() && !in_array($extOp->status, ['completed', 'cancelled']);
                                                             @endphp
@@ -1196,28 +1206,25 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    @forelse($order->operations->where('is_external', true)->reject(fn($op) => $op->isWipJobWork())->filter(fn($op) => ($op->material_supply_type ?? 'company_supplied') === 'company_supplied') as $extOp)
-                                                        @php
-                                                            $bal = $matBalanceService->getMaterialBalance($order->tenant_id, $order->id, $extOp->id);
-                                                        @endphp
+                                                    @php
+                                                        // TF-04: one row per material actually sent, per outsourced operation (from the dispatch slips)
+                                                        $materialBalanceRows = $order->operations->where('is_external', true)->flatMap(function ($extOp) use ($matBalanceService, $order) {
+                                                            return collect($matBalanceService->getMaterialBalance($order->tenant_id, $order->id, $extOp->id)['lines'])
+                                                                ->where('item_type', 'material')
+                                                                ->map(fn ($line) => $line + ['op' => $extOp]);
+                                                        });
+                                                    @endphp
+                                                    @forelse($materialBalanceRows as $line)
                                                         <tr>
-                                                            <td class="fw-bold text-dark">{{ $extOp->operation_number }} —
-                                                                {{ $extOp->name }}
+                                                            <td class="fw-bold text-dark">{{ $line['op']->operation_number }} — {{ $line['op']->name }}
+                                                                <div class="fs-10 text-muted">{{ $line['op']->vendor?->name }}</div>
                                                             </td>
-                                                            <td>{{ $order->product->name }} (Component/Raw)</td>
-                                                            <td class="text-end font-monospace">{{ number_format($bal['sent'], 2) }}</td>
-                                                            <td class="text-end font-monospace text-success">
-                                                                {{ number_format($bal['consumed'], 2) }}
-                                                            </td>
-                                                            <td class="text-end font-monospace text-info">
-                                                                {{ number_format($bal['returned'], 2) }}
-                                                            </td>
-                                                            <td class="text-end font-monospace text-danger">
-                                                                {{ number_format($bal['scrapped'], 2) }}
-                                                            </td>
-                                                            <td class="text-end font-monospace fw-bold text-warning">
-                                                                {{ number_format($bal['remaining'], 2) }}
-                                                            </td>
+                                                            <td>{{ $line['name'] }} <span class="text-muted text-uppercase fs-10">{{ $line['uom'] }}</span></td>
+                                                            <td class="text-end font-monospace">{{ number_format($line['sent'], 4) }}</td>
+                                                            <td class="text-end font-monospace text-success">{{ number_format($line['consumed'], 4) }}</td>
+                                                            <td class="text-end font-monospace text-info">{{ number_format($line['returned'], 4) }}</td>
+                                                            <td class="text-end font-monospace text-danger">{{ number_format($line['scrapped'], 4) }}</td>
+                                                            <td class="text-end font-monospace fw-bold text-warning">{{ number_format($line['at_vendor'] ?? 0, 4) }}</td>
                                                         </tr>
                                                     @empty
                                                         <tr>

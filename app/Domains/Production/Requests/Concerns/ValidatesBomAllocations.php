@@ -173,6 +173,9 @@ trait ValidatesBomAllocations
             'items.*.priority'                  => 'nullable|integer|min:1',
             'items.*.sequence'                  => 'nullable|integer|min:1',
             'items.*.notes'                     => 'nullable|string|max:1000',
+            'items.*.supplied_by'               => 'nullable|in:company,vendor', // TF-02
+            'operation_input_flags'             => 'nullable|array',          // TF-01 {routing_operation_id: 0|1}
+            'operation_input_flags.*'           => 'nullable|boolean',
         ];
     }
 

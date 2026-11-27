@@ -24,8 +24,9 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The engineering side of the test production dataset (docs/production_seeder_audit_2026-11-26.md, SR-06):
- * 9 routings and 13 BOM rows (12 products; test-semi-04 has two versions).
+ * The engineering side of the test production dataset (docs/production_seeder_audit_2026-11-26.md, SR-06 / SR-10):
+ * 12 routings and 17 BOM rows (16 products; test-semi-04 has two versions). Routings 010–012 and the last four BOMs
+ * are the subcontract examples (Part C): outsourced operations in every mode, with and without QC.
  *
  * Only the inputs are data, written with codes (section TEST-SEC-1, machine TEST-MAH-5, batch test-batch-1, material
  * test-raw-01, plan name …). Everything derived is produced by the application's own code, as in NonWovenPlantSeeder:
@@ -106,9 +107,20 @@ class TestProductionEngineeringSeeder extends Seeder
         $previousPrimary = null; // nearest earlier non-alternative operation
 
         foreach ($operations as $data) {
-            $section = WorkCenterSection::withoutGlobalScopes()->where('tenant_id', $this->tenantId)->where('code', $data['section'])->firstOrFail();
             $opNumber = 'OP-' . str_pad((string) $data['seq'], 3, '0', STR_PAD_LEFT);
             $primary = isset($data['alt_of']) ? ($created[$data['alt_of']] ?? throw new \RuntimeException("{$routing->routing_number} {$opNumber}: alternative of an unknown operation {$data['alt_of']}.")) : null;
+
+            if (isset($data['external'])) {
+                $model = RoutingOperation::create($this->outsourcedOperation($routing, $data, $opNumber, $primary, $previousPrimary, $calculator));
+                $this->linkQualityPlans($model, null, $data['qc'] ?? []);
+                $created[$data['seq']] = $model;
+                if ($primary === null) {
+                    $previousPrimary = $model;
+                }
+                continue;
+            }
+
+            $section = WorkCenterSection::withoutGlobalScopes()->where('tenant_id', $this->tenantId)->where('code', $data['section'])->firstOrFail();
 
             $op = [
                 'tenant_id' => $this->tenantId,
@@ -162,11 +174,84 @@ class TestProductionEngineeringSeeder extends Seeder
     }
 
     /**
+     * An outsourced operation, saved the way RoutingOperationDTO saves one from the routing form: type 'outsourcing',
+     * no work centre / section / machine / batch, no setup or run time; vendor, service product, rate per unit, supply
+     * type, processing mode, lead time and buffers. WIP job work ('previous_operation_wip') is saved 'company_supplied',
+     * as the form does (its supply select is hidden but posted). Cost per unit = rate × 100 ÷ yield % (the calculator's
+     * outsourced branch), resource snapshot type 'outsourced'. Checked with the routing validator's subcontract rules
+     * (M-02): active vendor, active service product, no WIP job work on the first operation, no negative days.
+     */
+    private function outsourcedOperation(Routing $routing, array $data, string $opNumber, ?RoutingOperation $primary, ?RoutingOperation $previousPrimary, RoutingOperationCostCalculator $calculator): array
+    {
+        $ext = $data['external'];
+        $where = "{$routing->routing_number} {$opNumber}";
+        $vendorId = $this->links->vendorId($ext['vendor']);
+        if (strcasecmp((string) DB::table('vendors')->where('id', $vendorId)->value('status'), 'active') !== 0) {
+            throw new \RuntimeException("{$where}: vendor {$ext['vendor']} is not active.");
+        }
+        $serviceId = $this->links->productId($ext['service']);
+        $service = DB::table('products')->where('id', $serviceId)->first(['type', 'item_type', 'status']);
+        if (strcasecmp((string) $service->type, 'service') !== 0 || strcasecmp((string) $service->status, 'active') !== 0) {
+            throw new \RuntimeException("{$where}: {$ext['service']} is not an active service product.");
+        }
+        $input = $ext['input'] ?? 'bom_raw_materials';
+        $previousId = $primary ? $primary->previous_operation_id : $previousPrimary?->id;
+        if ($input === 'previous_operation_wip' && $previousId === null) {
+            throw new \RuntimeException("{$where}: the first operation has no previous operation to send to the vendor.");
+        }
+
+        $op = [
+            'tenant_id' => $this->tenantId,
+            'routing_id' => $routing->id,
+            'sequence' => $data['seq'],
+            'operation_number' => $opNumber,
+            'name' => $data['name'],
+            'operation_type' => RoutingOperation::TYPE_OUTSOURCING, // RoutingOperationDTO: an outsourced op is always 'outsourcing'
+            'work_center_id' => null,
+            'section_id' => null,
+            'machine_id' => null,
+            'section_manual_production_id' => null,
+            'is_alternative' => $primary !== null,
+            'replaces_operation_id' => $primary?->id,
+            'priority' => 1,
+            'previous_operation_id' => $previousId,
+            'setup_time_minutes' => 0,
+            'setup_time_per_piece_minutes' => null,
+            'processing_time_minutes' => 0,
+            'wait_time_minutes' => 0,
+            'expected_yield_percentage' => (float) ($data['yield'] ?? 100),
+            'quality_required' => !empty($data['qc']),
+            'is_external' => true,
+            'vendor_id' => $vendorId,
+            'subcontract_service_product_id' => $serviceId,
+            'subcontract_cost_per_unit' => (float) $ext['rate'],
+            'material_supply_type' => $input === 'previous_operation_wip' ? 'company_supplied' : ($ext['supply'] ?? 'company_supplied'),
+            'subcontract_input_type' => $input,
+            'subcontract_lead_time_days' => (int) $ext['lead'],
+            'dispatch_buffer_days' => (int) ($ext['dispatch_buffer'] ?? 0),
+            'return_buffer_days' => (int) ($ext['return_buffer'] ?? 0),
+        ];
+
+        $result = $calculator->calculate($op, null);
+        foreach (RoutingOperationCostCalculator::FIELDS as $field) {
+            $op[$field] = $result['figures'][$field] ?? 0;
+        }
+        $op['resource_snapshot'] = $calculator->buildResourceSnapshot($op, null, null);
+        $op['section_calculation_id'] = null;
+        $op['section_snapshot_number'] = null;
+        $op['work_center_calculation_id'] = null;
+        $op['costs_calculated_at'] = now();
+
+        return $op;
+    }
+
+    /**
      * QR-15 / QR-16: the gate (quality_required) is on, the mapping table holds the plans with their Mandatory flag.
      * Same rules as ValidatesRoutingOperations::validateRoutingOperationQualityPlans — approved section plans of the
      * operation's own section or process plans — except a link marked 'outdated', the SD-02 demo of an old version.
+     * An outsourced operation ($section null) can only carry process plans.
      */
-    private function linkQualityPlans(RoutingOperation $op, WorkCenterSection $section, array $links): void
+    private function linkQualityPlans(RoutingOperation $op, ?WorkCenterSection $section, array $links): void
     {
         foreach (array_values($links) as $i => $link) {
             $query = ProductionQualityPlan::where('tenant_id', $this->tenantId)->where('name', $link['plan']);
@@ -181,8 +266,8 @@ class TestProductionEngineeringSeeder extends Seeder
             if ($plan->type === ProductionQualityPlan::SCOPE_PRODUCT) {
                 throw new \RuntimeException("Test routing {$where}: product plans cannot be linked to a routing ({$plan->name}).");
             }
-            if ($plan->type === ProductionQualityPlan::SCOPE_SECTION && (int) $plan->section_id !== (int) $section->id) {
-                throw new \RuntimeException("Test routing {$where}: section plan {$plan->name} belongs to another section than {$section->code}.");
+            if ($plan->type === ProductionQualityPlan::SCOPE_SECTION && (int) $plan->section_id !== (int) $section?->id) {
+                throw new \RuntimeException("Test routing {$where}: section plan {$plan->name} " . ($section ? "belongs to another section than {$section->code}." : 'cannot be linked to an outsourced operation (no section).'));
             }
             if (!$plan->isApproved() && empty($link['outdated'])) {
                 throw new \RuntimeException("Test routing {$where}: quality plan {$plan->name} v{$plan->version} is not approved.");
@@ -228,7 +313,7 @@ class TestProductionEngineeringSeeder extends Seeder
                 'tenant_id' => $this->tenantId,
                 'bom_number' => $data['bom_number'],
                 'bom_name' => $data['name'],
-                'bom_type' => 'manufacturing',
+                'bom_type' => $data['bom_type'] ?? 'manufacturing',
                 'usage_context' => 'manufacturing',
                 'product_id' => $productId,
                 'routing_id' => $routing->id,
@@ -240,6 +325,7 @@ class TestProductionEngineeringSeeder extends Seeder
                 'effective_date' => now()->toDateString(),
                 'status' => 'draft',
                 'has_warning' => false,
+                'operation_input_flags' => $this->operationInputFlags($routing),
                 'created_by' => $this->userId,
             ]);
             $this->bomLog($bom, 'Created', 'Initial BOM draft created.');
@@ -257,6 +343,20 @@ class TestProductionEngineeringSeeder extends Seeder
         }
 
         return $count;
+    }
+
+    /**
+     * TF-01 "Previous OP materials": the BOM form posts a flag for every operation of the routing (hidden input per
+     * card), so a saved BOM always holds one. Same default as the form: on for an operation that has a predecessor
+     * and is not parallel, off for the first operation.
+     *
+     * @return array<string, bool> routing_operation_id => uses the previous operation's output
+     */
+    private function operationInputFlags(Routing $routing): array
+    {
+        return RoutingOperation::where('routing_id', $routing->id)->orderBy('sequence')->get()
+            ->mapWithKeys(fn (RoutingOperation $op) => [(string) $op->id => !empty($op->previous_operation_id) && !$op->is_parallel])
+            ->all();
     }
 
     /**
@@ -329,12 +429,29 @@ class TestProductionEngineeringSeeder extends Seeder
                 'replaces_routing_material_id' => $replaces?->id,
                 'material_scrap_percentage' => $scrap,
                 'sequence' => $i + 1,
+                // TF-02: what the BOM form saves — 'vendor' when the row is marked Vendor-supplied, and always on an
+                // outsourced operation whose supply type is vendor_supplied (the form's default for those cards)
+                'supplied_by' => $this->suppliedBy($row),
             ]);
 
             if (!$row['is_alternative']) {
                 $byOpAndMaterial[$row['operation']->id . ':' . $row['material_id']] = $allocation;
             }
         }
+    }
+
+    private function suppliedBy(array $row): string
+    {
+        $op = $row['operation'];
+        $vendorSuppliedOp = $op->is_external && $op->material_supply_type === 'vendor_supplied';
+        if (!empty($row['vendor']) && !$op->is_external) {
+            throw new \RuntimeException("Material {$row['material']} on {$op->operation_number}: only an outsourced operation can carry vendor-supplied material.");
+        }
+        if (isset($row['child']) && (!empty($row['vendor']) || $vendorSuppliedOp)) {
+            throw new \RuntimeException("Material {$row['material']} on {$op->operation_number}: a sub-assembly made in-house cannot be vendor-supplied.");
+        }
+
+        return (!empty($row['vendor']) || $vendorSuppliedOp) ? 'vendor' : 'company';
     }
 
     /** BM-08: the sub-BOM link always points at the child's current approved version, made for that material. */
@@ -380,8 +497,9 @@ class TestProductionEngineeringSeeder extends Seeder
     }
 
     /**
-     * 9 routings. Operations: section code, one machine (code) or one manual batch (name), setup per run / per piece in
-     * minutes, yield %, 'alt_of' = the primary's sequence, 'qc' = linked plans in order (mandatory first).
+     * 12 routings. Operations: section code, one machine (code) or one manual batch (name), setup per run / per piece in
+     * minutes, yield %, 'alt_of' = the primary's sequence, 'qc' = linked plans in order (mandatory first); an outsourced
+     * operation has 'external' instead of section / machine / batch.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -391,6 +509,7 @@ class TestProductionEngineeringSeeder extends Seeder
         $visual = 'Visual surface check — general';
         $safety = 'Safety & sharp-edge check — general';
         $cleanliness = 'Cleanliness check — general';
+        $subcontractReceipt = 'Subcontract receipt check — general';
 
         return [
             ['routing_number' => 'RTG-2026-000001', 'name' => 'Tube Cutting & Deburring', 'description' => 'Steel tube cut to length (cold saw, plasma as alternative) and deburred.', 'operations' => [
@@ -438,12 +557,53 @@ class TestProductionEngineeringSeeder extends Seeder
                     ['plan' => $dimensional, 'mandatory' => true],
                 ]],
             ]],
+
+            // ── Subcontract examples (Part C of the doc). 'external' = outsourced operation: vendor code, service
+            // product SKU, rate per unit (₹, before yield), supply type, processing mode, lead time + buffers in days.
+            // An outsourced operation has no section, so its QC can only be process plans.
+
+            // two job works with different vendors in one routing: raw material sent to the laser cutter (first
+            // operation), in-house deburr, then the deburred plates go to the plater (WIP job work, last operation)
+            ['routing_number' => 'RTG-2026-000010', 'name' => 'Gusset Plate: Job-Work Laser Cutting & Zinc Plating', 'description' => 'CRCA sheet sent to the laser cutter, plates deburred in-house, then zinc plated by a second vendor.', 'operations' => [
+                ['seq' => 10, 'name' => 'Laser cutting — job work', 'yield' => 98, 'external' => [
+                    'vendor' => 'VEND-JW-LASER', 'service' => 'test-srv-laser', 'rate' => 18, 'supply' => 'company_supplied', 'input' => 'bom_raw_materials',
+                    'lead' => 2, 'dispatch_buffer' => 1, 'return_buffer' => 1,
+                ], 'qc' => self::qc([$subcontractReceipt], [$dimensional])],
+                ['seq' => 20, 'name' => 'Deburr plates', 'section' => 'TEST-SEC-3', 'batch' => 'test-batch-1', 'setup' => 5, 'per_piece' => 0.5, 'qc' => self::qc(['Edge deburr check'])],
+                ['seq' => 30, 'name' => 'Zinc plating — job work', 'external' => [
+                    'vendor' => 'VEND-JW-ZINC', 'service' => 'test-srv-zinc', 'rate' => 12, 'input' => 'previous_operation_wip',
+                    'lead' => 3, 'dispatch_buffer' => 0, 'return_buffer' => 1,
+                ], 'qc' => self::qc(['Zinc plating check — general', $subcontractReceipt])],
+            ]],
+            // fully outsourced: the vendor makes the rail from its own tube and powder — nothing is sent, nothing is
+            // requested from the store; received on the shop floor (MES) only
+            ['routing_number' => 'RTG-2026-000011', 'name' => 'Support Rail: Fully Outsourced (vendor material)', 'description' => 'The vendor makes and coats the rail from its own material; we receive and inspect it.', 'operations' => [
+                ['seq' => 10, 'name' => 'Make & coat support rail — job work', 'external' => [
+                    'vendor' => 'VEND-JW-COAT', 'service' => 'test-srv-rail', 'rate' => 240, 'supply' => 'vendor_supplied', 'input' => 'bom_raw_materials',
+                    'lead' => 4, 'dispatch_buffer' => 0, 'return_buffer' => 1,
+                ], 'qc' => self::qc([$visual])],
+            ]],
+            // in-house welding, the welded frame sent for hot-dip galvanising (WIP job work, QC off), then powder coated
+            // in-house — or, as the alternative, at the coater with our powder sent along (WIP + company material)
+            ['routing_number' => 'RTG-2026-000012', 'name' => 'Outdoor Frame: Weld, Job-Work Galvanising & Coating', 'description' => 'Frame welded in-house, galvanised by a vendor, then powder coated in-house or at a coating vendor.', 'operations' => [
+                ['seq' => 10, 'name' => 'Frame welding', 'section' => 'TEST-SEC-8', 'machine' => 'TEST-MAH-4', 'setup' => 10, 'qc' => self::qc(['Weld inspection'])],
+                ['seq' => 20, 'name' => 'Hot-dip galvanising — job work', 'external' => [
+                    'vendor' => 'VEND-JW-GALVA', 'service' => 'test-srv-galva', 'rate' => 180, 'input' => 'previous_operation_wip',
+                    'lead' => 5, 'dispatch_buffer' => 1, 'return_buffer' => 2,
+                ]],
+                ['seq' => 30, 'name' => 'Powder coating', 'section' => 'TEST-SEC-8', 'machine' => 'TEST-MAH-6', 'setup' => 15, 'qc' => self::qc(['Powder coat inspection'])],
+                ['seq' => 40, 'name' => 'Powder coating — job work', 'alt_of' => 30, 'external' => [
+                    'vendor' => 'VEND-JW-COAT', 'service' => 'test-srv-coat', 'rate' => 110, 'input' => 'previous_operation_wip',
+                    'lead' => 3, 'dispatch_buffer' => 1, 'return_buffer' => 1,
+                ], 'qc' => self::qc([$subcontractReceipt], [$visual])],
+            ]],
         ];
     }
 
     /**
-     * 13 BOM rows, children before parents. Materials: 'op' = routing operation sequence, quantity per 1 unit in the
-     * material's own unit, 'scrap' %, 'alt_of' = the primary material on the same operation, 'child' = sub-BOM number.
+     * 17 BOM rows, children before parents. Materials: 'op' = routing operation sequence, quantity per 1 unit in the
+     * material's own unit, 'scrap' %, 'alt_of' = the primary material on the same operation, 'child' = sub-BOM number,
+     * 'vendor' = Vendor-supplied (outsourced operations only).
      * An alternative operation repeats the materials of its primary.
      *
      * @return array<int, array<string, mixed>>
@@ -533,6 +693,37 @@ class TestProductionEngineeringSeeder extends Seeder
                 ['op' => 20, 'material' => 'test-raw-20', 'qty' => 6],
                 ['op' => 40, 'material' => 'test-raw-21', 'qty' => 1],
                 ['op' => 40, 'material' => 'test-raw-22', 'qty' => 2],
+            ]],
+
+            // ── Subcontract examples (Part C of the doc). 'vendor' => true = the row is marked Vendor-supplied (TF-02);
+            // every row of a vendor_supplied outsourced operation is vendor-supplied by itself.
+            ['bom_number' => 'BOM-TEST-SEMI-09', 'product' => 'test-semi-09', 'name' => 'Laser-cut zinc-plated gusset plate', 'routing' => 'RTG-2026-000010', 'materials' => [
+                ['op' => 10, 'material' => 'test-raw-14', 'qty' => 0.125],                   // 8 plates per sheet: requested, issued, sent to the laser cutter
+                ['op' => 30, 'material' => 'test-raw-25', 'qty' => 0.01, 'vendor' => true],  // the plater's own pre-treatment chemicals
+            ]],
+            ['bom_number' => 'BOM-TEST-SEMI-10', 'product' => 'test-semi-10', 'name' => 'Vendor-made support rail', 'bom_type' => 'subcontracting', 'routing' => 'RTG-2026-000011', 'materials' => [
+                ['op' => 10, 'material' => 'test-raw-01', 'qty' => 0.6],   // vendor's tube (vendor_supplied operation)
+                ['op' => 10, 'material' => 'test-raw-07', 'qty' => 0.05],  // vendor's powder
+            ]],
+            ['bom_number' => 'BOM-TEST-SEMIFINAL-04', 'product' => 'test-semifinal-04', 'name' => 'Galvanised outdoor table frame', 'routing' => 'RTG-2026-000012', 'materials' => [
+                ['op' => 10, 'material' => 'test-semi-01', 'qty' => 4, 'child' => 'BOM-TEST-SEMI-01'],
+                ['op' => 10, 'material' => 'test-semi-09', 'qty' => 4, 'child' => 'BOM-TEST-SEMI-09'],
+                ['op' => 10, 'material' => 'test-semi-10', 'qty' => 2, 'child' => 'BOM-TEST-SEMI-10'],
+                ['op' => 10, 'material' => 'test-raw-12', 'qty' => 0.25],
+                ['op' => 30, 'material' => 'test-raw-07', 'qty' => 0.4],
+                ['op' => 40, 'material' => 'test-raw-07', 'qty' => 0.4],   // the coating job work: our powder goes with the frame
+            ]],
+            ['bom_number' => 'BOM-TEST-FINAL-03', 'product' => 'test-final-03', 'name' => 'Outdoor cafe table 1200×750', 'routing' => 'RTG-2026-000008', 'materials' => [
+                ['op' => 10, 'material' => 'test-semifinal-04', 'qty' => 1, 'child' => 'BOM-TEST-SEMIFINAL-04'],
+                ['op' => 10, 'material' => 'test-semifinal-03', 'qty' => 1, 'child' => 'BOM-TEST-SEMIFINAL-03'],
+                ['op' => 10, 'material' => 'test-raw-23', 'qty' => 1],
+                ['op' => 10, 'material' => 'test-raw-20', 'qty' => 4],
+                ['op' => 20, 'material' => 'test-semifinal-04', 'qty' => 1, 'child' => 'BOM-TEST-SEMIFINAL-04'],
+                ['op' => 20, 'material' => 'test-semifinal-03', 'qty' => 1, 'child' => 'BOM-TEST-SEMIFINAL-03'],
+                ['op' => 20, 'material' => 'test-raw-23', 'qty' => 1],
+                ['op' => 20, 'material' => 'test-raw-20', 'qty' => 4],
+                ['op' => 40, 'material' => 'test-raw-21', 'qty' => 1],
+                ['op' => 40, 'material' => 'test-raw-22', 'qty' => 1],
             ]],
         ];
     }

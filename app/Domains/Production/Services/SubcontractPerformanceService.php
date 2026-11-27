@@ -110,19 +110,22 @@ class SubcontractPerformanceService
         $validLeadTimeOps = 0;
 
         foreach ($completedOps as $op) {
-            // Find latest delivery challan for expected return date
+            // H-08 / N-18: the first real dispatch slip (not a rework re-send) sets the dispatch and expected-back dates;
+            // without a slip, one shared rule (SubcontractDates: buffers + lead time)
             $challan = DeliveryChallan::where('tenant_id', $tenantId)
                 ->where('production_order_operation_id', $op->id)
-                ->latest()
+                ->whereIn('status', DeliveryChallan::SENT_STATUSES)
+                ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'vendor_rework'))
+                ->orderBy('id')
                 ->first();
 
-            $expectedReturn = $challan?->expected_return_date 
+            $expectedReturn = $challan?->expected_return_date
                 ? Carbon::parse($challan->expected_return_date)
-                : ($op->actual_start_time ? Carbon::parse($op->actual_start_time)->addDays($op->subcontract_lead_time_days ?: 1) : null);
+                : ($op->actual_start_time ? app(SubcontractDates::class)->expectedReturnDate($op, Carbon::parse($op->actual_start_time)) : null);
 
             $actualReturn = $op->actual_end_time ? Carbon::parse($op->actual_end_time) : null;
-            $dispatchDate = $challan?->challan_date 
-                ? Carbon::parse($challan->challan_date)
+            $dispatchDate = $challan
+                ? Carbon::parse($challan->dispatched_at ?? $challan->challan_date)
                 : ($op->actual_start_time ? Carbon::parse($op->actual_start_time) : null);
 
             if ($expectedReturn && $actualReturn) {
@@ -138,9 +141,10 @@ class SubcontractPerformanceService
             }
 
             if ($dispatchDate && $actualReturn) {
-                $leadDays = max(0.1, $actualReturn->diffInDays($dispatchDate));
+                // Carbon 3 diffInDays is signed: measure from dispatch to return
+                $leadDays = max(0.1, abs($dispatchDate->diffInDays($actualReturn)));
                 $actualLeadTimesSum += $leadDays;
-                $plannedLeadTimesSum += (float) ($op->subcontract_lead_time_days ?: 1);
+                $plannedLeadTimesSum += (float) app(SubcontractDates::class)->totalDays($op);
                 $validLeadTimeOps++;
             }
         }
@@ -243,7 +247,7 @@ class SubcontractPerformanceService
 
         $this->applyVendorAndProductFilters($query, $filters);
 
-        $ops = $query->with('order')->get(['id', 'production_order_id', 'subcontract_cost_per_unit', 'target_produced_qty']);
+        $ops = $query->with(['order', 'routingOperation'])->get(['id', 'production_order_id', 'routing_operation_id', 'subcontract_cost_per_unit', 'target_produced_qty']);
 
         $plannedCost   = 0.0;
         $committedCost = 0.0;
@@ -252,7 +256,9 @@ class SubcontractPerformanceService
 
         foreach ($ops as $op) {
             $qty = $op->target_produced_qty ?: ($op->order?->quantity_ordered ?: 1.0);
-            $plannedRate = (float) $op->subcontract_cost_per_unit;
+            // M-03: same yield rule as the routing cost (rate × 100 ÷ yield %)
+            $yield = (float) ($op->routingOperation?->expected_yield_percentage ?? 100);
+            $plannedRate = (float) $op->subcontract_cost_per_unit * ($yield > 0 ? 100 / $yield : 1);
             $opPlanned = $plannedRate * $qty;
             $plannedCost += $opPlanned;
 
@@ -274,17 +280,17 @@ class SubcontractPerformanceService
                     $rateVariances[] = (($poRate - $plannedRate) / $plannedRate) * 100;
                 }
 
-                // Vendor Bill actual cost
-                $vendorBillItem = DB::table('vendor_bill_items')
+                // Vendor Bill actual cost — all bill lines for this PO line (several part bills possible)
+                $billLines = DB::table('vendor_bill_items')
                     ->join('vendor_bills', 'vendor_bill_items.vendor_bill_id', '=', 'vendor_bills.id')
                     ->where('vendor_bills.tenant_id', $tenantId)
                     ->where('vendor_bills.purchase_order_id', $poItem->purchase_order_id)
                     ->where('vendor_bill_items.product_id', $poItem->product_id)
-                    ->select('vendor_bill_items.*')
-                    ->first();
+                    ->select('vendor_bill_items.total_amount')
+                    ->get();
 
-                if ($vendorBillItem && isset($vendorBillItem->total_amount)) {
-                    $actualCost += (float) $vendorBillItem->total_amount;
+                if ($billLines->isNotEmpty()) {
+                    $actualCost += (float) $billLines->sum('total_amount');
                 } else {
                     $actualCost += $opCommitted;
                 }
@@ -313,35 +319,37 @@ class SubcontractPerformanceService
      */
     public function getVendorWipMetrics(int $tenantId, array $filters = []): array
     {
+        // H-08 (2026-11-27): what is at the vendor = units on dispatch slips still at the vendor
+        // (units sent − units received), not the op's whole target.
         $query = ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('is_external', true)
-            ->where('status', 'vendor_dispatched');
+            ->whereHas('deliveryChallans', fn ($q) => $q->whereIn('status', DeliveryChallan::AT_VENDOR_STATUSES));
 
         $this->applyVendorAndProductFilters($query, $filters);
 
-        $activeOps = $query->with('order')->get();
+        $activeOps = $query->with(['order.product', 'deliveryChallans' => fn ($q) => $q->whereIn('status', DeliveryChallan::AT_VENDOR_STATUSES)])->get();
         $activeOpsCount = $activeOps->count();
 
         $wipQty = 0.0;
         $wipValue = 0.0;
+        $wipCards = [];
 
         foreach ($activeOps as $op) {
             $order = $op->order;
-            $qty = (float) ($op->target_produced_qty ?: ($order?->quantity_ordered ?: 0.0));
+            $qty = (float) $op->deliveryChallans->sum(fn ($c) => $c->unitsAtVendor());
             $wipQty += $qty;
 
-            // Fetch accumulated WIP card value
-            $wipCardValue = ProductionWip::where('tenant_id', $tenantId)
-                ->where('production_order_id', $op->production_order_id)
-                ->sum('total_value');
-
-            if ($wipCardValue > 0) {
-                $wipValue += (float) $wipCardValue;
-            } else {
-                // Estimate based on unit cost + subcontract rate
-                $unitEst = ((float) $op->subcontract_cost_per_unit) + ($order?->product?->unit_cost ?? 10.0);
-                $wipValue += ($unitEst * $qty);
+            // Value per unit from the order's WIP card (read once per order, no double count across ops)
+            if (!array_key_exists($op->production_order_id, $wipCards)) {
+                $card = ProductionWip::where('tenant_id', $tenantId)
+                    ->where('production_order_id', $op->production_order_id)
+                    ->selectRaw('COALESCE(SUM(total_value),0) as v, COALESCE(SUM(quantity),0) as q')
+                    ->first();
+                $wipCards[$op->production_order_id] = ($card && (float) $card->q > 0) ? ((float) $card->v / (float) $card->q) : null;
             }
+            $unitValue = $wipCards[$op->production_order_id]
+                ?? (float) ($order?->product?->unit_cost ?? 0); // no made-up fallback rate
+            $wipValue += $unitValue * $qty;
         }
 
         return [
@@ -414,12 +422,13 @@ class SubcontractPerformanceService
             $isPR = $po->purchase_requisition_id !== null;
             $notes = (string) $po->notes;
 
+            // H-08: the orchestrator writes "[Auto-approval skipped: …]" — match case-insensitively
             if ($isPR) {
                 $manualPrPo++;
-            } elseif (str_contains($notes, '[Auto-Approval Skipped:')) {
+            } elseif (stripos($notes, '[Auto-Approval Skipped:') !== false) {
                 $autoDraftPo++;
                 $autoApprovalFallback++;
-                if (preg_match('/\[Auto-Approval Skipped: (.*?)\]/', $notes, $matches)) {
+                if (preg_match('/\[Auto-Approval Skipped: (.*?)\]/i', $notes, $matches)) {
                     $reason = trim($matches[1]);
                     $fallbackReasons[$reason] = ($fallbackReasons[$reason] ?? 0) + 1;
                 }

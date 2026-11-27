@@ -36,6 +36,8 @@ class GoodsReceiptNote extends BaseModel
         'transporter_name',
         'lr_number',
         'status', // Draft, Approved, Cancelled
+        'source_type', // null = Purchase GRN screen; 'subcontract_receipt' = system GRN made by a subcontract receipt (SC-03)
+        'source_id',
         'notes',
         'approved_by',
         'approved_at',

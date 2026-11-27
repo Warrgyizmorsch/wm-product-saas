@@ -623,18 +623,37 @@
                                                                     <i class="feather-check text-white fs-12"></i>
                                                                 </span>
                                                             @endif
-                                                            @if($isVendorSupplied)
-                                                                <button type="button"
-                                                                    class="btn btn-sm btn-info fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
-                                                                    data-bs-toggle="modal" data-bs-target="#completeModal{{ $op->id }}"
-                                                                    title="Record Subcontract Receipt (Vendor Supplied - No Company Material Sent)">
-                                                                    <i class="feather-download-cloud fs-12"></i>{{ __('production.record_subcontract_receipt') }}</button>
-                                                            @else
+                                                            @php
+                                                                // TF-05 / TF-06: PR/PO by button; receipt only when the vendor has the work (or brings everything)
+                                                                $scDoc = app(\App\Domains\Production\Services\SubcontractProcurementOrchestrator::class)->existingDocument($orderOp, (int) $orderOp->tenant_id);
+                                                                $scAtVendor = \App\Domains\Production\Models\DeliveryChallan::where('production_order_operation_id', $orderOp->id)
+                                                                    ->whereIn('status', \App\Domains\Production\Models\DeliveryChallan::AT_VENDOR_STATUSES)->exists();
+                                                                $scCanReceive = !$isCompleted && ($isVendorSupplied || $scAtVendor);
+                                                            @endphp
+                                                            @if(!$scDoc && !$isCompleted)
+                                                                <form method="POST" action="{{ route('production.mes.subcontract-procure', $orderOp->id) }}" class="d-inline">
+                                                                    @csrf
+                                                                    <button type="submit" class="btn btn-sm btn-outline-primary fw-semibold px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 text-nowrap"
+                                                                        title="Raise the subcontract PR / PO for this operation (follows Production → Settings)">
+                                                                        <i class="feather-shopping-cart fs-12"></i>Raise PR / PO</button>
+                                                                </form>
+                                                            @elseif($scDoc)
+                                                                <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-9" title="Subcontract purchasing raised for this operation">
+                                                                    <i class="feather-shopping-cart me-1"></i>{{ $scDoc instanceof \App\Domains\Purchase\Models\PurchaseOrder ? $scDoc->purchase_order_number : $scDoc->requisition_number }} · {{ $scDoc->status }}</span>
+                                                            @endif
+                                                            @unless($isVendorSupplied)
                                                                 <button type="button"
                                                                     class="btn btn-sm btn-purple fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
                                                                     data-bs-toggle="modal" data-bs-target="#manageChallanModal{{ $op->id }}"
-                                                                    title="Manage Subcontract Delivery Challans (Company Material Sent)">
-                                                                    <i class="feather-file-text fs-12"></i>{{ __('production.manage_challan') }}</button>
+                                                                    title="Dispatch slips: send the issued material / previous operation output to the vendor">
+                                                                    <i class="feather-truck fs-12"></i>Dispatch</button>
+                                                            @endunless
+                                                            @if($scCanReceive)
+                                                                <button type="button"
+                                                                    class="btn btn-sm btn-info fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
+                                                                    data-bs-toggle="modal" data-bs-target="#subcontractReceiptModal{{ $orderOp->id }}"
+                                                                    title="Record the vendor's work received on the shop floor">
+                                                                    <i class="feather-download-cloud fs-12"></i>{{ __('production.record_subcontract_receipt') }}</button>
                                                             @endif
                                                         </div>
                                                         @if($isVendorSupplied)
@@ -646,6 +665,11 @@
                                                                     class="badge bg-soft-warning text-dark border border-warning fs-9 text-decoration-none"
                                                                     title="Draft Gate Pass pending dispatch">
                                                                     <i class="feather-clock me-1"></i>{{ __('production.draft_gate_pass') }}</a>
+                                                            @elseif($latestChallan->status === 'partially_received')
+                                                                <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
+                                                                    class="badge bg-soft-warning text-dark border border-warning fs-9 text-decoration-none"
+                                                                    title="Part of the work is back, the rest is still with the vendor">
+                                                                    <i class="feather-truck me-1"></i>Partly received</a>
                                                             @elseif($latestChallan->status === 'dispatched')
                                                                 <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
                                                                     class="badge bg-soft-info text-info border border-info-subtle fs-9 text-decoration-none"
@@ -1129,7 +1153,66 @@
                             </x-ui.modal>
                         @endif
 
-                        @if(!$isActiveCompanySupplied)
+                        @if($isActiveOutsourced)
+                            @php
+                                // SC-02 / TF-06: the shop-floor receipt of outsourced work (same receipt as the Subcontracting menu)
+                                $scOpenChallans = \App\Domains\Production\Models\DeliveryChallan::where('production_order_operation_id', $activeOrderOp->id)
+                                    ->whereIn('status', \App\Domains\Production\Models\DeliveryChallan::AT_VENDOR_STATUSES)
+                                    ->orderBy('id')->get();
+                                $scQcRequired = (bool) ($activeOrderOp->quality_required || ($activeOrderOp->routingOperation?->quality_required ?? false));
+                            @endphp
+                            <x-ui.modal id="subcontractReceiptModal{{ $activeOrderOp->id }}"
+                                title="RECORD SUBCONTRACT RECEIPT — {{ html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}"
+                                class="text-start" size="lg">
+                                <form method="POST" action="{{ route('production.mes.subcontract-receive', $activeOrderOp->id) }}" id="subcontractReceiptForm{{ $activeOrderOp->id }}">
+                                    @csrf
+                                    <div class="alert alert-soft-info border border-info-subtle fs-11 py-2">
+                                        <i class="feather-info me-1"></i>
+                                        Work back from <strong>{{ $activeOrderOp->vendor->name ?? 'the vendor' }}</strong>. The receipt books the good units, updates the subcontract PO and makes the bill possible (no Purchase GRN needed).
+                                        @if($scQcRequired) This operation has QC: the units wait for <strong>Run QC</strong> before they count. @endif
+                                    </div>
+                                    <div class="row g-3">
+                                        @if($scOpenChallans->isNotEmpty())
+                                            <div class="col-md-12">
+                                                <x-ui.odoo-form-ui type="select" label="Dispatch slip" name="delivery_challan_id" :searchable="false">
+                                                    @foreach($scOpenChallans as $sc)
+                                                        <option value="{{ $sc->id }}">{{ $sc->challan_number }} — {{ rtrim(rtrim(number_format($sc->unitsAtVendor(), 4, '.', ''), '0'), '.') }} unit(s) still at vendor</option>
+                                                    @endforeach
+                                                </x-ui.odoo-form-ui>
+                                            </div>
+                                        @endif
+                                        <div class="col-md-4">
+                                            <x-ui.odoo-form-ui type="input" label="Received" name="received_qty" inputType="number" step="any" :required="true"
+                                                value="{{ $scOpenChallans->first()?->unitsAtVendor() ?? '' }}" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <x-ui.odoo-form-ui type="input" label="Rejected" name="rejected_qty" inputType="number" step="any" value="0" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <x-ui.odoo-form-ui type="input" label="Scrapped" name="scrapped_qty" inputType="number" step="any" value="0" />
+                                        </div>
+                                        @if($scOpenChallans->isNotEmpty())
+                                            <div class="col-md-12">
+                                                <label class="form-check fs-12">
+                                                    <input type="checkbox" class="form-check-input" name="final" value="1">
+                                                    <span class="form-check-label">Last receipt on this slip (close it even if units are missing)</span>
+                                                </label>
+                                            </div>
+                                        @endif
+                                        <div class="col-md-12">
+                                            <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" placeholder="Vendor delivery note / invoice reference…" rows="2" />
+                                        </div>
+                                    </div>
+                                </form>
+                                <x-slot name="footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
+                                    <button type="submit" class="btn btn-success px-4" onclick="document.getElementById('subcontractReceiptForm{{ $activeOrderOp->id }}').submit();">
+                                        <i class="feather-check me-1"></i>Record receipt</button>
+                                </x-slot>
+                            </x-ui.modal>
+                        @endif
+
+                        @if(!$isActiveOutsourced)
                             @php
                                 $activeTargetQty = 0.0;
                                 if ($activeOrderOp && (float) ($activeOrderOp->target_produced_qty ?? 0) > 0) {

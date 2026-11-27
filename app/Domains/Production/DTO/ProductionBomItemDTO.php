@@ -18,6 +18,7 @@ class ProductionBomItemDTO
         public readonly int $sequence = 1,
         public readonly ?string $notes = null,
         public readonly ?int $child_bom_id = null,
+        public readonly string $supplied_by = 'company', // TF-02: company | vendor (vendor = never requested from the store)
     ) {
     }
 
@@ -39,6 +40,7 @@ class ProductionBomItemDTO
             sequence: isset($data['sequence']) ? (int) $data['sequence'] : 1,
             notes: $data['notes'] ?? null,
             child_bom_id: !empty($data['child_bom_id']) ? (int) $data['child_bom_id'] : null,
+            supplied_by: ($data['supplied_by'] ?? 'company') === 'vendor' ? 'vendor' : 'company',
         );
     }
 
@@ -62,6 +64,7 @@ class ProductionBomItemDTO
             'sequence' => $this->sequence,
             'notes' => $this->notes,
             'child_bom_id' => $this->child_bom_id,
+            'supplied_by' => $this->supplied_by,
         ];
     }
 }

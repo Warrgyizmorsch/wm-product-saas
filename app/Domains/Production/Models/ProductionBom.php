@@ -48,6 +48,7 @@ class ProductionBom extends BaseModel
         'expiry_date',
         'status', // draft, pending_approval, approved, inactive, cancelled, under_revision
         'notes',
+        'operation_input_flags', // TF-01
         'has_warning',
         'warning_reason',
         'created_by',
@@ -63,7 +64,25 @@ class ProductionBom extends BaseModel
         'base_quantity' => 'float',
         'routing_id' => 'integer',
         'has_warning' => 'boolean',
+        'operation_input_flags' => 'array', // TF-01 "Previous OP materials" per routing operation
     ];
+
+    /**
+     * TF-01: does the routing operation work on the previous operation's output? An explicit choice on the BOM wins;
+     * without one, a dependent operation (it has a predecessor and is not parallel) does.
+     */
+    public function usesPreviousOpOutput(?\App\Domains\Production\Models\RoutingOperation $op): bool
+    {
+        if (!$op) {
+            return false;
+        }
+        $flags = (array) ($this->operation_input_flags ?? []);
+        if (array_key_exists((string) $op->id, $flags)) {
+            return (bool) $flags[(string) $op->id];
+        }
+
+        return !empty($op->previous_operation_id) && !$op->is_parallel;
+    }
 
     public function product(): BelongsTo
     {

@@ -506,8 +506,12 @@ class MesExecutionService
                 ->lockForUpdate()
                 ->findOrFail($scheduleOpId);
 
-            $isExtOp = (bool) ($schedOp->orderOperation?->is_external ?? false);
-            if (!$schedOp->isRunning() && !$schedOp->isPaused() && !($isExtOp && in_array($schedOp->status, [ProductionScheduleOperation::STATUS_READY, ProductionScheduleOperation::STATUS_RUNNING]))) {
+            // N-10 / SC-02: outsourced work is never "completed" here — it is received (SubcontractReceiptService), which
+            // checks the slip at the vendor, the approved PO and creates the system GRN
+            if ((bool) ($schedOp->orderOperation?->is_external ?? false)) {
+                throw new InvalidArgumentException('This is an outsourced operation: record the vendor\'s work with "Record subcontract receipt" (shop floor) or on the dispatch slip (Subcontracting menu).');
+            }
+            if (!$schedOp->isRunning() && !$schedOp->isPaused()) {
                 throw new InvalidArgumentException(
                     "Only running or paused operations can be completed. Current status: [{$schedOp->status}]."
                 );

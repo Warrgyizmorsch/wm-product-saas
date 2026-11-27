@@ -25,8 +25,12 @@ class SubcontractProcurementPolicyResolver
 
         $order = $op->order ?? \App\Domains\Production\Models\ProductionOrder::find($op->production_order_id);
         $vendorId = $op->vendor_id;
-        $serviceProductId = $op->subcontract_service_product_id ?? $order?->product_id;
-        $unitCost = (float) ($op->subcontract_cost_per_unit ?? 0.0);
+        // C-06: the service is bought, never the finished good — a missing service product is a setup error, not a fallback
+        $serviceProductId = $op->subcontract_service_product_id;
+        // M-03: same yield rule as the routing cost — rate per GOOD unit = rate × 100 ÷ yield %.
+        // The PO quantity stays the op's output target, so receipts of good units close the PO.
+        $yield = (float) ($op->routingOperation?->expected_yield_percentage ?? 100);
+        $unitCost = round((float) ($op->subcontract_cost_per_unit ?? 0.0) * ($yield > 0 ? 100 / $yield : 1), 4);
         $quantity = (float) ($op->target_produced_qty ?: ($order?->quantity_ordered ?: 0.0));
         $totalCost = round($quantity * $unitCost, 2);
 

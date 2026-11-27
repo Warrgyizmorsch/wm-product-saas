@@ -33,7 +33,7 @@
                         @csrf
                         <div class="mb-4">
                             <label class="form-label fw-semibold text-dark fs-13">Procurement Workflow Mode</label>
-                            <p class="text-muted fs-12 mb-3">Controls how purchase requisitions and purchase orders are generated when a Manufacturing Order is released with external operations.</p>
+                            <p class="text-muted fs-12 mb-3">Controls what the <strong>Raise PR / PO</strong> button creates for an outsourced operation. Nothing is raised automatically — the button is on the order's Subcontract tab and on the shop floor (MES).</p>
                             
                             <div class="row g-3">
                                 <!-- Manual PR -> PO Mode -->
@@ -46,7 +46,7 @@
                                                 <span class="badge bg-secondary text-white fs-10">Traditional</span>
                                             </div>
                                             <div class="text-muted fs-12 mt-1">
-                                                MO Release creates a Subcontract Purchase Requisition. Purchase team manually approves PR, converts to PO, and submits PO for approval before dispatch.
+                                                The button creates a Subcontract Purchase Requisition for the operation. Purchase team manually approves PR, converts to PO, and submits PO for approval before dispatch.
                                             </div>
                                         </label>
                                     </div>
@@ -62,7 +62,7 @@
                                                 <span class="badge bg-success text-white fs-10">1-Click Approval</span>
                                             </div>
                                             <div class="text-muted fs-12 mt-1">
-                                                MO Release skips PR creation and directly auto-generates a Draft Subcontract PO with routing cost snapshot. Purchase Manager approves PO in 1-click.
+                                                The button skips the PR and creates a Draft Subcontract PO for the operation with routing cost snapshot. Purchase Manager approves PO in 1-click.
                                             </div>
                                         </label>
                                     </div>
@@ -78,7 +78,7 @@
                                                 <span class="badge bg-info text-white fs-10">Fast-Track</span>
                                             </div>
                                             <div class="text-muted fs-12 mt-1">
-                                                MO Release directly generates an Approved PO ready for immediate Delivery Challan dispatch, provided total value does not exceed the financial threshold.
+                                                The button creates an Approved PO for the operation, ready for dispatch, provided total value does not exceed the financial threshold.
                                             </div>
                                         </label>
                                     </div>

@@ -208,6 +208,27 @@ trait ValidatesRoutingOperations
             if ($isExternal) {
                 if (empty($vendorId)) {
                     $validator->errors()->add("operations.{$index}.vendor_id", 'Vendor is required for outsourced operations.');
+                } else {
+                    // M-02: an inactive vendor can't be given new work
+                    $vendor = \App\Domains\Inventory\Models\Vendor::find($vendorId);
+                    if ($vendor && !empty($vendor->status) && strcasecmp((string) $vendor->status, 'active') !== 0) {
+                        $validator->errors()->add("operations.{$index}.vendor_id", "Vendor {$vendor->name} is not active. Choose another vendor.");
+                    }
+                }
+                // M-02: the subcontract service product must be a service (the PO buys the service, not the goods)
+                if (!empty($op['subcontract_service_product_id'])) {
+                    $service = \App\Domains\Inventory\Models\Product::find((int) $op['subcontract_service_product_id']);
+                    if ($service && !$service->isService()) {
+                        $validator->errors()->add("operations.{$index}.subcontract_service_product_id", "{$service->name} is not a service product. Choose a service product for the subcontract charge.");
+                    } elseif ($service && !empty($service->status) && strcasecmp((string) $service->status, 'active') !== 0) {
+                        $validator->errors()->add("operations.{$index}.subcontract_service_product_id", "Service product {$service->name} is not active.");
+                    }
+                }
+                // M-02: the first operation has no previous operation whose output could be sent
+                $isEntryOp = empty($op['predecessor_sequence']) && empty($op['previous_operation_id'])
+                    && (int) ($op['sequence'] ?? 0) === (int) collect($operations)->min(fn ($o) => (int) ($o['sequence'] ?? 0));
+                if (($op['subcontract_input_type'] ?? null) === 'previous_operation_wip' && $isEntryOp) {
+                    $validator->errors()->add("operations.{$index}.subcontract_input_type", 'The first operation has no previous operation to send to the vendor. Choose "BOM raw materials".');
                 }
                 foreach (['subcontract_lead_time_days' => 'Subcontract lead time days', 'dispatch_buffer_days' => 'Dispatch buffer days', 'return_buffer_days' => 'Return buffer days'] as $key => $label) {
                     if (isset($op[$key]) && (float) $op[$key] < 0) {

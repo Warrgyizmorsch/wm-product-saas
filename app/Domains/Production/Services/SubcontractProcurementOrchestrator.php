@@ -3,15 +3,25 @@
 namespace App\Domains\Production\Services;
 
 use App\Domains\Production\Models\ProductionOrderOperation;
-use App\Domains\Production\Models\ProductionOrderProgressLog;
 use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Purchase\Models\PurchaseOrderItem;
 use App\Domains\Purchase\Models\PurchaseRequisition;
+use App\Domains\Purchase\Models\PurchaseRequisitionItem;
 use App\Domains\Purchase\Repositories\PurchaseOrderRepository;
 use App\Domains\Purchase\Services\PurchaseOrderService;
 use App\Domains\Purchase\Services\PurchaseRequisitionService;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
+/**
+ * Subcontract purchasing for ONE outsourced operation, raised only by the "Raise PR / PO" button on the order screen
+ * or the MES floor (D-4 / TF-05 — nothing calls this automatically any more). What the button creates follows the
+ * tenant setting (Production → Settings): manual_pr_po → a PR; auto_draft_po → a Draft PO; auto_approved_po → an
+ * Approved PO within the auto-approval limit (else Draft).
+ *
+ * The PR / PO line is tied to the operation (N-14 / N-15), uses the operation's vendor, its service product and its
+ * subcontract rate, and is a non-stock line posted to WIP 1204 when billed (TF-07).
+ */
 class SubcontractProcurementOrchestrator
 {
     public function __construct(
@@ -21,90 +31,75 @@ class SubcontractProcurementOrchestrator
         protected SubcontractProcurementPolicyResolver $policyResolver
     ) {}
 
+    /** Open PR / PO already raised for this operation, if any (cancelled ones never count — N-14). */
+    public function existingDocument(ProductionOrderOperation $op, int $tenantId): PurchaseOrder|PurchaseRequisition|null
+    {
+        $poItem = PurchaseOrderItem::where('production_order_operation_id', $op->id)
+            ->whereHas('order', fn ($q) => $q->where('tenant_id', $tenantId)->where('status', '!=', 'Cancelled'))
+            ->with('order')
+            ->first();
+        if ($poItem?->order) {
+            return $poItem->order;
+        }
+
+        $prItem = PurchaseRequisitionItem::where('production_order_operation_id', $op->id)
+            ->whereHas('requisition', fn ($q) => $q->where('tenant_id', $tenantId)->where('status', '!=', 'Cancelled'))
+            ->with('requisition')
+            ->first();
+
+        return $prItem?->requisition;
+    }
+
     /**
-     * Master entry point to orchestrate subcontract procurement according to tenant policy.
+     * The button. Returns the PR or PO it created, or the open one that already exists.
+     *
+     * @throws InvalidArgumentException when the operation is not ready to be bought (vendor, service product, rate…)
      */
-    public function orchestrateSubcontractProcurement(
-        ProductionOrderOperation $op,
-        int $tenantId,
-        ?int $userId = null
-    ): mixed {
+    public function orchestrateSubcontractProcurement(ProductionOrderOperation $op, int $tenantId, ?int $userId = null): PurchaseOrder|PurchaseRequisition
+    {
         if (!$op->is_external) {
-            return null;
+            throw new InvalidArgumentException("Operation #{$op->operation_number} is not an outsourced operation.");
         }
 
         $order = $op->order ?? \App\Domains\Production\Models\ProductionOrder::find($op->production_order_id);
         if (!$order) {
-            return null;
+            throw new InvalidArgumentException("Operation #{$op->operation_number} has no production order.");
+        }
+        if (in_array($order->status, ['cancelled', 'completed', 'closed'], true)) {
+            throw new InvalidArgumentException("Order {$order->order_number} is {$order->status}: no subcontract purchasing can be raised.");
         }
 
-        // Idempotency check: verify if active PO already exists for this operation
-        $existingPoItem = PurchaseOrderItem::where('production_order_operation_id', $op->id)
-            ->whereHas('order', function ($q) use ($tenantId) {
-                $q->where('tenant_id', $tenantId)->where('status', '!=', 'Cancelled');
-            })
-            ->with('order')
-            ->first();
-
-        if ($existingPoItem && $existingPoItem->order) {
-            return $existingPoItem->order;
+        if ($existing = $this->existingDocument($op, $tenantId)) {
+            return $existing;
         }
 
-        // Idempotency check: verify if active PR already exists for this operation
-        $existingPr = PurchaseRequisition::where('tenant_id', $tenantId)
-            ->whereIn('source_type', ['mo', 'ProductionOrder'])
-            ->where('source_id', $order->id)
-            ->where('notes', 'like', "%Op #{$op->sequence}%")
-            ->where('status', '!=', 'Cancelled')
-            ->first();
-
-        // Resolve Policy
         $policy = $this->policyResolver->resolvePolicy($op, $tenantId);
-
         if (!$policy['is_valid']) {
-            // Log setup issue for audit trail
-            ProductionOrderProgressLog::create([
-                'tenant_id' => $tenantId,
-                'production_order_id' => $order->id,
-                'operation_id' => $op->id,
-                'quantity_completed' => 0,
-                'recorded_at' => now(),
-                'status' => $op->status,
-                'log_type' => 'subcontract_setup_required',
-                'logged_by' => $userId ?: 1,
-                'remarks' => "Subcontract Setup Required: " . implode(' ', $policy['validation_errors']),
-            ]);
-
-            return null;
+            throw new InvalidArgumentException('Subcontract setup missing: ' . implode(' ', $policy['validation_errors']));
         }
 
-        if ($existingPr && $policy['effective_workflow'] === 'manual_pr_po') {
-            return $existingPr;
+        if ($policy['effective_workflow'] === 'manual_pr_po') {
+            return $this->generateSubcontractRequisition($op, $tenantId, $userId);
         }
 
         return DB::transaction(function () use ($op, $order, $tenantId, $userId, $policy) {
-            if ($policy['effective_workflow'] === 'manual_pr_po') {
-                return $this->generateSubcontractRequisition($op, $tenantId, $userId);
-            }
-
-            // Mode: auto_draft_po or auto_approved_po
-            $poNumber = $this->poRepo->getNextPoNumber($tenantId);
             $status = ($policy['effective_workflow'] === 'auto_approved_po' && $policy['can_auto_approve']) ? 'Approved' : 'Draft';
-            
-            $sourceNote = "Production Subcontract · MO #{$order->order_number} · Op #{$op->sequence} ({$op->name})";
+
+            $note = "Production Subcontract · MO #{$order->order_number} · Op #{$op->sequence} ({$op->name})";
             if (!empty($policy['fallback_reason'])) {
-                $sourceNote .= " [Auto-Approval Skipped: {$policy['fallback_reason']}]";
+                $note .= " [Auto-approval skipped: {$policy['fallback_reason']}]";
             }
 
             $po = PurchaseOrder::create([
                 'tenant_id' => $tenantId,
-                'purchase_order_number' => $poNumber,
+                'purchase_order_number' => $this->poRepo->getNextPoNumber($tenantId),
                 'vendor_id' => $policy['vendor_id'],
                 'is_subcontract' => true,
                 'production_order_id' => $order->id,
                 'source_type' => 'ProductionOrder',
                 'date' => now()->toDateString(),
-                'delivery_date' => now()->addDays($op->subcontract_lead_time_days ?? 0)->toDateString(),
+                // N-18 / H-02: expected back = scheduled start + dispatch buffer + lead time + return buffer
+                'delivery_date' => app(SubcontractDates::class)->expectedReturnDate($op)->toDateString(),
                 'status' => $status,
                 'discount_type' => 'without_discount',
                 'tax_type' => 'order_wise_tax',
@@ -116,13 +111,15 @@ class SubcontractProcurementOrchestrator
                 'igst_amount' => 0,
                 'tax_amount' => 0,
                 'grand_total' => $policy['total_cost'],
-                'notes' => $sourceNote,
-                'created_by' => $userId ?: 1,
+                'notes' => $note,
+                'created_by' => $userId ?: (auth()->id() ?: 1),
             ]);
 
             $poi = PurchaseOrderItem::create([
                 'purchase_order_id' => $po->id,
                 'product_id' => $policy['service_product_id'],
+                'line_type' => PurchaseOrderItem::LINE_TYPE_EXPENSE, // TF-07: service, not stock
+                'chart_of_account_id' => $this->wipAccountId($tenantId),
                 'production_order_id' => $order->id,
                 'production_order_operation_id' => $op->id,
                 'quantity' => $policy['quantity'],
@@ -131,93 +128,80 @@ class SubcontractProcurementOrchestrator
                 'total_amount' => $policy['total_cost'],
             ]);
 
-            $op->update([
-                'purchase_order_id' => $po->id,
-                'purchase_order_item_id' => $poi->id,
-            ]);
-
-            // Audit Trail Progress Log
-            ProductionOrderProgressLog::create([
-                'tenant_id' => $tenantId,
-                'production_order_id' => $order->id,
-                'operation_id' => $op->id,
-                'quantity_completed' => 0,
-                'recorded_at' => now(),
-                'status' => $op->status,
-                'log_type' => 'subcontract_procurement_created',
-                'logged_by' => $userId ?: 1,
-                'remarks' => "Subcontract PO #{$po->purchase_order_number} ({$status}) auto-generated for Op #{$op->sequence}.",
-            ]);
+            $op->update(['purchase_order_id' => $po->id, 'purchase_order_item_id' => $poi->id]);
 
             if ($status === 'Approved') {
                 $this->poService->syncPrOrderedQtyOnApproval($po);
             }
 
+            $this->logEvent($op, $tenantId, $userId, "Subcontract PO {$po->purchase_order_number} ({$status}) raised for Op #{$op->sequence}.");
+
             return $po;
         });
     }
 
-    /**
-     * Generate a Purchase Requisition for an outsourced production operation.
-     */
-    public function generateSubcontractRequisition(
-        ProductionOrderOperation $op,
-        int $tenantId,
-        ?int $userId = null
-    ): PurchaseRequisition {
-        return DB::transaction(function () use ($op, $tenantId, $userId) {
-            if (!$op->is_external) {
-                throw new \InvalidArgumentException("Operation {$op->name} is not an outsourced operation.");
-            }
+    /** A PR for the operation's service (manual_pr_po). An open PR for the same operation is returned, never a second. */
+    public function generateSubcontractRequisition(ProductionOrderOperation $op, int $tenantId, ?int $userId = null): PurchaseRequisition
+    {
+        if (!$op->is_external) {
+            throw new InvalidArgumentException("Operation {$op->name} is not an outsourced operation.");
+        }
+        $order = $op->order;
+        if (!$order) {
+            throw new InvalidArgumentException("Operation {$op->name} has no associated production order.");
+        }
 
-            $order = $op->order;
-            if (!$order) {
-                throw new \InvalidArgumentException("Operation {$op->name} has no associated production order.");
-            }
+        $existing = $this->existingDocument($op, $tenantId);
+        if ($existing instanceof PurchaseRequisition) {
+            return $existing;
+        }
+        if ($existing instanceof PurchaseOrder) {
+            throw new InvalidArgumentException("Subcontract PO {$existing->purchase_order_number} already exists for this operation.");
+        }
 
-            // Determine product to procure (subcontract service product, component product, or FG product)
-            $productId = $op->subcontract_service_product_id ?? $op->source_product_id ?? $order->product_id;
-            $qty = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1.0));
-            $unitCost = (float) ($op->subcontract_cost_per_unit ?? 0.0);
+        $policy = $this->policyResolver->resolvePolicy($op, $tenantId);
+        if (!$policy['is_valid']) {
+            throw new InvalidArgumentException('Subcontract setup missing: ' . implode(' ', $policy['validation_errors']));
+        }
 
-            // Check if PR already exists for this order/operation to prevent duplicate generation
-            $existingPr = PurchaseRequisition::where('tenant_id', $tenantId)
-                ->whereIn('source_type', ['mo', 'ProductionOrder'])
-                ->where('source_id', $order->id)
-                ->where('notes', 'like', "%Op #{$op->sequence}%")
-                ->first();
-
-            if (!$existingPr) {
-                $existingPr = PurchaseRequisition::where('tenant_id', $tenantId)
-                    ->whereIn('source_type', ['mo', 'ProductionOrder'])
-                    ->where('source_id', $order->id)
-                    ->first();
-            }
-
-            if ($existingPr) {
-                return $existingPr;
-            }
-
-            $serviceNote = "Subcontract Service — Op #{$op->sequence} {$op->name} for Order #{$order->order_number} ({$order->product?->name})";
-
-            // Create Requisition via standard PurchaseRequisitionService
-            $payload = [
+        return DB::transaction(function () use ($op, $order, $tenantId, $userId, $policy) {
+            $pr = $this->prService->storeRequisition([
                 'requisition_date' => now()->toDateString(),
+                'expected_date' => app(SubcontractDates::class)->expectedReturnDate($op)->toDateString(),
                 'source_type' => 'mo',
                 'production_order_id' => $order->id,
-                'notes' => $serviceNote,
-                'items' => [
-                    [
-                        'product_id' => $productId,
-                        'quantity' => $qty,
-                        'estimated_cost' => $unitCost,
-                    ]
-                ],
-            ];
+                'notes' => "Subcontract Service — Op #{$op->sequence} {$op->name} for Order #{$order->order_number} ({$order->product?->name})",
+                'items' => [[
+                    'production_order_operation_id' => $op->id,
+                    'product_id' => $policy['service_product_id'],
+                    'quantity' => $policy['quantity'],
+                    'estimated_cost' => $policy['unit_cost'],
+                    'estimated_cost_is_base' => true, // the routing rate is already in base currency
+                ]],
+            ], $tenantId);
 
-            $pr = $this->prService->storeRequisition($payload, $tenantId);
+            $this->logEvent($op, $tenantId, $userId, "Subcontract PR {$pr->requisition_number} raised for Op #{$op->sequence}.");
 
             return $pr;
         });
+    }
+
+    private function wipAccountId(int $tenantId): ?int
+    {
+        return \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1204')->value('id');
+    }
+
+    private function logEvent(ProductionOrderOperation $op, int $tenantId, ?int $userId, string $text): void
+    {
+        app(ProductionEventService::class)->writeEvent($tenantId, [
+            'production_order_id' => $op->production_order_id,
+            'production_order_operation_id' => $op->id,
+            'event_type' => 'Subcontract Procurement',
+            'title' => 'Subcontract purchasing raised',
+            'description' => mb_substr($text, 0, 250),
+            'severity' => 'info',
+            'event_source' => 'SubcontractProcurementOrchestrator',
+            'triggered_by' => $userId,
+        ]);
     }
 }

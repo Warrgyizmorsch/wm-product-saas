@@ -49,7 +49,7 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
         return [
             'total' => DeliveryChallan::where('tenant_id', $tenantId)->count(),
             'draft' => DeliveryChallan::where('tenant_id', $tenantId)->where('status', 'draft')->count(),
-            'dispatched' => DeliveryChallan::where('tenant_id', $tenantId)->where('status', 'dispatched')->count(),
+            'dispatched' => DeliveryChallan::where('tenant_id', $tenantId)->whereIn('status', DeliveryChallan::AT_VENDOR_STATUSES)->count(),
             'completed' => DeliveryChallan::where('tenant_id', $tenantId)->where('status', 'completed')->count(),
         ];
     }
@@ -59,7 +59,12 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
         return DB::transaction(function () use ($tenantId, $attributes, $items) {
             $challanNumber = $this->getNextChallanNumber($tenantId);
             $firstWarehouseId = $attributes['warehouse_id'] ?? ($items[0]['warehouse_id'] ?? null);
-            $dispatchedWipQty = (float) collect($items)->sum('quantity');
+            // TF-04: units of WORK sent (what the vendor must return) — the WIP quantity, or the operation units the sent
+            // material is for. Never the sum of material quantities (5 kg + 20 pcs is not "25 units").
+            $wipQty = (float) collect($items)->where('item_type', 'wip')->sum('quantity');
+            $dispatchedWipQty = isset($attributes['units_sent']) && (float) $attributes['units_sent'] > 0
+                ? (float) $attributes['units_sent']
+                : $wipQty;
 
             $orderId = $attributes['production_order_id'] ?? null;
             $order = $orderId ? \App\Domains\Production\Models\ProductionOrder::find($orderId) : null;
@@ -71,7 +76,7 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
                 'company_id' => $companyId,
                 'branch_id' => $branchId,
                 'challan_number' => $challanNumber,
-                'type' => 'subcontract_dispatch',
+                'type' => $attributes['type'] ?? 'subcontract_dispatch',
                 'production_order_id' => $orderId,
                 'production_order_operation_id' => $attributes['production_order_operation_id'] ?? null,
                 'vendor_id' => $attributes['vendor_id'],
@@ -138,10 +143,12 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
                     'branch_id' => $branchId,
                     'delivery_challan_id' => $challan->id,
                     'product_id' => $item['product_id'],
+                    'item_type' => ($item['item_type'] ?? 'material') === 'wip' ? 'wip' : 'material',
                     'production_batch_id' => $batchId,
                     'production_wip_id' => $wipId,
-                    'warehouse_id' => $item['warehouse_id'],
+                    'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $item['quantity'],
+                    'required_qty' => $item['required_qty'] ?? null,
                     'unit_of_measure' => $item['unit_of_measure'] ?? 'PCS',
                     'batch_number' => $item['batch_number'] ?? null,
                     'serial_number' => $item['serial_number'] ?? null,

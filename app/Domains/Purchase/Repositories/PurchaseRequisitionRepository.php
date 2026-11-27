@@ -176,12 +176,25 @@ class PurchaseRequisitionRepository
                         $order = \App\Domains\Production\Models\ProductionOrder::find($pr->source_id);
                         if ($order) {
                             $orderNum = $order->order_number;
-                            $extOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
-                                ->where('production_order_id', $order->id)
-                                ->where('is_external', true)
-                                ->first();
+                            // H-04: the PR line names its operation; older lines fall back to the service product,
+                            // then to an exact "Op #N " match (never the order's first outsourced op for every line)
+                            $extOp = null;
+                            if (!empty($item->production_order_operation_id)) {
+                                $extOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+                                    ->where('production_order_id', $order->id)
+                                    ->find($item->production_order_operation_id);
+                            }
+                            if (!$extOp) {
+                                $candidates = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+                                    ->where('production_order_id', $order->id)
+                                    ->where('is_external', true)
+                                    ->get();
+                                $extOp = $candidates->first(fn ($o) => (int) $o->subcontract_service_product_id === (int) $item->product_id
+                                        && $candidates->where('subcontract_service_product_id', $o->subcontract_service_product_id)->count() === 1)
+                                    ?? $candidates->first(fn ($o) => preg_match('/Op #' . preg_quote((string) $o->sequence, '/') . '(?!\d)/', (string) ($item->notes ?? $pr->notes)) === 1);
+                            }
 
-                            if ($extOp && ($item->product_id === $extOp->subcontract_service_product_id || str_contains((string)$pr->notes, "Op #{$extOp->sequence}") || str_contains((string)$pr->notes, 'Subcontract Service'))) {
+                            if ($extOp && ($item->product_id === $extOp->subcontract_service_product_id || !empty($item->production_order_operation_id) || str_contains((string)$pr->notes, "Op #{$extOp->sequence}") || str_contains((string)$pr->notes, 'Subcontract Service'))) {
                                 $isSubcontract = true;
                                 $opSeq = $extOp->sequence;
                                 $opName = $extOp->name;

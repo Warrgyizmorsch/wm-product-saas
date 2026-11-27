@@ -50,6 +50,10 @@ class MrpEngineService
                 $routing = Routing::withoutGlobalScopes()->with('operations')->find($plan->routing_id);
                 if ($routing) {
                     foreach ($routing->operations as $op) {
+                        // N-25: an alternative operation only stands in for its primary when chosen — never snapshot both
+                        if ($op->is_alternative) {
+                            continue;
+                        }
                         $totalMinutes = $op->setup_time_minutes + ($op->processing_time_minutes * $plan->quantity);
 
                         // Scale costs per minute from parent rates

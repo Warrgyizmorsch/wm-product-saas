@@ -92,8 +92,11 @@ class TestProductionDataTest extends TestCase
         $batchSection = collect($this->dataset()['production_section_manual_productions'])->mapWithKeys(fn ($b) => [$b['batch_name'] => $sections[$b['section_id']]]);
         $skus = collect($this->dataset()['products'])->pluck('type', 'sku');
 
+        $vendors = collect($this->dataset()['vendors'])->keyBy('code');
+        $this->assertCount(count($this->dataset()['vendors']), $vendors, 'vendor codes are unique');
+
         $plans = collect((new TestProductionQualitySeeder())->plans())->keyBy('name');
-        $this->assertCount(26, $plans, 'plan names are unique');
+        $this->assertCount(30, $plans, 'plan names are unique');
         foreach ($plans as $plan) {
             if ($plan['scope'] === 'section') {
                 $this->assertContains($plan['section'], $sections->all(), "plan {$plan['name']}: unknown section");
@@ -108,21 +111,32 @@ class TestProductionDataTest extends TestCase
         $routingNumbers = array_column($engineering->routings(), 'routing_number');
         $this->assertSame($routingNumbers, array_values(array_unique($routingNumbers)), 'routing numbers must be unique');
         foreach ($engineering->routings() as $routing) {
-            foreach ($routing['operations'] as $op) {
+            foreach ($routing['operations'] as $i => $op) {
                 $where = "{$routing['routing_number']} op {$op['seq']}";
-                $this->assertContains($op['section'], $sections->all(), "{$where}: unknown section");
-                $this->assertTrue(isset($op['machine']) xor isset($op['batch']), "{$where}: exactly one machine or batch");
-                if (isset($op['machine'])) {
-                    $this->assertSame($op['section'], $machineSection[$op['machine']] ?? null, "{$where}: machine is not in the section");
+                if (isset($op['external'])) {
+                    // outsourced: no own resources; an active job-work vendor and a service product (M-02)
+                    $this->assertFalse(isset($op['section']) || isset($op['machine']) || isset($op['batch']), "{$where}: an outsourced operation has no section, machine or batch");
+                    $this->assertSame('active', $vendors[$op['external']['vendor']]['status'] ?? null, "{$where}: unknown or inactive vendor");
+                    $this->assertSame('service', $skus[$op['external']['service']] ?? null, "{$where}: the subcontract charge must be a service product");
+                    $this->assertGreaterThan(0, $op['external']['rate'], "{$where}: a job work needs a rate");
+                    if (($op['external']['input'] ?? null) === 'previous_operation_wip') {
+                        $this->assertGreaterThan(0, $i, "{$where}: the first operation has no previous operation to send");
+                    }
                 } else {
-                    $this->assertSame($op['section'], $batchSection[$op['batch']] ?? null, "{$where}: batch is not in the section");
+                    $this->assertContains($op['section'], $sections->all(), "{$where}: unknown section");
+                    $this->assertTrue(isset($op['machine']) xor isset($op['batch']), "{$where}: exactly one machine or batch");
+                    if (isset($op['machine'])) {
+                        $this->assertSame($op['section'], $machineSection[$op['machine']] ?? null, "{$where}: machine is not in the section");
+                    } else {
+                        $this->assertSame($op['section'], $batchSection[$op['batch']] ?? null, "{$where}: batch is not in the section");
+                    }
                 }
                 foreach ($op['qc'] ?? [] as $link) {
                     $plan = $plans[$link['plan']] ?? null;
                     $this->assertNotNull($plan, "{$where}: unknown plan {$link['plan']}");
                     $this->assertNotSame('product', $plan['scope'], "{$where}: product plans are never linked to a routing");
                     if ($plan['scope'] === 'section') {
-                        $this->assertSame($op['section'], $plan['section'], "{$where}: section plan of another section");
+                        $this->assertSame($op['section'] ?? null, $plan['section'], "{$where}: section plan of another section (an outsourced operation takes process plans only)");
                     }
                 }
             }
@@ -146,10 +160,11 @@ class TestProductionDataTest extends TestCase
 
         $stock = TestProductionStockSeeder::openingStock();
         foreach ($skus as $sku => $type) {
-            if ($type !== 'raw_material') {
+            if (!in_array($type, ['raw_material', 'service'], true)) {
                 $this->assertArrayHasKey($sku, $stock, "no opening stock for {$sku}");
             }
         }
+        $this->assertSame([], array_values(array_intersect(array_keys($stock), $skus->filter(fn ($t) => $t === 'service')->keys()->all())), 'service products hold no stock');
     }
 
     public function test_test_employees_are_not_all_ceos(): void

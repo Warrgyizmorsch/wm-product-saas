@@ -35,14 +35,22 @@ class RoutingTemplate implements FromCollection, WithHeadings
             'Is External',
             'Vendor Code',
             'Subcontract Cost Per Unit',
+            // M-04: outsourced setup (blank = company_supplied / bom_raw_materials / 0 days)
+            'Material Supply Type',
+            'Subcontract Input Type',
+            'Subcontract Lead Time Days',
+            'Dispatch Buffer Days',
+            'Return Buffer Days',
+            'Service Product Code',
         ];
     }
 
     public function collection()
     {
         return collect([
-            ['RT-FG-OAK-01', 'Standard Oak Table Routing', '1.0.0', '10', 'Cutting Plank', 'OP-CUT', 'manufacturing', 'WC-CNC', 'SEC-CUT', 'MCH-CNC-01', '', '15', '0.5', '98', 'No', '', '', 'No', '', ''],
-            ['RT-FG-OAK-01', '', '', '20', 'Quality Check', 'OP-QC', 'inspection', 'WC-ASY', 'SEC-QC', '', 'QC Team A', '5', '', '100', 'No', '', '', 'No', '', ''],
+            ['RT-FG-OAK-01', 'Standard Oak Table Routing', '1.0.0', '10', 'Cutting Plank', 'OP-CUT', 'manufacturing', 'WC-CNC', 'SEC-CUT', 'MCH-CNC-01', '', '15', '0.5', '98', 'No', '', '', 'No', '', '', '', '', '', '', '', ''],
+            ['RT-FG-OAK-01', '', '', '20', 'Quality Check', 'OP-QC', 'inspection', 'WC-ASY', 'SEC-QC', '', 'QC Team A', '5', '', '100', 'No', '', '', 'No', '', '', '', '', '', '', '', ''],
+            ['RT-FG-OAK-01', '', '', '30', 'Polishing (job work)', 'OP-POL', 'outsourcing', '', '', '', '', '', '', '100', 'No', '', '', 'Yes', 'VEND-ACME', '45', 'company_supplied', 'previous_operation_wip', '3', '1', '1', 'SRV-POLISH'],
         ]);
     }
 }

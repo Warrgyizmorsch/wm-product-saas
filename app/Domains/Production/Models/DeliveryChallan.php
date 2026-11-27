@@ -18,6 +18,19 @@ class DeliveryChallan extends Model
 
     protected $table = 'delivery_challans';
 
+    // Dispatch slip life cycle (TF-04 / C-07): draft → dispatched → partially_received → completed; cancelled from draft
+    public const STATUS_DRAFT              = 'draft';
+    public const STATUS_DISPATCHED         = 'dispatched';
+    public const STATUS_PARTIALLY_RECEIVED = 'partially_received';
+    public const STATUS_COMPLETED          = 'completed';
+    public const STATUS_CANCELLED          = 'cancelled';
+
+    /** Material / WIP is still (partly) with the vendor */
+    public const AT_VENDOR_STATUSES = [self::STATUS_DISPATCHED, self::STATUS_PARTIALLY_RECEIVED];
+
+    /** Counted as "already sent" when working out what can still be dispatched (a draft never counts, H-07) */
+    public const SENT_STATUSES = [self::STATUS_DISPATCHED, self::STATUS_PARTIALLY_RECEIVED, self::STATUS_COMPLETED];
+
     protected $fillable = [
         'tenant_id',
         'company_id',
@@ -31,7 +44,13 @@ class DeliveryChallan extends Model
         'challan_date',
         'expected_return_date',
         'status',
-        'dispatched_wip_qty',
+        'dispatched_at',
+        'completed_at',
+        'dispatched_wip_qty', // units of work sent (WIP units, or the operation units the sent material is for)
+        'received_qty',
+        'accepted_qty',
+        'rejected_qty',
+        'scrapped_qty',
         'vehicle_number',
         'transporter_name',
         'lr_number',
@@ -44,7 +63,29 @@ class DeliveryChallan extends Model
         'challan_date' => 'date',
         'expected_return_date' => 'date',
         'dispatched_wip_qty' => 'float',
+        'received_qty' => 'float',
+        'accepted_qty' => 'float',
+        'rejected_qty' => 'float',
+        'scrapped_qty' => 'float',
+        'dispatched_at' => 'datetime',
+        'completed_at' => 'datetime',
     ];
+
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(ProductionSubcontractReceipt::class, 'delivery_challan_id');
+    }
+
+    /** Units still at the vendor on this slip (sent − received back, whatever the outcome) */
+    public function unitsAtVendor(): float
+    {
+        return max(0.0, round((float) $this->dispatched_wip_qty - (float) $this->received_qty, 4));
+    }
+
+    public function isAtVendor(): bool
+    {
+        return in_array($this->status, self::AT_VENDOR_STATUSES, true);
+    }
 
     public function productionOrder(): BelongsTo
     {

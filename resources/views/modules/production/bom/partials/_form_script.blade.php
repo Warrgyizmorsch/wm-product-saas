@@ -14,6 +14,8 @@
             selectedRoutingId: '{{ old('routing_id', $defaultRoutingId ?? '') }}',
             previousRoutingId: '{{ old('routing_id', $defaultRoutingId ?? '') }}',
             availableOperations: [],
+            // TF-01: per routing operation, 1 = works on the previous operation's output ("Previous OP materials")
+            operationInputFlags: @json((object) (old('operation_input_flags') ?? ($isEdit ? ($bom->operation_input_flags ?? []) : (($copyFromBom ?? null)?->operation_input_flags ?? [])))),
             expandedOps: {},
             expandedSummaryRows: {},
             activeTab: 'components',
@@ -34,6 +36,39 @@
 
             get activeOperations() {
                 return (this.availableOperations || []).filter(op => !op.is_deleted);
+            },
+
+            // ── TF-01 "Previous OP materials" ──
+            // an operation can work on a previous operation's output when it has a predecessor (dependent) or runs in
+            // parallel (SC-05); only the first operation of the routing cannot. Default: on for dependent operations.
+            hasPreviousOp(op) {
+                return !!(op && (op.previous_operation_id || op.is_parallel === true || op.is_parallel === 1 || String(op.is_parallel) === '1'));
+            },
+            usesPreviousOp(op) {
+                if (!op || !this.hasPreviousOp(op)) return false;
+                const key = String(op.id);
+                const flags = this.operationInputFlags || {};
+                if (Object.prototype.hasOwnProperty.call(flags, key)) {
+                    return flags[key] === true || String(flags[key]) === '1';
+                }
+                return !!op.previous_operation_id && !(op.is_parallel === true || op.is_parallel === 1 || String(op.is_parallel) === '1');
+            },
+            setUsesPreviousOp(op, value) {
+                this.operationInputFlags = Object.assign({}, this.operationInputFlags || {}, { [String(op.id)]: value ? 1 : 0 });
+                this.saveDraft && this.saveDraft();
+            },
+
+            // ── TF-02 vendor-supplied materials (outsourced operations only) ──
+            opById(opId) {
+                return (this.availableOperations || []).find(o => String(o.id) === String(opId)) || null;
+            },
+            isExternalOpId(opId) {
+                const op = this.opById(opId);
+                return !!(op && (op.is_external === true || op.is_external === 1 || String(op.is_external) === '1'));
+            },
+            defaultSuppliedBy(opId) {
+                const op = this.opById(opId);
+                return (this.isExternalOpId(opId) && op && op.material_supply_type === 'vendor_supplied') ? 'vendor' : 'company';
             },
 
             get visibleOperations() {
@@ -447,7 +482,8 @@
                         material_scrap_percentage: it.material_scrap_percentage || 0,
                         is_alternative: !!it.is_alternative,
                         replaces_row_uid: it.replaces_row_uid || '',
-                        priority: it.is_alternative ? (it.priority || '') : ''
+                        priority: it.is_alternative ? (it.priority || '') : '',
+                        supplied_by: it.supplied_by === 'vendor' ? 'vendor' : 'company'
                     }));
 
                     if (!prodId && !routId && !bomName && !itemsToSave.some(it => it.material_id)) {
@@ -545,6 +581,7 @@
                     is_alternative: !!parseInt(item.is_alternative) || item.is_alternative === true,
                     replaces_row_uid: replacesUid,
                     priority: item.priority || "",
+                    supplied_by: item.supplied_by === 'vendor' ? 'vendor' : 'company',
                     child_bom_status: 'none',
                     child_bom_versions: [],
                     child_bom_loading: false,
@@ -879,6 +916,7 @@
                     is_alternative: false,
                     replaces_row_uid: '',
                     priority: 1,
+                    supplied_by: this.defaultSuppliedBy(opId),
                     child_bom_status: 'none',
                     child_bom_versions: [],
                     child_bom_loading: false,

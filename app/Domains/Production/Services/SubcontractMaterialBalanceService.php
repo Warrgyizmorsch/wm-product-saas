@@ -2,579 +2,458 @@
 
 namespace App\Domains\Production\Services;
 
-use App\Domains\Inventory\Models\StockTransaction;
-use App\Domains\Inventory\Services\StockService;
+use App\Domains\Production\Models\DeliveryChallan;
+use App\Domains\Production\Models\DeliveryChallanItem;
+use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
+use App\Domains\Production\Models\ProductionOrderReservation;
+use App\Domains\Production\Models\ProductionWip;
+use App\Domains\Production\Models\ProductionWipTransaction;
+use App\Domains\Production\Models\RoutingOperationMaterial;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
+/**
+ * Dispatch slips (Delivery Challans) and the material / WIP held by subcontract vendors
+ * (docs/subcontracting_module_audit_2026-11-26.md, TF-03 / TF-04 / TF-08).
+ *
+ *  - Company material for an outsourced operation is requested and issued to the order like any other material: the
+ *    store issue is the ONLY stock-out. The dispatch slip sends material that was issued to the order and not sent
+ *    yet — it never touches stock again (C-03 / N-01).
+ *  - WIP job work: the slip sends the previous operation's accepted output (D-3b, my rule: good output − already sent).
+ *  - The slip records which material / WIP is at which vendor, for which operation. Value stays inside the order's
+ *    WIP (1204) — no separate vendor stock (D-3c, my rule).
+ *  - Nothing is backflushed at receipt (TF-08): the receipt records how much of the sent material the vendor used.
+ */
 class SubcontractMaterialBalanceService
 {
+    // ─── What an outsourced operation needs and may send ─────────────────────────
+
     /**
-     * Get or calculate current vendor material balance for an outsourced operation.
-     * Sent = Consumed + Returned + Scrapped + Remaining
+     * Company-supplied materials of the operation (its chosen BOM allocations, vendor-supplied ones left out — TF-02),
+     * as quantity per 1 unit of the operation's output.
+     *
+     * @return Collection<int, array{product_id:int, name:string, sku:?string, uom:string, per_unit:float}>
+     */
+    public function companyMaterialsPerUnit(ProductionOrderOperation $op): Collection
+    {
+        $order = $op->order;
+        $bomId = $op->source_bom_id ?: $order?->bom_id;
+        if (!$bomId || !$op->routing_operation_id) {
+            return collect();
+        }
+
+        $bom = \App\Domains\Production\Models\ProductionBom::find($bomId);
+        $baseQty = ($bom && (float) $bom->base_quantity > 0) ? (float) $bom->base_quantity : 1.0;
+
+        $selected = array_filter((array) ($op->selected_routing_material_ids ?? []));
+        $rows = RoutingOperationMaterial::with('material')
+            ->where('bom_id', $bomId)
+            ->where('routing_operation_id', $op->routing_operation_id)
+            ->when($selected, fn ($q) => $q->whereIn('id', $selected), fn ($q) => $q->where('is_alternative', false))
+            ->get()
+            ->reject(fn ($row) => $this->isVendorSupplied($row, $op));
+
+        return $rows->groupBy('material_id')->map(function ($group, $materialId) use ($baseQty) {
+            $first = $group->first();
+            $gross = (float) $group->sum(fn ($r) => (float) ($r->gross_quantity ?: $r->quantity));
+
+            return [
+                'product_id' => (int) $materialId,
+                'name' => $first->material?->name ?? ('Material #' . $materialId),
+                'sku' => $first->material?->sku,
+                'uom' => $first->material?->unit_of_measure ?? 'PCS',
+                'per_unit' => round($gross / $baseQty, 6),
+            ];
+        })->values();
+    }
+
+    /** TF-02: a BOM allocation the vendor brings — marked on the row, or every row of a vendor-supplied operation. */
+    public function isVendorSupplied(RoutingOperationMaterial $row, ?ProductionOrderOperation $op = null): bool
+    {
+        if (($row->supplied_by ?? 'company') === 'vendor') {
+            return true;
+        }
+
+        return $op && $op->isOutsourced() && $op->material_supply_type === 'vendor_supplied';
+    }
+
+    /** Quantity of a material issued to the order so far (store issue or order-screen issue, pooled per product). */
+    public function issuedToOrder(int $tenantId, int $orderId, int $productId): float
+    {
+        return (float) ProductionOrderReservation::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->where('product_id', $productId)
+            ->sum('quantity_issued');
+    }
+
+    /** Material of the order already sent to vendors (slips that went out), net of what came back unused. */
+    public function sentForOrder(int $tenantId, int $orderId, int $productId, ?int $exceptChallanId = null): float
+    {
+        return (float) DeliveryChallanItem::query()
+            ->join('delivery_challans', 'delivery_challans.id', '=', 'delivery_challan_items.delivery_challan_id')
+            ->where('delivery_challans.tenant_id', $tenantId)
+            ->where('delivery_challans.production_order_id', $orderId)
+            ->whereIn('delivery_challans.status', DeliveryChallan::SENT_STATUSES)
+            ->whereNull('delivery_challans.deleted_at')
+            ->when($exceptChallanId, fn ($q) => $q->where('delivery_challans.id', '!=', $exceptChallanId))
+            ->where('delivery_challan_items.item_type', 'material')
+            ->where('delivery_challan_items.product_id', $productId)
+            ->selectRaw('COALESCE(SUM(delivery_challan_items.quantity - delivery_challan_items.returned_qty), 0) as total')
+            ->value('total');
+    }
+
+    /** Issued to the order and not yet with a vendor — the most a dispatch slip may send of that material. */
+    public function availableToSend(ProductionOrderOperation $op, int $productId, ?int $exceptChallanId = null): float
+    {
+        $tenantId = (int) $op->tenant_id;
+        $orderId = (int) $op->production_order_id;
+
+        return max(0.0, round($this->issuedToOrder($tenantId, $orderId, $productId) - $this->sentForOrder($tenantId, $orderId, $productId, $exceptChallanId), 4));
+    }
+
+    /**
+     * D-3b (my rule): WIP job work may send the previous operation's good output that was not sent yet. Good output is
+     * the operation's quantity_produced (for a QC operation that is the QC-accepted quantity). Drafts never count (H-07).
+     *
+     * @return array{prev_op: ?ProductionOrderOperation, produced_qty: float, already_dispatched: float, available_wip: float}
+     */
+    public function availableWip(ProductionOrderOperation $op, ?int $exceptChallanId = null): array
+    {
+        $prevOp = $op->previousOperation ?: ProductionOrderOperation::where('tenant_id', $op->tenant_id)
+            ->where('production_order_id', $op->production_order_id)
+            ->where(function ($q) use ($op) {
+                $op->source_product_id ? $q->where('source_product_id', $op->source_product_id) : $q->whereNull('source_product_id');
+            })
+            ->where('sequence', '<', $op->sequence)
+            ->orderByDesc('sequence')
+            ->first();
+
+        $produced = $prevOp ? (float) $prevOp->quantity_produced : (float) ($op->order?->quantity_ordered ?? 0);
+
+        $sent = (float) DeliveryChallan::where('tenant_id', $op->tenant_id)
+            ->where('production_order_operation_id', $op->id)
+            ->whereIn('status', DeliveryChallan::SENT_STATUSES)
+            ->where('type', '!=', 'vendor_rework')
+            ->when($exceptChallanId, fn ($q) => $q->where('id', '!=', $exceptChallanId))
+            ->sum('dispatched_wip_qty');
+
+        return [
+            'prev_op' => $prevOp,
+            'produced_qty' => $produced,
+            'already_dispatched' => $sent,
+            'available_wip' => max(0.0, round($produced - $sent, 4)),
+        ];
+    }
+
+    /** Units of the operation not yet sent to a vendor (target − sent on slips that went out). */
+    public function unitsNotYetSent(ProductionOrderOperation $op, ?int $exceptChallanId = null): float
+    {
+        $target = (float) ($op->target_produced_qty ?: ($op->order?->quantity_ordered ?? 0));
+        $sent = (float) DeliveryChallan::where('tenant_id', $op->tenant_id)
+            ->where('production_order_operation_id', $op->id)
+            ->whereIn('status', DeliveryChallan::SENT_STATUSES)
+            ->where('type', '!=', 'vendor_rework')
+            ->when($exceptChallanId, fn ($q) => $q->where('id', '!=', $exceptChallanId))
+            ->sum('dispatched_wip_qty');
+
+        return max(0.0, round($target - $sent, 4));
+    }
+
+    /**
+     * Pre-filled lines of a new dispatch slip for the operation: the WIP line (job work) and the company materials for
+     * $units, each capped at what may be sent.
+     */
+    public function prefillLines(ProductionOrderOperation $op, float $units): array
+    {
+        $lines = [];
+        $order = $op->order;
+
+        if ($op->isWipJobWork()) {
+            $wipData = $this->availableWip($op);
+            $prevOp = $wipData['prev_op'];
+            $wip = ProductionWip::where('tenant_id', $op->tenant_id)->where('production_order_id', $op->production_order_id)->first();
+            $lines[] = [
+                'item_type' => 'wip',
+                'product_id' => $op->source_product_id ?: $order?->product_id,
+                'production_wip_id' => $wip?->id,
+                'production_batch_id' => $wip?->production_batch_id,
+                'product_name' => ($order?->product?->name ?? 'WIP') . ($prevOp ? " (output of OP-{$prevOp->operation_number})" : ' (in-process WIP)'),
+                'sku' => $order?->product?->sku,
+                'uom' => $order?->product?->unit_of_measure ?? 'PCS',
+                'required_qty' => round($units, 4),
+                'available' => $wipData['available_wip'],
+                'quantity' => round(min($units, $wipData['available_wip']), 4),
+            ];
+        }
+
+        foreach ($this->companyMaterialsPerUnit($op) as $material) {
+            $required = round($material['per_unit'] * $units, 4);
+            $available = $this->availableToSend($op, $material['product_id']);
+            $lines[] = [
+                'item_type' => 'material',
+                'product_id' => $material['product_id'],
+                'product_name' => $material['name'],
+                'sku' => $material['sku'],
+                'uom' => $material['uom'],
+                'required_qty' => $required,
+                'available' => $available,
+                'quantity' => round(min($required, $available), 4),
+            ];
+        }
+
+        return $lines;
+    }
+
+    // ─── Dispatch ────────────────────────────────────────────────────────────────
+
+    /**
+     * C-07 / N-20: every rule a slip must pass before it goes out. Returns the problems (empty = fine).
+     *
+     * @param array<int, array{item_type?:string, product_id:int, quantity:float}> $items
+     */
+    public function dispatchProblems(ProductionOrderOperation $op, int $vendorId, array $items, float $units, ?int $exceptChallanId = null): array
+    {
+        $problems = [];
+        $order = $op->order;
+
+        if (!$op->isOutsourced()) {
+            $problems[] = "Operation #{$op->operation_number} is not an outsourced operation.";
+        }
+        if ($order && !in_array($order->status, [ProductionOrder::STATUS_RELEASED, ProductionOrder::STATUS_IN_PROGRESS], true)) {
+            $problems[] = "Order {$order->order_number} is {$order->status}: material can be sent to a vendor only after the order is released.";
+        }
+        if ($op->vendor_id && (int) $op->vendor_id !== $vendorId) {
+            $problems[] = 'The vendor of the slip is not the vendor of the outsourced operation.';
+        }
+        if (in_array($op->status, [ProductionOrderOperation::STATUS_COMPLETED, ProductionOrderOperation::STATUS_CANCELLED, ProductionOrderOperation::STATUS_SKIPPED], true)) {
+            $problems[] = "Operation #{$op->operation_number} is {$op->status}.";
+        }
+        if ($units <= 0) {
+            $problems[] = 'Enter the units of work sent to the vendor.';
+        } elseif ($units > $this->unitsNotYetSent($op, $exceptChallanId) + 0.0001) {
+            $problems[] = 'Units sent (' . self::fmt($units) . ') exceed what is still to be sent for this operation (' . self::fmt($this->unitsNotYetSent($op, $exceptChallanId)) . ').';
+        }
+
+        $wipQty = 0.0;
+        foreach ($items as $item) {
+            $qty = (float) ($item['quantity'] ?? 0);
+            if (($item['item_type'] ?? 'material') === 'wip') {
+                $wipQty += $qty;
+                continue;
+            }
+            $available = $this->availableToSend($op, (int) $item['product_id'], $exceptChallanId);
+            if ($qty > $available + 0.0001) {
+                $name = \App\Domains\Inventory\Models\Product::find($item['product_id'])?->name ?? ('#' . $item['product_id']);
+                $problems[] = "{$name}: " . self::fmt($qty) . ' to send, but only ' . self::fmt($available) . ' is issued to the order and not yet sent. Request and issue it from the store first.';
+            }
+        }
+
+        if ($op->isWipJobWork()) {
+            $wip = $this->availableWip($op, $exceptChallanId);
+            if ($wipQty <= 0) {
+                $problems[] = 'This is WIP job work: add the WIP line (the previous operation\'s output).';
+            } elseif ($wipQty > $wip['available_wip'] + 0.0001) {
+                $problems[] = 'WIP to send (' . self::fmt($wipQty) . ') exceeds the previous operation\'s good output not yet sent (' . self::fmt($wip['available_wip']) . ').';
+            }
+        }
+
+        return $problems;
+    }
+
+    /**
+     * The slip goes out: no stock movement (TF-04 — the store issue was the stock-out); the operation is at the vendor;
+     * WIP lines are logged as WIP sent to the vendor.
+     */
+    public function processDispatchActions(DeliveryChallan $challan, int $tenantId): void
+    {
+        DB::transaction(function () use ($challan, $tenantId) {
+            $challan->load('items');
+            $op = $challan->operation;
+
+            $challan->status = DeliveryChallan::STATUS_DISPATCHED;
+            $challan->dispatched_at = now();
+            $challan->save();
+
+            foreach ($challan->items->where('item_type', 'wip') as $item) {
+                if (!$item->production_wip_id) {
+                    continue;
+                }
+                ProductionWipTransaction::create([
+                    'tenant_id' => $tenantId,
+                    'wip_id' => $item->production_wip_id,
+                    'production_order_id' => $challan->production_order_id,
+                    'production_batch_id' => $item->production_batch_id,
+                    'from_operation_id' => $op?->previousOperation?->routing_operation_id ?? $op?->routing_operation_id,
+                    'to_operation_id' => $op?->routing_operation_id,
+                    'from_work_center_id' => $op?->previousOperation?->work_center_id,
+                    'to_work_center_id' => null,
+                    'transaction_type' => 'wip_vendor_dispatched',
+                    'quantity' => (float) $item->quantity,
+                    'good_quantity' => (float) $item->quantity,
+                    'cost_before' => 0.00,
+                    'cost_added' => 0.00,
+                    'cost_after' => 0.00,
+                    'remarks' => mb_substr("WIP sent to vendor [{$challan->vendor?->name}] on dispatch slip {$challan->challan_number}", 0, 250),
+                    'transaction_at' => now(),
+                    'created_by' => auth()->id() ?: 1,
+                ]);
+            }
+
+            if ($op && !in_array($op->status, [ProductionOrderOperation::STATUS_COMPLETED, ProductionOrderOperation::STATUS_SUBCONTRACT_QC_PENDING], true)) {
+                $op->status = ProductionOrderOperation::STATUS_VENDOR_DISPATCHED;
+                $op->actual_start_time = $op->actual_start_time ?: now();
+                $op->save();
+
+                \App\Domains\Production\Models\ProductionScheduleOperation::where('production_order_operation_id', $op->id)
+                    ->whereNotIn('status', ['completed', 'skipped', 'cancelled'])
+                    ->update(['status' => 'running', 'actual_start' => DB::raw('COALESCE(actual_start, NOW())')]);
+            }
+
+            app(ProductionEventService::class)->writeEvent($tenantId, [
+                'production_order_id' => $challan->production_order_id,
+                'production_order_operation_id' => $op?->id,
+                'event_type' => 'Subcontract Dispatched',
+                'title' => 'Sent to vendor',
+                'description' => mb_substr(self::fmt((float) $challan->dispatched_wip_qty) . " unit(s) of work sent to {$challan->vendor?->name} on dispatch slip {$challan->challan_number}.", 0, 250),
+                'severity' => 'info',
+                'event_source' => 'SubcontractMaterialBalanceService',
+                'triggered_by' => auth()->id(),
+            ]);
+        });
+    }
+
+    // ─── Receipt side: what the vendor used / returned ───────────────────────────
+
+    /**
+     * TF-08: no backflush. Material lines of the slip record how much the vendor used for the units it returned
+     * (per-unit need × units processed, capped at what is still with the vendor) and what came back unused.
+     *
+     * @param array<int|string, float> $returns product_id => quantity returned unused (goes back to the floor)
+     */
+    public function recordMaterialUse(DeliveryChallan $challan, float $unitsProcessed, array $returns = []): void
+    {
+        $units = max(0.0, (float) $challan->dispatched_wip_qty);
+        foreach ($challan->items()->where('item_type', 'material')->get() as $item) {
+            $atVendor = max(0.0, (float) $item->quantity - (float) $item->consumed_qty - (float) $item->returned_qty - (float) $item->scrapped_qty);
+            $perUnit = $units > 0 ? ((float) ($item->required_qty ?: $item->quantity)) / $units : 0.0;
+
+            $used = min($atVendor, round($perUnit * $unitsProcessed, 4));
+            $returned = min(max(0.0, $atVendor - $used), max(0.0, (float) ($returns[$item->product_id] ?? 0)));
+
+            $item->consumed_qty = round((float) $item->consumed_qty + $used, 4);
+            $item->returned_qty = round((float) $item->returned_qty + $returned, 4);
+            $item->save();
+        }
+    }
+
+    /**
+     * Balance of an outsourced operation: per material sent / used / returned / scrapped / still at the vendor, plus the
+     * units of work at the vendor. The flat keys (sent, consumed …) stay for the existing order screen.
      */
     public function getMaterialBalance(int $tenantId, int $orderId, int $operationId): array
     {
         $op = ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
-            ->where(function ($q) use ($operationId) {
-                $q->where('id', $operationId)->orWhere('routing_operation_id', $operationId);
-            })
+            ->where(fn ($q) => $q->where('id', $operationId)->orWhere('routing_operation_id', $operationId))
             ->first();
 
+        $empty = ['sent' => 0.0, 'consumed' => 0.0, 'returned' => 0.0, 'scrapped' => 0.0, 'remaining' => 0.0, 'lines' => [], 'units_sent' => 0.0, 'units_received' => 0.0, 'units_at_vendor' => 0.0];
         if (!$op) {
-            return [
-                'sent' => 0.0,
-                'consumed' => 0.0,
-                'returned' => 0.0,
-                'scrapped' => 0.0,
-                'remaining' => 0.0,
-            ];
+            return $empty;
         }
 
-        // Outflows to Subcontractor Warehouse linked to this order/operation
-        $sentQty = (float) StockTransaction::where('tenant_id', $tenantId)
-            ->whereIn('reference_type', ['StockTransfer', 'DeliveryChallan'])
-            ->where('reference_id', $op->production_order_id)
-            ->where('type', 'OUT')
-            ->sum('quantity');
+        $challans = DeliveryChallan::where('tenant_id', $tenantId)
+            ->where('production_order_operation_id', $op->id)
+            ->whereIn('status', DeliveryChallan::SENT_STATUSES)
+            ->with('items.product')
+            ->get();
 
-        // Material consumed via backflushing
-        $consumedQty = (float) StockTransaction::where('tenant_id', $tenantId)
-            ->where('reference_type', 'SubcontractBackflush')
-            ->where('reference_id', $op->id)
-            ->where('type', 'OUT')
-            ->sum('quantity');
+        $lines = $challans->flatMap->items
+            ->groupBy(fn ($item) => $item->item_type . ':' . $item->product_id)
+            ->map(function ($items) {
+                $first = $items->first();
+                $sent = (float) $items->sum('quantity');
+                $consumed = (float) $items->sum('consumed_qty');
+                $returned = (float) $items->sum('returned_qty');
+                $scrapped = (float) $items->sum('scrapped_qty');
 
-        // Material returned to Main Warehouse
-        $returnedQty = (float) StockTransaction::where('tenant_id', $tenantId)
-            ->where('reference_type', 'SubcontractReturn')
-            ->where('reference_id', $op->id)
-            ->where('type', 'IN')
-            ->sum('quantity');
+                return [
+                    'item_type' => $first->item_type,
+                    'product_id' => $first->product_id,
+                    'name' => $first->product?->name ?? ('#' . $first->product_id),
+                    'uom' => $first->unit_of_measure,
+                    'sent' => $sent,
+                    'consumed' => $consumed,
+                    'returned' => $returned,
+                    'scrapped' => $scrapped,
+                    'at_vendor' => $first->item_type === 'wip' ? null : max(0.0, round($sent - $consumed - $returned - $scrapped, 4)),
+                ];
+            })->values();
 
-        // Material scrapped at vendor
-        $scrappedQty = (float) StockTransaction::where('tenant_id', $tenantId)
-            ->where('reference_type', 'SubcontractScrap')
-            ->where('reference_id', $op->id)
-            ->sum('quantity');
-
-        $remainingQty = max(0.0, $sentQty - ($consumedQty + $returnedQty + $scrappedQty));
+        $materials = $lines->where('item_type', 'material');
 
         return [
-            'sent' => $sentQty,
-            'consumed' => $consumedQty,
-            'returned' => $returnedQty,
-            'scrapped' => $scrappedQty,
-            'remaining' => $remainingQty,
+            'sent' => (float) $materials->sum('sent'),
+            'consumed' => (float) $materials->sum('consumed'),
+            'returned' => (float) $materials->sum('returned'),
+            'scrapped' => (float) $materials->sum('scrapped'),
+            'remaining' => (float) $materials->sum('at_vendor'),
+            'lines' => $lines->all(),
+            'units_sent' => (float) $challans->sum('dispatched_wip_qty'),
+            'units_received' => (float) $challans->sum('received_qty'),
+            'units_at_vendor' => (float) $challans->sum(fn ($c) => $c->unitsAtVendor()),
         ];
     }
 
-    /**
-     * Backflush company material from Subcontractor Warehouse upon accepted GRN.
-     */
-    public function backflushCompanyMaterial(
-        int $tenantId,
-        ProductionOrderOperation $op,
-        float $acceptedQty,
-        ?int $subcontractorWarehouseId = null
-    ): float {
-        return DB::transaction(function () use ($tenantId, $op, $acceptedQty, $subcontractorWarehouseId) {
-            if ($op->material_supply_type !== 'company_supplied') {
-                return 0.0;
-            }
-
-            $order = $op->order;
-            if (!$order || !$order->bom_id) {
-                return 0.0;
-            }
-
-            // Find subcontractor warehouse for vendor
-            $whId = $subcontractorWarehouseId;
-            if (!$whId && $op->vendor_id) {
-                $whId = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $tenantId)
-                    ->where('type', 'subcontractor')
-                    ->where('vendor_id', $op->vendor_id)
-                    ->value('id');
-            }
-
-            if (!$whId) {
-                // Fallback to any subcontractor warehouse or default warehouse
-                $whId = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $tenantId)
-                    ->where('type', 'subcontractor')
-                    ->value('id');
-            }
-
-            if (!$whId) {
-                return 0.0;
-            }
-
-            $bom = \App\Domains\Production\Models\ProductionBom::with(['operationMaterials', 'items'])->find($order->bom_id);
-            if (!$bom) {
-                return 0.0;
-            }
-
-            $totalBackflushed = 0.0;
-            $baseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
-            $sourceRows = ($bom->operationMaterials->isNotEmpty() ? $bom->operationMaterials : $bom->items)
-                ->where('is_alternative', false);
-
-            foreach ($sourceRows as $item) {
-                $grossUnitQty = method_exists($item, 'calculateGrossQuantity')
-                    ? (float) ($item->gross_quantity ?? $item->calculateGrossQuantity())
-                    : ((float) $item->quantity * (1.0 + ((float) ($item->material_scrap_percentage ?? 0) / 100.0)));
-                $reqQtyPerUnit = $grossUnitQty / $baseQty;
-                $componentQtyToDeduct = round($acceptedQty * $reqQtyPerUnit, 4);
-
-                if ($componentQtyToDeduct <= 0) continue;
-
-                // Idempotency check for this GRN/operation backflush
-                $alreadyBackflushed = StockTransaction::where('tenant_id', $tenantId)
-                    ->where('product_id', $item->material_id)
-                    ->where('warehouse_id', $whId)
-                    ->where('reference_type', 'SubcontractBackflush')
-                    ->where('reference_id', $op->id)
-                    ->sum('quantity');
-
-                // Record stock outflow from vendor subcontractor warehouse
-                StockService::recordOutflow(
-                    tenantId: $tenantId,
-                    productId: $item->material_id,
-                    warehouseId: $whId,
-                    quantity: $componentQtyToDeduct,
-                    referenceType: 'SubcontractBackflush',
-                    referenceId: $op->id
-                );
-
-                $totalBackflushed += $componentQtyToDeduct;
-            }
-
-            return $totalBackflushed;
-        });
-    }
+    // ─── Rework slip ─────────────────────────────────────────────────────────────
 
     /**
-     * Validate physical stock availability across items.
+     * Rejected units go back to the vendor for rework (N-19): a WIP slip for the operation. Its receipt goes through
+     * SubcontractReceiptService like any other (no PO / GRN — rework is not billed again).
      */
-    public function validateStockAvailability(int $tenantId, array $items): array
+    public function createReworkChallan(int $tenantId, ProductionOrderOperation $op, float $qty, array $data, int $userId): DeliveryChallan
     {
-        $errors = [];
-
-        foreach ($items as $item) {
-            $whId = $item['warehouse_id'] ?? null;
-            $productId = $item['product_id'];
-            $reqQty = (float) $item['quantity'];
-
-            if (!$whId) continue;
-
-            $wh = \App\Domains\Inventory\Models\Warehouse::find($whId);
-            $stock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
-                ->where('warehouse_id', $whId)
-                ->where('product_id', $productId)
-                ->first();
-
-            $available = $stock ? (float) ($stock->available_qty ?? $stock->quantity) : 0.0;
-
-            if ($available < $reqQty) {
-                $product = \App\Domains\Inventory\Models\Product::find($productId);
-                $errors[] = "Insufficient stock for [{$product?->name}] in warehouse [{$wh?->name}]. Required: " . number_format($reqQty, 2) . ", Available: " . number_format($available, 2) . ".";
-            }
+        if (!$op->isOutsourced()) {
+            throw new InvalidArgumentException("Operation #{$op->operation_number} is not outsourced.");
+        }
+        if ($qty <= 0 || $qty > (float) $op->quantity_rejected + 0.0001) {
+            throw new InvalidArgumentException('Rework quantity must be more than 0 and at most the rejected quantity (' . self::fmt((float) $op->quantity_rejected) . ').');
         }
 
-        return $errors;
-    }
-
-    /**
-     * Execute stock deduction and operation status updates upon challan dispatch.
-     */
-    public function processDispatchActions(\App\Domains\Production\Models\DeliveryChallan $challan, int $tenantId): void
-    {
-        DB::transaction(function () use ($challan, $tenantId) {
-            $op = $challan->operation;
-            $isWipJobWork = $op?->isWipJobWork() ?? false;
-            $challan->load('items');
-            $totalDispatched = (float) $challan->items->sum('quantity');
-
-            $challan->dispatched_wip_qty = $totalDispatched;
-            $challan->save();
-
-            foreach ($challan->items as $item) {
-                $whId = $item->warehouse_id ?: $challan->warehouse_id;
-
-                if ($isWipJobWork) {
-                    $wipId = $item->production_wip_id;
-                    $batchId = $item->production_batch_id;
-
-                    if (!$wipId && $challan->production_order_id) {
-                        $wip = \App\Domains\Production\Models\ProductionWip::where('tenant_id', $tenantId)
-                            ->where('production_order_id', $challan->production_order_id)
-                            ->first();
-
-                        if (!$wip) {
-                            $batch = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $tenantId)
-                                ->where('production_order_id', $challan->production_order_id)
-                                ->first();
-
-                            $wip = \App\Domains\Production\Models\ProductionWip::create([
-                                'tenant_id' => $tenantId,
-                                'company_id' => $challan->productionOrder?->company_id ?? $challan->company_id ?? company_id(),
-                                'branch_id' => $challan->productionOrder?->branch_id ?? $challan->branch_id ?? branch_id(),
-                                'production_order_id' => $challan->production_order_id,
-                                'production_batch_id' => $batch?->id,
-                                'product_id' => $item->product_id ?: $challan->productionOrder?->product_id,
-                                'current_routing_operation_id' => $op?->routing_operation_id,
-                                'current_work_center_id' => $op?->work_center_id,
-                                'quantity' => $challan->productionOrder?->quantity_ordered ?? 0,
-                                'available_quantity' => 0,
-                                'completed_quantity' => 0,
-                                'rejected_quantity' => 0,
-                                'scrap_quantity' => 0,
-                                'rework_quantity' => 0,
-                                'status' => 'active',
-                            ]);
-                        }
-
-                        $wipId = $wip->id;
-                        if (!$batchId) {
-                            $batchId = $wip->production_batch_id;
-                        }
-
-                        $item->production_wip_id = $wipId;
-                        if ($batchId) {
-                            $item->production_batch_id = $batchId;
-                        }
-                        $item->save();
-                    }
-
-                    \App\Domains\Production\Models\ProductionWipTransaction::create([
-                        'tenant_id' => $tenantId,
-                        'wip_id' => $wipId,
-                        'production_order_id' => $challan->production_order_id,
-                        'production_batch_id' => $batchId,
-                        'from_operation_id' => $op?->routing_operation_id,
-                        'to_operation_id' => null,
-                        'from_work_center_id' => $op?->work_center_id,
-                        'to_work_center_id' => null,
-                        'transaction_type' => 'wip_vendor_dispatched',
-                        'quantity' => (float) $item->quantity,
-                        'good_quantity' => (float) $item->quantity,
-                        'cost_before' => 0.00,
-                        'cost_added' => 0.00,
-                        'cost_after' => 0.00,
-                        'remarks' => "WIP dispatched to vendor [{$challan->vendor?->name}] via Delivery Challan #{$challan->challan_number}",
-                        'transaction_at' => now(),
-                        'created_by' => auth()->id() ?: 1,
-                    ]);
-                } else if ($whId) {
-                    StockTransaction::create([
-                        'tenant_id' => $tenantId,
-                        'product_id' => $item->product_id,
-                        'warehouse_id' => $whId,
-                        'type' => 'OUT',
-                        'reference_type' => 'DeliveryChallan',
-                        'reference_id' => $challan->production_order_id ?: $challan->id,
-                        'quantity' => (float) $item->quantity,
-                        'unit_cost' => 0,
-                        'total_value' => 0,
-                        'balance_qty' => 0,
-                    ]);
-
-                    $stock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
-                        ->where('warehouse_id', $whId)
-                        ->where('product_id', $item->product_id)
-                        ->first();
-
-                    if ($stock) {
-                        $stock->quantity = max(0.0, (float) $stock->quantity - (float) $item->quantity);
-                        $stock->available_qty = max(0.0, (float) $stock->available_qty - (float) $item->quantity);
-                        $stock->save();
-                    }
-                }
-            }
-
-            if ($op) {
-                $op->status = 'vendor_dispatched';
-                $op->actual_start_time = $op->actual_start_time ?: now();
-                $op->save();
-
-                \App\Domains\Production\Models\ProductionOrderProgressLog::create([
-                    'tenant_id' => $tenantId,
-                    'production_order_id' => $op->production_order_id,
-                    'operation_id' => $op->id,
-                    'quantity_completed' => 0,
-                    'recorded_at' => now(),
-                    'status' => 'vendor_dispatched',
-                    'log_type' => 'subcontract_dispatch',
-                    'logged_by' => auth()->id() ?: 1,
-                    'remarks' => "Dispatched {$totalDispatched} units to vendor via Delivery Challan #{$challan->challan_number} (Vehicle: {$challan->vehicle_number}).",
-                ]);
-            }
-        });
-    }
-
-    /**
-     * Execute receipt stock inflow, backflushing, operation completion, and WIP evaluation upon receiving challan.
-     */
-    public function processReceiveActions(
-        \App\Domains\Production\Models\DeliveryChallan $challan,
-        int $tenantId,
-        float $receivedQty,
-        float $acceptedQty,
-        float $rejectedQty,
-        int $warehouseId,
-        ?string $remarks = null,
-        float $scrappedQty = 0.0
-    ): void {
-        DB::transaction(function () use ($challan, $tenantId, $receivedQty, $acceptedQty, $rejectedQty, $scrappedQty, $warehouseId, $remarks) {
-            $op = $challan->operation;
-            $order = $challan->productionOrder;
-            $isWipJobWork = $op?->isWipJobWork() ?? false;
-
-            // 1. Finished Goods stock inflow only for raw material subcontracting (NOT for intermediate WIP Job Work)
-            $targetProductId = $order?->product_id;
-            if (!$isWipJobWork && $targetProductId && $acceptedQty > 0) {
-                StockService::recordInflow(
-                    tenantId: $tenantId,
-                    productId: $targetProductId,
-                    warehouseId: $warehouseId,
-                    quantity: $acceptedQty,
-                    unitCost: 0,
-                    referenceType: 'SubcontractReceipt',
-                    referenceId: $challan->id
-                );
-            }
-
-            // 2. Backflush company material components only for raw material subcontracting
-            if ($op && !$isWipJobWork) {
-                $this->backflushCompanyMaterial($tenantId, $op, $acceptedQty);
-            }
-
-            // 3. Update WIP transactions & operation progress
-            if ($op) {
-                if ($isWipJobWork) {
-                    $firstItem = $challan->items->first();
-                    $wipId = $firstItem?->production_wip_id;
-                    $batchId = $firstItem?->production_batch_id;
-
-                    if (!$wipId && $challan->production_order_id) {
-                        $wip = \App\Domains\Production\Models\ProductionWip::where('tenant_id', $tenantId)
-                            ->where('production_order_id', $challan->production_order_id)
-                            ->first();
-
-                        if (!$wip) {
-                            $batch = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $tenantId)
-                                ->where('production_order_id', $challan->production_order_id)
-                                ->first();
-
-                            $wip = \App\Domains\Production\Models\ProductionWip::create([
-                                'tenant_id' => $tenantId,
-                                'company_id' => $order?->company_id ?? $challan->company_id ?? company_id(),
-                                'branch_id' => $order?->branch_id ?? $challan->branch_id ?? branch_id(),
-                                'production_order_id' => $challan->production_order_id,
-                                'production_batch_id' => $batch?->id,
-                                'product_id' => $firstItem?->product_id ?: $order?->product_id,
-                                'current_routing_operation_id' => $op->routing_operation_id,
-                                'current_work_center_id' => $op->work_center_id,
-                                'quantity' => $order?->quantity_ordered ?? 0,
-                                'available_quantity' => 0,
-                                'completed_quantity' => 0,
-                                'rejected_quantity' => 0,
-                                'scrap_quantity' => 0,
-                                'rework_quantity' => 0,
-                                'status' => 'active',
-                            ]);
-                        }
-
-                        $wipId = $wip->id;
-                        if (!$batchId) {
-                            $batchId = $wip->production_batch_id;
-                        }
-
-                        if ($firstItem) {
-                            $firstItem->production_wip_id = $wipId;
-                            if ($batchId) {
-                                $firstItem->production_batch_id = $batchId;
-                            }
-                            $firstItem->save();
-                        }
-                    }
-
-                    \App\Domains\Production\Models\ProductionWipTransaction::create([
-                        'tenant_id' => $tenantId,
-                        'wip_id' => $wipId,
-                        'production_order_id' => $challan->production_order_id,
-                        'production_batch_id' => $batchId,
-                        'from_operation_id' => $op->routing_operation_id,
-                        'to_operation_id' => null,
-                        'from_work_center_id' => null,
-                        'to_work_center_id' => $op->work_center_id,
-                        'transaction_type' => 'subcontract_received',
-                        'quantity' => $acceptedQty,
-                        'good_quantity' => $acceptedQty,
-                        'rejected_quantity' => $rejectedQty,
-                        'scrap_quantity' => $scrappedQty,
-                        'remarks' => "Received {$acceptedQty} processed WIP units from vendor [{$challan->vendor?->name}] via Challan #{$challan->challan_number} (from Op {$op->sequence}). " . ($remarks ?? ''),
-                        'transaction_at' => now(),
-                        'created_by' => auth()->id() ?: 1,
-                    ]);
-                }
-
-                $isQcRequired = (bool) ($op->quality_required || ($op->routingOperation?->quality_required ?? false));
-
-                if ($isQcRequired) {
-                    $op->status = 'subcontract_qc_pending';
-                    $op->save();
-
-                    \App\Domains\Production\Models\ProductionOrderProgressLog::create([
-                        'tenant_id'           => $tenantId,
-                        'production_order_id' => $op->production_order_id,
-                        'operation_id'        => $op->id,
-                        'quantity_completed'  => 0,
-                        'quantity_produced'   => $receivedQty,
-                        'recorded_at'          => now(),
-                        'status'              => 'subcontract_qc_pending',
-                        'log_type'            => 'subcontract_receipt',
-                        'logged_by'           => auth()->id() ?: 1,
-                        'remarks'             => "Received {$receivedQty} units from vendor [{$challan->vendor?->name}] via Challan #{$challan->challan_number} - pending QC inspection. " . ($remarks ?? ''),
-                    ]);
-                } else {
-                    $op->quantity_produced = (float) $op->quantity_produced + $acceptedQty;
-                    if ($rejectedQty > 0) {
-                        $op->quantity_rejected = (float) $op->quantity_rejected + $rejectedQty;
-                    }
-                    if ($scrappedQty > 0) {
-                        $op->quantity_scrapped = (float) $op->quantity_scrapped + $scrappedQty;
-                    }
-
-                    $targetQty = (float) ($op->target_produced_qty ?: ($order?->quantity_ordered ?: 0.0));
-                    if ($targetQty > 0 && $op->quantity_produced < ($targetQty - 0.0001)) {
-                        $op->status = 'running';
-                    } else {
-                        $op->status = 'completed';
-                        $op->actual_end_time = now();
-                    }
-                    $op->save();
-
-                    // Log progress
-                    \App\Domains\Production\Models\ProductionOrderProgressLog::create([
-                        'tenant_id'           => $tenantId,
-                        'production_order_id' => $op->production_order_id,
-                        'operation_id'        => $op->id,
-                        'quantity_completed'  => $acceptedQty,
-                        'quantity_produced'   => $acceptedQty,
-                        'recorded_at'          => now(),
-                        'status'              => $op->status,
-                        'log_type'            => 'subcontract_receipt',
-                        'logged_by'           => auth()->id() ?: 1,
-                        'remarks'             => "Received {$acceptedQty} processed items from vendor [{$challan->vendor?->name}] via Challan #{$challan->challan_number}. " . ($remarks ?? ''),
-                    ]);
-
-                    // Unlock next operation on Shopfloor via WIP transfer evaluator
-                    app(\App\Domains\Production\Services\ProductionWipService::class)->evaluateAndExecuteWipTransfers($op->id);
-                }
-            }
-
-            // Mark Challan as Completed
-            $challan->status = 'completed';
-            $challan->save();
-
-            // Auto-approve Subcontract PO if draft
-            if ($challan->production_order_operation_id) {
-                $poItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('production_order_operation_id', $challan->production_order_operation_id)->first();
-                if ($poItem && $poItem->order && $poItem->order->status === 'Draft') {
-                    $poItem->order->status = 'Approved';
-                    $poItem->order->save();
-                }
-            }
-
-            // Auto-complete Production Order if all operations completed
-            if ($challan->production_order_id) {
-                app(\App\Domains\Production\Services\ProductionOrderService::class)->evaluateAndAutoCompleteOrder($challan->production_order_id);
-            }
-        });
-    }
-
-    /**
-     * Create a Subcontract Rework Delivery Challan (Return Gate Pass) to dispatch rejected WIP back to vendor for rework.
-     */
-    public function createReworkChallan(int $tenantId, ProductionOrderOperation $op, float $qty, array $data, int $userId): \App\Domains\Production\Models\DeliveryChallan
-    {
         return DB::transaction(function () use ($tenantId, $op, $qty, $data, $userId) {
             $order = $op->order;
             $vendorId = $data['vendor_id'] ?? $op->vendor_id;
 
-            if (!$vendorId && $order?->operations) {
-                $extOp = $order->operations->firstWhere('is_external', true);
-                $vendorId = $extOp?->vendor_id;
-            }
-
-            $challanNumber = 'DC-RWK-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -4));
-            $companyId = $order?->company_id ?? company_id() ?? (class_exists(\App\Core\Company\CompanyContext::class) ? app(\App\Core\Company\CompanyContext::class)->id() : null);
-            $branchId = $order?->branch_id ?? branch_id() ?? (class_exists(\App\Core\Branch\BranchContext::class) ? app(\App\Core\Branch\BranchContext::class)->id() : null);
-
-            $challan = \App\Domains\Production\Models\DeliveryChallan::create([
-                'tenant_id' => $tenantId,
-                'company_id' => $companyId,
-                'branch_id' => $branchId,
-                'challan_number' => $challanNumber,
+            $challan = app(\App\Domains\Production\Repositories\DeliveryChallanRepositoryInterface::class)->create($tenantId, [
                 'type' => 'vendor_rework',
                 'production_order_id' => $op->production_order_id,
                 'production_order_operation_id' => $op->id,
                 'vendor_id' => $vendorId,
                 'warehouse_id' => $data['warehouse_id'] ?? null,
-                'challan_date' => now(),
-                'expected_return_date' => now()->addDays(7),
-                'status' => 'dispatched',
-                'dispatched_wip_qty' => $qty,
-                'notes' => $data['instructions'] ?? "Subcontract Rework Dispatch for {$qty} rejected units on Op #{$op->operation_number}. Reason: " . ($data['reason'] ?? 'Defect Rectification'),
+                'challan_date' => now()->toDateString(),
+                'expected_return_date' => app(SubcontractDates::class)->expectedReturnDate($op, now())->toDateString(),
+                'status' => DeliveryChallan::STATUS_DRAFT,
+                'units_sent' => $qty,
+                'notes' => $data['instructions'] ?? "Rework of {$qty} rejected unit(s) on Op #{$op->operation_number}. Reason: " . ($data['reason'] ?? 'Defect rectification'),
                 'created_by' => $userId,
-            ]);
-
-            // Locate WIP record
-            $wip = \App\Domains\Production\Models\ProductionWip::where('tenant_id', $tenantId)
-                ->where('production_order_id', $op->production_order_id)
-                ->first();
-
-            $batch = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $tenantId)
-                ->where('production_order_id', $op->production_order_id)
-                ->first();
-
-            \App\Domains\Production\Models\DeliveryChallanItem::create([
-                'tenant_id' => $tenantId,
-                'company_id' => $companyId,
-                'branch_id' => $branchId,
-                'delivery_challan_id' => $challan->id,
+            ], [[
+                'item_type' => 'wip',
                 'product_id' => $op->source_product_id ?: $order?->product_id,
-                'production_batch_id' => $data['batch_id'] ?? $batch?->id,
-                'production_wip_id' => $wip?->id,
-                'warehouse_id' => $data['warehouse_id'] ?? null,
                 'quantity' => $qty,
+                'required_qty' => $qty,
                 'unit_of_measure' => $order?->product?->unit_of_measure ?? 'PCS',
-                'batch_number' => $batch?->batch_number,
-                'notes' => "Subcontract Rework WIP Unit Sent for Vendor Rectification",
-            ]);
+            ]]);
 
-            if ($wip) {
-                \App\Domains\Production\Models\ProductionWipTransaction::create([
-                    'tenant_id' => $tenantId,
-                    'wip_id' => $wip->id,
-                    'production_order_id' => $op->production_order_id,
-                    'production_batch_id' => $batch?->id,
-                    'from_operation_id' => $op->routing_operation_id,
-                    'to_operation_id' => $op->routing_operation_id,
-                    'from_work_center_id' => $op->work_center_id,
-                    'to_work_center_id' => null,
-                    'transaction_type' => 'subcontract_rework_dispatched',
-                    'quantity' => $qty,
-                    'good_quantity' => 0,
-                    'rework_quantity' => $qty,
-                    'remarks' => "Dispatched {$qty} rejected units to vendor for rework via Challan #{$challanNumber}",
-                    'transaction_at' => now(),
-                    'created_by' => $userId,
-                ]);
-            }
+            $this->processDispatchActions($challan->fresh('items'), $tenantId);
 
-            return $challan;
+            return $challan->fresh();
         });
+    }
+
+    private static function fmt(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 4, '.', ''), '0'), '.') ?: '0';
     }
 }

@@ -993,13 +993,38 @@ class ProductionOrderController extends Controller
         Gate::authorize('update', $order);
         $tenantId = require_tenant_id();
 
-        if (!$operation->is_external) {
-            return redirect()->back()->with('error', 'Operation is not an outsourced operation.');
+        // M-01: the operation must belong to this order (and tenant)
+        if ((int) $operation->production_order_id !== (int) $order->id || (int) $operation->tenant_id !== (int) $tenantId) {
+            abort(404);
         }
 
-        $pr = app(\App\Domains\Production\Services\SubcontractProcurementOrchestrator::class)
-            ->generateSubcontractRequisition($operation, $tenantId, Auth::id());
+        return $this->raiseSubcontractPurchasing($operation, $tenantId);
+    }
 
-        return redirect()->back()->with('success', "Purchase Requisition {$pr->requisition_number} generated successfully for Subcontract Operation #{$operation->sequence}.");
+    /**
+     * TF-05 "Raise PR / PO" (order screen and MES floor): what it creates follows Production → Settings
+     * (PR / Draft PO / auto-approved PO). An open PR / PO for the operation is reported, never duplicated.
+     */
+    public function raiseSubcontractPurchasing(ProductionOrderOperation $operation, int $tenantId)
+    {
+        $orchestrator = app(\App\Domains\Production\Services\SubcontractProcurementOrchestrator::class);
+        $existing = $orchestrator->existingDocument($operation, $tenantId);
+
+        try {
+            $doc = $existing ?? $orchestrator->orchestrateSubcontractProcurement($operation, $tenantId, Auth::id());
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        $label = $doc instanceof \App\Domains\Purchase\Models\PurchaseOrder
+            ? "Subcontract PO {$doc->purchase_order_number} ({$doc->status})"
+            : "Subcontract PR {$doc->requisition_number} ({$doc->status})";
+
+        return redirect()->back()->with(
+            $existing ? 'info' : 'success',
+            $existing
+                ? "{$label} already exists for Op #{$operation->sequence} — no second document was raised."
+                : "{$label} raised for Op #{$operation->sequence}."
+        );
     }
 }

@@ -299,6 +299,9 @@ Route::prefix('production')
         Route::post('mes/{op}/hold', [MesController::class, 'hold'])->name('mes.hold');
         Route::post('mes/{op}/cancel', [MesController::class, 'cancel'])->name('mes.cancel');
         Route::post('mes/{op}/andon-alert', [MesController::class, 'reportAndonAlert'])->name('mes.andon-alert');
+        // SC-02 / D-4: outsourced work on the shop floor — receive it, or raise its PR / PO (order-operation id)
+        Route::post('mes/subcontract/{orderOp}/receive', [MesController::class, 'recordSubcontractReceipt'])->name('mes.subcontract-receive');
+        Route::post('mes/subcontract/{orderOp}/procure', [MesController::class, 'raiseSubcontractPurchasing'])->name('mes.subcontract-procure');
         Route::post('mes/{op}/quality-inspection', [MesController::class, 'recordQualityInspection'])->name('mes.quality-inspection');
         Route::post('mes/{op}/scrap', [MesController::class, 'recordOperationalScrap'])->name('mes.scrap');
         Route::post('mes/{op}/disposition', [MesController::class, 'recordDisposition'])->name('mes.disposition');

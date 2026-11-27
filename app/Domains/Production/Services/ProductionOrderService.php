@@ -282,6 +282,7 @@ class ProductionOrderService
                     'subcontract_service_product_id' => $routingOp?->subcontract_service_product_id,
                     'material_supply_type' => $routingOp?->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
                     'subcontract_input_type' => $routingOp?->subcontract_input_type ?? 'bom_raw_materials',
+                    'uses_previous_op_output' => $this->usesPreviousOpOutput($order->bom_id, $routingOp), // TF-01
                     'dispatch_buffer_days' => (int) ($routingOp?->dispatch_buffer_days ?? 0),
                     'return_buffer_days' => (int) ($routingOp?->return_buffer_days ?? 0),
                     'queue_threshold_enabled' => (bool) ($routingOp?->queue_threshold_enabled ?? $routingOp?->overlap_enabled ?? false),
@@ -331,16 +332,8 @@ class ProductionOrderService
                 $order->save();
             }
 
-            // Auto-orchestrate Subcontract Procurement according to tenant settings (Manual PR/PO, Auto Draft PO, Auto Approved PO)
-            foreach ($createdOps as $createdOp) {
-                if ($createdOp->is_external) {
-                    try {
-                        app(SubcontractProcurementOrchestrator::class)->orchestrateSubcontractProcurement($createdOp, $order->tenant_id, $userId);
-                    } catch (\Throwable $e) {
-                        // Procurement orchestration fallback
-                    }
-                }
-            }
+            // SC D-4: subcontract PR / PO is never raised automatically — only by the "Raise PR / PO" button
+            // (order screen / MES floor), see docs/subcontracting_module_audit_2026-11-26.md TF-05.
 
             // 4. Progress Production Plan status
             $plan->status = ProductionPlan::STATUS_RELEASED;
@@ -855,25 +848,21 @@ class ProductionOrderService
                 throw new MaterialsNotReleasedException(__('production.materials_not_released_confirm'));
             }
 
-            $order->status = ProductionOrder::STATUS_RELEASED;
-            $order->released_by = $userId;
-            $order->released_at = now();
-            $order->save();
+            // N-24: the status change, WIP start and readiness refresh succeed or fail together
+            DB::transaction(function () use ($order, $userId) {
+                $order->status = ProductionOrder::STATUS_RELEASED;
+                $order->released_by = $userId;
+                $order->released_at = now();
+                $order->save();
 
-            // Initialize Work-in-Progress (WIP) tracking
-            app(ProductionWipService::class)->initializeWip($order->id, null, $userId);
+                // Initialize Work-in-Progress (WIP) tracking
+                app(ProductionWipService::class)->initializeWip($order->id, null, $userId);
 
-            // PX-10: readiness is computed from release on (event), not when a page is opened
-            $this->reconcileOperationReadiness($order);
+                // PX-10: readiness is computed from release on (event), not when a page is opened
+                $this->reconcileOperationReadiness($order);
+            });
 
-            // Orchestrate subcontract procurement for external operations
-            $externalOps = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $order->id)
-                ->where('is_external', true)
-                ->get();
-
-            foreach ($externalOps as $externalOp) {
-                app(SubcontractProcurementOrchestrator::class)->orchestrateSubcontractProcurement($externalOp, $order->tenant_id, $userId);
-            }
+            // SC D-4: no automatic subcontract PR / PO on release — raised only by the button (TF-05)
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
@@ -1059,6 +1048,65 @@ class ProductionOrderService
     /**
      * Cancel order execution.
      */
+    /**
+     * H-05: an order cannot be cancelled or deleted while subcontract documents are still open — material or WIP at the
+     * vendor (a dispatch slip not fully received) or a subcontract PR / PO that is not cancelled / completed. The user
+     * closes those first, so nothing is left orphaned.
+     */
+    /** @var array<int, ?ProductionBom> BOMs looked up while snapshotting operations */
+    private array $snapshotBomCache = [];
+
+    /** TF-01: the BOM's "Previous OP materials" choice for a routing operation, copied onto the order operation. */
+    private function usesPreviousOpOutput(?int $bomId, $routingOp): bool
+    {
+        if (!$bomId || !$routingOp) {
+            return false;
+        }
+        if (!array_key_exists($bomId, $this->snapshotBomCache)) {
+            $this->snapshotBomCache[$bomId] = \App\Domains\Production\Models\ProductionBom::withoutGlobalScopes()->find($bomId);
+        }
+
+        return (bool) $this->snapshotBomCache[$bomId]?->usesPreviousOpOutput($routingOp);
+    }
+
+    private function assertNoOpenSubcontractDocuments(ProductionOrder $order, string $action): void
+    {
+        $open = [];
+
+        $challans = \App\Domains\Production\Models\DeliveryChallan::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->whereIn('status', \App\Domains\Production\Models\DeliveryChallan::AT_VENDOR_STATUSES)
+            ->pluck('challan_number');
+        if ($challans->isNotEmpty()) {
+            $open[] = 'dispatch slip(s) at the vendor: ' . $challans->implode(', ');
+        }
+
+        $pos = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->where('is_subcontract', true)
+            ->whereNotIn('status', ['Cancelled', 'Completed', 'Closed'])
+            ->pluck('purchase_order_number');
+        if ($pos->isNotEmpty()) {
+            $open[] = 'subcontract PO(s): ' . $pos->implode(', ');
+        }
+
+        $prs = \App\Domains\Purchase\Models\PurchaseRequisition::where('tenant_id', $order->tenant_id)
+            ->whereIn('source_type', ['mo', 'ProductionOrder'])
+            ->where('source_id', $order->id)
+            ->where('notes', 'like', 'Subcontract Service%')
+            ->where('status', '!=', 'Cancelled')
+            ->get()
+            ->filter(fn ($pr) => $pr->items()->get()->every(fn ($item) => (float) ($item->ordered_qty ?? 0) < (float) $item->quantity))
+            ->pluck('requisition_number');
+        if ($prs->isNotEmpty()) {
+            $open[] = 'subcontract PR(s): ' . $prs->implode(', ');
+        }
+
+        if ($open) {
+            throw new InvalidArgumentException("This order cannot be {$action} while subcontract documents are open — " . implode('; ', $open) . '. Receive or cancel them first.');
+        }
+    }
+
     public function cancel(int $id, ?int $userId = null): void
     {
         $order = $this->orderRepository->find($id);
@@ -1067,6 +1115,8 @@ class ProductionOrderService
         if ($order->isClosed() || $order->isCompleted()) {
             throw new InvalidArgumentException('Closed or completed orders cannot be cancelled.');
         }
+
+        $this->assertNoOpenSubcontractDocuments($order, 'cancelled');
 
         DB::transaction(function () use ($order, $userId) {
             // PX-20 (decision D-06 A): material already issued to the order but not consumed by output goes back to stock
@@ -1165,6 +1215,8 @@ class ProductionOrderService
         if ($reason = $order->editBlockReason('deleted')) {
             throw new InvalidArgumentException($reason);
         }
+
+        $this->assertNoOpenSubcontractDocuments($order, 'deleted');
 
         DB::transaction(function () use ($order) {
             $this->cancelPendingSlips($order, true, 'this order can no longer be deleted');
@@ -1785,6 +1837,7 @@ class ProductionOrderService
                 'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
                 'material_supply_type' => $routingOp->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
                 'subcontract_input_type' => $routingOp->subcontract_input_type ?? 'bom_raw_materials',
+                'uses_previous_op_output' => $this->usesPreviousOpOutput($bom->id, $routingOp), // TF-01
                 'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
                 'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
                 'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
@@ -1828,16 +1881,7 @@ class ProductionOrderService
             }
         }
 
-        // Auto-orchestrate Subcontract Procurement according to tenant settings (Manual PR/PO, Auto Draft PO, Auto Approved PO)
-        foreach ($createdOps as $createdOp) {
-            if ($createdOp->is_external) {
-                try {
-                    app(SubcontractProcurementOrchestrator::class)->orchestrateSubcontractProcurement($createdOp, $tenantId, $userId);
-                } catch (\Throwable $e) {
-                    // Procurement orchestration fallback
-                }
-            }
-        }
+        // SC D-4: subcontract PR / PO is raised only by the button (TF-05), never while building the order
 
         // 2. Recursively inspect component BOM items for child SFGs
         $bomBaseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
@@ -2272,6 +2316,7 @@ class ProductionOrderService
             'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
             'material_supply_type' => $routingOp->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
             'subcontract_input_type' => $routingOp->subcontract_input_type ?? 'bom_raw_materials',
+            'uses_previous_op_output' => $this->usesPreviousOpOutput($entry['source_bom_id'] ?? null, $routingOp), // TF-01
             'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
             'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
             'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
@@ -2405,15 +2450,7 @@ class ProductionOrderService
             $order->save();
         }
 
-        foreach ($createdNow as $createdOp) {
-            if ($createdOp->is_external) {
-                try {
-                    app(SubcontractProcurementOrchestrator::class)->orchestrateSubcontractProcurement($createdOp, $order->tenant_id, $userId);
-                } catch (\Throwable $e) {
-                    // Procurement orchestration fallback
-                }
-            }
-        }
+        // SC D-4: subcontract PR / PO is raised only by the button (TF-05), never while building the order
 
         $this->reconcileOperationReadiness($order);
 
@@ -2510,15 +2547,7 @@ class ProductionOrderService
         // The parent waits for ALL the operations that make its sub-assembly, not only the last one (type sub_assembly = ordering only)
         app(SubAssemblyDependencyService::class)->ensure($order);
 
-        foreach ($created as $createdOp) {
-            if ($createdOp->is_external) {
-                try {
-                    app(SubcontractProcurementOrchestrator::class)->orchestrateSubcontractProcurement($createdOp, $order->tenant_id, $userId);
-                } catch (\Throwable $e) {
-                    // Procurement orchestration fallback
-                }
-            }
-        }
+        // SC D-4: subcontract PR / PO is raised only by the button (TF-05), never while building the order
 
         $this->reconcileOperationReadiness($order);
 
@@ -2682,7 +2711,10 @@ class ProductionOrderService
                 ProductionOrderOperation::STATUS_CANCELLED,
                 ProductionOrderOperation::STATUS_RUNNING,
                 ProductionOrderOperation::STATUS_PAUSED,
-                'subcontract_qc_pending',
+                // C-01: the vendor-side states belong to the dispatch slip / subcontract receipt — the page-load, the
+                // 5-minute sweep and every event refresh must leave them alone
+                ProductionOrderOperation::STATUS_VENDOR_DISPATCHED,
+                ProductionOrderOperation::STATUS_SUBCONTRACT_QC_PENDING,
             ], true)) {
                 continue;
             }

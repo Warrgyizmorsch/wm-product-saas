@@ -524,6 +524,13 @@ class ProductionMasterImportService
                     $isExt = strtolower(trim($opData['is_external'] ?? 'no'));
                     $vendorCode = trim((string) ($opData['vendor_code'] ?? ''));               // RT-IMPL-16: external operations
                     $subcontractCost = trim((string) ($opData['subcontract_cost_per_unit'] ?? ''));
+                    // M-04 / N-26: the rest of the outsourced setup, so an exported routing re-imports whole
+                    $supplyType = strtolower(trim((string) ($opData['material_supply_type'] ?? '')));
+                    $inputType = strtolower(trim((string) ($opData['subcontract_input_type'] ?? '')));
+                    $leadDays = trim((string) ($opData['subcontract_lead_time_days'] ?? ''));
+                    $dispatchBuffer = trim((string) ($opData['dispatch_buffer_days'] ?? ''));
+                    $returnBuffer = trim((string) ($opData['return_buffer_days'] ?? ''));
+                    $serviceSku = trim((string) ($opData['service_product_code'] ?? ''));
 
                     $matCode = trim($opData['material_code'] ?? '');
                     $matQty = trim($opData['material_quantity'] ?? '');
@@ -552,6 +559,12 @@ class ProductionMasterImportService
                             'is_external' => in_array($isExt, ['yes', '1', 'true', 'external']),
                             'vendor_code' => $vendorCode,
                             'subcontract_cost_per_unit' => $subcontractCost === '' ? 0 : $subcontractCost,
+                            'material_supply_type' => $supplyType,
+                            'subcontract_input_type' => $inputType,
+                            'subcontract_lead_time_days' => $leadDays,
+                            'dispatch_buffer_days' => $dispatchBuffer,
+                            'return_buffer_days' => $returnBuffer,
+                            'service_product_code' => $serviceSku,
                             'materials' => []
                         ];
                     }
@@ -666,6 +679,30 @@ class ProductionMasterImportService
                             $vendorId = \App\Domains\Inventory\Models\Vendor::where('tenant_id', $tenantId)->where('code', $op['vendor_code'])->value('id');
                             if (!$vendorId) {
                                 $opErrors[] = "Vendor '{$op['vendor_code']}' does not exist.";
+                            }
+                        }
+
+                        // M-04: outsourced setup columns (blank = the form's defaults)
+                        if ($op['material_supply_type'] !== '' && !in_array($op['material_supply_type'], ['company_supplied', 'vendor_supplied'], true)) {
+                            $opErrors[] = "Material Supply Type for '{$opNumber}' must be company_supplied or vendor_supplied.";
+                        }
+                        if ($op['subcontract_input_type'] !== '' && !in_array($op['subcontract_input_type'], ['bom_raw_materials', 'previous_operation_wip'], true)) {
+                            $opErrors[] = "Subcontract Input Type for '{$opNumber}' must be bom_raw_materials or previous_operation_wip.";
+                        }
+                        foreach (['subcontract_lead_time_days' => 'Subcontract Lead Time Days', 'dispatch_buffer_days' => 'Dispatch Buffer Days', 'return_buffer_days' => 'Return Buffer Days'] as $k => $label) {
+                            if ($op[$k] !== '' && (!is_numeric($op[$k]) || (float) $op[$k] < 0)) {
+                                $opErrors[] = "{$label} for '{$opNumber}' must be a number of days, 0 or more.";
+                            }
+                        }
+                        $op['subcontract_service_product_id'] = null;
+                        if ($op['service_product_code'] !== '') {
+                            $service = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->where('sku', $op['service_product_code'])->first();
+                            if (!$service) {
+                                $opErrors[] = "Service product '{$op['service_product_code']}' does not exist.";
+                            } elseif (!$service->isService()) {
+                                $opErrors[] = "'{$op['service_product_code']}' is not a service product.";
+                            } else {
+                                $op['subcontract_service_product_id'] = $service->id;
                             }
                         }
                     }
@@ -956,6 +993,15 @@ class ProductionMasterImportService
                 // Short Full Review Point 2: the sheet is in the active currency → DB base once, before the base calculator runs
                 'subcontract_cost_per_unit'    => round(convert_to_base((float) ($op['subcontract_cost_per_unit'] ?? 0)), 4),
             ];
+            if ($row['is_external']) {
+                // M-04: same defaults as the routing form when a column is blank
+                $row['material_supply_type'] = ($op['material_supply_type'] ?? '') !== '' ? $op['material_supply_type'] : 'company_supplied';
+                $row['subcontract_input_type'] = ($op['subcontract_input_type'] ?? '') !== '' ? $op['subcontract_input_type'] : 'bom_raw_materials';
+                $row['subcontract_lead_time_days'] = (int) ($op['subcontract_lead_time_days'] ?? 0);
+                $row['dispatch_buffer_days'] = (int) ($op['dispatch_buffer_days'] ?? 0);
+                $row['return_buffer_days'] = (int) ($op['return_buffer_days'] ?? 0);
+                $row['subcontract_service_product_id'] = $op['subcontract_service_product_id'] ?? null;
+            }
 
             $resources = null;
             if (!$row['is_external'] && $row['section_id']) {

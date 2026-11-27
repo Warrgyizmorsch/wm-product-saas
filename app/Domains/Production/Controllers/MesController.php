@@ -265,6 +265,57 @@ class MesController extends Controller
         }
     }
 
+    /**
+     * SC-02 / TF-06: outsourced work received on the shop floor — the same receipt as the Subcontracting menu
+     * (SubcontractReceiptService): accepted units, the slip at the vendor, the approved PO and its system GRN.
+     */
+    public function recordSubcontractReceipt(Request $request, int $orderOp)
+    {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+        $tenantId = require_tenant_id();
+
+        $validated = $request->validate([
+            'received_qty' => 'required|numeric|gt:0',
+            'rejected_qty' => 'nullable|numeric|min:0',
+            'scrapped_qty' => 'nullable|numeric|min:0',
+            'remarks' => 'nullable|string|max:1000',
+            'delivery_challan_id' => 'nullable|integer',
+            'final' => 'nullable|boolean',
+        ]);
+
+        $op = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($orderOp);
+        $challan = !empty($validated['delivery_challan_id'])
+            ? \App\Domains\Production\Models\DeliveryChallan::where('tenant_id', $tenantId)->findOrFail($validated['delivery_challan_id'])
+            : null;
+
+        try {
+            $receipt = app(\App\Domains\Production\Services\SubcontractReceiptService::class)->receive(
+                $op,
+                $validated,
+                (int) auth()->id(),
+                \App\Domains\Production\Models\ProductionSubcontractReceipt::SOURCE_SHOP_FLOOR,
+                $challan
+            );
+        } catch (InvalidArgumentException $e) {
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', $receipt->status === \App\Domains\Production\Models\ProductionSubcontractReceipt::STATUS_QC_PENDING
+            ? "Receipt {$receipt->receipt_number} recorded — the units wait for this operation's QC."
+            : "Receipt {$receipt->receipt_number} recorded: " . (float) $receipt->accepted_qty . ' good unit(s) booked.');
+    }
+
+    /** D-4 / TF-05: the "Raise PR / PO" button on the MES floor */
+    public function raiseSubcontractPurchasing(int $orderOp)
+    {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+        $tenantId = require_tenant_id();
+        $op = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($orderOp);
+        \Illuminate\Support\Facades\Gate::authorize('update', $op->order);
+
+        return app(ProductionOrderController::class)->raiseSubcontractPurchasing($op, $tenantId);
+    }
+
     public function logProgress(MesCompleteOperationRequest $request, int $op)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);

@@ -28,6 +28,21 @@ use InvalidArgumentException;
  */
 class ProductionOrderEngineeringService
 {
+    /**
+     * TF-02 / N-27 (docs/subcontracting_module_audit_2026-11-26.md): a BOM allocation the subcontract vendor brings —
+     * marked "Vendor-supplied" on the BOM, or any material of a vendor-supplied outsourced operation. It is never
+     * planned, reserved, requested from the store or checked for readiness.
+     */
+    public static function isVendorSuppliedAllocation($allocation, $routingOperation = null): bool
+    {
+        if (($allocation->supplied_by ?? 'company') === 'vendor') {
+            return true;
+        }
+        $op = $routingOperation ?? ($allocation->routingOperation ?? null);
+
+        return (bool) ($op && $op->is_external && ($op->material_supply_type ?? null) === 'vendor_supplied');
+    }
+
     private const BOM_TYPES = ['manufacturing', 'subcontracting'];
     private const MAX_LEVELS = 20;
 
@@ -731,6 +746,10 @@ class ProductionOrderEngineeringService
                     if (!$alloc->material || (int) $alloc->material_id === (int) $parentBom->product_id) {
                         continue;
                     }
+                    // TF-02 / N-27: the vendor brings it — not planned, not reserved, never requested from the store
+                    if (self::isVendorSuppliedAllocation($alloc, $op)) {
+                        continue;
+                    }
                     $net = (float) $alloc->quantity * $parentScale;
                     $gross = $this->grossUnit($alloc) * $parentScale;
                     $pid = $ensureRow($alloc->material, $alloc->uom_id, $alloc->child_bom_id);
@@ -772,6 +791,7 @@ class ProductionOrderEngineeringService
                         ->with(['material.uom', 'routingOperation'])
                         ->get()
                         ->filter(fn ($a) => !$a->routingOperation || !$a->routingOperation->is_alternative)
+                        ->reject(fn ($a) => self::isVendorSuppliedAllocation($a, $a->routingOperation)) // TF-02 / N-27
                         ->sort($bomOrder)
                         ->values()
                     : collect();
