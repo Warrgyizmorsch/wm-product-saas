@@ -1142,7 +1142,7 @@
                                         {{ __('crm.terms_conditions') ?? 'Terms & Conditions' }}
                                     </div>
                                     <div class="text-muted fs-12 terms-conditions-content" style="line-height: 1.5;">
-                                        {!! $order->terms_conditions !!}
+                                        {!! clean_html($order->terms_conditions) !!}
                                     </div>
                                 </div>
                             @endif

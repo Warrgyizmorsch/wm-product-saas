@@ -19,7 +19,7 @@
     ])->filter(fn ($item) => \Illuminate\Support\Facades\Route::has($item['route']));
 
     $headerUser = auth()->user();
-    $headerAvatarUrl = $headerUser ? $headerUser->avatar_url : '/assets/images/avatar/default.png';
+    $headerAvatarUrl = $headerUser ? $headerUser->avatar_url : asset('assets/images/avatar/default.png');
     $languages = collect(config('localization.supported', []));
     $appLabel = $shell['current_app']['label'] ?? __('ui.workspace');
 @endphp

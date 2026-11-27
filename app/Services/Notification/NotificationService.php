@@ -116,7 +116,7 @@ class NotificationService
                     // Real-time Pusher WebSockets Broadcast
                     try {
                         \App\Services\Pusher\PusherBroadcastService::broadcast(
-                            channels: ["user-{$userId}"],
+                            channels: ["private-user-{$userId}"],
                             eventName: 'notification',
                             data: [
                                 'id' => $notification->id,
@@ -293,7 +293,7 @@ class NotificationService
         self::runDeferred(function () use ($validRecipientUsers, $title, $message, $actionUrl, $module, $type, $iconClass, $extraData, $notifications) {
             // 1. Single Pusher request targeting all recipient channels simultaneously
             try {
-                $channels = array_map(fn($uid) => "user-{$uid}", $validRecipientUsers);
+                $channels = array_map(fn($uid) => "private-user-{$uid}", $validRecipientUsers);
                 $channelChunks = array_chunk($channels, 100);
                 $firstNotifId = $notifications[0]->id ?? null;
 

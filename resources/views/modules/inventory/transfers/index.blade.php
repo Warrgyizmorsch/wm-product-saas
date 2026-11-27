@@ -57,6 +57,7 @@
                             class="form-control border-0 bg-transparent p-0 fs-13" 
                             placeholder="{{ __('inventory.search_transfer_placeholder') }}" 
                             value="{{ request('search') }}"
+                            aria-label="{{ __('inventory.search') ?? 'Search' }}"
                             style="box-shadow: none; height: 32px; width: 220px;"
                         >
                     </form>

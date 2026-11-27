@@ -214,6 +214,52 @@ class CrmDealController extends Controller
         return view('modules.crm.deals.kanban', compact('stages', 'kanbanData', 'dealStatuses'));
     }
 
+    /**
+     * Load next batch of deal cards for a single Kanban column via AJAX.
+     */
+    public function kanbanMore(Request $request)
+    {
+        $this->authorize('viewAny', CrmDeal::class);
+        $tenantId = require_tenant_id();
+
+        $stageKey = (string)$request->input('stage', 'Qualification');
+        $offset = max(0, (int)$request->input('offset', self::KANBAN_CARDS_PER_COLUMN));
+
+        $stageAliases = ['Closed Won' => 'Won', 'Closed Lost' => 'Lost', 'New' => 'Qualification', 'Qualified' => 'Needs Analysis'];
+        $rawStages = array_keys(array_filter($stageAliases, fn ($target) => $target === $stageKey));
+        if (!array_key_exists($stageKey, $stageAliases)) {
+            $rawStages[] = $stageKey;
+        }
+
+        $dealValueSql = 'COALESCE('
+            . "(SELECT NULLIF(so.total_amount, 0) FROM sales_orders so WHERE so.crm_deal_id = crm_deals.id AND so.status <> 'Cancelled' AND so.deleted_at IS NULL ORDER BY so.id DESC LIMIT 1), "
+            . "(SELECT NULLIF(q.total_amount, 0) FROM quotations q WHERE q.crm_deal_id = crm_deals.id AND q.status IN ('Accepted', 'Converted', 'Won') AND q.deleted_at IS NULL ORDER BY q.id DESC LIMIT 1), "
+            . 'estimated_value, 0)';
+
+        $baseQuery = CrmDeal::query()->where('tenant_id', $tenantId)->whereIn('stage', $rawStages);
+        $total = (clone $baseQuery)->count();
+
+        $deals = (clone $baseQuery)
+            ->select('crm_deals.*')
+            ->selectRaw("{$dealValueSql} as kanban_value")
+            ->with(['account', 'contact', 'lead'])
+            ->withExists(['quotations as has_accepted_quote' => fn ($q) => $q->where('status', 'Accepted')])
+            ->orderBy('updated_at', 'desc')
+            ->offset($offset)
+            ->limit(self::KANBAN_CARDS_PER_COLUMN)
+            ->get();
+
+        $html = view('modules.crm.deals.partials.kanban-cards', compact('deals'))->render();
+        $nextOffset = $offset + $deals->count();
+
+        return response()->json([
+            'html'       => $html,
+            'loaded'     => $deals->count(),
+            'remaining'  => max(0, $total - $nextOffset),
+            'nextOffset' => $nextOffset,
+        ]);
+    }
+
     public function create(Request $request): View
     {
         $this->authorize('create', CrmDeal::class);

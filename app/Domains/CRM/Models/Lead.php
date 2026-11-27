@@ -48,7 +48,14 @@ class Lead extends Model
                 $next = \App\Support\TenantSequence::next($tenantId, "lead:{$year}", fn () => \App\Support\TenantSequence::highestSuffix(
                     static::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('lead_number', 'like', $prefix . '%')->pluck('lead_number')
                 ));
-                $lead->lead_number = $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+                $candidate = $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+                $attempts = 0;
+                while ($attempts < 100 && static::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('lead_number', $candidate)->exists()) {
+                    $next = \App\Support\TenantSequence::next($tenantId, "lead:{$year}", fn () => (int) $next);
+                    $candidate = $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+                    $attempts++;
+                }
+                $lead->lead_number = $candidate;
             }
         });
 

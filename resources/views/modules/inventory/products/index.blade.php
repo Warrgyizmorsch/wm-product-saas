@@ -172,7 +172,7 @@
                                 @endphp
                                 <div class="d-flex align-items-center gap-3" style="max-width: 100%;">
                                     <div class="product-thumb-wrapper position-relative flex-shrink-0">
-                                        <a href="{{ route('inventory.products.show', $product) }}" class="product-thumb-link d-block rounded-3 border bg-white overflow-hidden shadow-2xs position-relative">
+                                        <a href="{{ route('inventory.products.show', $product) }}" class="product-thumb-link d-block rounded-3 border bg-body-secondary overflow-hidden shadow-2xs position-relative">
                                             @if($mainImg)
                                                 <img src="{{ $mainImg }}" alt="{{ $product->name }}" class="product-img-display w-100 h-100 object-fit-cover" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                                 <div class="product-initials-badge bg-soft-{{ $colorClass }} text-{{ $colorClass }} fw-bold fs-12 d-none align-items-center justify-content-center w-100 h-100">
@@ -260,9 +260,9 @@
                             </td>
                             <td class="text-nowrap" style="white-space: nowrap;">
                                 @if ($product->status === 'active')
-                                    <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.active') }}</span>
+                                    <span class="badge bg-soft-success text-success border border-success px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.active') }}</span>
                                 @else
-                                    <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.inactive') }}</span>
+                                    <span class="badge bg-secondary text-white px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.inactive') }}</span>
                                 @endif
                             </td>
                             <td class="text-end pe-4">

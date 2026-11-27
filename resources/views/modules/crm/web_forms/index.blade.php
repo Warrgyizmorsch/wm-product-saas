@@ -351,7 +351,7 @@
 </div>
 
 <script>
-    const baseUrl = window.location.origin;
+    const baseUrl = @json($baseUrl);
     const tenantIdentifier = @json($tenantIdentifier);
     let formFields = @json($savedSchema);
     let draggedIndex = null;

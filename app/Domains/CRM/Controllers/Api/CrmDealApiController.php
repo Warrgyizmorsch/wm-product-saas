@@ -342,7 +342,7 @@ class CrmDealApiController extends Controller
             'owner_id'        => ['nullable', 'integer', tenant_exists('users')],
             'notes'           => 'nullable|string',
             'product_ids'     => 'nullable|array',
-            'product_ids.*'   => 'integer',
+            'product_ids.*'   => ['integer', tenant_exists('products')],
             'product_items'   => 'nullable|array',
         ]);
 
@@ -411,6 +411,7 @@ class CrmDealApiController extends Controller
             'notes'           => 'nullable|string',
             'close_reason'    => 'nullable|string|max:255',
             'product_ids'     => 'nullable|array',
+            'product_ids.*'   => ['integer', tenant_exists('products')],
             'product_items'   => 'nullable|array',
         ]);
 

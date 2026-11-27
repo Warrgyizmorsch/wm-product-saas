@@ -86,6 +86,10 @@ class StockTransferPolicy
 
     public function delete(User $user, StockTransfer $transfer): bool
     {
+        if ($transfer->status !== 'Draft') {
+            return false;
+        }
+
         return $this->update($user, $transfer);
     }
 }

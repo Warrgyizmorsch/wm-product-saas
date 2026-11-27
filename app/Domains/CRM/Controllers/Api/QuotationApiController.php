@@ -219,7 +219,7 @@ class QuotationApiController extends Controller
             'notes'            => 'nullable|string',
             'status'           => 'nullable|string',
             'items'            => 'nullable|array|min:1',
-            'items.*.product_id'   => 'required_with:items|integer',
+            'items.*.product_id'   => ['required_with:items', 'integer', tenant_exists('products')],
             'items.*.quantity'     => 'required_with:items|numeric|min:0.01',
             'items.*.unit_price'   => 'required_with:items|numeric|min:0',
             'items.*.tax_rate'     => 'nullable|numeric|min:0',

@@ -55,8 +55,13 @@ class MaterialRequirementController extends Controller
     {
         $this->authorize('create', MaterialRequirement::class);
 
+        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+
         $validated = $request->validate([
-            'sales_order_id' => ['required', 'exists:sales_orders,id'],
+            'sales_order_id' => [
+                'required',
+                \Illuminate\Validation\Rule::exists('sales_orders', 'id')->where(fn($q) => $q->where('tenant_id', $tenantId)),
+            ],
             'requirement_number' => ['required', 'string', 'max:255'],
             'requirement_date' => ['required', 'date'],
             'carrier' => ['nullable', 'string', 'max:255'],
@@ -64,8 +69,8 @@ class MaterialRequirementController extends Controller
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array'],
             'items.*.quantity' => ['required', 'numeric', 'min:0'],
-            'items.*.warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
-            'items.*.batch_id' => ['nullable', 'integer', 'exists:batches,id'],
+            'items.*.warehouse_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('warehouses', 'id')->where(fn($q) => $q->where('tenant_id', $tenantId))],
+            'items.*.batch_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('batches', 'id')->where(fn($q) => $q->where('tenant_id', $tenantId))],
         ]);
 
         try {
@@ -115,7 +120,10 @@ class MaterialRequirementController extends Controller
 
     public function updateWarehouse(Request $request, int $itemId)
     {
-        $item = MaterialRequirementItem::findOrFail($itemId);
+        $item = MaterialRequirementItem::with('materialRequirement')->findOrFail($itemId);
+        if ($item->materialRequirement) {
+            $this->authorize('ship', $item->materialRequirement);
+        }
         $warehouseId = (int) $request->input('warehouse_id');
         $item->update(['warehouse_id' => $warehouseId]);
 
@@ -128,6 +136,9 @@ class MaterialRequirementController extends Controller
     public function reserveQty(Request $request, int $itemId)
     {
         $item = MaterialRequirementItem::with('materialRequirement')->findOrFail($itemId);
+        if ($item->materialRequirement) {
+            $this->authorize('ship', $item->materialRequirement);
+        }
         $qtyToReserve = (float) $request->input('quantity_reserve');
 
         if ($qtyToReserve <= 0) {
@@ -145,6 +156,9 @@ class MaterialRequirementController extends Controller
     public function mockIndent(Request $request, int $itemId)
     {
         $item = MaterialRequirementItem::with('materialRequirement')->findOrFail($itemId);
+        if ($item->materialRequirement) {
+            $this->authorize('view', $item->materialRequirement);
+        }
         $qtyToRequest = (float) $request->input('quantity_request');
         if ($qtyToRequest <= 0) return back()->with('error', 'Quantity to request must be greater than 0.');
 
@@ -165,6 +179,10 @@ class MaterialRequirementController extends Controller
             ->whereHas('materialRequirement', fn ($q) => $q->where('tenant_id', $tenantId))
             ->findOrFail($itemId);
 
+        if ($item->materialRequirement) {
+            $this->authorize('view', $item->materialRequirement);
+        }
+
         $orderedQty = (float) ($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
         $shortageQty = max(0, $orderedQty - (float) $item->quantity_reserved);
         $qtyToMfg = (float) $request->input('quantity_mfg', $shortageQty > 0 ? $shortageQty : $orderedQty);
@@ -184,6 +202,7 @@ class MaterialRequirementController extends Controller
     public function startPicking(int $id)
     {
         $delivery = MaterialRequirement::findOrFail($id);
+        $this->authorize('ship', $delivery);
         $this->deliveryService->startPicking($delivery);
         return back()->with('success', 'Picking process started. Status set to Picked.');
     }
@@ -191,6 +210,7 @@ class MaterialRequirementController extends Controller
     public function pack(int $id)
     {
         $delivery = MaterialRequirement::findOrFail($id);
+        $this->authorize('ship', $delivery);
         $this->deliveryService->pack($delivery);
         return back()->with('success', 'Package packed successfully. Status set to Packed.');
     }
@@ -198,6 +218,7 @@ class MaterialRequirementController extends Controller
     public function dispatch(int $id, Request $request)
     {
         $delivery = MaterialRequirement::with('items.product', 'salesOrder')->findOrFail($id);
+        $this->authorize('ship', $delivery);
         $validated = $request->validate(['carrier' => 'nullable|string|max:255', 'tracking_number' => 'nullable|string|max:255', 'notes' => 'nullable|string']);
 
         $this->deliveryService->dispatch($delivery, $validated);
@@ -207,6 +228,7 @@ class MaterialRequirementController extends Controller
     public function deliver(int $id)
     {
         $delivery = MaterialRequirement::with('items', 'salesOrder')->findOrFail($id);
+        $this->authorize('ship', $delivery);
         $this->deliveryService->deliver($delivery);
         return back()->with('success', 'Order delivered successfully! Ready for invoicing.');
     }
@@ -257,6 +279,7 @@ class MaterialRequirementController extends Controller
     public function storeDispatchOrder(int $deliveryId, Request $request): RedirectResponse
     {
         $delivery = MaterialRequirement::with('items.product', 'items.warehouse', 'salesOrder')->findOrFail($deliveryId);
+        $this->authorize('ship', $delivery);
         $validated = $request->validate([
             'carrier' => 'nullable|string|max:255', 'tracking_number' => 'nullable|string|max:255',
             'vehicle_number' => 'nullable|string|max:100', 'driver_name' => 'nullable|string|max:150',
@@ -271,6 +294,7 @@ class MaterialRequirementController extends Controller
     public function releaseForDispatch(int $deliveryId, Request $request): RedirectResponse
     {
         $delivery = MaterialRequirement::with(['items.product', 'salesOrder'])->findOrFail($deliveryId);
+        $this->authorize('ship', $delivery);
 
         $selectedItemIds = $request->input('selected_items', []);
         if (is_string($selectedItemIds)) {

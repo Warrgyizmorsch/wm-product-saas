@@ -80,35 +80,44 @@ class MaterialRequirementService
 
     public function reserveQty(MaterialRequirementItem $item, float $qtyToReserve): void
     {
-        $warehouseId = $item->warehouse_id;
-        $productId = $item->product_id;
-        $tenantId = $item->materialRequirement->tenant_id;
+        DB::transaction(function () use ($item, $qtyToReserve) {
+            $lockedItem = MaterialRequirementItem::where('id', $item->id)->lockForUpdate()->firstOrFail();
+            $warehouseId = $lockedItem->warehouse_id;
+            $productId = $lockedItem->product_id;
+            $tenantId = $lockedItem->materialRequirement->tenant_id;
 
-        $availableStock = StockService::getAvailableStock($productId, $warehouseId);
+            $stock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->where('warehouse_id', $warehouseId)
+                ->lockForUpdate()
+                ->first();
 
-        if ($qtyToReserve > $availableStock) {
-            throw new \InvalidArgumentException("Cannot reserve {$qtyToReserve}. Only {$availableStock} is available in this warehouse.");
-        }
+            $availableStock = $stock ? max(0.0, (float)$stock->quantity - (float)$stock->reserved_qty) : 0.0;
 
-        StockService::reserveStock(
-            $tenantId,
-            $productId,
-            $warehouseId,
-            $qtyToReserve,
-            'DeliveryOrder',
-            $item->material_requirement_id,
-            $item->id
-        );
+            if ($qtyToReserve > $availableStock) {
+                throw new \InvalidArgumentException("Cannot reserve {$qtyToReserve}. Only {$availableStock} is available in this warehouse.");
+            }
 
-        $item->increment('quantity_reserved', $qtyToReserve);
+            StockService::reserveStock(
+                $tenantId,
+                $productId,
+                $warehouseId,
+                $qtyToReserve,
+                'DeliveryOrder',
+                $lockedItem->material_requirement_id,
+                $lockedItem->id
+            );
 
-        if ($item->quantity_reserved >= $item->quantity_ordered) {
-            $item->update(['status' => 'Reserved']);
-        } else {
-            $item->update(['status' => 'Partially Reserved']);
-        }
+            $lockedItem->increment('quantity_reserved', $qtyToReserve);
 
-        $this->updateOverallDeliveryStatus($item->materialRequirement);
+            if ($lockedItem->quantity_reserved >= $lockedItem->quantity_ordered) {
+                $lockedItem->update(['status' => 'Reserved']);
+            } else {
+                $lockedItem->update(['status' => 'Partially Reserved']);
+            }
+
+            $this->updateOverallDeliveryStatus($lockedItem->materialRequirement);
+        });
     }
 
     public function createPurchaseRequisition(MaterialRequirementItem $item, float $qtyToRequest, ?int $warehouseId, ?string $notes, ?string $expectedDate = null): PurchaseRequisition
@@ -121,7 +130,7 @@ class MaterialRequirementService
 
             $year = now()->format('Y');
             $prefix = "PR-{$year}-";
-            $lastPr = PurchaseRequisition::where('tenant_id', $tenantId)
+            $lastPr = PurchaseRequisition::withoutGlobalScopes()->where('tenant_id', $tenantId)
                 ->where('requisition_number', 'like', "{$prefix}%")
                 ->orderBy('id', 'desc')
                 ->first();
@@ -131,7 +140,7 @@ class MaterialRequirementService
                 $nextNum = ((int) $lastNumStr) + 1;
             }
             $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
-            while (PurchaseRequisition::where('requisition_number', $requisitionNumber)->exists()) {
+            while (PurchaseRequisition::withoutGlobalScopes()->where('requisition_number', $requisitionNumber)->exists()) {
                 $nextNum++;
                 $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
             }
@@ -253,7 +262,7 @@ class MaterialRequirementService
                 StockService::recordOutflow($tenantId, $productId, $warehouseId, $qty, 'DeliveryOrder', $delivery->id, []);
             }
 
-            $delivery->salesOrder->update(['status' => 'Shipped']);
+            $delivery->salesOrder()->withoutGlobalScopes()->first()?->update(['status' => 'Shipped']);
         });
     }
 
@@ -264,7 +273,7 @@ class MaterialRequirementService
             foreach ($delivery->items as $item) {
                 $item->update(['status' => 'Delivered']);
             }
-            $delivery->salesOrder->update(['status' => 'Delivered']);
+            $delivery->salesOrder()->withoutGlobalScopes()->first()?->update(['status' => 'Delivered']);
         });
     }
 
@@ -275,7 +284,7 @@ class MaterialRequirementService
             foreach ($delivery->items as $item) {
                 $item->update(['status' => 'Shipped']);
             }
-            $delivery->salesOrder->update(['status' => 'Shipped']);
+            $delivery->salesOrder()->withoutGlobalScopes()->first()?->update(['status' => 'Shipped']);
         });
     }
 

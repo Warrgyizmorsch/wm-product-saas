@@ -47,12 +47,31 @@ class VisitorApiController extends Controller
             'company_name' => 'nullable|string|max:255',
         ]);
 
-        $visitor = Visitor::create(array_merge($validated, [
-            'tenant_id'  => $tenantId,
-            'company_id' => $companyId,
-            'branch_id'  => $branchId,
-            'status'     => 'Active',
-        ]));
+        $phone = trim($validated['phone']);
+
+        $visitor = \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $phone, $tenantId, $companyId, $branchId) {
+            $existing = Visitor::where('tenant_id', $tenantId)
+                ->where('phone', $phone)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                $existing->update([
+                    'full_name'    => trim($validated['full_name']),
+                    'email'        => $validated['email'] ?? $existing->email,
+                    'company_name' => $validated['company_name'] ?? $existing->company_name,
+                ]);
+                return $existing;
+            }
+
+            return Visitor::create(array_merge($validated, [
+                'phone'      => $phone,
+                'tenant_id'  => $tenantId,
+                'company_id' => $companyId,
+                'branch_id'  => $branchId,
+                'status'     => 'Active',
+            ]));
+        });
 
         return response()->json([
             'success' => true,

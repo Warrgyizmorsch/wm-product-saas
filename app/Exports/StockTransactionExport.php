@@ -3,19 +3,19 @@
 namespace App\Exports;
 
 use App\Domains\Inventory\Models\StockTransaction;
-use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 
-class StockTransactionExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
+class StockTransactionExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize
 {
     public function __construct(
         private readonly int $tenantId,
         private readonly array $filters = []
     ) {}
 
-    public function collection()
+    public function query()
     {
         $query = StockTransaction::where('tenant_id', $this->tenantId)
             ->with(['product', 'warehouse', 'batch', 'incomingSerials', 'outgoingSerials']);

@@ -60,10 +60,74 @@ class StockService
                 $availableToReserve = max(0.0, (float)$stock->quantity - (float)$stock->reserved_qty);
             }
 
-            // General reservation allows reserving the full requested quantity
+            if ($qty > $availableToReserve + 0.0001) {
+                throw new \InvalidArgumentException("Cannot reserve {$qty}. Only {$availableToReserve} available stock on hand in this warehouse.");
+            }
+
+            $product = Product::withoutGlobalScopes()->find($productId);
+
+            // 1. Mark matching serial numbers as 'Reserved' if tracked (must have sufficient available physical serials)
+            if ($product && $product->track_serial_number) {
+                $query = SerialNumber::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_id', $productId)
+                    ->where('warehouse_id', $warehouseId)
+                    ->where('status', 'Available')
+                    ->lockForUpdate();
+
+                if (!empty($selectedSerials)) {
+                    $query->whereIn('serial_number', $selectedSerials);
+                } else {
+                    $query->limit((int)$qty);
+                }
+
+                $serials = $query->get();
+
+                if ($serials->count() < (int)$qty) {
+                    throw new \InvalidArgumentException("Cannot reserve {$qty} serial(s). Only {$serials->count()} available serial(s) found in this warehouse.");
+                }
+
+                foreach ($serials as $serial) {
+                    $serial->update([
+                        'status' => 'Reserved',
+                        'material_requirement_item_id' => ($referenceType === 'DeliveryOrder' || $referenceType === 'MaterialRequirement') ? $referenceItemId : $serial->material_requirement_item_id,
+                    ]);
+                }
+            }
+
+            // 2. Adjust batch availability if batch tracked (must have sufficient available physical batch stock)
+            if ($product && $product->track_batch) {
+                $batches = Batch::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_id', $productId)
+                    ->where('warehouse_id', $warehouseId)
+                    ->where('available_qty', '>', 0)
+                    ->orderBy('expiry_date', 'asc')
+                    ->lockForUpdate()
+                    ->get();
+
+                $totalBatchAvail = (float)$batches->sum('available_qty');
+                if ($qty > $totalBatchAvail + 0.0001) {
+                    throw new \InvalidArgumentException("Cannot reserve {$qty} batch units. Only {$totalBatchAvail} available batch stock found in this warehouse.");
+                }
+
+                $remainingToReserve = $qty;
+                foreach ($batches as $batch) {
+                    if ($remainingToReserve <= 0) break;
+                    $avail = (float)$batch->available_qty;
+                    if ($avail >= $remainingToReserve) {
+                        $batch->decrement('available_qty', $remainingToReserve);
+                        $remainingToReserve = 0;
+                    } else {
+                        $batch->update(['available_qty' => 0]);
+                        $remainingToReserve -= $avail;
+                    }
+                }
+            }
+
             $qtyToReserve = $qty;
 
-            // 1. Create or update the active reservation record
+            // 3. Create or update the active reservation record
             $reservation = StockReservation::query()
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $productId)
@@ -92,7 +156,7 @@ class StockService
                 ]);
             }
 
-            // 2. Adjust warehouse stock reservations
+            // 4. Adjust warehouse stock reservations
             if ($stock) {
                 $stock->increment('reserved_qty', $qtyToReserve);
                 $stock->update([
@@ -108,56 +172,6 @@ class StockService
                     'available_qty' => 0.0000,
                     'unit_cost' => 0.0000,
                 ]);
-            }
-
-            // 3. Mark matching serial numbers as 'Reserved' if tracked (capped by available physical serials)
-            $product = Product::find($productId);
-            $qtyToReservePhysical = min($qty, $availableToReserve);
-            if ($product && $product->track_serial_number && $qtyToReservePhysical > 0) {
-                $query = SerialNumber::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('product_id', $productId)
-                    ->where('warehouse_id', $warehouseId)
-                    ->where('status', 'Available');
-
-                if (!empty($selectedSerials)) {
-                    $query->whereIn('serial_number', $selectedSerials);
-                } else {
-                    $query->limit((int)$qtyToReservePhysical);
-                }
-
-                $serials = $query->get();
-
-                foreach ($serials as $serial) {
-                    $serial->update([
-                        'status' => 'Reserved',
-                        'material_requirement_item_id' => ($referenceType === 'DeliveryOrder' || $referenceType === 'MaterialRequirement') ? $referenceItemId : $serial->material_requirement_item_id,
-                    ]);
-                }
-            }
-
-            // 4. Adjust batch availability if batch tracked (capped by available physical batch stock)
-            if ($product && $product->track_batch && $qtyToReservePhysical > 0) {
-                $batches = Batch::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('product_id', $productId)
-                    ->where('warehouse_id', $warehouseId)
-                    ->where('available_qty', '>', 0)
-                    ->orderBy('expiry_date', 'asc')
-                    ->get();
-
-                $remainingToReserve = $qtyToReservePhysical;
-                foreach ($batches as $batch) {
-                    if ($remainingToReserve <= 0) break;
-                    $avail = (float)$batch->available_qty;
-                    if ($avail >= $remainingToReserve) {
-                        $batch->decrement('available_qty', $remainingToReserve);
-                        $remainingToReserve = 0;
-                    } else {
-                        $batch->update(['available_qty' => 0]);
-                        $remainingToReserve -= $avail;
-                    }
-                }
             }
 
             return $reservation;
@@ -573,10 +587,28 @@ class StockService
                 ->first();
 
             $currentQty = $stock ? (float)$stock->quantity : 0.0;
-            if ($quantity > $currentQty + 0.0001) {
+            $reservedQty = $stock ? (float)($stock->reserved_qty ?? 0.0) : 0.0;
+            $unreserved = max(0.0, $currentQty - $reservedQty);
+
+            if (round($quantity, 4) > round($currentQty, 4)) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'quantity' => "Insufficient stock on hand for product '{$product->name}'. Requested: {$quantity}, Available on hand: {$currentQty}."
                 ]);
+            }
+
+            if (round($quantity, 4) > round($unreserved, 4)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'quantity' => "Insufficient unreserved stock for product '{$product->name}'. Requested: {$quantity}, Available unreserved: {$unreserved} (Total on hand: {$currentQty}, Reserved: {$reservedQty})."
+                ]);
+            }
+
+            if ($product->track_serial_number) {
+                $providedSerials = array_filter($serialNumbers ?? []);
+                if (count($providedSerials) < (int)$quantity) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'serial_numbers' => "Product '{$product->name}' is serial-tracked and requires selecting exactly {$quantity} serial number(s). Found: " . count($providedSerials) . "."
+                    ]);
+                }
             }
 
             $currentCost = $stock ? (float)$stock->unit_cost : (float)$product->cost_price;

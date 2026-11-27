@@ -95,6 +95,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        Schema::disableForeignKeyConstraints();
         if (Schema::hasTable('dispatch_orders')) {
             Schema::table('dispatch_orders', function (Blueprint $table) {
                 try {
@@ -172,5 +173,6 @@ return new class extends Migration
                 }
             });
         }
+        Schema::enableForeignKeyConstraints();
     }
 };

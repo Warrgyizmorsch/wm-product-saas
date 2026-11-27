@@ -140,12 +140,17 @@ class LeadApiController extends Controller
             ->where('tenant_id', $tenantId)
             ->with(['owner:id,name,email', 'crmAccount:id,name', 'crmDeal:id,title,estimated_value']);
 
-        // Search
+        // Search (FULLTEXT on contact_person/company_name in MySQL + prefix index on lead_number/email/phone)
         if ($search = trim((string)$request->input('search'))) {
-            $query->where(function ($q) use ($search) {
-                $q->where('contact_person', 'like', "%{$search}%")
-                  ->orWhere('company_name', 'like', "%{$search}%")
-                  ->orWhere('lead_number', 'like', "{$search}%")
+            $useFullText = \Illuminate\Support\Facades\DB::getDriverName() !== 'sqlite' && mb_strlen($search) >= 3;
+            $query->where(function ($q) use ($search, $useFullText) {
+                if ($useFullText) {
+                    $q->whereFullText(['contact_person', 'company_name'], $search);
+                } else {
+                    $q->where('contact_person', 'like', "{$search}%")
+                      ->orWhere('company_name', 'like', "{$search}%");
+                }
+                $q->orWhere('lead_number', 'like', "{$search}%")
                   ->orWhere('email', 'like', "{$search}%")
                   ->orWhere('phone', 'like', "{$search}%");
             });
@@ -524,7 +529,7 @@ class LeadApiController extends Controller
 
             // Products & Additional Lists
             'product_ids'                       => 'nullable|array',
-            'product_ids.*'                     => 'integer',
+            'product_ids.*'                     => ['integer', tenant_exists('products')],
             'product_items'                     => 'nullable|array',
             'additional_contacts'               => 'nullable|array',
             'additional_contacts.*.name'        => 'nullable|string|max:255',

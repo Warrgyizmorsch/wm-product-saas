@@ -1,6 +1,7 @@
 <?php
 
 return array (
+  'per_page' => 'Per Page',
   'inventory' => 'Inventory',
   'items' => 'Items',
   'products' => 'Products',

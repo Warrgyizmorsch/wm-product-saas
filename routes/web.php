@@ -81,6 +81,7 @@ Route::middleware(['tenant'])->group(function (): void {
 
     Route::middleware(['auth', 'company', 'branch', 'billing.active'])->group(function (): void {
         Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
+        Route::post('/broadcasting/auth', [\App\Http\Controllers\BroadcastingAuthController::class, 'authenticate'])->name('broadcasting.auth');
 
         Route::get('/tenant-switch/{tenant:slug}', TenantSwitchController::class)
             ->name('tenant.switch');
@@ -141,7 +142,7 @@ Route::middleware(['tenant'])->group(function (): void {
         });
     });
 
-    Route::middleware(['auth:sanctum', 'company', 'branch', 'billing.active', 'module.access'])->group(function (): void {
+    Route::middleware(['api', 'throttle:60,1', 'auth:sanctum', 'company', 'branch', 'billing.active', 'module.access'])->group(function (): void {
         foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/api.php'))) as $moduleApiRoutes) {
             if (str_contains($moduleApiRoutes, 'Production')) {
                 continue;

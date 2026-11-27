@@ -1,6 +1,7 @@
 <?php
 
 return array (
+  'per_page' => 'प्रति पृष्ठ',
   'inventory' => 'इन्वेंटरी',
   'items' => 'वस्तुएं',
   'products' => 'उत्पाद',

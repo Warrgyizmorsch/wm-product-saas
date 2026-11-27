@@ -99,6 +99,7 @@ class RbacSeeder extends Seeder
             'crm.quotations.delete' => $permissions['crm.quotations.delete'],
             'crm.webforms.manage' => $permissions['crm.webforms.manage'],
             'crm.masters.manage' => $permissions['crm.masters.manage'],
+            'crm.settings.manage' => $permissions['crm.settings.manage'],
         ], RolePermission::SCOPE_TENANT);
 
         // "create" abilities have no existing record to own yet, so they're granted at

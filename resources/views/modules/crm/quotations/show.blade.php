@@ -570,7 +570,7 @@
                         @if($quotation->terms_conditions)
                             <div class="mb-3">
                                 <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-1" style="letter-spacing: 0.5px;">Terms & Conditions:</span>
-                                <div class="text-secondary fs-12 terms-conditions-content">{!! $quotation->terms_conditions !!}</div>
+                                <div class="text-secondary fs-12 terms-conditions-content">{!! clean_html($quotation->terms_conditions) !!}</div>
                             </div>
                         @endif
 
@@ -638,7 +638,7 @@
                 <div class="row align-items-end mt-5 pt-4 border-top">
                     <div class="col-7">
                         <span class="fs-11 text-muted d-block">This sales quotation is valid until {{ $quotation->expiry_date ? date('d-M-Y', strtotime($quotation->expiry_date)) : 'the expiry date' }}.</span>
-                        <span class="fs-11 text-muted d-block">For any queries, please contact our support at {{ tenant() ? tenant()->billing_email : 'sales@saaserp.com' }}.</span>
+                        <span class="fs-11 text-muted d-block">For any queries, please contact our support at {{ tenant()?->billing_email ?: ($quotation->company?->email ?: 'sales@saaserp.com') }}.</span>
                     </div>
                     <div class="col-5 text-end">
                         <div class="d-inline-block text-center" style="min-width: 180px;">

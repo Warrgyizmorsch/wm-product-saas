@@ -526,6 +526,14 @@ class ProductApiController extends Controller
 
         $payload = $request->all();
 
+        if (empty($payload)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The request payload is empty.',
+                'errors'  => ['payload' => ['The request payload cannot be empty.']],
+            ], 422);
+        }
+
         // 1) Direct JSON array: [ {...}, {...} ]
         if (is_array($payload) && array_is_list($payload)) {
             return $this->processBulkProducts($payload);
@@ -1515,7 +1523,7 @@ class ProductApiController extends Controller
 
         $warehouseStocks = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
             ->where('product_id', $product->id)
-            ->with(['warehouse:id,name,code,location,type'])
+            ->with(['warehouse:id,name,code,address,type'])
             ->get();
 
         $totalOnHand = 0.0;
@@ -1537,7 +1545,7 @@ class ProductApiController extends Controller
                 'warehouse_name'  => $stock->warehouse?->name ?? 'Unknown',
                 'warehouse_code'  => $stock->warehouse?->code ?? '',
                 'warehouse_type'  => $stock->warehouse?->type ?? '',
-                'location'        => $stock->warehouse?->location ?? '',
+                'location'        => $stock->warehouse?->address ?? '',
                 'quantity'        => $onHand,
                 'reserved_qty'    => $reserved,
                 'available_qty'   => $available,

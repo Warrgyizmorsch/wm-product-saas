@@ -35,7 +35,14 @@ class CrmSettingsApiController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
-        $this->authorize('create', Lead::class);
+        $user = $request->user();
+        $access = app(\App\Services\Access\AccessService::class);
+        if (!$user || (!$user->is_super_admin && !$user->hasRole('super_admin') && !$access->allows($user, 'crm.settings.manage', ['tenant_id' => $user->tenant_id]))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Managing CRM settings requires crm.settings.manage permission.',
+            ], 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'quotation_approval_policy' => 'nullable|string|in:approval_required,auto_approve',

@@ -141,14 +141,14 @@
             <x-ui.odoo-form-ui type="table" id="batchesTable">
                 <thead class="table-light bg-light">
                     <tr>
-                        <th class="ps-3" style="width: 18%;">{{ __('inventory.batch_lot_number') }}</th>
-                        <th style="width: 24%;">{{ __('inventory.product_name_sku') }}</th>
-                        <th style="width: 18%;">{{ __('inventory.warehouse_location') }}</th>
-                        <th style="width: 10%;">{{ __('inventory.mfg_date') }}</th>
-                        <th style="width: 10%;">{{ __('inventory.expiry_date') }}</th>
+                        <th class="ps-3" style="width: 16%;">{{ __('inventory.batch_lot_number') }}</th>
+                        <th style="width: 22%;">{{ __('inventory.product_name_sku') }}</th>
+                        <th style="width: 16%;">{{ __('inventory.warehouse_location') }}</th>
+                        <th style="width: 9%;">{{ __('inventory.mfg_date') }}</th>
+                        <th style="width: 9%;">{{ __('inventory.expiry_date') }}</th>
                         <th style="width: 12%;">{{ __('inventory.expiry_status') }}</th>
                         <th class="text-end" style="width: 8%;">{{ __('inventory.total_inward_qty') }}</th>
-                        <th class="text-end pe-3" style="width: 10%;">{{ __('inventory.available_stock_qty') }}</th>
+                        <th class="text-end pe-3" style="width: 8%;">{{ __('inventory.available_stock_qty') }}</th>
                     </tr>
                 </thead>
                 <tbody class="text-dark">

@@ -2358,7 +2358,13 @@
                                             <div class="col-md-8">
                                                 <div class="pe-md-4">
                                                     <x-ui.odoo-form-ui type="editor" :label="__('crm.terms_conditions')" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions') !!}</x-ui.odoo-form-ui>
-                                                    <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes')" name="notes" rows="2" placeholder="Notes for internal view..." :errorText="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
+                                                    <div class="mt-2">
+                                                        <label for="createQuotationNotes" class="form-label fw-bold text-secondary fs-13 mb-1">{{ __('crm.notes') }}</label>
+                                                        <textarea name="notes" id="createQuotationNotes" rows="3" class="form-control form-control-sm @error('notes') is-invalid @enderror" placeholder="Notes for internal view...">{{ old('notes') }}</textarea>
+                                                        @error('notes')
+                                                            <div class="invalid-feedback d-block fs-11 mt-1">{{ $message }}</div>
+                                                        @enderror
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div class="col-md-4">
@@ -2523,7 +2529,13 @@
                                             <div class="col-md-8">
                                                 <div class="pe-md-4">
                                                     <x-ui.odoo-form-ui type="editor" :label="__('crm.terms_conditions')" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions', $activeQuotation->terms_conditions) !!}</x-ui.odoo-form-ui>
-                                                    <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes')" name="notes" rows="2" placeholder="Notes for internal view..." :errorText="$errors->first('notes')">{{ old('notes', $activeQuotation->notes) }}</x-ui.odoo-form-ui>
+                                                    <div class="mt-2">
+                                                        <label for="editQuotationNotes" class="form-label fw-bold text-secondary fs-13 mb-1">{{ __('crm.notes') }}</label>
+                                                        <textarea name="notes" id="editQuotationNotes" rows="3" class="form-control form-control-sm @error('notes') is-invalid @enderror" placeholder="Notes for internal view...">{{ old('notes', $activeQuotation->notes) }}</textarea>
+                                                        @error('notes')
+                                                            <div class="invalid-feedback d-block fs-11 mt-1">{{ $message }}</div>
+                                                        @enderror
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div class="col-md-4">
@@ -2910,7 +2922,7 @@
                                             @if($activeQuotation->terms_conditions)
                                                 <div class="mb-2">
                                                     <strong class="text-muted fs-11 text-uppercase fw-bold d-block">{{ __('crm.terms_conditions') }}:</strong>
-                                                    <div class="fs-12 text-muted mt-1">{!! $activeQuotation->terms_conditions !!}</div>
+                                                    <div class="fs-12 text-muted mt-1">{!! clean_html($activeQuotation->terms_conditions) !!}</div>
                                                 </div>
                                             @endif
                                         </div>

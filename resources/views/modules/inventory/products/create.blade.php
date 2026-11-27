@@ -77,6 +77,10 @@
             font-size: 13px;
             min-width: 120px;
         }
+        .tag-input:focus-visible {
+            outline: 2px solid #3b82f6 !important;
+            border-radius: 2px;
+        }
 
         /* Modern ERP Media Uploader Styles */
         .erp-media-box {

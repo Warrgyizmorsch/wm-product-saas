@@ -327,15 +327,17 @@ class DispatchOrderController extends Controller
 
         try {
             $dispatch = $this->dispatchService->confirmDispatchOrder($dispatch);
-            $redirect = $request->filled('redirect_to')
-                ? redirect()->to($request->input('redirect_to'))
+            $redirectTo = $request->input('redirect_to');
+            $redirect = ($redirectTo && str_starts_with($redirectTo, '/') && !str_starts_with($redirectTo, '//') && !str_contains($redirectTo, '\\'))
+                ? redirect()->to($redirectTo)
                 : redirect()->back();
 
             return $redirect
                 ->with('success', "Dispatch Order {$dispatch->dispatch_number} confirmed and warehouse stock reserved successfully. Invoice creation is now enabled.");
         } catch (Exception $e) {
-            $redirect = $request->filled('redirect_to')
-                ? redirect()->to($request->input('redirect_to'))
+            $redirectTo = $request->input('redirect_to');
+            $redirect = ($redirectTo && str_starts_with($redirectTo, '/') && !str_starts_with($redirectTo, '//') && !str_contains($redirectTo, '\\'))
+                ? redirect()->to($redirectTo)
                 : redirect()->back();
 
             return $redirect->with('error', $e->getMessage());
@@ -353,15 +355,17 @@ class DispatchOrderController extends Controller
 
             \App\Domains\Sales\Services\SalesNotificationService::notifyDispatchShipped($dispatch);
 
-            $redirect = $request->filled('redirect_to')
-                ? redirect()->to($request->input('redirect_to'))
+            $redirectTo = $request->input('redirect_to');
+            $redirect = ($redirectTo && str_starts_with($redirectTo, '/') && !str_starts_with($redirectTo, '//') && !str_contains($redirectTo, '\\'))
+                ? redirect()->to($redirectTo)
                 : redirect()->back();
 
             return $redirect
                 ->with('success', "Dispatch Order {$dispatch->dispatch_number} marked as Shipped (Gate Outward) and physical stock deducted from warehouse successfully.");
         } catch (Exception $e) {
-            $redirect = $request->filled('redirect_to')
-                ? redirect()->to($request->input('redirect_to'))
+            $redirectTo = $request->input('redirect_to');
+            $redirect = ($redirectTo && str_starts_with($redirectTo, '/') && !str_starts_with($redirectTo, '//') && !str_contains($redirectTo, '\\'))
+                ? redirect()->to($redirectTo)
                 : redirect()->back();
 
             return $redirect->with('error', $e->getMessage());
@@ -431,6 +435,19 @@ class DispatchOrderController extends Controller
 
         return redirect()->route('sales.dispatches.show', $dispatch->id)
             ->with('success', 'Tracking & logistics details updated successfully.');
+    }
+
+    public function warehouseAddress(\App\Domains\Inventory\Models\Warehouse $warehouse): JsonResponse
+    {
+        $this->authorize('view', $warehouse);
+
+        return response()->json([
+            'success' => true,
+            'id'      => $warehouse->id,
+            'name'    => $warehouse->name,
+            'code'    => $warehouse->code,
+            'address' => $warehouse->address ?? '',
+        ]);
     }
 
     public function cancel(Request $request, int $id): RedirectResponse

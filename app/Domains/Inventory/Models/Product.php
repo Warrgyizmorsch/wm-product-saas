@@ -8,10 +8,11 @@ use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch;
+    use HasFactory, BelongsToCompany, BelongsToBranch, SoftDeletes;
 
     public bool $sharedAcrossCompanies = true;
 
@@ -218,19 +219,21 @@ class Product extends BaseModel
         if ($this->relationLoaded('primaryImage') && $this->primaryImage) {
             return $this->primaryImage->url;
         }
-        
-        $primary = $this->primaryImage()->first();
-        if ($primary) {
-            return $primary->url;
-        }
 
-        // Check if there is any image attached to this product
-        if ($this->relationLoaded('images') && $this->images->isNotEmpty()) {
-            return $this->images->first()->url;
-        }
-        $firstImg = $this->images()->first();
-        if ($firstImg) {
-            return $firstImg->url;
+        if ($this->relationLoaded('images')) {
+            $first = $this->images->first();
+            if ($first) {
+                return $first->url;
+            }
+        } else {
+            $primary = $this->primaryImage()->first();
+            if ($primary) {
+                return $primary->url;
+            }
+            $firstImg = $this->images()->first();
+            if ($firstImg) {
+                return $firstImg->url;
+            }
         }
 
         // If legacy image_path exists
@@ -306,19 +309,22 @@ class Product extends BaseModel
      */
     public function getResolvedSalesAccount(?int $tenantId = null): ?\App\Domains\Accounting\Models\ChartOfAccount
     {
-        $tenantId = $tenantId ?? $this->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $tenantId ?? $this->tenant_id ?? tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) return null;
         return app(\App\Domains\Accounting\Services\AccountResolverService::class)->resolveSalesAccount($this, $tenantId);
     }
 
     public function getResolvedPurchaseAccount(?int $tenantId = null): ?\App\Domains\Accounting\Models\ChartOfAccount
     {
-        $tenantId = $tenantId ?? $this->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $tenantId ?? $this->tenant_id ?? tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) return null;
         return app(\App\Domains\Accounting\Services\AccountResolverService::class)->resolvePurchaseAccount($this, $tenantId);
     }
 
     public function getResolvedInventoryAccount(?int $tenantId = null): ?\App\Domains\Accounting\Models\ChartOfAccount
     {
-        $tenantId = $tenantId ?? $this->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $tenantId ?? $this->tenant_id ?? tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) return null;
         return app(\App\Domains\Accounting\Services\AccountResolverService::class)->resolveInventoryAccount($this, $tenantId);
     }
 

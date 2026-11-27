@@ -3,19 +3,19 @@
 namespace App\Exports;
 
 use App\Domains\Inventory\Models\Product;
-use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 
-class ProductExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
+class ProductExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize
 {
     public function __construct(
         private readonly ?int $tenantId = null,
         private readonly array $filters = []
     ) {}
 
-    public function collection()
+    public function query()
     {
         $query = Product::with(['uom', 'parent']);
 
@@ -166,7 +166,11 @@ class ProductExport implements FromCollection, WithHeadings, WithMapping, Should
 
         $output = [];
         foreach ($this->getActiveColumns() as $col) {
-            $output[] = $values[$col] ?? '';
+            $val = $values[$col] ?? '';
+            if (is_string($val) && strlen($val) > 0 && in_array($val[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+                $val = "'" . $val;
+            }
+            $output[] = $val;
         }
 
         return $output;

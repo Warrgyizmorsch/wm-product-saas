@@ -46,7 +46,7 @@ class VisitorController extends Controller
         } elseif ($status === 'Overstayed') {
             $passesQuery->whereIn('status', ['Checked-In', 'Meeting in Progress', 'Overstayed'])
                 ->whereNull('check_out_at')
-                ->whereRaw("TIMESTAMPDIFF(MINUTE, check_in_at, NOW()) > COALESCE(expected_duration_minutes, 60)");
+                ->whereRaw("TIMESTAMPDIFF(MINUTE, check_in_at, ?) > COALESCE(expected_duration_minutes, 60)", [now()->toDateTimeString()]);
         } elseif ($status === 'Denied' || $status === 'Rejected') {
             $passesQuery->whereIn('status', ['Denied', 'Rejected']);
         } elseif (!empty($status) && $status !== 'all') {
@@ -110,7 +110,21 @@ class VisitorController extends Controller
             'id_proof_type'             => 'nullable|string|max:50',
             'id_proof_number'           => 'nullable|string|max:100',
             'id_verification_status'    => 'nullable|string|in:Pending,Verified,Exempted,Failed',
-            'photo_url'                 => 'nullable|string|max:2097152',
+            'photo_url'                 => ['nullable', 'string', 'max:1048576', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (!is_string($value) || $value === '') {
+                    return;
+                }
+                $isHttpUrl = filter_var($value, FILTER_VALIDATE_URL) && in_array(strtolower((string)parse_url($value, PHP_URL_SCHEME)), ['http', 'https'], true);
+                $isLocalPath = str_starts_with($value, '/storage/');
+                $isDataImage = (bool)preg_match('/^data:image\/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+\/=]+$/i', $value);
+                if (!$isHttpUrl && !$isLocalPath && !$isDataImage) {
+                    $fail('The photo URL must be a valid HTTP/HTTPS URL, storage path, or base64 image.');
+                    return;
+                }
+                if (!$isDataImage && strlen($value) > 2048) {
+                    $fail('The photo URL must not exceed 2048 characters.');
+                }
+            }],
             'host_user_id'              => ['nullable', \Illuminate\Validation\Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
             'department_id'             => 'nullable|integer',
             'purpose'                   => 'required|string|max:100',

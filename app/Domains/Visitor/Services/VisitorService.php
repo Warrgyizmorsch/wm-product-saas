@@ -59,20 +59,23 @@ class VisitorService
      */
     public function getDashboardStats(int $tenantId, ?int $branchId = null): array
     {
+        $now = now()->toDateTimeString();
+        $today = now()->toDateString();
+
         $stats = VisitorPass::where('tenant_id', $tenantId)
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->selectRaw("
                 COUNT(*) as total_passes,
                 COUNT(CASE WHEN status IN ('Checked-In', 'Meeting in Progress', 'Overstayed') AND check_out_at IS NULL THEN 1 END) as active_inside,
-                COUNT(CASE WHEN status = 'Expected' AND DATE(expected_arrival_at) = CURRENT_DATE THEN 1 END) as today_expected,
-                COUNT(CASE WHEN status IN ('Checked-In', 'Meeting in Progress') AND DATE(check_in_at) = CURRENT_DATE THEN 1 END) as today_checked_in,
+                COUNT(CASE WHEN status = 'Expected' AND DATE(expected_arrival_at) = ? THEN 1 END) as today_expected,
+                COUNT(CASE WHEN status IN ('Checked-In', 'Meeting in Progress') AND DATE(check_in_at) = ? THEN 1 END) as today_checked_in,
                 COUNT(CASE WHEN status = 'Checked-Out' THEN 1 END) as total_checked_out,
-                COUNT(CASE WHEN status = 'Checked-Out' AND DATE(check_out_at) = CURRENT_DATE THEN 1 END) as today_checked_out,
+                COUNT(CASE WHEN status = 'Checked-Out' AND DATE(check_out_at) = ? THEN 1 END) as today_checked_out,
                 COUNT(CASE WHEN status = 'Waiting Approval' THEN 1 END) as waiting_approval,
                 COUNT(CASE WHEN status IN ('Denied', 'Rejected') THEN 1 END) as denied_count,
-                COUNT(CASE WHEN status IN ('Checked-In', 'Meeting in Progress', 'Overstayed') AND check_out_at IS NULL AND check_in_at IS NOT NULL AND TIMESTAMPDIFF(MINUTE, check_in_at, NOW()) > COALESCE(expected_duration_minutes, 60) THEN 1 END) as overstayed_count,
-                COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN fee_amount ELSE 0 END), 0) as today_fees
-            ")->first();
+                COUNT(CASE WHEN status IN ('Checked-In', 'Meeting in Progress', 'Overstayed') AND check_out_at IS NULL AND check_in_at IS NOT NULL AND TIMESTAMPDIFF(MINUTE, check_in_at, ?) > COALESCE(expected_duration_minutes, 60) THEN 1 END) as overstayed_count,
+                COALESCE(SUM(CASE WHEN DATE(created_at) = ? THEN fee_amount ELSE 0 END), 0) as today_fees
+            ", [$today, $today, $today, $now, $today])->first();
 
         $totalVisitors = Visitor::where('tenant_id', $tenantId)->count();
         $repeatVisitorsCount = Visitor::where('tenant_id', $tenantId)->has('passes', '>', 1)->count();
@@ -130,7 +133,9 @@ class VisitorService
             if (!empty($data['visitor_type'])) $visitor->visitor_type = $data['visitor_type'];
             if (!empty($data['id_proof_type'])) $visitor->id_proof_type = $data['id_proof_type'];
             if (!empty($data['id_proof_number'])) $visitor->id_proof_number = trim($data['id_proof_number']);
-            if (!empty($data['photo_url'])) $visitor->photo_url = $data['photo_url'];
+            if (!empty($data['photo_url'])) {
+                $visitor->photo_url = $this->storeVisitorPhotoIfBase64((string)$data['photo_url'], $tenantId);
+            }
             $visitor->save();
 
             $passNotes = $data['notes'] ?? null;
@@ -387,6 +392,27 @@ class VisitorService
                 'url'          => $actionUrl,
             ]
         );
+    }
+
+    /**
+     * Persist inline base64 visitor photo to disk so database and HTML responses stay lightweight.
+     */
+    private function storeVisitorPhotoIfBase64(string $photoUrl, int $tenantId): string
+    {
+        if (!preg_match('/^data:image\/(jpeg|jpg|png|webp|gif);base64,([A-Za-z0-9+\/=]+)$/i', $photoUrl, $matches)) {
+            return $photoUrl;
+        }
+
+        $ext = strtolower($matches[1]) === 'jpeg' ? 'jpg' : strtolower($matches[1]);
+        $binary = base64_decode($matches[2], true);
+        if ($binary === false || $binary === '') {
+            return $photoUrl;
+        }
+
+        $relativePath = "visitors/{$tenantId}/" . Str::uuid()->toString() . ".{$ext}";
+        \Illuminate\Support\Facades\Storage::disk('public')->put($relativePath, $binary);
+
+        return '/storage/' . $relativePath;
     }
 }
 

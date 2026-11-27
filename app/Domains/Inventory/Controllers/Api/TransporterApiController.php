@@ -25,6 +25,8 @@ class TransporterApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Transporter::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $query = Transporter::query()
@@ -64,6 +66,8 @@ class TransporterApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Transporter::class);
+
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [
@@ -150,6 +154,8 @@ class TransporterApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $transporter);
+
         return response()->json([
             'success' => true,
             'data'    => $transporter,
@@ -171,6 +177,8 @@ class TransporterApiController extends Controller
                 'message' => 'Transporter not found',
             ], 404);
         }
+
+        $this->authorize('update', $transporter);
 
         $validator = Validator::make($request->all(), [
             'name'                  => ['sometimes', 'required', 'string', 'max:255'],
@@ -249,6 +257,8 @@ class TransporterApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $transporter);
+
         $transporter->delete();
 
         return response()->json([
@@ -262,6 +272,8 @@ class TransporterApiController extends Controller
      */
     public function quickCreate(Request $request): JsonResponse
     {
+        $this->authorize('create', Transporter::class);
+
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [

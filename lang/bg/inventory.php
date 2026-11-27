@@ -1,6 +1,7 @@
 <?php
 
 return array (
+  'per_page' => 'На страница',
   'inventory' => 'Инвентар',
   'items' => 'Артикули',
   'products' => 'Продукти',

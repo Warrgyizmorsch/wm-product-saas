@@ -456,7 +456,13 @@
         try {
             const pusher = new Pusher(pusherKey, {
                 cluster: pusherCluster || 'ap2',
-                forceTLS: true
+                forceTLS: true,
+                channelAuthorization: {
+                    endpoint: '{{ route("broadcasting.auth") }}',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}'
+                    }
+                }
             });
 
             const visitorEvents = [
@@ -545,7 +551,7 @@
 
             // 1. User Channel (User-specific real-time alerts for HRMS, CRM, System)
             if (currentUserId > 0) {
-                const userChannelName = 'user-' + currentUserId;
+                const userChannelName = 'private-user-' + currentUserId;
                 const userChannel = pusher.subscribe(userChannelName);
 
                 // Bind all designated events
@@ -567,7 +573,7 @@
 
             // 2. Tenant Visitor Channel (Gate desk & general security alerts)
             if (currentTenantId > 0) {
-                const tenantChannelName = 'visitor-tenant-' + currentTenantId;
+                const tenantChannelName = 'private-visitor-tenant-' + currentTenantId;
                 const tenantChannel = pusher.subscribe(tenantChannelName);
 
                 visitorEvents.forEach(ev => {

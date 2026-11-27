@@ -104,7 +104,11 @@ class WarehouseExport implements FromCollection, WithHeadings, WithMapping, Shou
 
         $output = [];
         foreach ($this->getActiveColumns() as $col) {
-            $output[] = $values[$col] ?? '';
+            $val = $values[$col] ?? '';
+            if (is_string($val) && strlen($val) > 0 && in_array($val[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+                $val = "'" . $val;
+            }
+            $output[] = $val;
         }
 
         return $output;

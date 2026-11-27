@@ -36,6 +36,13 @@ class LeadImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $contactEmail = trim((string)($rowArray['email'] ?? ($rowArray['contact_email'] ?? ($rowArray['personal_email'] ?? ''))));
             $contactPhone = trim((string)($rowArray['phone'] ?? ($rowArray['contact_phone'] ?? ($rowArray['mobile'] ?? ''))));
 
+            if (empty($companyEmail) && !empty($contactEmail) && !empty($companyName)) {
+                $companyEmail = $contactEmail;
+            }
+            if (empty($companyPhone) && !empty($contactPhone) && !empty($companyName)) {
+                $companyPhone = $contactPhone;
+            }
+
             $hasCompanyName  = !empty($companyName);
             $hasCompanyEmail = !empty($companyEmail);
             $isB2B           = $hasCompanyName || $hasCompanyEmail;
@@ -146,7 +153,7 @@ class LeadImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                     'designation'        => $dataToValidate['designation'],
                     'email'              => $dataToValidate['email'],
                     'phone'              => $dataToValidate['phone'],
-                    'expected_amount'    => null,
+                    'expected_amount'    => isset($rowArray['expected_amount']) && is_numeric($rowArray['expected_amount']) ? (float)$rowArray['expected_amount'] : null,
                     'expected_sale_date' => $expectedSaleDate,
                     'requirement'        => $rowArray['requirement'] ?? ($rowArray['requirements'] ?? null),
                     'industry_type'      => $dataToValidate['industry_type'],

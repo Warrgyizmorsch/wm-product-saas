@@ -27,6 +27,8 @@ class BarcodeApiController extends Controller
      */
     public function meta(): JsonResponse
     {
+        $this->authorize('viewAny', Product::class);
+
         [$tenantId] = $this->resolveTenantContext();
         $products   = Product::where('tenant_id', $tenantId)->sellable()->orderBy('name')->get(['id', 'name', 'sku', 'barcode', 'selling_price', 'track_serial_number']);
         $warehouses = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'code']);
@@ -45,6 +47,8 @@ class BarcodeApiController extends Controller
      */
     public function getSerials(int $productId): JsonResponse
     {
+        $this->authorize('viewAny', Product::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $serials = SerialNumber::where('tenant_id', $tenantId)
@@ -63,6 +67,8 @@ class BarcodeApiController extends Controller
      */
     public function print(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Product::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [

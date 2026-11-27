@@ -67,4 +67,9 @@ class BatchPolicy
         return $this->access->allows($user, 'inventory.batches.manage', $context)
             || $this->access->allows($user, 'inventory.warehouses.manage', $context);
     }
+
+    public function delete(User $user, Batch $batch): bool
+    {
+        return $this->update($user, $batch);
+    }
 }

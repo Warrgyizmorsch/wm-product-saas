@@ -14,7 +14,7 @@ class ProductRepository
      */
     public function getPaginatedProducts(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
-        $query = Product::query()->whereNull('parent_id')->with(['uom', 'variants.images', 'variants.primaryImage', 'images', 'primaryImage']);
+        $query = Product::query()->whereNull('parent_id')->with(['uom', 'variants.images', 'variants.primaryImage', 'images', 'primaryImage', 'warehouseStocks']);
 
         if (!empty($filters['search'])) {
             $search = trim($filters['search']);

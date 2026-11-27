@@ -44,7 +44,14 @@ class CrmDeal extends BaseModel
                 $next = \App\Support\TenantSequence::next($tenantId, "deal:{$year}", fn () => \App\Support\TenantSequence::highestSuffix(
                     static::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('deal_number', 'like', $prefix . '%')->pluck('deal_number')
                 ));
-                $deal->deal_number = $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+                $candidate = $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+                $attempts = 0;
+                while ($attempts < 100 && static::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('deal_number', $candidate)->exists()) {
+                    $next = \App\Support\TenantSequence::next($tenantId, "deal:{$year}", fn () => (int) $next);
+                    $candidate = $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+                    $attempts++;
+                }
+                $deal->deal_number = $candidate;
             }
             if (empty($deal->owner_id) && auth()->check()) {
                 $deal->owner_id = auth()->id();

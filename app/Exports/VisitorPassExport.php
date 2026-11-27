@@ -3,19 +3,19 @@
 namespace App\Exports;
 
 use App\Domains\Visitor\Models\VisitorPass;
-use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 
-class VisitorPassExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
+class VisitorPassExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize
 {
     public function __construct(
         private readonly int $tenantId,
         private readonly array $filters = []
     ) {}
 
-    public function collection()
+    public function query()
     {
         $query = VisitorPass::where('tenant_id', $this->tenantId)
             ->with(['visitor', 'host', 'belongings']);
@@ -59,7 +59,7 @@ class VisitorPassExport implements FromCollection, WithHeadings, WithMapping, Sh
             });
         }
 
-        return $query->latest()->limit(10000)->get();
+        return $query->latest();
     }
 
     public static function availableColumns(): array

@@ -28,7 +28,7 @@
                                     <i class="feather-truck me-1"></i>{{ __('inventory.subcontract_wip_dispatch') }}
                                 </span>
                             @else
-                                <span class="badge bg-soft-info text-info border border-info px-2.5 py-1 fs-11 fw-bold me-2">
+                                <span class="badge bg-soft-info text-dark border border-info px-2.5 py-1 fs-11 fw-bold me-2">
                                     <i class="feather-box me-1"></i>{{ __('inventory.subcontract_material_dispatch') }}
                                 </span>
                             @endif

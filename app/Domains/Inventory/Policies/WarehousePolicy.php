@@ -23,6 +23,11 @@ class WarehousePolicy
         ]);
     }
 
+    public function view(User $user, Warehouse $warehouse): bool
+    {
+        return $this->viewAny($user);
+    }
+
     public function create(User $user): bool
     {
         return $this->access->allows($user, 'inventory.warehouses.manage', [

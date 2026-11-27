@@ -13,7 +13,8 @@ class BarcodeController extends Controller
     public function index(Request $request)
     {
         $this->authorize('viewAny', Product::class);
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) abort(403, 'Tenant context missing.');
         $products = Product::where('tenant_id', $tenantId)->sellable()->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
 
@@ -23,7 +24,8 @@ class BarcodeController extends Controller
     public function getSerials(Request $request, Product $product)
     {
         $this->authorize('view', $product);
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) abort(403, 'Tenant context missing.');
         $serials = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
             ->where('product_id', $product->id)
             ->where('status', 'Available')
@@ -35,7 +37,8 @@ class BarcodeController extends Controller
     public function print(Request $request)
     {
         $this->authorize('viewAny', Product::class);
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) abort(403, 'Tenant context missing.');
 
         $request->validate([
             'product_id' => [
