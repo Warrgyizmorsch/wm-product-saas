@@ -358,6 +358,23 @@ class BomDetailDisplayImprovementsTest extends TestCase
         $this->assertMatchesRegularExpression('/class="bom-exp-row[^"]*d-none"[^>]*data-node-id="exp-1-0-0"/', $html);
         $response->assertSee('Expand All');
         $response->assertSee('Default (L1–L2 Only)');
+        $response->assertSee('Produce Qty:');
+        $response->assertSee('Calculate Materials');
+        $response->assertSee('bomExplosionTableBody');
+
+        // AJAX explosion endpoint updates only Tab 2 rows without full-page reload
+        $ajaxRes = $this->withHeaders(['X-Tenant' => $this->tenant->slug])
+            ->getJson(route('production.boms.explosion', $bom->id) . '?calc_qty=10');
+        $ajaxRes->assertOk()
+            ->assertJsonPath('calc_qty', 10);
+        $ajaxHtml = $ajaxRes->json('html');
+        $this->assertStringContainsString('bom-exp-row', $ajaxHtml);
+        $this->assertStringContainsString('>50<', $ajaxHtml); // 5 Steel Tube * 10 = 50 (base qty 2 -> sf qty 2*10/2=10, 10*5=50)
+        $this->assertStringContainsString('>22<', $ajaxHtml); // 4.4 Bolt Set * 10 / 2 = 22
+
+        $this->withHeaders(['X-Tenant' => $this->tenant->slug])
+            ->getJson(route('production.boms.explosion', $bom->id) . '?calc_qty=0')
+            ->assertStatus(422);
 
         // Tab 3: Workflow & Routing shows alternative operation badge, manual batches, and full times/yield
         $response->assertSee(__('production.bom_alternative_operation'));

@@ -180,6 +180,32 @@ class ProductionBomController extends Controller
     }
 
     /**
+     * AJAX endpoint for recalculating Tab 2 Multi-Level BOM Explosion without reloading the page.
+     */
+    public function explosion(int $id, Request $request): \Illuminate\Http\JsonResponse
+    {
+        $bom = $this->bomRepository->find($id);
+        abort_if(!$bom, 404, 'BOM not found.');
+
+        $this->authorize('view', $bom);
+
+        $calcQty = (float) $request->input('calc_qty', $bom->base_quantity);
+        if ($calcQty <= 0) {
+            return response()->json([
+                'message' => 'Quantity must be greater than zero.',
+            ], 422);
+        }
+
+        $explosion = $this->explosionService->explodeBom($bom->id, $calcQty, $bom->tenant_id);
+        $html = view('modules.production.bom.partials._explosion_rows', compact('explosion'))->render();
+
+        return response()->json([
+            'calc_qty' => $calcQty,
+            'html' => $html,
+        ]);
+    }
+
+    /**
      * Build Tab 4 cost breakdown, multi-level roll-up summary, and Alpine Simulate Cost payload.
      */
     private function buildCostSummaryPayload(ProductionBom $bom): array

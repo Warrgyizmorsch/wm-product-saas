@@ -99,6 +99,7 @@ Route::prefix('production')
 
         // ── BOM ───────────────────────────────────────────────────────────────
         Route::get('boms/check-child/{productId}', [ProductionBomController::class, 'checkChildBom'])->name('boms.check-child');
+        Route::get('boms/{bom}/explosion', [ProductionBomController::class, 'explosion'])->name('boms.explosion');
         Route::post('boms/{bom}/create-revision', [ProductionBomController::class, 'createRevision'])->name('boms.create-revision');
         Route::post('boms/{bom}/submit', [ProductionBomController::class, 'submitApproval'])->name('boms.submit');
         Route::post('boms/{bom}/approve', [ProductionBomController::class, 'approve'])->name('boms.approve');
