@@ -27,6 +27,17 @@ class StockTransferItem extends Model
         'serial_numbers' => 'array',
     ];
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope('tenant', function (\Illuminate\Database\Eloquent\Builder $builder) {
+            if ($tenantId = tenant_id() ?? current_tenant_id() ?? auth()->user()?->tenant_id) {
+                $builder->whereHas('transfer', function ($q) use ($tenantId) {
+                    $q->where('tenant_id', $tenantId);
+                });
+            }
+        });
+    }
+
     public function transfer(): BelongsTo
     {
         return $this->belongsTo(StockTransfer::class, 'stock_transfer_id');

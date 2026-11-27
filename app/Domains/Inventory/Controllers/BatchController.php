@@ -35,11 +35,11 @@ class BatchController extends Controller
         if ($request->filled('expiry_filter')) {
             $filter = $request->expiry_filter;
             if ($filter === 'expired') {
-                $query->where('expiry_date', '<', now());
+                $query->whereDate('expiry_date', '<', today());
             } elseif ($filter === 'expiring_soon') {
-                $query->whereBetween('expiry_date', [now(), now()->addDays(30)]);
+                $query->whereBetween('expiry_date', [today()->startOfDay(), today()->addDays(30)->endOfDay()]);
             } elseif ($filter === 'fresh') {
-                $query->where('expiry_date', '>', now()->addDays(30));
+                $query->whereDate('expiry_date', '>', today()->addDays(30));
             }
         }
 

@@ -9,6 +9,13 @@ use App\Models\Tenant;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+if (! function_exists('clean_html')) {
+    function clean_html(?string $html): string
+    {
+        return \App\Support\HtmlSanitizer::clean($html);
+    }
+}
+
 if (! function_exists('tenant')) {
     function tenant(): ?Tenant
     {

@@ -24,6 +24,8 @@ class MaterialRequirementApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', MaterialRequirement::class);
+
         $filters = $request->only([
             'search', 'status', 'date_from', 'date_to', 'sort_by', 'sort_order'
         ]);
@@ -54,6 +56,8 @@ class MaterialRequirementApiController extends Controller
             return response()->json(['success' => false, 'message' => "Material requirement #{$id} not found."], 404);
         }
 
+        $this->authorize('view', $requirement);
+
         return response()->json([
             'success' => true,
             'data'    => $requirement,
@@ -66,15 +70,22 @@ class MaterialRequirementApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', MaterialRequirement::class);
+
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
         $validator = Validator::make($request->all(), [
-            'sales_order_id'       => ['required', 'exists:sales_orders,id'],
+            'sales_order_id'       => [
+                'required',
+                \Illuminate\Validation\Rule::exists('sales_orders', 'id')->where(fn($q) => $q->where('tenant_id', $tenantId)),
+            ],
             'requirement_number'   => ['nullable', 'string', 'max:255'],
             'requirement_date'     => ['nullable', 'date'],
             'delivery_date'        => ['nullable', 'date'],
             'notes'                => ['nullable', 'string'],
             'items'                => ['required', 'array', 'min:1'],
-            'items.*.product_id'   => ['required', 'exists:products,id'],
-            'items.*.warehouse_id' => ['required', 'exists:warehouses,id'],
+            'items.*.product_id'   => ['required', \Illuminate\Validation\Rule::exists('products', 'id')->where(fn($q) => $q->where('tenant_id', $tenantId))],
+            'items.*.warehouse_id' => ['required', \Illuminate\Validation\Rule::exists('warehouses', 'id')->where(fn($q) => $q->where('tenant_id', $tenantId))],
             'items.*.quantity'     => ['required', 'numeric', 'min:0.01'],
         ]);
 
@@ -94,7 +105,7 @@ class MaterialRequirementApiController extends Controller
             $validated['requirement_date'] = now()->toDateString();
         }
 
-        $requirement = $this->requirementService->createRequirement($validated, $validated['items']);
+        $requirement = $this->requirementService->create($validated, $validated['items']);
 
         return response()->json([
             'success' => true,
@@ -112,6 +123,8 @@ class MaterialRequirementApiController extends Controller
         if (!$delivery) {
             return response()->json(['success' => false, 'message' => "Material requirement #{$id} not found."], 404);
         }
+
+        $this->authorize('ship', $delivery);
 
         $this->requirementService->startPicking($delivery);
 
@@ -132,6 +145,8 @@ class MaterialRequirementApiController extends Controller
             return response()->json(['success' => false, 'message' => "Material requirement #{$id} not found."], 404);
         }
 
+        $this->authorize('ship', $delivery);
+
         $this->requirementService->pack($delivery);
 
         return response()->json([
@@ -150,6 +165,8 @@ class MaterialRequirementApiController extends Controller
         if (!$delivery) {
             return response()->json(['success' => false, 'message' => "Material requirement #{$id} not found."], 404);
         }
+
+        $this->authorize('ship', $delivery);
 
         $validated = $request->validate([
             'carrier'         => 'nullable|string|max:255',
@@ -176,6 +193,8 @@ class MaterialRequirementApiController extends Controller
             return response()->json(['success' => false, 'message' => "Material requirement #{$id} not found."], 404);
         }
 
+        $this->authorize('ship', $delivery);
+
         $this->requirementService->deliver($delivery);
 
         return response()->json([
@@ -194,6 +213,8 @@ class MaterialRequirementApiController extends Controller
         if (!$delivery) {
             return response()->json(['success' => false, 'message' => "Material requirement #{$id} not found."], 404);
         }
+
+        $this->authorize('cancel', $delivery);
 
         $this->requirementService->cancel($delivery);
 
@@ -214,6 +235,8 @@ class MaterialRequirementApiController extends Controller
         if (!$delivery) {
             return response()->json(['success' => false, 'message' => "Material requirement #{$id} not found."], 404);
         }
+
+        $this->authorize('ship', $delivery);
 
         $selectedItemIds = (array) $request->input('selected_items', []);
         $itemWarehouses = (array) $request->input('item_warehouses', []);
@@ -240,9 +263,13 @@ class MaterialRequirementApiController extends Controller
      */
     public function updateWarehouse(Request $request, int $itemId): JsonResponse
     {
-        $item = MaterialRequirementItem::find($itemId);
+        $item = MaterialRequirementItem::with('materialRequirement')->find($itemId);
         if (!$item) {
             return response()->json(['success' => false, 'message' => "Item #{$itemId} not found."], 404);
+        }
+
+        if ($item->materialRequirement) {
+            $this->authorize('ship', $item->materialRequirement);
         }
 
         $warehouseId = (int) $request->input('warehouse_id');
@@ -264,6 +291,10 @@ class MaterialRequirementApiController extends Controller
         $item = MaterialRequirementItem::with('materialRequirement')->find($itemId);
         if (!$item) {
             return response()->json(['success' => false, 'message' => "Item #{$itemId} not found."], 404);
+        }
+
+        if ($item->materialRequirement) {
+            $this->authorize('ship', $item->materialRequirement);
         }
 
         $qtyToReserve = (float) $request->input('quantity_reserve', $request->input('quantity', 0));
@@ -291,6 +322,10 @@ class MaterialRequirementApiController extends Controller
         $item = MaterialRequirementItem::with('materialRequirement')->find($itemId);
         if (!$item) {
             return response()->json(['success' => false, 'message' => "Item #{$itemId} not found."], 404);
+        }
+
+        if ($item->materialRequirement) {
+            $this->authorize('view', $item->materialRequirement);
         }
 
         $qtyToRequest = (float) $request->input('quantity_request', $request->input('quantity', 0));
@@ -327,6 +362,10 @@ class MaterialRequirementApiController extends Controller
             return response()->json(['success' => false, 'message' => "Item #{$itemId} not found."], 404);
         }
 
+        if ($item->materialRequirement) {
+            $this->authorize('view', $item->materialRequirement);
+        }
+
         $orderedQty = (float) ($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
         $shortageQty = max(0, $orderedQty - (float) $item->quantity_reserved);
         $qtyToMfg = (float) $request->input('quantity_mfg', $request->input('quantity', $shortageQty > 0 ? $shortageQty : $orderedQty));
@@ -356,6 +395,8 @@ class MaterialRequirementApiController extends Controller
         if (!$delivery) {
             return response()->json(['success' => false, 'message' => "Material requirement #{$id} not found."], 404);
         }
+
+        $this->authorize('ship', $delivery);
 
         $allocations = (array) $request->input('allocations', []);
         foreach ($delivery->items as $item) {

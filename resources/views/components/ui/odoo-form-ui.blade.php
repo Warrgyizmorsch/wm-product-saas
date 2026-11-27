@@ -57,9 +57,9 @@
                 width: 100%;
                 transition: border-color 0.2s ease-in-out;
             }
-            .odoo-form-control:focus {
+            .odoo-form-control:focus, .odoo-form-control:focus-visible {
                 border-color: var(--bs-primary) !important;
-                outline: none;
+                outline: 2px solid #3b82f6 !important;
                 box-shadow: 0 1px 0 0 var(--bs-primary);
             }
             .odoo-form-control[readonly] {
@@ -275,9 +275,9 @@
                 -moz-appearance: textfield !important;
                 appearance: textfield !important;
             }
-            .odoo-table-input:focus {
+            .odoo-table-input:focus, .odoo-table-input:focus-visible {
                 border-bottom-color: var(--bs-primary) !important;
-                outline: none;
+                outline: 2px solid #3b82f6 !important;
                 box-shadow: 0 1px 0 0 var(--bs-primary);
                 background: transparent !important;
             }
@@ -296,9 +296,9 @@
                 cursor: pointer;
                 transition: border-bottom-color 0.2s ease-in-out;
             }
-            .odoo-table-select:focus {
+            .odoo-table-select:focus, .odoo-table-select:focus-visible {
                 border-bottom-color: var(--bs-primary) !important;
-                outline: none;
+                outline: 2px solid #3b82f6 !important;
                 box-shadow: 0 1px 0 0 var(--bs-primary);
             }
 

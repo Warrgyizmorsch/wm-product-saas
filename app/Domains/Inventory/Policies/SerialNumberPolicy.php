@@ -67,4 +67,9 @@ class SerialNumberPolicy
         return $this->access->allows($user, 'inventory.serials.manage', $context)
             || $this->access->allows($user, 'inventory.warehouses.manage', $context);
     }
+
+    public function delete(User $user, SerialNumber $serial): bool
+    {
+        return $this->update($user, $serial);
+    }
 }

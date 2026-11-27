@@ -786,11 +786,9 @@
                 @endif
 
                 @if($order->terms_conditions)
-                    @if(strip_tags($order->terms_conditions) !== $order->terms_conditions)
-                        {!! $order->terms_conditions !!}
-                    @else
-                        <p style="white-space: pre-line;">{{ $order->terms_conditions }}</p>
-                    @endif
+                    <div class="terms-content">
+                        {!! clean_html($order->terms_conditions) !!}
+                    </div>
                 @endif
             </div>
         </div>

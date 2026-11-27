@@ -211,6 +211,9 @@ class QuotationService
             $data['total_amount'] = round($totalAmount, 2);
             $data['is_current'] = true;
             $data['revision_number'] = 0;
+            if (isset($data['terms_conditions'])) {
+                $data['terms_conditions'] = clean_html($data['terms_conditions']);
+            }
 
             $quotation = $this->quotations->create($data);
             $quotation->items()->createMany($itemsData);
@@ -372,7 +375,7 @@ class QuotationService
                 'igst' => $igst,
                 'discount' => $discount,
                 'total_amount' => round($totalAmount, 2),
-                'terms_conditions' => $data['terms_conditions'] ?? null,
+                'terms_conditions' => isset($data['terms_conditions']) ? clean_html($data['terms_conditions']) : null,
                 'notes' => $data['notes'] ?? null,
                 'parent_id' => $rootParentId,
                 'revision_number' => $newRevisionNumber,

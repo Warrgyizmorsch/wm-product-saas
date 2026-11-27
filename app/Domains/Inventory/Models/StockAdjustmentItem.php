@@ -30,6 +30,17 @@ class StockAdjustmentItem extends Model
         'serial_numbers' => 'array',
     ];
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope('tenant', function (\Illuminate\Database\Eloquent\Builder $builder) {
+            if ($tenantId = tenant_id() ?? current_tenant_id() ?? auth()->user()?->tenant_id) {
+                $builder->whereHas('adjustment', function ($q) use ($tenantId) {
+                    $q->where('tenant_id', $tenantId);
+                });
+            }
+        });
+    }
+
     public function adjustment(): BelongsTo
     {
         return $this->belongsTo(StockAdjustment::class, 'stock_adjustment_id');

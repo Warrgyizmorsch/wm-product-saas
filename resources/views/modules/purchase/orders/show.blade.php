@@ -642,11 +642,7 @@
                             <div class="p-3 bg-light bg-opacity-40 rounded border mb-3">
                                 <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-1">Terms &amp; Conditions:</span>
                                 <div class="fs-12 text-secondary po-rich-text">
-                                    @if(strip_tags($order->terms_conditions) !== $order->terms_conditions)
-                                        {!! $order->terms_conditions !!}
-                                    @else
-                                        <div style="white-space: pre-wrap;">{{ $order->terms_conditions }}</div>
-                                    @endif
+                                    {!! clean_html($order->terms_conditions) !!}
                                 </div>
                             </div>
                         @endif

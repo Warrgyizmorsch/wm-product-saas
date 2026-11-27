@@ -59,12 +59,10 @@ class SupplyChainDashboardController extends Controller
 
         $lowStockProductsList = Product::where('tenant_id', $tenantId)
             ->sellable()
+            ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM product_warehouse_stocks WHERE product_warehouse_stocks.product_id = products.id AND product_warehouse_stocks.tenant_id = ?) <= COALESCE(products.reorder_point, 10)', [$tenantId])
             ->with('warehouseStocks')
-            ->get()
-            ->filter(function ($p) {
-                $reorder = (float) ($p->reorder_point ?: 10);
-                return $p->total_stock <= $reorder;
-            })->take(10);
+            ->take(10)
+            ->get();
 
         $lowStockCount = $lowStockProductsList->count();
 

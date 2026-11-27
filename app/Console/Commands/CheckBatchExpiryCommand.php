@@ -25,6 +25,11 @@ class CheckBatchExpiryCommand extends Command
     public function handle(): int
     {
         $days = (int) $this->option('days');
+        if ($days <= 0) {
+            $this->error("The --days option must be a positive integer greater than zero.");
+            return self::FAILURE;
+        }
+
         $tenantId = $this->option('tenant') ? (int) $this->option('tenant') : null;
 
         $targetDate = Carbon::now()->addDays($days);
@@ -39,14 +44,24 @@ class CheckBatchExpiryCommand extends Command
             $query->where('tenant_id', $tenantId);
         }
 
-        $batches = $query->with(['product', 'warehouse'])->get();
+        $today = Carbon::today()->toDateString();
+        $notifiedCount = 0;
 
-        $this->info("Found {$batches->count()} batch(es) nearing expiration within {$days} days.");
+        $query->with(['product', 'warehouse'])->chunkById(100, function ($batches) use ($today, &$notifiedCount) {
+            foreach ($batches as $batch) {
+                $cacheKey = "batch_expiry_notified_{$batch->id}_{$today}";
+                if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+                    continue;
+                }
+                \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->endOfDay());
 
-        foreach ($batches as $batch) {
-            $daysLeft = (int) Carbon::now()->diffInDays(Carbon::parse($batch->expiry_date), false);
-            InventoryNotificationService::notifyBatchExpiring($batch, max(0, $daysLeft));
-        }
+                $daysLeft = (int) Carbon::now()->diffInDays(Carbon::parse($batch->expiry_date), false);
+                InventoryNotificationService::notifyBatchExpiring($batch, max(0, $daysLeft));
+                $notifiedCount++;
+            }
+        });
+
+        $this->info("Completed batch expiry check: {$notifiedCount} new notification(s) sent.");
 
         return self::SUCCESS;
     }

@@ -18,11 +18,34 @@ class MrpShortageController extends Controller
         private readonly MrpShortageService $mrpShortageService,
     ) {}
 
+    private function checkPermission(string|array $permissions): void
+    {
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+        if ($user->is_super_admin ?? false) {
+            return;
+        }
+
+        $access = app(\App\Services\Access\AccessService::class);
+        $perms = (array) $permissions;
+        foreach ($perms as $perm) {
+            if ($user->can($perm) || $access->allows($user, $perm, ['tenant_id' => $user->tenant_id])) {
+                return;
+            }
+        }
+
+        abort(403, 'Unauthorized action.');
+    }
+
     /**
      * Display MRP Multi-Level BOM Explosion & Net Shortage Planning screen.
      */
     public function index(Request $request): View
     {
+        $this->checkPermission(['inventory.warehouses.manage', 'inventory.material_requirements.view', 'production.plans.view']);
+
         $tenantId = require_tenant_id();
 
         // Load Products & Warehouses for manual selection
@@ -119,6 +142,8 @@ class MrpShortageController extends Controller
      */
     public function generatePr(Request $request): RedirectResponse
     {
+        $this->checkPermission(['purchase.requisitions.create', 'inventory.warehouses.manage']);
+
         $tenantId = require_tenant_id();
         $userId = auth()->id() ?: 1;
 

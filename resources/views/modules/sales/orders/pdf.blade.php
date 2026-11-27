@@ -695,7 +695,7 @@
         <div class="terms-section">
             <div class="section-label">Terms & Conditions:</div>
             <div class="terms-content">
-                {!! $order->terms_conditions !!}
+                {!! clean_html($order->terms_conditions) !!}
             </div>
         </div>
     @endif

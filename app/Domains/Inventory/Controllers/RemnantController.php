@@ -17,8 +17,31 @@ class RemnantController extends Controller
         protected RemnantInventoryService $remnantService
     ) {}
 
+    private function checkPermission(string|array $permissions): void
+    {
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+        if ($user->is_super_admin ?? false) {
+            return;
+        }
+
+        $access = app(\App\Services\Access\AccessService::class);
+        $perms = (array) $permissions;
+        foreach ($perms as $perm) {
+            if ($user->hasPermissionTo($perm) || $user->can($perm) || $access->allows($user, $perm, ['tenant_id' => $user->tenant_id])) {
+                return;
+            }
+        }
+
+        abort(403, 'Unauthorized action.');
+    }
+
     public function index(Request $request): View
     {
+        $this->checkPermission(['inventory.warehouses.manage', 'inventory.products.view', 'production.plans.view']);
+
         $tenantId = require_tenant_id();
 
         $query = InventoryRemnant::query()
@@ -107,6 +130,8 @@ class RemnantController extends Controller
 
     public function show(int $id): View
     {
+        $this->checkPermission(['inventory.warehouses.manage', 'inventory.products.view', 'production.plans.view']);
+
         $tenantId = require_tenant_id();
 
         $remnant = InventoryRemnant::where('tenant_id', $tenantId)
@@ -134,6 +159,8 @@ class RemnantController extends Controller
 
     public function confirm(Request $request, int $id): RedirectResponse
     {
+        $this->checkPermission(['inventory.warehouses.manage', 'production.orders.edit']);
+
         $tenantId = require_tenant_id();
         $remnant = InventoryRemnant::where('tenant_id', $tenantId)->findOrFail($id);
 
@@ -147,6 +174,8 @@ class RemnantController extends Controller
 
     public function split(Request $request, int $id): RedirectResponse
     {
+        $this->checkPermission(['inventory.warehouses.manage', 'production.orders.edit']);
+
         $tenantId = require_tenant_id();
         $remnant = InventoryRemnant::where('tenant_id', $tenantId)->findOrFail($id);
 
@@ -169,6 +198,8 @@ class RemnantController extends Controller
 
     public function scrap(Request $request, int $id): RedirectResponse
     {
+        $this->checkPermission(['inventory.warehouses.manage', 'production.orders.edit']);
+
         $tenantId = require_tenant_id();
         $remnant = InventoryRemnant::where('tenant_id', $tenantId)->findOrFail($id);
 

@@ -24,7 +24,7 @@
             </div>
 
             <!-- Action Buttons -->
-            <div class="d-flex gap-2 flex-wrap align-items-center">
+            <div class="d-flex gap-2 flex-wrap align-items-center d-print-none">
                 @if($adjustment->status === 'Draft')
                     <form id="approveAdjustmentForm" action="{{ route('inventory.adjustments.approve', $adjustment->id) }}" method="POST">
                         @csrf

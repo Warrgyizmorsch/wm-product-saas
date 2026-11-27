@@ -570,7 +570,7 @@
                         @if($quotation->terms_conditions)
                             <div class="mb-3">
                                 <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-1" style="letter-spacing: 0.5px;">Terms & Conditions:</span>
-                                <div class="text-secondary fs-12 terms-conditions-content">{!! $quotation->terms_conditions !!}</div>
+                                <div class="text-secondary fs-12 terms-conditions-content">{!! clean_html($quotation->terms_conditions) !!}</div>
                             </div>
                         @endif
 

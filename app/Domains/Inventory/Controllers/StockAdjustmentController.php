@@ -212,14 +212,16 @@ class StockAdjustmentController extends Controller
     {
         $this->authorize('approve', $adjustment);
 
-        if ($adjustment->status !== 'Draft') {
-            return back()->with('error', 'Only Draft adjustments can be approved.');
-        }
-
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
-        DB::transaction(function () use ($adjustment, $tenantId) {
-            foreach ($adjustment->items as $item) {
+        return DB::transaction(function () use ($adjustment, $tenantId) {
+            $lockedAdj = StockAdjustment::where('id', $adjustment->id)->lockForUpdate()->firstOrFail();
+
+            if ($lockedAdj->status !== 'Draft') {
+                return back()->with('error', 'Only Draft adjustments can be approved.');
+            }
+
+            foreach ($lockedAdj->items as $item) {
                 if ($item->type === 'Addition') {
                     $batchNumber = $item->batch?->batch_number;
                     $mfgDate = $item->batch?->manufacturing_date ? $item->batch->manufacturing_date->format('Y-m-d') : null;
@@ -228,11 +230,11 @@ class StockAdjustmentController extends Controller
                     StockService::recordInflow(
                         tenantId: $tenantId,
                         productId: $item->product_id,
-                        warehouseId: $adjustment->warehouse_id,
+                        warehouseId: $lockedAdj->warehouse_id,
                         quantity: (float)$item->quantity,
                         unitCost: (float)$item->unit_cost,
                         referenceType: 'StockAdjustment',
-                        referenceId: $adjustment->id,
+                        referenceId: $lockedAdj->id,
                         batchNumber: $batchNumber,
                         serialNumbers: $item->serial_numbers ?? [],
                         mfgDate: $mfgDate,
@@ -242,27 +244,27 @@ class StockAdjustmentController extends Controller
                     StockService::recordOutflow(
                         tenantId: $tenantId,
                         productId: $item->product_id,
-                        warehouseId: $adjustment->warehouse_id,
+                        warehouseId: $lockedAdj->warehouse_id,
                         quantity: (float)$item->quantity,
                         referenceType: 'StockAdjustment',
-                        referenceId: $adjustment->id,
+                        referenceId: $lockedAdj->id,
                         serialNumbers: $item->serial_numbers ?? [],
                         batchId: $item->batch_id
                     );
                 }
             }
 
-            $adjustment->update([
+            $lockedAdj->update([
                 'status' => 'Approved',
                 'approved_by' => Auth::id(),
             ]);
 
-            $this->postAdjustmentAccountingJournal($adjustment, $tenantId);
-        });
+            $this->postAdjustmentAccountingJournal($lockedAdj, $tenantId);
 
-        \App\Domains\Inventory\Services\InventoryNotificationService::notifyAdjustmentApproved($adjustment);
+            \App\Domains\Inventory\Services\InventoryNotificationService::notifyAdjustmentApproved($lockedAdj);
 
-        return back()->with('success', 'Stock Adjustment Approved and inventory updated.');
+            return back()->with('success', 'Stock Adjustment Approved and inventory updated.');
+        }, 3);
     }
 
     protected function postAdjustmentAccountingJournal(StockAdjustment $adjustment, int $tenantId): void

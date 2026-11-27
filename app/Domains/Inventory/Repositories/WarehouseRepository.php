@@ -34,6 +34,14 @@ class WarehouseRepository
 
     public function delete(Warehouse $warehouse): ?bool
     {
+        // Guard against cascade deletion of historical stock transactions or active inventory (BUG-INV-DATA-01)
+        if (\App\Domains\Inventory\Models\StockTransaction::where('warehouse_id', $warehouse->id)->exists()
+            || \App\Domains\Inventory\Models\ProductWarehouseStock::where('warehouse_id', $warehouse->id)->where('quantity', '>', 0)->exists()
+            || \App\Domains\Inventory\Models\Batch::where('warehouse_id', $warehouse->id)->where('quantity', '>', 0)->exists()
+            || \App\Domains\Inventory\Models\SerialNumber::where('warehouse_id', $warehouse->id)->where('status', '!=', 'Sold')->exists()) {
+            throw new \InvalidArgumentException('Cannot delete warehouse with existing stock history or active inventory.');
+        }
+
         if ($warehouse->is_default) {
             $other = Warehouse::query()->where('id', '!=', $warehouse->id)->first();
             if ($other) {

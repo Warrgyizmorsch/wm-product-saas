@@ -20,6 +20,27 @@ class MrpShortageApiController extends Controller
         private readonly MrpShortageService $mrpShortageService,
     ) {}
 
+    private function checkPermission(string|array $permissions): void
+    {
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+        if ($user->is_super_admin ?? false) {
+            return;
+        }
+
+        $access = app(\App\Services\Access\AccessService::class);
+        $perms = (array) $permissions;
+        foreach ($perms as $perm) {
+            if ($user->can($perm) || $access->allows($user, $perm, ['tenant_id' => $user->tenant_id])) {
+                return;
+            }
+        }
+
+        abort(403, 'Unauthorized action.');
+    }
+
     private function resolveTenantContext(): array
     {
         $user      = auth()->user();
@@ -36,6 +57,8 @@ class MrpShortageApiController extends Controller
      */
     public function calculate(Request $request): JsonResponse
     {
+        $this->checkPermission(['inventory.warehouses.manage', 'inventory.material_requirements.view', 'production.plans.view']);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $selectedWarehouseId = $request->filled('warehouse_id') ? (int)$request->input('warehouse_id') : null;
@@ -117,6 +140,8 @@ class MrpShortageApiController extends Controller
      */
     public function generatePr(Request $request): JsonResponse
     {
+        $this->checkPermission(['purchase.requisitions.create', 'inventory.warehouses.manage']);
+
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
         $userId = auth()->id() ?: 1;
 
@@ -176,7 +201,8 @@ class MrpShortageApiController extends Controller
             DB::beginTransaction();
 
             $prPrefix = 'PR-' . date('Ymd') . '-';
-            $latestPr = PurchaseRequisition::where('tenant_id', $tenantId)
+            $latestPr = PurchaseRequisition::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('requisition_number', 'like', "{$prPrefix}%")
                 ->orderByDesc('id')
                 ->first();
@@ -186,6 +212,10 @@ class MrpShortageApiController extends Controller
                 $nextSeq = ((int)$matches[1]) + 1;
             }
             $prNumber = $prPrefix . str_pad((string)$nextSeq, 4, '0', STR_PAD_LEFT);
+            while (PurchaseRequisition::withoutGlobalScopes()->where('requisition_number', $prNumber)->exists()) {
+                $nextSeq++;
+                $prNumber = $prPrefix . str_pad((string)$nextSeq, 4, '0', STR_PAD_LEFT);
+            }
 
             $notes = trim(($validated['notes'] ?? '') . "\n[Automated MRP Net Shortage Planning Generator via REST API]");
 

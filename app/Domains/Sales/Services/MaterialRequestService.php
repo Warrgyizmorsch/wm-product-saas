@@ -347,7 +347,8 @@ class MaterialRequestService
 
             $year = now()->format('Y');
             $prefix = "PR-{$year}-";
-            $lastPr = PurchaseRequisition::where('tenant_id', $tenantId)
+            $lastPr = PurchaseRequisition::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('requisition_number', 'like', "{$prefix}%")
                 ->orderBy('id', 'desc')
                 ->first();
@@ -358,7 +359,7 @@ class MaterialRequestService
                 $nextNum = ((int) $lastNumStr) + 1;
             }
             $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
-            while (PurchaseRequisition::where('requisition_number', $requisitionNumber)->exists()) {
+            while (PurchaseRequisition::withoutGlobalScopes()->where('requisition_number', $requisitionNumber)->exists()) {
                 $nextNum++;
                 $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
             }
@@ -435,7 +436,8 @@ class MaterialRequestService
             // Generate single PR number
             $year   = now()->format('Y');
             $prefix = "PR-{$year}-";
-            $lastPr = PurchaseRequisition::where('tenant_id', $tenantId)
+            $lastPr = PurchaseRequisition::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('requisition_number', 'like', "{$prefix}%")
                 ->orderBy('id', 'desc')
                 ->first();
@@ -445,7 +447,7 @@ class MaterialRequestService
                 : 1;
 
             $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
-            while (PurchaseRequisition::where('requisition_number', $requisitionNumber)->exists()) {
+            while (PurchaseRequisition::withoutGlobalScopes()->where('requisition_number', $requisitionNumber)->exists()) {
                 $nextNum++;
                 $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
             }

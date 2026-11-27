@@ -100,7 +100,7 @@ class StockAdjustmentApiController extends Controller
         $validator = Validator::make($request->all(), [
             'warehouse_id'        => ['required', 'integer'],
             'adjustment_date'     => ['required', 'date'],
-            'reason'              => ['required', 'string', 'max:255'],
+            'reason'              => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::in(['Damaged', 'Expired', 'Stock Count Variance', 'Theft/Loss', 'Scrap', 'Sample', 'Other', 'damaged', 'expired', 'stock count variance', 'theft/loss', 'scrap', 'sample', 'other'])],
             'notes'               => ['nullable', 'string'],
             'status'              => ['nullable', 'in:Draft,Approved,Cancelled,Completed'],
             'items'               => ['required', 'array', 'min:1'],
@@ -126,7 +126,7 @@ class StockAdjustmentApiController extends Controller
         $autoApprove = in_array(strtolower($validated['status'] ?? 'draft'), ['approved', 'completed']);
 
         $adjustment = DB::transaction(function () use ($validated, $tenantId, $companyId, $branchId, $autoApprove) {
-            $adjNo = 'ADJ-' . strtoupper(uniqid());
+            $adjNo = 'ADJ-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
 
             $adj = StockAdjustment::create([
                 'tenant_id'         => $tenantId,
@@ -284,9 +284,15 @@ class StockAdjustmentApiController extends Controller
 
                 $adjustment->update([
                     'status'      => 'Approved',
-                    'approved_by' => auth()->id() ?? 1,
+                    'approved_by' => auth()->id() ?? auth()->user()?->id,
                 ]);
             });
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error during adjustment: ' . $e->getMessage(),
+                'errors'  => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

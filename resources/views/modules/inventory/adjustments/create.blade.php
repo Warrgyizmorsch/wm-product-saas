@@ -268,7 +268,7 @@
                                 <th style="width: 4%;" class="text-center"></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody aria-live="polite">
                             <tr class="adjustment-row" data-row-index="0">
                                 <td class="ps-3">
                                     <select name="items[0][product_id]" class="form-select odoo-table-select product-select" required>

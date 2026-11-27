@@ -329,8 +329,9 @@ class LeadFollowupService
                 $decoded = base64_decode($data, true);
                 if ($decoded !== false && strlen($decoded) <= 5242880) { // Max 5MB
                     $filename = Str::uuid() . '.' . ($imageType === 'jpeg' ? 'jpg' : $imageType);
-                    Storage::disk('public')->put('crm/selfies/' . $filename, $decoded);
-                    return 'storage/crm/selfies/' . $filename;
+                    $path = 'crm/selfies/' . $filename;
+                    Storage::disk('local')->put($path, $decoded);
+                    return $path;
                 }
             }
         } elseif ($request->hasFile('selfie')) {
@@ -340,8 +341,8 @@ class LeadFollowupService
                 $ext = 'jpg';
             }
             $filename = Str::uuid() . '.' . $ext;
-            $path = $file->storeAs('crm/selfies', $filename, 'public');
-            return 'storage/' . $path;
+            $path = $file->storeAs('crm/selfies', $filename, 'local');
+            return $path;
         }
 
         return null;

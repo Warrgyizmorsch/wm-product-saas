@@ -925,9 +925,28 @@
 
     // Event Listeners for Source Warehouse and Product
     $(document).on('change select2:select', '#fromWarehouseSelect', function() {
+        const fromVal = $(this).val();
+        $('#toWarehouseSelect option').prop('disabled', false);
+        if (fromVal) {
+            $('#toWarehouseSelect option[value="' + fromVal + '"]').prop('disabled', true);
+            if ($('#toWarehouseSelect').val() === fromVal) {
+                $('#toWarehouseSelect').val('').trigger('change');
+            }
+        }
         $('#items-table tbody tr.transfer-row').each(function() {
             checkRowStock($(this));
         });
+    });
+
+    $(document).on('change select2:select', '#toWarehouseSelect', function() {
+        const toVal = $(this).val();
+        $('#fromWarehouseSelect option').prop('disabled', false);
+        if (toVal) {
+            $('#fromWarehouseSelect option[value="' + toVal + '"]').prop('disabled', true);
+            if ($('#fromWarehouseSelect').val() === toVal) {
+                $('#fromWarehouseSelect').val('').trigger('change');
+            }
+        }
     });
 
     $(document).on('change select2:select', '.product-select', function() {

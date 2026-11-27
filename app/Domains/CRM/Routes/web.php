@@ -187,6 +187,8 @@ Route::prefix('crm')
             ->name('leads.documents.delete');
 
         // Follow-ups
+        Route::get('followups/{followup}/selfie', [LeadFollowupController::class, 'viewSelfie'])
+            ->name('followups.selfie');
         Route::post('leads/{lead}/followups', [LeadFollowupController::class, 'store'])
             ->name('leads.followups.store');
         Route::put('followups/{followup}', [LeadFollowupController::class, 'update'])

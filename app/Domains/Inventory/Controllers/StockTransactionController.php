@@ -95,7 +95,7 @@ class StockTransactionController extends Controller
 
         $transactions = $query->paginate(10)->withQueryString();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
-        $products = Product::where('tenant_id', $tenantId)->sellable()->get();
+        $products = Product::where('tenant_id', $tenantId)->sellable()->orderBy('name')->take(100)->get(['id', 'name', 'sku']);
 
         return view('modules.inventory.transactions.index', compact(
             'transactions',

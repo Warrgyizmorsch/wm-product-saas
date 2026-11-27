@@ -47,7 +47,10 @@ class Warehouse extends BaseModel
      */
     public static function ensureDefaultWarehouse(?int $tenantId = null, ?int $companyId = null, ?int $branchId = null): self
     {
-        $tenantId = $tenantId ?? (tenant_id() ?? current_tenant_id() ?? 1);
+        $tenantId = $tenantId ?? tenant_id() ?? current_tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) {
+            throw new \InvalidArgumentException("Cannot ensure default warehouse without a valid tenant ID.");
+        }
 
         $warehouse = static::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)

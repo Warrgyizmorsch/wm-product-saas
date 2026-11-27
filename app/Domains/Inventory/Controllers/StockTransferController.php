@@ -223,52 +223,56 @@ class StockTransferController extends Controller
     {
         $this->authorize('dispatch', $transfer);
 
-        if ($transfer->status !== 'Draft' && $transfer->status !== 'Pending') {
-            return back()->with('error', 'Only Draft or Pending transfers can be dispatched.');
-        }
-
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
-        DB::transaction(function () use ($transfer, $tenantId) {
-            foreach ($transfer->items as $item) {
+        return DB::transaction(function () use ($transfer, $tenantId) {
+            $lockedTransfer = StockTransfer::where('id', $transfer->id)->lockForUpdate()->firstOrFail();
+
+            if ($lockedTransfer->status !== 'Draft' && $lockedTransfer->status !== 'Pending') {
+                return back()->with('error', 'Only Draft or Pending transfers can be dispatched.');
+            }
+
+            foreach ($lockedTransfer->items as $item) {
                 // Record stock outflow from source warehouse
                 StockService::recordOutflow(
                     tenantId: $tenantId,
                     productId: $item->product_id,
-                    warehouseId: $transfer->from_warehouse_id,
+                    warehouseId: $lockedTransfer->from_warehouse_id,
                     quantity: (float) $item->quantity,
                     referenceType: 'StockTransfer',
-                    referenceId: $transfer->id,
+                    referenceId: $lockedTransfer->id,
                     serialNumbers: $item->serial_numbers ?? []
                 );
             }
 
-            $transfer->update([
+            $lockedTransfer->update([
                 'status' => 'In-Transit',
                 'approved_by' => Auth::id(),
             ]);
-        });
 
-        \App\Domains\Inventory\Services\InventoryNotificationService::notifyTransferDispatched($transfer);
+            \App\Domains\Inventory\Services\InventoryNotificationService::notifyTransferDispatched($lockedTransfer);
 
-        return back()->with('success', 'Stock Transfer dispatched and items are now In-Transit.');
+            return back()->with('success', 'Stock Transfer dispatched and items are now In-Transit.');
+        }, 3);
     }
 
     public function receive(StockTransfer $transfer)
     {
         $this->authorize('receive', $transfer);
 
-        if ($transfer->status !== 'In-Transit') {
-            return back()->with('error', 'Only In-Transit transfers can be received.');
-        }
-
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
-        DB::transaction(function () use ($transfer, $tenantId) {
-            foreach ($transfer->items as $item) {
+        return DB::transaction(function () use ($transfer, $tenantId) {
+            $lockedTransfer = StockTransfer::where('id', $transfer->id)->lockForUpdate()->firstOrFail();
+
+            if ($lockedTransfer->status !== 'In-Transit') {
+                return back()->with('error', 'Only In-Transit transfers can be received.');
+            }
+
+            foreach ($lockedTransfer->items as $item) {
                 $outTx = StockTransaction::where('tenant_id', $tenantId)
                     ->where('reference_type', 'StockTransfer')
-                    ->where('reference_id', $transfer->id)
+                    ->where('reference_id', $lockedTransfer->id)
                     ->where('product_id', $item->product_id)
                     ->where('type', 'OUT')
                     ->first();
@@ -285,11 +289,11 @@ class StockTransferController extends Controller
                 StockService::recordInflow(
                     tenantId: $tenantId,
                     productId: $item->product_id,
-                    warehouseId: $transfer->to_warehouse_id,
+                    warehouseId: $lockedTransfer->to_warehouse_id,
                     quantity: (float) $item->quantity,
                     unitCost: $unitCost,
                     referenceType: 'StockTransfer',
-                    referenceId: $transfer->id,
+                    referenceId: $lockedTransfer->id,
                     batchNumber: $batchNumber,
                     serialNumbers: $item->serial_numbers ?? [],
                     mfgDate: $mfgDate,
@@ -299,15 +303,15 @@ class StockTransferController extends Controller
                 $item->update(['received_quantity' => $item->quantity]);
             }
 
-            $transfer->update([
+            $lockedTransfer->update([
                 'status' => 'Completed',
                 'received_by' => Auth::id(),
             ]);
-        });
 
-        \App\Domains\Inventory\Services\InventoryNotificationService::notifyTransferReceived($transfer);
+            \App\Domains\Inventory\Services\InventoryNotificationService::notifyTransferReceived($lockedTransfer);
 
-        return back()->with('success', 'Stock Transfer successfully received at destination warehouse.');
+            return back()->with('success', 'Stock Transfer successfully received at destination warehouse.');
+        }, 3);
     }
 
     public function cancel(StockTransfer $transfer)
@@ -378,6 +382,10 @@ class StockTransferController extends Controller
     {
         $this->authorize('delete', $transfer);
 
+        if ($transfer->status !== 'Draft') {
+            return back()->with('error', 'Cannot delete a transfer that has already been dispatched or completed.');
+        }
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
         DB::transaction(function () use ($transfer, $tenantId) {
@@ -394,90 +402,10 @@ class StockTransferController extends Controller
                 );
             }
 
-            // If it was Completed or In-Transit, revert stock movements
-            if (in_array($transfer->status, ['In-Transit', 'In Transit', 'Completed'])) {
-                foreach ($transfer->items as $item) {
-                    $qty = (float)$item->quantity;
-                    $prodId = $item->product_id;
-
-                    if ($transfer->status === 'Completed') {
-                        $destStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
-                            ->where('product_id', $prodId)
-                            ->where('warehouse_id', $transfer->to_warehouse_id)
-                            ->first();
-                        if ($destStock) {
-                            $destStock->quantity = max(0, (float)$destStock->quantity - $qty);
-                            $destStock->available_qty = max(0, (float)$destStock->available_qty - $qty);
-                            $destStock->save();
-                        }
-
-                        // Revert destination batch if batch tracked
-                        if ($item->batch_id) {
-                            $sourceBatch = \App\Domains\Inventory\Models\Batch::find($item->batch_id);
-                            if ($sourceBatch) {
-                                $destBatch = \App\Domains\Inventory\Models\Batch::where('tenant_id', $tenantId)
-                                    ->where('product_id', $prodId)
-                                    ->where('warehouse_id', $transfer->to_warehouse_id)
-                                    ->where('batch_number', $sourceBatch->batch_number)
-                                    ->first();
-                                if ($destBatch) {
-                                    $destBatch->quantity = max(0, (float)$destBatch->quantity - $qty);
-                                    $destBatch->available_qty = max(0, (float)$destBatch->available_qty - $qty);
-                                    $destBatch->save();
-                                }
-                            }
-                        }
-                    }
-
-                    $srcStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
-                        ->where('product_id', $prodId)
-                        ->where('warehouse_id', $transfer->from_warehouse_id)
-                        ->first();
-                    if ($srcStock) {
-                        $srcStock->quantity = (float)$srcStock->quantity + $qty;
-                        $srcStock->available_qty = (float)$srcStock->available_qty + $qty;
-                        $srcStock->save();
-                    }
-
-                    if ($item->batch_id) {
-                        $sourceBatch = \App\Domains\Inventory\Models\Batch::find($item->batch_id);
-                        if ($sourceBatch) {
-                            $sourceBatch->quantity = (float)$sourceBatch->quantity + $qty;
-                            $sourceBatch->available_qty = (float)$sourceBatch->available_qty + $qty;
-                            $sourceBatch->save();
-                        }
-                    }
-
-                    if (!empty($item->serial_numbers)) {
-                        $serials = is_array($item->serial_numbers) ? $item->serial_numbers : json_decode($item->serial_numbers, true);
-                        if (is_array($serials)) {
-                            foreach ($serials as $sn) {
-                                \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
-                                    ->where('serial_number', $sn)
-                                    ->update([
-                                        'warehouse_id' => $transfer->from_warehouse_id,
-                                        'status' => 'Available',
-                                    ]);
-                            }
-                        }
-                    }
-                }
-            }
-
-            \App\Domains\Inventory\Models\StockTransaction::where('tenant_id', $tenantId)
-                ->where('reference_type', 'StockTransfer')
-                ->where('reference_id', $transfer->id)
-                ->delete();
-
-            \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
-                ->where('reference_type', 'StockTransfer')
-                ->where('reference_id', $transfer->id)
-                ->delete();
-
             $transfer->items()->delete();
             $transfer->delete();
         });
 
-        return redirect()->route('inventory.transfers.index')->with('success', 'Stock Transfer deleted successfully and stock reverted.');
+        return redirect()->route('inventory.transfers.index')->with('success', 'Stock Transfer deleted successfully.');
     }
 }

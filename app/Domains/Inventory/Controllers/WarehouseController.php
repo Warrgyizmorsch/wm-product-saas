@@ -121,13 +121,17 @@ class WarehouseController extends Controller
     {
         $this->authorize('delete', $warehouse);
 
-        $success = $this->warehouseRepo->delete($warehouse);
+        try {
+            $success = $this->warehouseRepo->delete($warehouse);
 
-        if ($success === false) {
-            return redirect()->route('inventory.warehouses.index')->with('error', 'Cannot delete the only warehouse. Add another one first.');
+            if ($success === false) {
+                return redirect()->route('inventory.warehouses.index')->with('error', 'Cannot delete the only warehouse. Add another one first.');
+            }
+
+            return redirect()->route('inventory.warehouses.index')->with('success', 'Warehouse deleted successfully.');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->route('inventory.warehouses.index')->with('error', $e->getMessage());
         }
-
-        return redirect()->route('inventory.warehouses.index')->with('success', 'Warehouse deleted successfully.');
     }
 
     public function quickCreate(Request $request): JsonResponse

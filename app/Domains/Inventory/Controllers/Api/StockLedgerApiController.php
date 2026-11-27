@@ -26,6 +26,8 @@ class StockLedgerApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', StockTransaction::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         $query = StockTransaction::query()
@@ -71,6 +73,8 @@ class StockLedgerApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', StockTransaction::class);
+
         [$tenantId] = $this->resolveTenantContext();
 
         return \Maatwebsite\Excel\Facades\Excel::download(

@@ -93,6 +93,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        Schema::disableForeignKeyConstraints();
         Schema::dropIfExists('stock_reservations');
         Schema::dropIfExists('serial_numbers');
         Schema::dropIfExists('stock_transactions');
@@ -103,5 +104,6 @@ return new class extends Migration
         Schema::table('products', function (Blueprint $table) {
             $table->dropColumn('inventory_valuation_method');
         });
+        Schema::enableForeignKeyConstraints();
     }
 };

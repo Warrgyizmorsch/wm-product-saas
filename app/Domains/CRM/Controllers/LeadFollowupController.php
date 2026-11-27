@@ -234,6 +234,41 @@ class LeadFollowupController extends Controller
         return redirect()->back()->with('success', 'Follow-up successfully deleted!');
     }
 
+    public function viewSelfie(LeadFollowup $followup)
+    {
+        if ($followup->lead) {
+            $this->authorize('view', $followup->lead);
+        } elseif ($followup->deal) {
+            $this->authorize('view', $followup->deal);
+        }
+
+        if (empty($followup->selfie_path)) {
+            abort(404, 'Selfie not found.');
+        }
+
+        // 1. Private local disk check
+        if (\Illuminate\Support\Facades\Storage::disk('local')->exists($followup->selfie_path)) {
+            return response()->file(\Illuminate\Support\Facades\Storage::disk('local')->path($followup->selfie_path), [
+                'Content-Type' => 'image/jpeg',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        }
+
+        // 2. Backward compatibility for legacy public files
+        $clean = ltrim(str_replace(['storage/', 'crm/selfies/'], ['', ''], $followup->selfie_path), '/');
+        $publicCandidates = [$followup->selfie_path, 'crm/selfies/' . $clean, $clean];
+        foreach ($publicCandidates as $cand) {
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($cand)) {
+                return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($cand), [
+                    'Content-Type' => 'image/jpeg',
+                    'X-Content-Type-Options' => 'nosniff',
+                ]);
+            }
+        }
+
+        abort(404, 'Selfie file not found on disk.');
+    }
+
     public function storeDealFollowup(Request $request, CrmDeal $deal)
     {
         $validated = $request->validate([

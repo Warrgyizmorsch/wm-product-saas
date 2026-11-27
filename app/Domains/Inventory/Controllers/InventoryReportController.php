@@ -42,7 +42,8 @@ class InventoryReportController extends Controller
     {
         $this->authorizeReport();
 
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) abort(403, 'Tenant context missing.');
 
         $query = Product::query()
             ->with('warehouseStocks.warehouse')
@@ -81,7 +82,8 @@ class InventoryReportController extends Controller
     {
         $this->authorizeReport();
 
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) abort(403, 'Tenant context missing.');
 
         $baseQuery = ProductWarehouseStock::query()
             ->with(['product', 'warehouse'])
@@ -213,7 +215,8 @@ class InventoryReportController extends Controller
     {
         $this->authorizeReport();
 
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = current_tenant_id() ?? tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) abort(403, 'Tenant context missing.');
 
         $query = ProductWarehouseStock::query()
             ->with(['product', 'warehouse'])
@@ -292,6 +295,8 @@ class InventoryReportController extends Controller
                 ->get()
                 ->groupBy(fn($tx) => "{$tx->product_id}_{$tx->warehouse_id}");
 
+            $currency = function_exists('active_currency_symbol') ? active_currency_symbol() : 'INR';
+
             // Column Headers
             fputcsv($handle, [
                 'S.No',
@@ -300,8 +305,8 @@ class InventoryReportController extends Controller
                 'Warehouse Location',
                 'Valuation Method',
                 'On Hand Quantity',
-                'Unit Cost Rate (INR)',
-                'Total Asset Value (INR)',
+                "Unit Cost Rate ({$currency})",
+                "Total Asset Value ({$currency})",
             ]);
 
             $index = 1;
@@ -400,7 +405,8 @@ class InventoryReportController extends Controller
         $pr = DB::transaction(function () use ($tenantId, $products, $itemsData) {
             $year = now()->format('Y');
             $prefix = "PR-{$year}-";
-            $lastPr = PurchaseRequisition::where('tenant_id', $tenantId)
+            $lastPr = PurchaseRequisition::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('requisition_number', 'like', "{$prefix}%")
                 ->orderBy('id', 'desc')
                 ->first();
@@ -411,6 +417,10 @@ class InventoryReportController extends Controller
                 $nextNum = ((int) $lastNumStr) + 1;
             }
             $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            while (PurchaseRequisition::withoutGlobalScopes()->where('requisition_number', $requisitionNumber)->exists()) {
+                $nextNum++;
+                $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            }
 
             $pr = PurchaseRequisition::create([
                 'tenant_id'          => $tenantId,

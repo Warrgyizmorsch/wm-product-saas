@@ -47,7 +47,6 @@
         font-size: 13.5px !important;
         color: #1e293b !important;
         width: 100% !important;
-        outline: none !important;
         box-shadow: none !important;
         transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out !important;
     }
@@ -313,7 +312,7 @@
                         @endif
                     @endforeach
                     <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
-                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('visitor.search_placeholder') }}" aria-label="{{ __('visitor.search_placeholder') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('visitor.search_placeholder') }}" aria-label="{{ __('visitor.search_placeholder') }}" value="{{ request('search') }}" style="box-shadow: none;">
                     @if(request('search'))
                         <a href="{{ route('visitor.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search" aria-label="Clear Search">
                             <i class="feather-x fs-12"></i>

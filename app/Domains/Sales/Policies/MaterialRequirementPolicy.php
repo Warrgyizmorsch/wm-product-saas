@@ -23,6 +23,8 @@ class MaterialRequirementPolicy
         ];
 
         return $this->access->allows($user, 'sales.material_requirements.view', $context)
+            || $this->access->allows($user, 'inventory.material_requirements.view', $context)
+            || $this->access->allows($user, 'inventory.warehouses.manage', $context)
             || $this->access->allows($user, 'inventory.products.view', $context);
     }
 
@@ -40,6 +42,8 @@ class MaterialRequirementPolicy
         ];
 
         return $this->access->allows($user, 'sales.material_requirements.view', $context)
+            || $this->access->allows($user, 'inventory.material_requirements.view', $context)
+            || $this->access->allows($user, 'inventory.warehouses.manage', $context)
             || $this->access->allows($user, 'inventory.products.view', $context);
     }
 
@@ -53,17 +57,23 @@ class MaterialRequirementPolicy
             'company_id'    => $user->company_id,
         ];
 
-        return $this->access->allows($user, 'sales.material_requirements.create', $context);
+        return $this->access->allows($user, 'sales.material_requirements.create', $context)
+            || $this->access->allows($user, 'inventory.material_requirements.create', $context)
+            || $this->access->allows($user, 'inventory.warehouses.manage', $context);
     }
 
     public function ship(User $user, MaterialRequirement $delivery): bool
     {
         return $this->access->allows($user, 'sales.material_requirements.ship', ['tenant_id' => $delivery->tenant_id])
+            || $this->access->allows($user, 'inventory.material_requirements.ship', ['tenant_id' => $delivery->tenant_id])
+            || $this->access->allows($user, 'inventory.warehouses.manage', ['tenant_id' => $delivery->tenant_id])
             || $this->access->allows($user, 'inventory.products.update', ['tenant_id' => $delivery->tenant_id]);
     }
 
     public function cancel(User $user, MaterialRequirement $delivery): bool
     {
-        return $this->access->allows($user, 'sales.material_requirements.cancel', ['tenant_id' => $delivery->tenant_id]);
+        return $this->access->allows($user, 'sales.material_requirements.cancel', ['tenant_id' => $delivery->tenant_id])
+            || $this->access->allows($user, 'inventory.material_requirements.cancel', ['tenant_id' => $delivery->tenant_id])
+            || $this->access->allows($user, 'inventory.warehouses.manage', ['tenant_id' => $delivery->tenant_id]);
     }
 }

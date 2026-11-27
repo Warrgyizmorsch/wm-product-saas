@@ -90,17 +90,38 @@ class SerialNumberApiController extends Controller
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
         $validated = $validator->validated();
 
-        $serial = SerialNumber::create([
-            'tenant_id'     => $tenantId,
-            'company_id'    => $companyId,
-            'branch_id'     => $branchId,
-            'product_id'    => $validated['product_id'],
-            'warehouse_id'  => $validated['warehouse_id'] ?? null,
-            'batch_id'      => $validated['batch_id'] ?? null,
-            'serial_number' => $validated['serial_number'],
-            'purchase_rate' => $validated['purchase_rate'] ?? 0,
-            'status'        => $validated['status'] ?? 'Available',
-        ]);
+        $serial = \Illuminate\Support\Facades\DB::transaction(function () use ($tenantId, $companyId, $branchId, $validated) {
+            $serial = SerialNumber::create([
+                'tenant_id'     => $tenantId,
+                'company_id'    => $companyId,
+                'branch_id'     => $branchId,
+                'product_id'    => $validated['product_id'],
+                'warehouse_id'  => $validated['warehouse_id'] ?? null,
+                'batch_id'      => $validated['batch_id'] ?? null,
+                'serial_number' => $validated['serial_number'],
+                'purchase_rate' => $validated['purchase_rate'] ?? 0,
+                'status'        => $validated['status'] ?? 'Available',
+            ]);
+
+            if ($serial->warehouse_id && $serial->status === 'Available') {
+                $product = Product::withoutGlobalScopes()->find($validated['product_id']);
+                $unitCost = (float)($validated['purchase_rate'] ?? $product?->cost_price ?? 0);
+                $batchNumber = $serial->batch?->batch_number;
+                \App\Domains\Inventory\Services\StockService::recordInflow(
+                    tenantId: $tenantId,
+                    productId: (int)$validated['product_id'],
+                    warehouseId: (int)$serial->warehouse_id,
+                    quantity: 1.0,
+                    unitCost: $unitCost,
+                    referenceType: 'SerialNumber',
+                    referenceId: $serial->id,
+                    batchNumber: $batchNumber,
+                    serialNumbers: [$serial->serial_number]
+                );
+            }
+
+            return $serial;
+        });
 
         return response()->json([
             'success' => true,

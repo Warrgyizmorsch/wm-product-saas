@@ -90,18 +90,39 @@ class BatchApiController extends Controller
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
         $validated = $validator->validated();
 
-        $batch = Batch::create([
-            'tenant_id'          => $tenantId,
-            'company_id'         => $companyId,
-            'branch_id'          => $branchId,
-            'product_id'         => $validated['product_id'],
-            'warehouse_id'       => $validated['warehouse_id'],
-            'batch_number'       => $validated['batch_number'],
-            'quantity'           => $validated['quantity'],
-            'available_qty'      => $validated['quantity'],
-            'manufacturing_date' => $validated['manufacturing_date'] ?? null,
-            'expiry_date'        => $validated['expiry_date'] ?? null,
-        ]);
+        $batch = \Illuminate\Support\Facades\DB::transaction(function () use ($tenantId, $companyId, $branchId, $validated) {
+            $batch = Batch::create([
+                'tenant_id'          => $tenantId,
+                'company_id'         => $companyId,
+                'branch_id'          => $branchId,
+                'product_id'         => $validated['product_id'],
+                'warehouse_id'       => $validated['warehouse_id'],
+                'batch_number'       => $validated['batch_number'],
+                'quantity'           => $validated['quantity'],
+                'available_qty'      => $validated['quantity'],
+                'manufacturing_date' => $validated['manufacturing_date'] ?? null,
+                'expiry_date'        => $validated['expiry_date'] ?? null,
+            ]);
+
+            if ((float)$validated['quantity'] > 0) {
+                $product = Product::withoutGlobalScopes()->find($validated['product_id']);
+                $unitCost = (float)($product?->cost_price ?? 0);
+                \App\Domains\Inventory\Services\StockService::recordInflow(
+                    tenantId: $tenantId,
+                    productId: (int)$validated['product_id'],
+                    warehouseId: (int)$validated['warehouse_id'],
+                    quantity: (float)$validated['quantity'],
+                    unitCost: $unitCost,
+                    referenceType: 'Batch',
+                    referenceId: $batch->id,
+                    batchNumber: $batch->batch_number,
+                    mfgDate: $batch->manufacturing_date?->format('Y-m-d'),
+                    expiryDate: $batch->expiry_date?->format('Y-m-d')
+                );
+            }
+
+            return $batch;
+        });
 
         return response()->json([
             'success' => true,

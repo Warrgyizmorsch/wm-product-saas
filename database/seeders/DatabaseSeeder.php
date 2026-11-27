@@ -45,7 +45,7 @@ class DatabaseSeeder extends Seeder
             ],
             [
                 'name' => 'Demo Admin',
-                'password' => 'password',
+                'password' => app()->isProduction() ? \Illuminate\Support\Str::random(32) : env('DEMO_ADMIN_PASSWORD', 'password'),
             ],
         );
 

@@ -81,12 +81,7 @@ class LeadFollowup extends Model
             return $this->selfie_path;
         }
 
-        $path = ltrim($this->selfie_path, '/');
-        while (str_starts_with($path, 'storage/')) {
-            $path = substr($path, 8);
-        }
-
-        return asset('storage/' . $path);
+        return route('crm.followups.selfie', $this->id);
     }
 
     protected static function boot()

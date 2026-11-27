@@ -14,7 +14,15 @@ class CrmSettingsController extends Controller
 {
     public function index(): View
     {
-        $this->authorize('viewAny', Lead::class);
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+
+        $access = app(\App\Services\Access\AccessService::class);
+        if (!$user->is_super_admin && !$user->can('crm.settings.manage') && !$access->allows($user, 'crm.settings.manage', ['tenant_id' => $user->tenant_id])) {
+            abort(403, 'Unauthorized access to CRM Settings.');
+        }
 
         $tenant = tenant();
         $tenantId = $tenant ? $tenant->id : 1;
@@ -40,7 +48,7 @@ class CrmSettingsController extends Controller
 
     public function updateLeadAssignment(Request $request): RedirectResponse
     {
-        $this->authorize('create', Lead::class);
+        $this->authorizeManageSettings();
 
         $tenant = tenant();
         if (!$tenant) {
@@ -79,7 +87,7 @@ class CrmSettingsController extends Controller
 
     public function updateQuotationApprovalPolicy(Request $request): RedirectResponse
     {
-        $this->authorize('create', Lead::class);
+        $this->authorizeManageSettings();
 
         $validated = $request->validate([
             'quotation_approval_policy' => ['required', 'string', 'in:approval_required,auto_approve'],
@@ -101,7 +109,7 @@ class CrmSettingsController extends Controller
 
     public function updateFieldVisitVerification(Request $request): RedirectResponse
     {
-        $this->authorize('create', Lead::class);
+        $this->authorizeManageSettings();
 
         $tenant = tenant();
         if (!$tenant) {
@@ -123,5 +131,24 @@ class CrmSettingsController extends Controller
 
         return redirect()->route('crm.settings.index', ['tab' => 'field-visit'])
             ->with('success', 'Field Visit, Mappls Map API Key & Geo-Verification settings updated successfully.');
+    }
+
+    private function authorizeManageSettings(): void
+    {
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+
+        if ($user->is_super_admin) {
+            return;
+        }
+
+        $access = app(\App\Services\Access\AccessService::class);
+        if ($user->can('crm.settings.manage') || $access->allows($user, 'crm.settings.manage', ['tenant_id' => $user->tenant_id])) {
+            return;
+        }
+
+        abort(403, 'Unauthorized action. Managing CRM settings requires crm.settings.manage permission.');
     }
 }

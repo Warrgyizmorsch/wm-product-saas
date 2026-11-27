@@ -44,6 +44,24 @@ class ProductController extends Controller
             'file' => 'required|file|mimes:xlsx,xls,csv,txt',
         ]);
 
+        $file = $request->file('file');
+        $ext = strtolower($file->getClientOriginalExtension());
+        if (in_array($ext, ['csv', 'txt'], true)) {
+            $lineCount = 0;
+            $handle = fopen($file->getRealPath(), 'r');
+            if ($handle) {
+                while (($line = fgets($handle)) !== false) {
+                    if (trim($line) !== '') $lineCount++;
+                    if ($lineCount > 501) {
+                        fclose($handle);
+                        return redirect()->route('inventory.products.index')
+                            ->withErrors(['file' => 'Import file exceeds the maximum batch limit of 500 rows. Please split your file.']);
+                    }
+                }
+                fclose($handle);
+            }
+        }
+
         try {
             Excel::import(new ProductImport, $request->file('file'));
             return redirect()->route('inventory.products.index')->with('success', 'Products imported successfully!');
@@ -62,7 +80,8 @@ class ProductController extends Controller
     public function parseImportFile(Request $request): JsonResponse
     {
         $this->authorize('create', Product::class);
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = tenant_id() ?? current_tenant_id() ?? auth()->user()?->tenant_id;
+        if (!$tenantId) abort(403, 'Tenant context missing.');
 
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:20480',
@@ -71,6 +90,13 @@ class ProductController extends Controller
         try {
             $service = app(\App\Domains\Inventory\Services\ProductImportMapperService::class);
             $result = $service->parseFile($request->file('file'), $tenantId);
+
+            if (isset($result['total_rows']) && $result['total_rows'] > 500) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Import file exceeds the maximum batch limit of 500 rows. Please split your file into smaller batches.',
+                ], 422);
+            }
 
             return response()->json([
                 'success' => true,
@@ -180,16 +206,16 @@ class ProductController extends Controller
             'hsn_sac' => 'nullable|string|max:50',
             'gst_rate' => 'nullable|numeric|min:0|max:100',
             'preferred_vendor_id' => 'nullable|exists:vendors,id',
-            'selling_price' => 'nullable|numeric|min:0',
-            'cost_price' => 'nullable|numeric|min:0',
+            'selling_price' => 'nullable|numeric|min:0|max:999999999.99',
+            'cost_price' => 'nullable|numeric|min:0|max:999999999.99',
             'sales_account' => 'nullable|string|max:255',
             'purchase_account' => 'nullable|string|max:255',
             'inventory_account' => 'nullable|string|max:255',
-            'reorder_point' => 'nullable|numeric|min:0',
-            'minimum_order_qty' => 'nullable|numeric|min:0',
-            'order_multiple' => 'nullable|numeric|min:0',
-            'opening_stock' => 'nullable|numeric|min:0',
-            'opening_stock_rate' => 'nullable|numeric|min:0',
+            'reorder_point' => 'nullable|numeric|min:0|max:999999999.99',
+            'minimum_order_qty' => 'nullable|numeric|min:0|max:999999999.99',
+            'order_multiple' => 'nullable|numeric|min:0|max:999999999.99',
+            'opening_stock' => 'nullable|numeric|min:0|max:999999999.99',
+            'opening_stock_rate' => 'nullable|numeric|min:0|max:999999999.99',
             'description' => 'nullable|string',
             'brand' => 'nullable|string|max:255',
             'manufacturer' => 'nullable|string|max:255',
@@ -298,14 +324,14 @@ class ProductController extends Controller
             'hsn_sac' => 'nullable|string|max:50',
             'gst_rate' => 'nullable|numeric|min:0|max:100',
             'preferred_vendor_id' => 'nullable|exists:vendors,id',
-            'selling_price' => 'nullable|numeric|min:0',
-            'cost_price' => 'nullable|numeric|min:0',
+            'selling_price' => 'nullable|numeric|min:0|max:999999999.99',
+            'cost_price' => 'nullable|numeric|min:0|max:999999999.99',
             'sales_account' => 'nullable|string|max:255',
             'purchase_account' => 'nullable|string|max:255',
             'inventory_account' => 'nullable|string|max:255',
-            'reorder_point' => 'nullable|numeric|min:0',
-            'minimum_order_qty' => 'nullable|numeric|min:0',
-            'order_multiple' => 'nullable|numeric|min:0',
+            'reorder_point' => 'nullable|numeric|min:0|max:999999999.99',
+            'minimum_order_qty' => 'nullable|numeric|min:0|max:999999999.99',
+            'order_multiple' => 'nullable|numeric|min:0|max:999999999.99',
             'description' => 'nullable|string',
             'brand' => 'nullable|string|max:255',
             'manufacturer' => 'nullable|string|max:255',
@@ -461,6 +487,8 @@ class ProductController extends Controller
 
     public function barcodeLookup(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Product::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
         $code = trim($request->input('code', ''));
 
@@ -601,6 +629,8 @@ class ProductController extends Controller
 
     public function stockCheck(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Product::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
         $productId = $request->input('product_id');
         $warehouseId = $request->input('warehouse_id');
@@ -728,6 +758,8 @@ class ProductController extends Controller
      */
     public function availableSerials(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Product::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
         $productId = $request->input('product_id');
         $warehouseId = $request->input('warehouse_id');
@@ -777,6 +809,8 @@ class ProductController extends Controller
      */
     public function nextSerialSequence(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Product::class);
+
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
         $productId = $request->input('product_id');
         $prefix = (string)$request->input('prefix', '');

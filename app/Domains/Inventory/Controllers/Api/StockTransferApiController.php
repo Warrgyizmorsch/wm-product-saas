@@ -143,8 +143,7 @@ class StockTransferApiController extends Controller
         }
 
         $transfer = DB::transaction(function () use ($validated, $tenantId, $companyId, $branchId) {
-            $lastId     = (StockTransfer::where('tenant_id', $tenantId)->max('id') ?? 0) + 1;
-            $transferNo = 'TRF-' . str_pad((string)$lastId, 5, '0', STR_PAD_LEFT);
+            $transferNo = 'TRF-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
 
             $st = StockTransfer::create([
                 'tenant_id'         => $tenantId,
