@@ -73,8 +73,8 @@
                 <div class="d-flex align-items-center gap-2">
                     <div class="dropdown">
                         <a href="javascript:void(0);" class="ax-avatar" data-bs-toggle="dropdown" role="button" aria-label="Account">
-                            <img src="{{ $adminUser?->avatar_url ?? '/assets/images/avatar/default.png' }}" alt=""
-                                onerror="this.onerror=null; this.src='/assets/images/avatar/default.png';">
+                            <img src="{{ $adminUser?->avatar_url ?? asset('assets/images/avatar/default.png') }}" alt=""
+                                onerror="this.onerror=null; this.src='{{ asset('assets/images/avatar/default.png') }}';">
                         </a>
                         <div class="dropdown-menu dropdown-menu-end">
                             <div class="dropdown-header">

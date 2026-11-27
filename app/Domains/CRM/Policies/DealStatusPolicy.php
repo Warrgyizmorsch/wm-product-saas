@@ -21,21 +21,21 @@ class DealStatusPolicy
 
     public function create(User $user): bool
     {
-        return $this->access->allows($user, 'crm.deals.create', [
+        return $this->access->allows($user, 'crm.masters.manage', [
             'tenant_id' => $user->tenant_id,
         ]);
     }
 
     public function update(User $user, DealStatus $dealStatus): bool
     {
-        return $this->access->allows($user, 'crm.deals.update', [
+        return $this->access->allows($user, 'crm.masters.manage', [
             'tenant_id' => $dealStatus->tenant_id,
         ]);
     }
 
     public function delete(User $user, DealStatus $dealStatus): bool
     {
-        return $this->access->allows($user, 'crm.deals.delete', [
+        return $this->access->allows($user, 'crm.masters.manage', [
             'tenant_id' => $dealStatus->tenant_id,
         ]);
     }

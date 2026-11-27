@@ -21,21 +21,21 @@ class LeadStatusPolicy
 
     public function create(User $user): bool
     {
-        return $this->access->allows($user, 'crm.leads.create', [
+        return $this->access->allows($user, 'crm.masters.manage', [
             'tenant_id' => $user->tenant_id,
         ]);
     }
 
     public function update(User $user, LeadStatus $leadStatus): bool
     {
-        return $this->access->allows($user, 'crm.leads.update', [
+        return $this->access->allows($user, 'crm.masters.manage', [
             'tenant_id' => $leadStatus->tenant_id,
         ]);
     }
 
     public function delete(User $user, LeadStatus $leadStatus): bool
     {
-        return $this->access->allows($user, 'crm.leads.delete', [
+        return $this->access->allows($user, 'crm.masters.manage', [
             'tenant_id' => $leadStatus->tenant_id,
         ]);
     }

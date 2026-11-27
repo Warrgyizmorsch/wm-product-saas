@@ -730,7 +730,7 @@
                                 @endif
 
                                 @if ($lead->email)
-                                    <span class="text-muted fs-11 d-block"><i
+                                    <span class="text-muted fs-11 d-block text-truncate" style="max-width: 185px;" title="{{ $lead->email }}"><i
                                             class="feather-mail fs-11 me-1 text-muted"></i>{{ $lead->email }}</span>
                                 @endif
                                 @php

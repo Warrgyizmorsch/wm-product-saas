@@ -69,6 +69,7 @@ Route::prefix('crm')
         Route::get('deals', [CrmDealController::class, 'index'])->name('deals.index');
         Route::get('deals/export', [CrmDealController::class, 'export'])->name('deals.export');
         Route::get('deals/kanban', [CrmDealController::class, 'kanban'])->middleware('throttle:60,1')->name('deals.kanban');
+        Route::get('deals/kanban/more', [CrmDealController::class, 'kanbanMore'])->middleware('throttle:60,1')->name('deals.kanban.more');
         Route::get('deals/activities', [DealActivityController::class, 'index'])->name('deals.activities');
         Route::get('deals/create', [CrmDealController::class, 'create'])->name('deals.create');
         Route::get('deals/google-auth-status', [CrmDealController::class, 'checkGoogleAuth'])->name('deals.googleAuthStatus');
@@ -100,6 +101,8 @@ Route::prefix('crm')
             ->name('leads.index');
         Route::get('leads/kanban', [LeadController::class, 'kanban'])
             ->name('leads.kanban');
+        Route::get('leads/kanban/more', [LeadController::class, 'kanbanMore'])
+            ->name('leads.kanban.more');
 
         // AI Call Assistant & Click-to-Call Routes
         Route::get('twilio/voice-token', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'generateVoiceToken'])

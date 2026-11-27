@@ -89,8 +89,83 @@ class LeadController extends Controller
         $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses($tenantId);
         $statuses = $leadStatuses->pluck('name')->toArray();
 
-        $query = Lead::query()
-            ->where('tenant_id', $tenantId);
+        $query = $this->buildLeadKanbanQuery($request, $tenantId);
+
+        // Per-column queries with a cap, plus one grouped query for counts and
+        // totals. Loading every lead with its quotations ran out of memory
+        // (HTTP 500) at 30k leads.
+        $latestQuoteTotal = '(SELECT q.total_amount FROM quotations q WHERE q.lead_id = leads.id AND q.deleted_at IS NULL ORDER BY q.id DESC LIMIT 1)';
+        $stats = (clone $query)
+            ->selectRaw("COALESCE(NULLIF(status, ''), 'New') as kanban_status, COUNT(*) as lead_count, SUM(COALESCE(NULLIF(expected_amount, 0), {$latestQuoteTotal}, 0)) as lead_total")
+            ->groupBy('kanban_status')
+            ->get()
+            ->keyBy('kanban_status');
+
+        $kanbanData = [];
+        foreach ($statuses as $status) {
+            $leadsInStatus = (clone $query)
+                ->where(function ($q) use ($status) {
+                    $q->where('status', $status);
+                    if ($status === 'New') {
+                        $q->orWhereNull('status')->orWhere('status', '');
+                    }
+                })
+                ->with(['owner', 'quotations'])
+                ->orderBy('updated_at', 'desc')
+                ->limit(self::KANBAN_CARDS_PER_COLUMN)
+                ->get();
+
+            $kanbanData[$status] = [
+                'leads' => $leadsInStatus,
+                'count' => (int) ($stats->get($status)?->lead_count ?? 0),
+                'total_amount' => (float) ($stats->get($status)?->lead_total ?? 0),
+            ];
+        }
+
+        return view('modules.crm.leads.kanban', compact('kanbanData', 'statuses'));
+    }
+
+    /**
+     * Load next batch of lead cards for a single Kanban column via AJAX.
+     */
+    public function kanbanMore(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Lead::class);
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $status = (string)$request->input('status', 'New');
+        $offset = max(0, (int)$request->input('offset', self::KANBAN_CARDS_PER_COLUMN));
+
+        $statusQuery = $this->buildLeadKanbanQuery($request, $tenantId)
+            ->where(function ($q) use ($status) {
+                $q->where('status', $status);
+                if ($status === 'New') {
+                    $q->orWhereNull('status')->orWhere('status', '');
+                }
+            });
+
+        $total = (clone $statusQuery)->count();
+        $leads = (clone $statusQuery)
+            ->with(['owner', 'quotations'])
+            ->orderBy('updated_at', 'desc')
+            ->offset($offset)
+            ->limit(self::KANBAN_CARDS_PER_COLUMN)
+            ->get();
+
+        $html = view('modules.crm.leads.partials.kanban-cards', compact('leads'))->render();
+        $nextOffset = $offset + $leads->count();
+
+        return response()->json([
+            'html'       => $html,
+            'loaded'     => $leads->count(),
+            'remaining'  => max(0, $total - $nextOffset),
+            'nextOffset' => $nextOffset,
+        ]);
+    }
+
+    private function buildLeadKanbanQuery(Request $request, int $tenantId)
+    {
+        $query = Lead::query()->where('tenant_id', $tenantId);
 
         if ($request->filled('search')) {
             $search = trim((string) $request->search);
@@ -127,38 +202,7 @@ class LeadController extends Controller
             });
         }
 
-        // Per-column queries with a cap, plus one grouped query for counts and
-        // totals. Loading every lead with its quotations ran out of memory
-        // (HTTP 500) at 30k leads.
-        $latestQuoteTotal = '(SELECT q.total_amount FROM quotations q WHERE q.lead_id = leads.id AND q.deleted_at IS NULL ORDER BY q.id DESC LIMIT 1)';
-        $stats = (clone $query)
-            ->selectRaw("COALESCE(NULLIF(status, ''), 'New') as kanban_status, COUNT(*) as lead_count, SUM(COALESCE(NULLIF(expected_amount, 0), {$latestQuoteTotal}, 0)) as lead_total")
-            ->groupBy('kanban_status')
-            ->get()
-            ->keyBy('kanban_status');
-
-        $kanbanData = [];
-        foreach ($statuses as $status) {
-            $leadsInStatus = (clone $query)
-                ->where(function ($q) use ($status) {
-                    $q->where('status', $status);
-                    if ($status === 'New') {
-                        $q->orWhereNull('status')->orWhere('status', '');
-                    }
-                })
-                ->with(['owner', 'quotations'])
-                ->orderBy('updated_at', 'desc')
-                ->limit(self::KANBAN_CARDS_PER_COLUMN)
-                ->get();
-
-            $kanbanData[$status] = [
-                'leads' => $leadsInStatus,
-                'count' => (int) ($stats->get($status)?->lead_count ?? 0),
-                'total_amount' => (float) ($stats->get($status)?->lead_total ?? 0),
-            ];
-        }
-
-        return view('modules.crm.leads.kanban', compact('kanbanData', 'statuses'));
+        return $query;
     }
 
     public function checkDuplicate(Request $request): JsonResponse
@@ -871,7 +915,7 @@ class LeadController extends Controller
             'city' => 'nullable|string|max:255',
             'address' => 'nullable|string',
             'product_ids' => 'nullable|array',
-            'product_ids.*' => 'nullable',
+            'product_ids.*' => ['nullable', 'integer', tenant_exists('products')],
             'items' => 'nullable|array',
             'items.*.product_id' => ['nullable', 'integer', tenant_exists('products')],
             'items.*.quantity' => 'nullable|numeric|min:1',
