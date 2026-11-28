@@ -76,13 +76,13 @@ trait ValidatesRoutingOperations
             'operations.*.quality_plans.*.is_mandatory'   => 'nullable|boolean',
             'operations.*.is_external'                    => 'nullable|boolean',
             'operations.*.vendor_id'                      => ['nullable', 'integer', $this->tenantExists('vendors')],
-            'operations.*.subcontract_lead_time_days'     => 'nullable|numeric|min:0',
-            'operations.*.subcontract_cost_per_unit'      => 'nullable|numeric|min:0',
-            'operations.*.subcontract_service_product_id' => ['nullable', $this->tenantExists('products')],
-            'operations.*.material_supply_type'           => 'nullable|in:company_supplied,vendor_supplied,none',
-            'operations.*.subcontract_input_type'         => 'nullable|in:bom_raw_materials,previous_operation_wip',
-            'operations.*.dispatch_buffer_days'           => 'nullable|numeric|min:0',
-            'operations.*.return_buffer_days'             => 'nullable|numeric|min:0',
+            // SF-1: dispatch / processing / receipt time, entered as days + hours (or hours alone from the API)
+            'operations.*.vendor_dispatch_days'           => 'nullable|integer|min:0',
+            'operations.*.vendor_dispatch_hours'          => 'nullable|numeric|min:0',
+            'operations.*.vendor_processing_days'         => 'nullable|integer|min:0',
+            'operations.*.vendor_processing_hours'        => 'nullable|numeric|min:0',
+            'operations.*.vendor_receipt_days'            => 'nullable|integer|min:0',
+            'operations.*.vendor_receipt_hours'           => 'nullable|numeric|min:0',
             'operations.*.queue_threshold_enabled'        => 'nullable|boolean',
             'operations.*.overlap_enabled'                => 'nullable|boolean',
             'operations.*.transfer_batch_quantity'        => 'nullable|numeric|min:0',
@@ -215,24 +215,10 @@ trait ValidatesRoutingOperations
                         $validator->errors()->add("operations.{$index}.vendor_id", "Vendor {$vendor->name} is not active. Choose another vendor.");
                     }
                 }
-                // M-02: the subcontract service product must be a service (the PO buys the service, not the goods)
-                if (!empty($op['subcontract_service_product_id'])) {
-                    $service = \App\Domains\Inventory\Models\Product::find((int) $op['subcontract_service_product_id']);
-                    if ($service && !$service->isService()) {
-                        $validator->errors()->add("operations.{$index}.subcontract_service_product_id", "{$service->name} is not a service product. Choose a service product for the subcontract charge.");
-                    } elseif ($service && !empty($service->status) && strcasecmp((string) $service->status, 'active') !== 0) {
-                        $validator->errors()->add("operations.{$index}.subcontract_service_product_id", "Service product {$service->name} is not active.");
-                    }
-                }
-                // M-02: the first operation has no previous operation whose output could be sent
-                $isEntryOp = empty($op['predecessor_sequence']) && empty($op['previous_operation_id'])
-                    && (int) ($op['sequence'] ?? 0) === (int) collect($operations)->min(fn ($o) => (int) ($o['sequence'] ?? 0));
-                if (($op['subcontract_input_type'] ?? null) === 'previous_operation_wip' && $isEntryOp) {
-                    $validator->errors()->add("operations.{$index}.subcontract_input_type", 'The first operation has no previous operation to send to the vendor. Choose "BOM raw materials".');
-                }
-                foreach (['subcontract_lead_time_days' => 'Subcontract lead time days', 'dispatch_buffer_days' => 'Dispatch buffer days', 'return_buffer_days' => 'Return buffer days'] as $key => $label) {
-                    if (isset($op[$key]) && (float) $op[$key] < 0) {
-                        $validator->errors()->add("operations.{$index}.{$key}", "{$label} cannot be negative.");
+                // SF-1: the three times cannot be negative (the rules above also check each part)
+                foreach (['vendor_dispatch' => 'Dispatch time', 'vendor_processing' => 'Processing time', 'vendor_receipt' => 'Receipt time'] as $key => $label) {
+                    if ((float) ($op[$key . '_days'] ?? 0) < 0 || (float) ($op[$key . '_hours'] ?? 0) < 0) {
+                        $validator->errors()->add("operations.{$index}.{$key}_hours", "{$label} cannot be negative.");
                     }
                 }
             } else {
@@ -398,10 +384,7 @@ trait ValidatesRoutingOperations
         $calculator = app(\App\Domains\Production\Services\RoutingOperationCostCalculator::class);
 
         if ($isExternal) {
-            $result = $calculator->calculate($op, null);
-            if ($calculator->mismatches($op, $result['figures']) !== []) {
-                $validator->errors()->add("operations.{$index}.cost_per_unit", "Operation {$label}: cost does not match the subcontract cost and yield. Reload the operation and save again.");
-            }
+            // SF-1: an outsourced operation has no rate on the routing (cost 0, charged on the vendor bill)
             return;
         }
 

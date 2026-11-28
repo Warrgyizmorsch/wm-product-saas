@@ -978,10 +978,7 @@ class ProductionExecutionService
 
         $passedInspectionExists = ProductionQualityInspection::where('tenant_id', $operation->tenant_id)
             ->where('production_order_id', $operation->production_order_id)
-            ->where(function ($q) use ($operation) {
-                $q->where('production_order_operation_id', $operation->id)
-                  ->orWhereNull('production_order_operation_id');
-            })
+            ->where('production_order_operation_id', $operation->id) // QF-01: the operation's own inspections only
             ->where('status', 'approved')
             ->where('result', 'passed')
             ->exists();

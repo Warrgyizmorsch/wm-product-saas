@@ -68,11 +68,6 @@ class GoodsReceiptNoteService
                 $poItemId = $item['purchase_order_item_id'] ?? null;
                 $poItem = $poItemId ? PurchaseOrderItem::find($poItemId) : null;
 
-                // SC-02: outsourced production work is received from the Subcontracting menu or the shop floor; only the
-                // system GRN those receipts create may receive a subcontract line (it keeps the PO and the bill in step).
-                if ($poItem && $poItem->production_order_operation_id && ($validated['source_type'] ?? null) !== self::SOURCE_SUBCONTRACT_RECEIPT) {
-                    throw new \InvalidArgumentException('Subcontract work is received from the Subcontracting menu (dispatch slip) or on the shop floor, not with a Purchase GRN.');
-                }
 
                 $productId = $item['product_id'] ?? $poItem?->product_id;
                 $isAssetOrExpense = $poItem && in_array($poItem->line_type, ['asset', 'expense'], true);
@@ -174,9 +169,12 @@ class GoodsReceiptNoteService
                     $assetLineIds[] = $grnItem->id;
                 }
 
-                $shouldAffectStock = $poItem
+                // Subcontract receipt (Production, docs/production_ui_rules_review_2026-11-27.md SF-4): the goods came back
+                // from the job-work vendor onto the shop floor — the GRN records the receipt only, never stock.
+                $isSubcontractReceipt = ($validated['source_type'] ?? null) === self::SOURCE_SUBCONTRACT_RECEIPT;
+                $shouldAffectStock = !$isSubcontractReceipt && ($poItem
                     ? $this->shouldAffectPhysicalInventory($poItem)
-                    : ($product && strtolower((string)($product->item_type ?? '')) !== 'service' && strtolower((string)($product->type ?? '')) !== 'service');
+                    : ($product && strtolower((string)($product->item_type ?? '')) !== 'service' && strtolower((string)($product->type ?? '')) !== 'service'));
 
                 if ($qtyAccepted > 0 && $shouldAffectStock) {
                     if (!empty($item['batches']) && is_array($item['batches'])) {

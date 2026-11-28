@@ -30,7 +30,7 @@ class ProductionSubcontractReceipt extends BaseModel
         'production_order_id',
         'production_order_operation_id',
         'delivery_challan_id',
-        'purchase_order_item_id',
+
         'goods_receipt_note_id',
         'source',
         'status',

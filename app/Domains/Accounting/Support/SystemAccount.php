@@ -170,6 +170,7 @@ final class SystemAccount
         'wages_factory_warehouse' => '5031',
         'packing_material_expense' => '5032',
         'power_and_fuel_production' => '5033',
+        'job_work_charges' => '5034', // subcontract job-work vendor bills (Service Bill head "Job Work")
         'salary_and_wages_staff' => '5100',
         'employer_statutory_contribution' => '5110',
         'staff_welfare_expenses' => '5500',

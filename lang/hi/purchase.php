@@ -628,6 +628,7 @@ return array (
   'service_head_handling' => 'लॉजिस्टिक्स एवं हैंडलिंग शुल्क',
   'service_head_insurance' => 'पारगमन बीमा प्रीमियम',
   'service_head_other' => 'अन्य सेवा शुल्क',
+  'service_head_job_work' => 'जॉब वर्क (सबकॉन्ट्रैक्ट)',
   'service_amount' => 'सेवा राशि',
   'gst_mechanism' => 'GST प्रणाली',
   'gst_cgst_sgst' => 'अंतर-राज्यीय CGST + SGST (FCM)',

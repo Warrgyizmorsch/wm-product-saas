@@ -342,9 +342,6 @@ class RoutingService
             if (!is_array($op)) {
                 continue;
             }
-            if (isset($op['subcontract_cost_per_unit']) && $op['subcontract_cost_per_unit'] !== '') {
-                $op['subcontract_cost_per_unit'] = round(convert_to_base((float) $op['subcontract_cost_per_unit']), 4);
-            }
 
             $isExternal = filter_var($op['is_external'] ?? false, FILTER_VALIDATE_BOOLEAN);
             $resources = null;
@@ -432,13 +429,10 @@ class RoutingService
                     : [],
                 'is_external'                    => (bool) $op->is_external,
                 'vendor_id'                      => $op->vendor_id,
-                'material_supply_type'           => $op->material_supply_type,
-                'subcontract_input_type'         => $op->subcontract_input_type,
-                'subcontract_lead_time_days'     => $op->subcontract_lead_time_days,
-                'subcontract_cost_per_unit'      => $op->subcontract_cost_per_unit !== null ? (float) $op->subcontract_cost_per_unit : null,
-                'subcontract_service_product_id' => $op->subcontract_service_product_id,
-                'dispatch_buffer_days'           => $op->dispatch_buffer_days,
-                'return_buffer_days'             => $op->return_buffer_days,
+                // SF-1: the three times copy as hours (the DTO reads {key}_hours alone)
+                'vendor_dispatch_hours'          => (float) $op->vendor_dispatch_hours,
+                'vendor_processing_hours'        => (float) $op->vendor_processing_hours,
+                'vendor_receipt_hours'           => (float) $op->vendor_receipt_hours,
                 'queue_threshold_enabled'        => (bool) ($op->queue_threshold_enabled ?? $op->overlap_enabled),
                 'transfer_batch_quantity'        => $op->transfer_batch_quantity,
                 'transfer_lag_minutes'           => $op->transfer_lag_minutes,

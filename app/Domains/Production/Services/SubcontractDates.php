@@ -7,15 +7,14 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
 /**
- * One rule for the dates of an outsourced operation (N-18 / H-02), used by the PO delivery date, the dispatch slip's
- * expected return date, the order screen, the touch UI and the planning exceptions:
+ * One rule for the dates of an outsourced operation (SF-1, docs/production_ui_rules_review_2026-11-27.md), used by the
+ * dispatch slip's expected return date, the order screen, the touch UI, scheduling and the planning exceptions.
+ * All three times are hours of calendar time (not our working calendar):
  *
- *   dispatch      = the operation's scheduled start (else the order start, else today)
- *   leaves plant  = dispatch + dispatch buffer days
- *   expected back = leaves plant + vendor lead time days + return buffer days
- *
- * The lead time is taken as configured on the routing operation (0 is a valid value); there is no hidden default
- * (before: 0 / 1 / 3 / 3 / 7 days depending on the screen).
+ *   leaves our floor = the operation's scheduled start (else the order start, else now)
+ *   at the vendor    = leaves our floor + dispatch time   (travel from our work floor to the vendor)
+ *   work done        = at the vendor + processing time    (the vendor's work)
+ *   back on floor    = work done + receipt time            (travel from the vendor back to our work floor)
  */
 class SubcontractDates
 {
@@ -31,21 +30,51 @@ class SubcontractDates
         return $orderStart ? Carbon::parse($orderStart) : now();
     }
 
+    /** The goods leave our floor at the operation start (the dispatch time is travel, not a wait before leaving) */
     public function leavesPlant(ProductionOrderOperation $op, ?CarbonInterface $from = null): CarbonInterface
     {
-        return Carbon::parse($from ?? $this->plannedStart($op))->copy()->addDays((int) ($op->dispatch_buffer_days ?? 0));
+        return Carbon::parse($from ?? $this->plannedStart($op))->copy();
+    }
+
+    public function reachesVendor(ProductionOrderOperation $op, ?CarbonInterface $from = null): CarbonInterface
+    {
+        return $this->leavesPlant($op, $from)->addMinutes((int) round((float) ($op->vendor_dispatch_hours ?? 0) * 60));
+    }
+
+    public function workDone(ProductionOrderOperation $op, ?CarbonInterface $from = null): CarbonInterface
+    {
+        return $this->reachesVendor($op, $from)->addMinutes((int) round((float) ($op->vendor_processing_hours ?? 0) * 60));
     }
 
     public function expectedReturnDate(ProductionOrderOperation $op, ?CarbonInterface $from = null): CarbonInterface
     {
-        return $this->leavesPlant($op, $from)
-            ->addDays((int) ($op->subcontract_lead_time_days ?? 0))
-            ->addDays((int) ($op->return_buffer_days ?? 0));
+        return $this->workDone($op, $from)->addMinutes((int) round((float) ($op->vendor_receipt_hours ?? 0) * 60));
     }
 
-    /** Total calendar days the vendor work takes (buffers included) */
-    public function totalDays(ProductionOrderOperation $op): int
+    /** Total calendar hours of the vendor work (dispatch + processing + receipt) */
+    public function totalHours(ProductionOrderOperation $op): float
     {
-        return (int) ($op->dispatch_buffer_days ?? 0) + (int) ($op->subcontract_lead_time_days ?? 0) + (int) ($op->return_buffer_days ?? 0);
+        return $op->vendorTotalHours();
+    }
+
+    /** Total in calendar days (fractions kept), for screens and checks that count days */
+    public function totalDays(ProductionOrderOperation $op): float
+    {
+        return round($this->totalHours($op) / 24, 4);
+    }
+
+    /** "2 d 6 h" / "6 h" / "0 h" — how the times are shown on screens (SF-1: days + hours) */
+    public static function formatHours(?float $hours): string
+    {
+        $hours = max(0.0, (float) $hours);
+        $days = (int) floor($hours / 24);
+        $rest = round($hours - $days * 24, 2);
+        $restText = rtrim(rtrim(number_format($rest, 2, '.', ''), '0'), '.');
+
+        if ($days === 0) {
+            return $restText . ' h';
+        }
+
+        return $rest > 0 ? "{$days} d {$restText} h" : "{$days} d";
     }
 }

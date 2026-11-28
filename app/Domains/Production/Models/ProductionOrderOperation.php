@@ -74,14 +74,11 @@ class ProductionOrderOperation extends BaseModel
         'executed_by',
         'is_external',
         'vendor_id',
-        'subcontract_lead_time_days',
-        'subcontract_cost_per_unit',
-        'subcontract_service_product_id',
-        'material_supply_type',
-        'subcontract_input_type',
+        'vendor_dispatch_hours',      // SF-1: our floor → vendor (hours)
+        'vendor_processing_hours',    // SF-1: the vendor's work (hours)
+        'vendor_receipt_hours',       // SF-1: vendor → our floor (hours)
         'uses_previous_op_output', // TF-01: BOM "Previous OP materials" — works on the previous operation's output
-        'dispatch_buffer_days',
-        'return_buffer_days',
+        'vendor_supplies_materials', // SF-2: BOM "Vendor-supplied materials" — the vendor uses its own materials
         'purchase_order_id',
         'purchase_order_item_id',
         'quality_required',
@@ -115,10 +112,10 @@ class ProductionOrderOperation extends BaseModel
         'is_external'             => 'boolean',
         'quality_required'        => 'boolean',
         'uses_previous_op_output' => 'boolean',
-        'subcontract_lead_time_days'=> 'integer',
-        'subcontract_cost_per_unit' => 'float',
-        'dispatch_buffer_days'      => 'integer',
-        'return_buffer_days'        => 'integer',
+        'vendor_supplies_materials' => 'boolean',
+        'vendor_dispatch_hours'     => 'float',
+        'vendor_processing_hours'   => 'float',
+        'vendor_receipt_hours'      => 'float',
         'quantity_produced'       => 'float',
         'quantity_rejected'       => 'float',
         'quantity_scrapped'       => 'float',
@@ -382,10 +379,6 @@ class ProductionOrderOperation extends BaseModel
         return $this->belongsTo(\App\Domains\Purchase\Models\PurchaseOrderItem::class, 'purchase_order_item_id');
     }
 
-    public function subcontractServiceProduct(): BelongsTo
-    {
-        return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'subcontract_service_product_id');
-    }
 
     public function progressLogs(): HasMany
     {
@@ -429,11 +422,29 @@ class ProductionOrderOperation extends BaseModel
 
     public function isWipJobWork(): bool
     {
-        return $this->isOutsourced() && (
-            $this->subcontract_input_type === 'previous_operation_wip'
-            || $this->routingOperation?->subcontract_input_type === 'previous_operation_wip'
-            || (bool) $this->uses_previous_op_output // TF-01 / TF-04: the dispatch slip sends the previous operation's output
-        );
+        // SF-2 / TF-01: the dispatch slip sends the previous operation's output when the BOM ticks "Previous OP materials"
+        return $this->isOutsourced() && (bool) $this->uses_previous_op_output;
+    }
+
+    /** SF-2: the BOM material rows of this operation — on an outsourced operation, our materials sent to the vendor */
+    public function bomMaterialRows(): \Illuminate\Support\Collection
+    {
+        return $this->getExpectedComponents();
+    }
+
+    /**
+     * SF-2 / SF-4: a dispatch slip is needed only when something of ours goes to the vendor — the previous operation's
+     * output (BOM "Previous OP materials") or BOM material rows. A vendor-supplied-only operation is received directly.
+     */
+    public function needsDispatchSlip(): bool
+    {
+        return $this->isOutsourced() && ($this->isWipJobWork() || $this->bomMaterialRows()->isNotEmpty());
+    }
+
+    /** SF-1: total vendor time in hours (dispatch + processing + receipt) */
+    public function vendorTotalHours(): float
+    {
+        return (float) ($this->vendor_dispatch_hours ?? 0) + (float) ($this->vendor_processing_hours ?? 0) + (float) ($this->vendor_receipt_hours ?? 0);
     }
 
     /** An outsourced operation in a vendor-side state that only the dispatch slip / subcontract receipt may change (C-01). */
@@ -676,10 +687,8 @@ class ProductionOrderOperation extends BaseModel
             )
             ->with(['material.uom'])
             ->get()
-            // TF-02 / N-27: material the subcontract vendor brings is not this order's to issue — no reservation, no
-            // material request, no readiness block (vendor-supplied marked on the BOM, or a vendor-supplied operation)
-            ->reject(fn ($row) => ($row->supplied_by ?? 'company') === 'vendor'
-                || ($this->is_external && $this->material_supply_type === 'vendor_supplied'))
+            // SF-2: a BOM material row is always our material (sent to the vendor on an outsourced operation);
+            // the vendor's own materials are only the operation tick, never rows
             ->values();
     }
 }

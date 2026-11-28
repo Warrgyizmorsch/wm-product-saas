@@ -74,21 +74,12 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
             ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
             ->whereHas('order', $liveOrder);
 
-        // Outsourced ops of live orders with no subcontract PO yet (D-4: raised only by button)
-        $awaitingProcurement = $openOp($Op::query())
-            ->whereNull('purchase_order_id')
-            ->count();
-
-        $poAwaitingApproval = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
-            ->where('is_subcontract', true)
-            ->whereIn('status', ['Draft', 'Pending Approval', 'draft', 'pending_approval'])
-            ->count();
-
-        // Company-material / job-work ops of live orders not yet at a vendor
+        // SF-2: ops of live orders that send something of ours (previous output or BOM rows) and have nothing at a vendor
         $readyForDispatch = $openOp($Op::query())
-            ->where(fn ($q) => $q->whereNull('material_supply_type')->orWhere('material_supply_type', '!=', 'vendor_supplied'))
             ->whereNotIn('status', [$Op::STATUS_VENDOR_DISPATCHED, $Op::STATUS_SUBCONTRACT_QC_PENDING])
             ->whereDoesntHave('deliveryChallans', fn ($q) => $q->whereIn('status', $Challan::AT_VENDOR_STATUSES))
+            ->get()
+            ->filter(fn ($op) => $op->needsDispatchSlip())
             ->count();
 
         // Dispatch slips still at a vendor (dispatched / partly received)
@@ -128,8 +119,6 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
             ->count();
 
         return [
-            'awaiting_subcontract_pr' => $awaitingProcurement,
-            'po_awaiting_approval' => $poAwaitingApproval,
             'ready_for_dispatch' => $readyForDispatch,
             'at_vendor' => $atVendor,
             'vendor_delayed' => $vendorDelayed,
@@ -164,7 +153,7 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
             'operations.sourceProduct',
             'operations.manualProduction',
             'operations.routingOperation',
-            'operations.subcontractServiceProduct',
+
             'operations.purchaseOrder',
             'operations.purchaseOrderItem',
             'operations.scheduleOperation',

@@ -49,6 +49,7 @@ class ProductionBom extends BaseModel
         'status', // draft, pending_approval, approved, inactive, cancelled, under_revision
         'notes',
         'operation_input_flags', // TF-01
+        'operation_vendor_material_flags', // SF-2
         'has_warning',
         'warning_reason',
         'created_by',
@@ -65,6 +66,7 @@ class ProductionBom extends BaseModel
         'routing_id' => 'integer',
         'has_warning' => 'boolean',
         'operation_input_flags' => 'array', // TF-01 "Previous OP materials" per routing operation
+        'operation_vendor_material_flags' => 'array', // SF-2 "Vendor-supplied materials" per outsourced routing operation
     ];
 
     /**
@@ -82,6 +84,16 @@ class ProductionBom extends BaseModel
         }
 
         return !empty($op->previous_operation_id) && !$op->is_parallel;
+    }
+
+    /** SF-2: does the vendor use its own materials on this outsourced routing operation? (BOM tick, default off) */
+    public function vendorSuppliesMaterials(?\App\Domains\Production\Models\RoutingOperation $op): bool
+    {
+        if (!$op || !$op->isOutsourced()) {
+            return false;
+        }
+
+        return (bool) (((array) ($this->operation_vendor_material_flags ?? []))[(string) $op->id] ?? false);
     }
 
     public function product(): BelongsTo

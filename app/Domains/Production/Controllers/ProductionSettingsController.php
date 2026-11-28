@@ -18,8 +18,6 @@ class ProductionSettingsController extends Controller
         return view('modules.production.settings.index', [
             'tenant' => $tenant,
             'settings' => $settings,
-            'currentWorkflow' => $settings['subcontract_procurement_workflow'] ?? 'manual_pr_po',
-            'autoApprovalLimit' => convert_from_base((float) ($settings['subcontract_auto_approval_limit'] ?? 10000.00)),
             'remnantReleasePolicy' => $settings['remnant_release_policy'] ?? 'immediate',
         ]);
     }
@@ -45,6 +43,24 @@ class ProductionSettingsController extends Controller
             ->with('success', 'Remnant release policy updated successfully.');
     }
 
+    /**
+     * The old Subcontract Settings page (procurement mode + auto-approval limit), restored 2026-11-28 at the user's
+     * request and kept for discussion. Since SF-4 (no PR / PO in subcontracting) nothing reads these two values.
+     */
+    public function subcontract(): View
+    {
+        \Illuminate\Support\Facades\Gate::authorize('create', \App\Domains\Production\Models\WorkCenter::class);
+        $tenant = tenant();
+        $settings = is_array($tenant?->settings) ? $tenant->settings : [];
+
+        return view('modules.production.settings.subcontract', [
+            'tenant' => $tenant,
+            'settings' => $settings,
+            'currentWorkflow' => $settings['subcontract_procurement_workflow'] ?? 'manual_pr_po',
+            'autoApprovalLimit' => convert_from_base((float) ($settings['subcontract_auto_approval_limit'] ?? 10000.00)),
+        ]);
+    }
+
     public function updateSubcontract(Request $request): RedirectResponse
     {
         \Illuminate\Support\Facades\Gate::authorize('create', \App\Domains\Production\Models\WorkCenter::class);
@@ -66,7 +82,7 @@ class ProductionSettingsController extends Controller
 
         $tenant->update(['settings' => $currentSettings]);
 
-        return redirect()->route('production.settings.index')
+        return redirect()->route('production.settings.subcontract')
             ->with('success', 'Subcontract procurement settings updated successfully.');
     }
 }

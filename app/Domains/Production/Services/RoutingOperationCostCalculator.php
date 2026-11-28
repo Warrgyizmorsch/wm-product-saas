@@ -17,7 +17,7 @@ namespace App\Domains\Production\Services;
  *   yield factor          = 100 ÷ yield %
  *   labor / machine per unit = cycle × rate × yield factor;  cost per unit = labor + machine
  *   setup cost per run    = setup per operation × (labor rate + machine rate)   (no yield)
- *   external              = subcontract cost per unit × yield factor
+ *   external              = 0 (SF-1: no rate on the routing; the job work is charged on the vendor bill)
  */
 class RoutingOperationCostCalculator
 {
@@ -76,7 +76,7 @@ class RoutingOperationCostCalculator
             return [
                 'type'          => 'outsourced',
                 'vendor_id'     => $op['vendor_id'] ?? null,
-                'cost_per_unit' => (float) ($op['subcontract_cost_per_unit'] ?? 0),
+                'cost_per_unit' => 0.0, // SF-1: charged on the vendor bill
             ];
         }
         if (!$resource) {
@@ -141,7 +141,8 @@ class RoutingOperationCostCalculator
         $isExternal = filter_var($op['is_external'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         if ($isExternal) {
-            $cpu = self::r4((float) ($op['subcontract_cost_per_unit'] ?? 0) * $yieldFactor);
+            // SF-1: no rate on the routing — the job work is charged on the vendor bill, so the operation costs 0 here
+            $cpu = 0.0;
 
             return ['figures' => [
                 'processing_time_minutes' => self::r4($op['processing_time_minutes'] ?? 0),

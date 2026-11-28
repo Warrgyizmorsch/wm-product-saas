@@ -306,6 +306,7 @@ class ChartOfAccountsService
             ['code' => '5031', 'key' => 'wages_factory_warehouse', 'name' => 'Wages - Factory/Warehouse', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'cogs', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
             ['code' => '5032', 'key' => 'packing_material_expense', 'name' => 'Packing Material Expense', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'cogs', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
             ['code' => '5033', 'key' => 'power_and_fuel_production', 'name' => 'Power & Fuel - Production', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'cogs', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
+            ['code' => '5034', 'key' => 'job_work_charges', 'name' => 'Job Work Charges', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'cogs', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
 
             // --- Indirect Expenses (sheet rows 71-99) ---
             ['code' => '5100', 'key' => 'salary_and_wages_staff', 'name' => 'Salary & Wages - Staff', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],

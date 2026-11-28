@@ -26,6 +26,7 @@ class ProductionBomDTO
         public readonly ?int $source_bom_id = null,
         // TF-01: {routing_operation_id: bool} — the operation works on the previous operation's output
         public readonly ?array $operation_input_flags = null,
+        public readonly ?array $operation_vendor_material_flags = null, // SF-2
     ) {
     }
 
@@ -57,6 +58,10 @@ class ProductionBomDTO
             operation_input_flags: isset($data['operation_input_flags']) && is_array($data['operation_input_flags'])
                 ? collect($data['operation_input_flags'])->mapWithKeys(fn ($v, $k) => [(string) (int) $k => filter_var($v, FILTER_VALIDATE_BOOLEAN)])->all()
                 : null,
+            // SF-2: only ticked operations are kept
+            operation_vendor_material_flags: isset($data['operation_vendor_material_flags']) && is_array($data['operation_vendor_material_flags'])
+                ? collect($data['operation_vendor_material_flags'])->filter(fn ($v) => filter_var($v, FILTER_VALIDATE_BOOLEAN))->mapWithKeys(fn ($v, $k) => [(string) (int) $k => true])->all()
+                : null,
         );
     }
 
@@ -76,6 +81,7 @@ class ProductionBomDTO
             'expiry_date' => $this->expiry_date,
             'notes' => $this->notes,
             'usage_context' => $this->usage_context,
-        ] + ($this->operation_input_flags !== null ? ['operation_input_flags' => $this->operation_input_flags] : []);
+        ] + ($this->operation_input_flags !== null ? ['operation_input_flags' => $this->operation_input_flags] : [])
+          + ($this->operation_vendor_material_flags !== null ? ['operation_vendor_material_flags' => $this->operation_vendor_material_flags] : []);
     }
 }

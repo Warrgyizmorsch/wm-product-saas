@@ -277,14 +277,12 @@ class ProductionOrderService
                     'quantity_scrapped' => 0.0000,
                     'is_external' => (bool) ($planOp->is_external ?? $routingOp?->is_external ?? false),
                     'vendor_id' => $planOp->vendor_id ?? $routingOp?->vendor_id,
-                    'subcontract_lead_time_days' => (int) ($routingOp?->subcontract_lead_time_days ?? 0),
-                    'subcontract_cost_per_unit' => (float) ($routingOp?->subcontract_cost_per_unit ?? 0.0),
-                    'subcontract_service_product_id' => $routingOp?->subcontract_service_product_id,
-                    'material_supply_type' => $routingOp?->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
-                    'subcontract_input_type' => $routingOp?->subcontract_input_type ?? 'bom_raw_materials',
+                    // SF-1: the outsourced operation's three times (hours)
+                    'vendor_dispatch_hours' => (float) ($routingOp?->vendor_dispatch_hours ?? 0),
+                    'vendor_processing_hours' => (float) ($routingOp?->vendor_processing_hours ?? 0),
+                    'vendor_receipt_hours' => (float) ($routingOp?->vendor_receipt_hours ?? 0),
                     'uses_previous_op_output' => $this->usesPreviousOpOutput($order->bom_id, $routingOp), // TF-01
-                    'dispatch_buffer_days' => (int) ($routingOp?->dispatch_buffer_days ?? 0),
-                    'return_buffer_days' => (int) ($routingOp?->return_buffer_days ?? 0),
+                    'vendor_supplies_materials' => $this->vendorSuppliesMaterials($order->bom_id, $routingOp), // SF-2
                     'queue_threshold_enabled' => (bool) ($routingOp?->queue_threshold_enabled ?? $routingOp?->overlap_enabled ?? false),
                     'overlap_enabled' => (bool) ($routingOp?->queue_threshold_enabled ?? $routingOp?->overlap_enabled ?? false),
                     'transfer_batch_quantity' => (float) ($routingOp?->transfer_batch_quantity ?? 0.0000),
@@ -756,19 +754,13 @@ class ProductionOrderService
             throw new InvalidArgumentException('This order already has a schedule, so its plan can no longer be changed. Cancel the schedule first.');
         }
 
-        $externalOpIds = $order->operations()->where('is_external', true)->pluck('id');
-        if ($externalOpIds->isNotEmpty()) {
-            $hasPo = \App\Domains\Purchase\Models\PurchaseOrderItem::whereIn('production_order_operation_id', $externalOpIds)
-                ->whereHas('order', fn ($q) => $q->where('tenant_id', $order->tenant_id)->where('status', '!=', 'Cancelled'))
-                ->exists();
-            $hasPr = \App\Domains\Purchase\Models\PurchaseRequisition::where('tenant_id', $order->tenant_id)
-                ->whereIn('source_type', ['mo', 'ProductionOrder'])
-                ->where('source_id', $order->id)
-                ->where('status', '!=', 'Cancelled')
-                ->exists();
-            if ($hasPo || $hasPr) {
-                throw new InvalidArgumentException('Subcontract purchasing has already been raised for this order, so its plan can no longer be changed. Cancel that purchase document first.');
-            }
+        // SF-4: no PR/PO in subcontracting — a dispatch slip already made for an outsourced operation fixes the plan
+        $hasSlip = \App\Domains\Production\Models\DeliveryChallan::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->where('status', '!=', 'cancelled')
+            ->exists();
+        if ($hasSlip) {
+            throw new InvalidArgumentException('A dispatch slip has already been made for this order, so its plan can no longer be changed. Cancel that slip first.');
         }
     }
 
@@ -1069,6 +1061,19 @@ class ProductionOrderService
         return (bool) $this->snapshotBomCache[$bomId]?->usesPreviousOpOutput($routingOp);
     }
 
+    /** SF-2: the BOM's "Vendor-supplied materials" tick for this outsourced routing operation */
+    private function vendorSuppliesMaterials(?int $bomId, $routingOp): bool
+    {
+        if (!$bomId || !$routingOp) {
+            return false;
+        }
+        if (!array_key_exists($bomId, $this->snapshotBomCache)) {
+            $this->snapshotBomCache[$bomId] = \App\Domains\Production\Models\ProductionBom::withoutGlobalScopes()->find($bomId);
+        }
+
+        return (bool) $this->snapshotBomCache[$bomId]?->vendorSuppliesMaterials($routingOp);
+    }
+
     private function assertNoOpenSubcontractDocuments(ProductionOrder $order, string $action): void
     {
         $open = [];
@@ -1081,26 +1086,7 @@ class ProductionOrderService
             $open[] = 'dispatch slip(s) at the vendor: ' . $challans->implode(', ');
         }
 
-        $pos = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $order->tenant_id)
-            ->where('production_order_id', $order->id)
-            ->where('is_subcontract', true)
-            ->whereNotIn('status', ['Cancelled', 'Completed', 'Closed'])
-            ->pluck('purchase_order_number');
-        if ($pos->isNotEmpty()) {
-            $open[] = 'subcontract PO(s): ' . $pos->implode(', ');
-        }
-
-        $prs = \App\Domains\Purchase\Models\PurchaseRequisition::where('tenant_id', $order->tenant_id)
-            ->whereIn('source_type', ['mo', 'ProductionOrder'])
-            ->where('source_id', $order->id)
-            ->where('notes', 'like', 'Subcontract Service%')
-            ->where('status', '!=', 'Cancelled')
-            ->get()
-            ->filter(fn ($pr) => $pr->items()->get()->every(fn ($item) => (float) ($item->ordered_qty ?? 0) < (float) $item->quantity))
-            ->pluck('requisition_number');
-        if ($prs->isNotEmpty()) {
-            $open[] = 'subcontract PR(s): ' . $prs->implode(', ');
-        }
+        // SF-4: there are no subcontract PRs / POs any more; only goods still at the vendor block cancel / delete
 
         if ($open) {
             throw new InvalidArgumentException("This order cannot be {$action} while subcontract documents are open — " . implode('; ', $open) . '. Receive or cancel them first.');
@@ -1832,14 +1818,12 @@ class ProductionOrderService
                 'is_external' => (bool) ($routingOp->is_external ?? false),
                 'quality_required' => (bool) ($routingOp->quality_required ?? false),
                 'vendor_id' => $routingOp->vendor_id,
-                'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
-                'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
-                'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
-                'material_supply_type' => $routingOp->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
-                'subcontract_input_type' => $routingOp->subcontract_input_type ?? 'bom_raw_materials',
+                // SF-1: the outsourced operation's three times (hours)
+                'vendor_dispatch_hours' => (float) ($routingOp->vendor_dispatch_hours ?? 0),
+                'vendor_processing_hours' => (float) ($routingOp->vendor_processing_hours ?? 0),
+                'vendor_receipt_hours' => (float) ($routingOp->vendor_receipt_hours ?? 0),
                 'uses_previous_op_output' => $this->usesPreviousOpOutput($bom->id, $routingOp), // TF-01
-                'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
-                'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
+                'vendor_supplies_materials' => $this->vendorSuppliesMaterials($bom->id, $routingOp), // SF-2
                 'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
                 'overlap_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
                 'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),
@@ -2311,14 +2295,12 @@ class ProductionOrderService
             'is_external' => (bool) ($routingOp->is_external ?? false),
             'quality_required' => (bool) ($routingOp->quality_required ?? false),
             'vendor_id' => $routingOp->vendor_id,
-            'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
-            'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
-            'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
-            'material_supply_type' => $routingOp->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
-            'subcontract_input_type' => $routingOp->subcontract_input_type ?? 'bom_raw_materials',
+            // SF-1: the outsourced operation's three times (hours)
+            'vendor_dispatch_hours' => (float) ($routingOp->vendor_dispatch_hours ?? 0),
+            'vendor_processing_hours' => (float) ($routingOp->vendor_processing_hours ?? 0),
+            'vendor_receipt_hours' => (float) ($routingOp->vendor_receipt_hours ?? 0),
             'uses_previous_op_output' => $this->usesPreviousOpOutput($entry['source_bom_id'] ?? null, $routingOp), // TF-01
-            'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
-            'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
+            'vendor_supplies_materials' => $this->vendorSuppliesMaterials($entry['source_bom_id'] ?? null, $routingOp), // SF-2
             'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
             'overlap_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
             'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),

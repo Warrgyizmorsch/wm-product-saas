@@ -528,6 +528,7 @@ class ProductionBomService
             'expiry_date'    => null,
             'notes'          => "Duplicated from version {$source->version}." . ($source->notes ? ' ' . $source->notes : ''),
             'operation_input_flags' => $source->operation_input_flags ?? [], // TF-01 copied with the BOM
+            'operation_vendor_material_flags' => $source->operation_vendor_material_flags ?? [], // SF-2 copied with the BOM
             'items'          => $source->operationMaterials->map(fn ($om) => [
                 'row_uid'                   => 'copy_' . $om->id,
                 'routing_operation_id'      => $om->routing_operation_id,
@@ -545,7 +546,6 @@ class ProductionBomService
                     : null,
                 'sequence'                  => $om->sequence,
                 'notes'                     => $om->notes,
-                'supplied_by'               => $om->supplied_by ?? 'company', // TF-02
             ])->values()->all(),
             'warnings'       => $warnings,
         ];
@@ -664,7 +664,6 @@ class ProductionBomService
                 'material_scrap_percentage'    => $scrapPct,
                 'sequence'                     => $itemDto->sequence ?: ($index + 1),
                 'notes'                        => $itemDto->notes,
-                'supplied_by'                  => $itemDto->supplied_by, // TF-02
                 'consumption_type'             => null,
             ]);
 

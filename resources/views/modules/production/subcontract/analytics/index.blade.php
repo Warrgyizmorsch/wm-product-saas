@@ -10,7 +10,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
         <div>
             <h4 class="fw-bold text-dark mb-1"><i class="feather-trending-up me-2 text-primary"></i>Subcontract Vendor Analytics & Performance Governance</h4>
-            <span class="fs-12 text-muted">Authoritative operational SLA, quality rates, lead-time variance, WIP value, and procurement mode throughput.</span>
+            <span class="fs-12 text-muted">Authoritative operational SLA, quality rates, lead-time variance, and WIP value at the vendor.</span>
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('production.subcontract.delivery-challans.index') }}" class="btn btn-sm btn-outline-primary">
@@ -224,7 +224,7 @@
                         <td class="fw-semibold text-dark fs-12">{{ $d['operation_name'] }}</td>
                         <td>
                             <div class="fw-semibold text-dark fs-12">{{ $d['vendor_name'] }}</div>
-                            <span class="fs-10 text-muted font-monospace">PO: {{ $d['po_number'] }}</span>
+                            <span class="fs-10 text-muted font-monospace">Slip: {{ $d['slip_number'] }}</span>
                         </td>
                         <td class="font-monospace fs-12 text-muted">{{ $d['dispatch_date'] }}</td>
                         <td class="font-monospace fs-12 text-muted">{{ $d['expected_return_date'] }}</td>
@@ -252,47 +252,5 @@
         </x-ui.odoo-form-ui>
     </div>
 
-    <!-- Procurement Automation Throughput Breakdown -->
-    <div class="row g-4">
-        <div class="col-md-6">
-            <div class="card border border-light-subtle shadow-sm p-4 h-100">
-                <h6 class="fw-bold text-dark mb-3"><i class="feather-cpu me-2 text-primary"></i>Procurement Automation Mode Throughput</h6>
-                <div class="d-flex justify-content-around text-center my-3">
-                    <div class="p-3 bg-light rounded-3 flex-fill me-2">
-                        <span class="fs-11 text-muted fw-bold text-uppercase d-block">Manual PR → PO</span>
-                        <h4 class="fw-bold text-dark mb-0 font-monospace">{{ $overall['automation']['manual_pr_po_count'] }}</h4>
-                    </div>
-                    <div class="p-3 bg-light rounded-3 flex-fill me-2">
-                        <span class="fs-11 text-muted fw-bold text-uppercase d-block">Auto-Draft PO</span>
-                        <h4 class="fw-bold text-info mb-0 font-monospace">{{ $overall['automation']['auto_draft_po_count'] }}</h4>
-                    </div>
-                    <div class="p-3 bg-light rounded-3 flex-fill">
-                        <span class="fs-11 text-muted fw-bold text-uppercase d-block">Auto-Approved PO</span>
-                        <h4 class="fw-bold text-success mb-0 font-monospace">{{ $overall['automation']['auto_approved_po_count'] }}</h4>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="card border border-light-subtle shadow-sm p-4 h-100">
-                <h6 class="fw-bold text-dark mb-3"><i class="feather-slash me-2 text-warning"></i>Auto-Approval Fallback Exceptions</h6>
-                @if(!empty($overall['automation']['fallback_reasons']))
-                    <ul class="list-group list-group-flush fs-12">
-                        @foreach($overall['automation']['fallback_reasons'] as $reason => $cnt)
-                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2 border-bottom">
-                                <span class="text-dark"><i class="feather-info me-2 text-warning"></i>{{ $reason }}</span>
-                                <span class="badge bg-soft-warning text-dark font-monospace">{{ $cnt }} Fallbacks</span>
-                            </li>
-                        @endforeach
-                    </ul>
-                @else
-                    <div class="p-4 text-center text-muted fs-12 bg-light rounded-3">
-                        <i class="feather-check-circle me-1 text-success"></i>No auto-approval fallbacks recorded. Policy rules operating at 100% throughput.
-                    </div>
-                @endif
-            </div>
-        </div>
-    </div>
 </div>
 @endsection

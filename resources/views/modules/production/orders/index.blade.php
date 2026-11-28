@@ -325,21 +325,23 @@
                                 $hasInt = $order->operations ? $order->operations->contains(fn($o) => !$o->is_external) : false;
                                 $isHybrid = $hasExt && $hasInt;
                                 $isPureSubcontract = $hasExt && !$hasInt;
-                                $hasCompanyMat = $extOps->contains(fn($o) => strtolower($o->material_supply_type ?? '') === 'company_supplied');
-                                $hasVendorMat = $extOps->contains(fn($o) => strtolower($o->material_supply_type ?? '') === 'vendor_supplied');
+                                // SF-2: what goes to the vendor comes from the BOM (operation tick / rows)
+                                $hasVendorMat = $extOps->contains(fn($o) => (bool) $o->vendor_supplies_materials);
+                                $hasCompanyMat = !$hasVendorMat && $extOps->isNotEmpty();
 
                                 $missingVendor = $extOps->contains(fn($o) => empty($o->vendor_id));
                                 $qcHold = $extOps->contains(fn($o) => $o->status === 'subcontract_qc_pending');
                                 // H-02 / N-18: overdue = a dispatch slip still at the vendor past its expected-back date,
-                                // or (vendor-supplied, no slip) past the one shared date rule (buffers + lead time)
+                                // or (no slip) past the one shared date rule (dispatch + processing + receipt time)
                                 $delayedVendor = $extOps->contains(function ($o) {
                                     if (in_array($o->status, ['completed', 'cancelled', 'skipped'])) return false;
                                     $late = $o->deliveryChallans
                                         ->whereIn('status', \App\Domains\Production\Models\DeliveryChallan::AT_VENDOR_STATUSES)
                                         ->contains(fn ($c) => $c->expected_return_date && $c->expected_return_date->endOfDay()->lt(now()));
                                     if ($late) return true;
-                                    return strtolower($o->material_supply_type ?? '') === 'vendor_supplied' && $o->purchase_order_id
-                                        && app(\App\Domains\Production\Services\SubcontractDates::class)->expectedReturnDate($o)->endOfDay()->lt(now());
+                                    // no slip (nothing of ours sent): late once the shared date rule (dispatch + processing + receipt) has passed
+                                    return $o->deliveryChallans->isEmpty() && $o->actual_start_time
+                                        && app(\App\Domains\Production\Services\SubcontractDates::class)->expectedReturnDate($o, \Illuminate\Support\Carbon::parse($o->actual_start_time))->lt(now());
                                 });
                             @endphp
 

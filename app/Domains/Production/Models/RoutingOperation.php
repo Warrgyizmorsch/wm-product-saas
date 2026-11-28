@@ -66,13 +66,10 @@ class RoutingOperation extends BaseModel
         'quality_required',
         'is_external',               // Subcontracting ready
         'vendor_id',                 // Subcontractor Vendor FK
-        'subcontract_lead_time_days',
-        'subcontract_cost_per_unit',
-        'subcontract_service_product_id',
-        'material_supply_type',
-        'subcontract_input_type',
-        'dispatch_buffer_days',
-        'return_buffer_days',
+        // SF-1: the outsourced operation's three times, in hours (calendar time)
+        'vendor_dispatch_hours',     // travel time from our work floor to the vendor
+        'vendor_processing_hours',   // time the vendor takes to do the work
+        'vendor_receipt_hours',      // travel time from the vendor back to our work floor
         'parallel_group',
         'is_parallel',
         'parallel_type',
@@ -105,10 +102,9 @@ class RoutingOperation extends BaseModel
         'expected_yield_percentage' => 'float',
         'labor_cost_rate'           => 'float',
         'machine_cost_rate'         => 'float',
-        'subcontract_lead_time_days'=> 'integer',
-        'subcontract_cost_per_unit' => 'float',
-        'dispatch_buffer_days'      => 'integer',
-        'return_buffer_days'        => 'integer',
+        'vendor_dispatch_hours'     => 'float',
+        'vendor_processing_hours'   => 'float',
+        'vendor_receipt_hours'      => 'float',
         'quality_required'          => 'boolean',
         'is_external'               => 'boolean',
         'queue_threshold_enabled'   => 'boolean',
@@ -184,10 +180,6 @@ class RoutingOperation extends BaseModel
         return $this->belongsTo(\App\Domains\Inventory\Models\Vendor::class, 'vendor_id');
     }
 
-    public function subcontractServiceProduct(): BelongsTo
-    {
-        return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'subcontract_service_product_id');
-    }
 
     public function materials(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
@@ -221,9 +213,10 @@ class RoutingOperation extends BaseModel
         return $this->operation_type === self::TYPE_OUTSOURCING || $this->is_external;
     }
 
-    public function isWipJobWork(): bool
+    /** SF-1: total vendor time in hours (dispatch + processing + receipt) */
+    public function vendorTotalHours(): float
     {
-        return $this->isOutsourced() && $this->subcontract_input_type === 'previous_operation_wip';
+        return (float) ($this->vendor_dispatch_hours ?? 0) + (float) ($this->vendor_processing_hours ?? 0) + (float) ($this->vendor_receipt_hours ?? 0);
     }
 
     // ─── Computed Helpers ─────────────────────────────────────────────────────

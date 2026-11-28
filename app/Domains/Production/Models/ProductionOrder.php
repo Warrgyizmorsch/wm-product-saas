@@ -457,7 +457,8 @@ class ProductionOrder extends BaseModel
         }
 
         if ($hasExt && !$hasInt) {
-            $allVendorSupplied = $collection->every(fn($op) => ($op->material_supply_type ?? null) === 'vendor_supplied');
+            // SF-2: fully vendor work = every outsourced op has the BOM "Vendor-supplied materials" tick
+            $allVendorSupplied = $collection->every(fn($op) => (bool) ($op->vendor_supplies_materials ?? false));
             if ($allVendorSupplied) {
                 return in_array($fallback, ['complete_subcontracting', self::MODEL_SUBCONTRACT_COMPLETE], true)
                     ? $fallback

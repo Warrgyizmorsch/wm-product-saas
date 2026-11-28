@@ -11,9 +11,6 @@ use App\Domains\Production\Models\ProductionOrderProgressLog;
 use App\Domains\Production\Models\ProductionOrderRework;
 use App\Domains\Production\Models\ProductionOrderScrap;
 use App\Domains\Production\Models\ProductionWip;
-use App\Domains\Purchase\Models\PurchaseOrder;
-use App\Domains\Purchase\Models\PurchaseOrderItem;
-use App\Domains\Purchase\Models\PurchaseRequisition;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -34,7 +31,6 @@ class SubcontractPerformanceService
         $cost     = $this->getCostMetrics($tenantId, $filters);
         $wip      = $this->getVendorWipMetrics($tenantId, $filters);
         $material = $this->getMaterialRiskMetrics($tenantId, $filters);
-        $automation = $this->getProcurementAutomationMetrics($tenantId, $filters);
 
         $activeVendorsCount = Vendor::where('tenant_id', $tenantId)
             ->where('status', 'active')
@@ -61,7 +57,6 @@ class SubcontractPerformanceService
             'po_rate_variance_pct'      => $cost['po_rate_variance_pct'],
             'unreconciled_material_qty' => $material['total_remaining_qty'],
             'material_risk_count'       => $material['aged_risk_count'],
-            'automation'                => $automation,
         ];
     }
 
@@ -242,78 +237,35 @@ class SubcontractPerformanceService
      */
     public function getCostMetrics(int $tenantId, array $filters = []): array
     {
+        // SF-1 / SF-5 (docs/production_ui_rules_review_2026-11-27.md): no rate on the routing and no PO in subcontracting —
+        // the only cost is what the vendors billed (Service Bills made from subcontract receipt GRNs, pre-tax).
         $query = ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('is_external', true);
 
         $this->applyVendorAndProductFilters($query, $filters);
 
-        $ops = $query->with(['order', 'routingOperation'])->get(['id', 'production_order_id', 'routing_operation_id', 'subcontract_cost_per_unit', 'target_produced_qty']);
+        $opIds = $query->pluck('id');
+        $receiptIds = $opIds->isEmpty() ? collect() : \App\Domains\Production\Models\ProductionSubcontractReceipt::where('tenant_id', $tenantId)
+            ->whereIn('production_order_operation_id', $opIds)
+            ->pluck('id');
 
-        $plannedCost   = 0.0;
-        $committedCost = 0.0;
-        $actualCost    = 0.0;
-        $rateVariances = [];
-
-        foreach ($ops as $op) {
-            $qty = $op->target_produced_qty ?: ($op->order?->quantity_ordered ?: 1.0);
-            // M-03: same yield rule as the routing cost (rate × 100 ÷ yield %)
-            $yield = (float) ($op->routingOperation?->expected_yield_percentage ?? 100);
-            $plannedRate = (float) $op->subcontract_cost_per_unit * ($yield > 0 ? 100 / $yield : 1);
-            $opPlanned = $plannedRate * $qty;
-            $plannedCost += $opPlanned;
-
-            // Fetch PO item
-            $poItem = PurchaseOrderItem::where('production_order_operation_id', $op->id)
-                ->whereHas('order', function ($q) use ($tenantId) {
-                    $q->where('tenant_id', $tenantId)->where('status', '!=', 'Cancelled');
-                })
-                ->with('order')
-                ->first();
-
-            if ($poItem) {
-                $poRate = (float) $poItem->rate;
-                $opCommitted = (float) ($poItem->total_amount ?? ($poItem->quantity * $poRate));
-                $committedCost += $opCommitted;
-
-                // Rate variance %
-                if ($plannedRate > 0) {
-                    $rateVariances[] = (($poRate - $plannedRate) / $plannedRate) * 100;
-                }
-
-                // Vendor Bill actual cost — all bill lines for this PO line (several part bills possible)
-                $billLines = DB::table('vendor_bill_items')
-                    ->join('vendor_bills', 'vendor_bill_items.vendor_bill_id', '=', 'vendor_bills.id')
-                    ->where('vendor_bills.tenant_id', $tenantId)
-                    ->where('vendor_bills.purchase_order_id', $poItem->purchase_order_id)
-                    ->where('vendor_bill_items.product_id', $poItem->product_id)
-                    ->select('vendor_bill_items.total_amount')
-                    ->get();
-
-                if ($billLines->isNotEmpty()) {
-                    $actualCost += (float) $billLines->sum('total_amount');
-                } else {
-                    $actualCost += $opCommitted;
-                }
-            } else {
-                $committedCost += $opPlanned;
-                $actualCost += $opPlanned;
-            }
-        }
-
-        $costVarAmount = $actualCost - $plannedCost;
-        $costVarPct = $plannedCost > 0 ? round(($costVarAmount / $plannedCost) * 100, 1) : 0.0;
-        $poRateVarPct = !empty($rateVariances) ? round(array_sum($rateVariances) / count($rateVariances), 1) : 0.0;
+        $actualCost = $receiptIds->isEmpty() ? 0.0 : (float) DB::table('vendor_bills')
+            ->join('goods_receipt_notes', 'goods_receipt_notes.id', '=', 'vendor_bills.goods_receipt_note_id')
+            ->where('vendor_bills.tenant_id', $tenantId)
+            ->where('goods_receipt_notes.source_type', \App\Domains\Purchase\Services\GoodsReceiptNoteService::SOURCE_SUBCONTRACT_RECEIPT)
+            ->whereIn('goods_receipt_notes.source_id', $receiptIds)
+            ->whereRaw("LOWER(COALESCE(vendor_bills.status, '')) != ?", ['cancelled'])
+            ->sum('vendor_bills.subtotal');
 
         return [
-            'planned_cost'          => round($plannedCost, 2),
-            'committed_po_cost'     => round($committedCost, 2),
+            'planned_cost'          => 0.0,
+            'committed_po_cost'     => 0.0,
             'actual_cost'           => round($actualCost, 2),
-            'cost_variance_amount'  => round($costVarAmount, 2),
-            'cost_variance_pct'     => $costVarPct,
-            'po_rate_variance_pct'  => $poRateVarPct,
+            'cost_variance_amount'  => 0.0,
+            'cost_variance_pct'     => 0.0,
+            'po_rate_variance_pct'  => 0.0,
         ];
     }
-
     /**
      * WIP at Vendor Metrics.
      */
@@ -366,7 +318,7 @@ class SubcontractPerformanceService
     {
         $query = ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('is_external', true)
-            ->where('material_supply_type', 'company_supplied');
+            ; // SF-2: any outsourced op may carry our material rows
 
         $this->applyVendorAndProductFilters($query, $filters);
 
@@ -399,52 +351,6 @@ class SubcontractPerformanceService
             'total_scrapped_qty'  => round($totalScrapped, 2),
             'total_remaining_qty' => round($totalRemaining, 2),
             'aged_risk_count'     => $agedRiskCount,
-        ];
-    }
-
-    /**
-     * Procurement Automation Statistics.
-     */
-    public function getProcurementAutomationMetrics(int $tenantId, array $filters = []): array
-    {
-        $pos = PurchaseOrder::where('tenant_id', $tenantId)
-            ->where('is_subcontract', true)
-            ->where('status', '!=', 'Cancelled')
-            ->get(['id', 'status', 'purchase_requisition_id', 'notes']);
-
-        $manualPrPo = 0;
-        $autoDraftPo = 0;
-        $autoApprovedPo = 0;
-        $autoApprovalFallback = 0;
-        $fallbackReasons = [];
-
-        foreach ($pos as $po) {
-            $isPR = $po->purchase_requisition_id !== null;
-            $notes = (string) $po->notes;
-
-            // H-08: the orchestrator writes "[Auto-approval skipped: …]" — match case-insensitively
-            if ($isPR) {
-                $manualPrPo++;
-            } elseif (stripos($notes, '[Auto-Approval Skipped:') !== false) {
-                $autoDraftPo++;
-                $autoApprovalFallback++;
-                if (preg_match('/\[Auto-Approval Skipped: (.*?)\]/i', $notes, $matches)) {
-                    $reason = trim($matches[1]);
-                    $fallbackReasons[$reason] = ($fallbackReasons[$reason] ?? 0) + 1;
-                }
-            } elseif ($po->status === 'Approved') {
-                $autoApprovedPo++;
-            } else {
-                $autoDraftPo++;
-            }
-        }
-
-        return [
-            'manual_pr_po_count'        => $manualPrPo,
-            'auto_draft_po_count'       => $autoDraftPo,
-            'auto_approved_po_count'    => $autoApprovedPo,
-            'auto_approval_fallback_cnt'=> $autoApprovalFallback,
-            'fallback_reasons'          => $fallbackReasons,
         ];
     }
 
@@ -518,7 +424,7 @@ class SubcontractPerformanceService
 
             $expectedReturn = $challan?->expected_return_date 
                 ? Carbon::parse($challan->expected_return_date)
-                : ($op->actual_start_time ? Carbon::parse($op->actual_start_time)->addDays($op->subcontract_lead_time_days ?: 1) : null);
+                : ($op->actual_start_time ? app(SubcontractDates::class)->expectedReturnDate($op, Carbon::parse($op->actual_start_time)) : null);
 
             if ($expectedReturn && $expectedReturn->lt(now()->startOfDay())) {
                 $daysOverdue = (int) abs(now()->startOfDay()->diffInDays($expectedReturn));
@@ -543,11 +449,6 @@ class SubcontractPerformanceService
                     }
                 }
 
-                $po = PurchaseOrder::where('tenant_id', $tenantId)
-                    ->where('production_order_id', $op->production_order_id)
-                    ->latest()
-                    ->first();
-
                 $report[] = [
                     'operation_id'        => $op->id,
                     'order_id'            => $op->production_order_id,
@@ -560,7 +461,7 @@ class SubcontractPerformanceService
                     'expected_return_date'=> $expectedReturn->format('Y-m-d'),
                     'days_overdue'        => $daysOverdue,
                     'quantity_outstanding'=> number_format($op->target_produced_qty ?: ($op->order?->quantity_ordered ?: 0), 2),
-                    'po_number'           => $po?->purchase_order_number ?: '—',
+                    'slip_number'         => $challan?->challan_number ?: '—', // SF-4: no PO — the dispatch slip identifies the work
                     'blocking_successor'  => $blockingOp,
                 ];
             }

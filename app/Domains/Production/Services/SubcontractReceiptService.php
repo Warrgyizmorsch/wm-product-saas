@@ -11,31 +11,27 @@ use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Domains\Production\Models\ProductionSubcontractReceipt;
 use App\Domains\Production\Models\ProductionWip;
 use App\Domains\Production\Models\ProductionWipTransaction;
-use App\Domains\Purchase\Models\PurchaseOrderItem;
 use App\Domains\Purchase\Services\GoodsReceiptNoteService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * The ONE receipt of outsourced work (docs/subcontracting_module_audit_2026-11-26.md SC-02 / SC-03 / TF-06..TF-11).
- * Called by the Subcontracting menu (dispatch slip → Receive) and by the shop floor (MES "Record subcontract receipt").
- * The Purchase GRN screen no longer receives subcontract lines (GoodsReceiptNoteService refuses them).
+ * The ONE receipt of outsourced work (docs/production_ui_rules_review_2026-11-27.md SF-4 / SF-5). Called by the
+ * receipt page, which the Subcontracting menu (dispatch slip → Receive) and the shop floor (MES button) both open.
+ * There is no PR / PO in subcontracting: the receipt is the GRN.
  *
  * One receipt:
- *  1. checks the operation, the order, the open dispatch slip and the approved subcontract PO (SC-04, my rule: no
- *     approved PO → no receipt), and never takes more than the PO still has open or the slip still has at the vendor;
+ *  1. checks the operation, the order and the dispatch slip; the quantity is typed by the user and may not be more than
+ *     the units still at the vendor on the slip (an operation with nothing of ours to send — vendor-supplied only — has
+ *     no slip: not more than the operation's target still open);
  *  2. records the receipt and a progress log (good / rejected / scrapped units), the slip's received units and what
- *     the vendor used of the sent material (TF-08: no backflush, no stock movement, no finished-goods stock — TF-09);
- *  3. without QC: books the good units on the operation, the WIP and the next operation, and creates the stock-free
- *     system GRN (accepted / rejected) that moves the PO and lets the vendor bill be entered (SC-03);
- *     with QC (TF-10): the units wait for the operation's normal QC on the shop floor; the QC result books them and
- *     creates the system GRN then (bookAfterQc).
+ *     the vendor used, returned or lost of the sent material (no backflush, no stock movement, no finished goods);
+ *  3. without QC: books the good units on the operation, the WIP and the next operation, and writes the stock-free GRN
+ *     (no PO) the vendor bill is made from; with QC: the units wait for the operation's normal QC on the shop floor and
+ *     the QC result books them and writes the GRN then (bookAfterQc).
  */
 class SubcontractReceiptService
 {
-    /** PO statuses that may still receive */
-    private const OPEN_PO_STATUSES = ['Approved', 'Partially Received'];
-
     public function __construct(
         private readonly SubcontractMaterialBalanceService $balance,
         private readonly GoodsReceiptNoteService $grnService,
@@ -52,7 +48,6 @@ class SubcontractReceiptService
 
             $this->assertOperationCanReceive($op, $order);
             $challan = $this->resolveChallan($op, $challan, $source);
-            $isRework = $challan?->type === 'vendor_rework';
 
             $received = round((float) ($data['received_qty'] ?? 0), 4);
             $rejected = round(max(0.0, (float) ($data['rejected_qty'] ?? 0)), 4);
@@ -68,15 +63,10 @@ class SubcontractReceiptService
             if ($challan && $received > $challan->unitsAtVendor() + 0.0001) {
                 throw new InvalidArgumentException('Only ' . $this->fmt($challan->unitsAtVendor()) . " unit(s) are still with the vendor on dispatch slip {$challan->challan_number}.");
             }
-
-            $poItem = $isRework ? null : $this->openPoItem($op);
-            if (!$isRework) {
-                if (!$poItem) {
-                    throw new InvalidArgumentException("No approved subcontract PO for Op #{$op->operation_number} ({$op->name}). Raise the PR / PO with the button and approve the PO before receiving the work.");
-                }
-                $openOnPo = $this->openOnPo($poItem, $op);
-                if ($received > $openOnPo + 0.0001) {
-                    throw new InvalidArgumentException('The subcontract PO has ' . $this->fmt($openOnPo) . ' unit(s) left to receive; ' . $this->fmt($received) . ' cannot be received. (Over-receipt is not allowed on subcontract work.)');
+            if (!$challan) {
+                $open = $this->openWithoutSlip($op);
+                if ($received > $open + 0.0001) {
+                    throw new InvalidArgumentException('Op #' . $op->operation_number . ' has ' . $this->fmt($open) . ' unit(s) still to receive; ' . $this->fmt($received) . ' cannot be received.');
                 }
             }
 
@@ -90,7 +80,6 @@ class SubcontractReceiptService
                 'production_order_id' => $op->production_order_id,
                 'production_order_operation_id' => $op->id,
                 'delivery_challan_id' => $challan?->id,
-                'purchase_order_item_id' => $poItem?->id,
                 'source' => $source,
                 'status' => $qcRequired ? ProductionSubcontractReceipt::STATUS_QC_PENDING : ProductionSubcontractReceipt::STATUS_BOOKED,
                 'received_qty' => $received,
@@ -130,11 +119,11 @@ class SubcontractReceiptService
                 $op->quantity_scrapped = round((float) $op->quantity_scrapped + $scrapped, 4);
                 $op->status = ProductionOrderOperation::STATUS_SUBCONTRACT_QC_PENDING;
                 $op->save();
+                // QD-02: the received units wait in the operation's open inspection record
+                app(QualityInspectionService::class)->openOperationInspection($op, $userId);
             } else {
                 $this->bookGoodUnits($op, $good, $rejected, $scrapped, $batchId, $userId, $receipt);
-                if ($poItem) {
-                    $this->createSystemGrn($receipt, $poItem, $op, $challan, $received, $rejected + $scrapped);
-                }
+                $this->createReceiptGrn($receipt, $op, $challan, $received, $rejected + $scrapped);
             }
 
             app(ProductionEventService::class)->writeEvent((int) $op->tenant_id, [
@@ -191,9 +180,8 @@ class SubcontractReceiptService
                 $receipt->status = (float) $receipt->accepted_qty > 0 ? ProductionSubcontractReceipt::STATUS_BOOKED : ProductionSubcontractReceipt::STATUS_REJECTED_IN_QC;
                 $receipt->save();
 
-                $poItem = $receipt->purchase_order_item_id ? PurchaseOrderItem::find($receipt->purchase_order_item_id) : null;
-                if ($poItem && !$receipt->goods_receipt_note_id) {
-                    $this->createSystemGrn($receipt, $poItem, $op, $receipt->challan, (float) $receipt->received_qty, (float) $receipt->rejected_qty + (float) $receipt->scrapped_qty);
+                if (!$receipt->goods_receipt_note_id) {
+                    $this->createReceiptGrn($receipt, $op, $receipt->challan, (float) $receipt->received_qty, (float) $receipt->rejected_qty + (float) $receipt->scrapped_qty);
                 }
             } else {
                 $receipt->save();
@@ -260,22 +248,16 @@ class SubcontractReceiptService
         return null; // vendor-supplied operation: the vendor brings everything, there is nothing to dispatch
     }
 
-    private function openPoItem(ProductionOrderOperation $op): ?PurchaseOrderItem
+    /** No slip (vendor-supplied only): the operation's target − good units booked − units still waiting for QC */
+    public function openWithoutSlip(ProductionOrderOperation $op): float
     {
-        return PurchaseOrderItem::where('production_order_operation_id', $op->id)
-            ->whereHas('order', fn ($q) => $q->where('tenant_id', $op->tenant_id)->whereIn('status', self::OPEN_PO_STATUSES))
-            ->orderBy('id')
-            ->first();
-    }
-
-    /** PO quantity − received on GRNs − receipts still waiting for QC (they get their GRN after QC) */
-    private function openOnPo(PurchaseOrderItem $poItem, ProductionOrderOperation $op): float
-    {
-        $waitingForQc = (float) ProductionSubcontractReceipt::where('purchase_order_item_id', $poItem->id)
+        $target = (float) ($op->target_produced_qty ?: ($op->order?->quantity_ordered ?: 0.0));
+        $waitingForQc = (float) ProductionSubcontractReceipt::where('production_order_operation_id', $op->id)
             ->where('status', ProductionSubcontractReceipt::STATUS_QC_PENDING)
-            ->sum('received_qty');
+            ->get()
+            ->sum(fn ($r) => max(0.0, (float) $r->received_qty - (float) $r->rejected_qty - (float) $r->scrapped_qty - (float) $r->accepted_qty));
 
-        return max(0.0, round((float) $poItem->quantity - (float) $poItem->received_qty - $waitingForQc, 4));
+        return max(0.0, round($target - (float) $op->quantity_produced - $waitingForQc, 4));
     }
 
     private function updateChallan(DeliveryChallan $challan, float $received, float $accepted, float $rejected, float $scrapped, array $returns, bool $final): void
@@ -364,22 +346,30 @@ class SubcontractReceiptService
         app(ProductionOrderService::class)->evaluateAndAutoCompleteOrder($op->production_order_id, $userId);
     }
 
-    /** SC-03: the stock-free GRN that moves the subcontract PO (received / status) and is the base of the vendor bill */
-    private function createSystemGrn(ProductionSubcontractReceipt $receipt, PurchaseOrderItem $poItem, ProductionOrderOperation $op, ?DeliveryChallan $challan, float $received, float $rejected): void
+    /**
+     * SF-4 / SF-5: the receipt's GRN — no PO, no stock, value 0 (the price comes on the vendor bill). It is what the
+     * vendor bill is made from ("Create vendor bill" on the receipt). The line names the order's product (the goods
+     * that came back) for reference only.
+     */
+    private function createReceiptGrn(ProductionSubcontractReceipt $receipt, ProductionOrderOperation $op, ?DeliveryChallan $challan, float $received, float $rejected): void
     {
+        $productId = $op->order?->product_id;
+        if (!$op->vendor_id || !$productId || $received <= 0) {
+            return;
+        }
+
         $grn = $this->grnService->storeGrn([
-            'purchase_order_id' => $poItem->purchase_order_id,
-            'vendor_id' => $op->vendor_id ?? $poItem->order?->vendor_id,
+            'vendor_id' => $op->vendor_id,
             'received_date' => now()->toDateString(),
             'challan_number' => $challan?->challan_number,
-            'notes' => "System GRN for subcontract receipt {$receipt->receipt_number} (Op #{$op->operation_number} {$op->name}).",
+            'notes' => "Subcontract receipt {$receipt->receipt_number}: Op #{$op->operation_number} {$op->name}, order " . ($op->order?->order_number ?? $op->production_order_id) . '.',
             'source_type' => GoodsReceiptNoteService::SOURCE_SUBCONTRACT_RECEIPT,
             'source_id' => $receipt->id,
             'items' => [[
-                'purchase_order_item_id' => $poItem->id,
-                'product_id' => $poItem->product_id,
+                'product_id' => $productId,
                 'received_qty' => $received,
                 'rejected_qty' => min($received, $rejected),
+                'unit_rate' => 0,
                 'remarks' => mb_substr("Subcontract receipt {$receipt->receipt_number}", 0, 250),
             ]],
         ], (int) $op->tenant_id);

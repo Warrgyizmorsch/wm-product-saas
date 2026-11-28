@@ -646,10 +646,8 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Listeners\PostCustomerPaymentJournal::class
         );
 
-        \Illuminate\Support\Facades\Event::listen(
-            \App\Domains\Purchase\Events\GoodsReceiptNoteApproved::class,
-            \App\Domains\Production\Listeners\ProcessSubcontractReceiptOnGrnApproved::class
-        );
+        // (the PO-based subcontract GRN listener was removed: no PR / PO in subcontracting,
+        // docs/production_ui_rules_review_2026-11-27.md SF-4 — receipts go through SubcontractReceiptService)
 
 
 

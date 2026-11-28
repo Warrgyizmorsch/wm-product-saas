@@ -114,14 +114,13 @@ class TestProductionDataTest extends TestCase
             foreach ($routing['operations'] as $i => $op) {
                 $where = "{$routing['routing_number']} op {$op['seq']}";
                 if (isset($op['external'])) {
-                    // outsourced: no own resources; an active job-work vendor and a service product (M-02)
+                    // SF-1: outsourced = no own resources; an active job-work vendor and the three times in hours (no rate)
                     $this->assertFalse(isset($op['section']) || isset($op['machine']) || isset($op['batch']), "{$where}: an outsourced operation has no section, machine or batch");
                     $this->assertSame('active', $vendors[$op['external']['vendor']]['status'] ?? null, "{$where}: unknown or inactive vendor");
-                    $this->assertSame('service', $skus[$op['external']['service']] ?? null, "{$where}: the subcontract charge must be a service product");
-                    $this->assertGreaterThan(0, $op['external']['rate'], "{$where}: a job work needs a rate");
-                    if (($op['external']['input'] ?? null) === 'previous_operation_wip') {
-                        $this->assertGreaterThan(0, $i, "{$where}: the first operation has no previous operation to send");
+                    foreach (['dispatch_h', 'processing_h', 'receipt_h'] as $timeKey) {
+                        $this->assertGreaterThanOrEqual(0, $op['external'][$timeKey] ?? -1, "{$where}: {$timeKey} must be 0 or more hours");
                     }
+                    $this->assertArrayNotHasKey('rate', $op['external'], "{$where}: no rate on the routing (SF-1)");
                 } else {
                     $this->assertContains($op['section'], $sections->all(), "{$where}: unknown section");
                     $this->assertTrue(isset($op['machine']) xor isset($op['batch']), "{$where}: exactly one machine or batch");

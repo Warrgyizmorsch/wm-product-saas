@@ -312,6 +312,11 @@ class MesExecutionService
                 'event_source' => 'MesExecutionService',
                 'triggered_by' => $operatorId,
             ]);
+
+            // QD-02: a QC operation gets its open inspection record (with its plans) when it starts
+            if ($schedOp->orderOperation instanceof ProductionOrderOperation) {
+                app(QualityInspectionService::class)->openOperationInspection($schedOp->orderOperation, $operatorId);
+            }
         });
     }
 
@@ -634,7 +639,13 @@ class MesExecutionService
                 $newGoodTotalOutput = (float) $orderOp->quantity_produced + ($isQcRequired ? 0.0 : $produced);
                 $isTargetReached = ($targetQty <= 0) || ($newGoodTotalOutput >= ($targetQty - 0.0001)) || !empty($data['force_complete']);
 
-                if ($isTargetReached && $isQcRequired && $this->qualityGateIsPendingOrFailed($orderOp)) {
+                // QF-02: units still waiting for QC (this log's output included) keep the operation open too
+                $waitingForQc = $isQcRequired ? $this->getPendingQcQuantity($orderOp->id) : 0.0;
+                if ($isTargetReached && $isQcRequired && $waitingForQc > 0.0001 && !empty($data['force_complete'])) {
+                    $waitingLabel = rtrim(rtrim(number_format($waitingForQc, 4, '.', ''), '0'), '.');
+                    throw new InvalidArgumentException("{$waitingLabel} unit(s) of this operation are waiting for QC. Inspect them before completing the operation.");
+                }
+                if ($isTargetReached && $isQcRequired && ($waitingForQc > 0.0001 || $this->qualityGateIsPendingOrFailed($orderOp))) {
                     if (!empty($data['force_complete'])) {
                         throw new InvalidArgumentException(
                             app(OrderOperationQualityService::class)->isSubAssemblyQc($orderOp)
@@ -1172,10 +1183,7 @@ class MesExecutionService
 
         return !ProductionQualityInspection::where('tenant_id', $operation->tenant_id)
             ->where('production_order_id', $operation->production_order_id)
-            ->where(function ($q) use ($operation) {
-                $q->where('production_order_operation_id', $operation->id)
-                    ->orWhereNull('production_order_operation_id');
-            })
+            ->where('production_order_operation_id', $operation->id) // QF-01: the operation's own inspections only
             ->where('status', 'approved')
             ->whereIn('result', ['passed', 'partially_passed'])
             ->exists();

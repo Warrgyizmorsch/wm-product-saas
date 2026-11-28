@@ -52,8 +52,7 @@ class SubcontractMaterialBalanceService
             ->where('bom_id', $bomId)
             ->where('routing_operation_id', $op->routing_operation_id)
             ->when($selected, fn ($q) => $q->whereIn('id', $selected), fn ($q) => $q->where('is_alternative', false))
-            ->get()
-            ->reject(fn ($row) => $this->isVendorSupplied($row, $op));
+            ->get(); // SF-2: every BOM row of the operation is our material (the vendor's own is only the operation tick)
 
         return $rows->groupBy('material_id')->map(function ($group, $materialId) use ($baseQty) {
             $first = $group->first();
@@ -67,16 +66,6 @@ class SubcontractMaterialBalanceService
                 'per_unit' => round($gross / $baseQty, 6),
             ];
         })->values();
-    }
-
-    /** TF-02: a BOM allocation the vendor brings — marked on the row, or every row of a vendor-supplied operation. */
-    public function isVendorSupplied(RoutingOperationMaterial $row, ?ProductionOrderOperation $op = null): bool
-    {
-        if (($row->supplied_by ?? 'company') === 'vendor') {
-            return true;
-        }
-
-        return $op && $op->isOutsourced() && $op->material_supply_type === 'vendor_supplied';
     }
 
     /** Quantity of a material issued to the order so far (store issue or order-screen issue, pooled per product). */

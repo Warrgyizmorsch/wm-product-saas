@@ -34,8 +34,9 @@
                         @csrf
                         <x-ui.button type="submit" variant="success" icon="feather-send">Dispatch to vendor</x-ui.button>
                     </form>
-                @elseif($atVendor)
-                    <x-ui.button type="button" variant="primary" icon="feather-download-cloud" data-bs-toggle="modal" data-bs-target="#receiveItemsModal">Receive from vendor</x-ui.button>
+                @elseif($atVendor && $challan->operation)
+                    {{-- SF-4: the one receipt page (no popup) --}}
+                    <x-ui.button href="{{ route('production.subcontract.receipts.create', ['operation_id' => $challan->production_order_operation_id, 'challan_id' => $challan->id]) }}" variant="primary" icon="feather-download-cloud">Receive from vendor</x-ui.button>
                 @endif
             </div>
         </div>
@@ -55,6 +56,10 @@
                 @if($challan->operation)
                     <div class="fs-12 mt-1">Op #{{ $challan->operation->operation_number }} — {{ $challan->operation->name }}
                         @if($qcRequired)<span class="badge bg-soft-warning text-dark ms-1">QC</span>@endif</div>
+                    @if($challan->operation->vendor_supplies_materials)
+                        {{-- SF-2: we send something and the vendor also uses its own materials --}}
+                        <div class="fs-12 mt-1"><span class="badge bg-soft-info text-info border"><i class="feather-package me-1"></i>Vendor also uses own materials</span></div>
+                    @endif
                 @endif
                 <div class="fs-12 mt-2">
                     Units sent <strong>{{ $fmt($challan->dispatched_wip_qty) }}</strong> ·
@@ -110,7 +115,7 @@
         <div class="mb-4">
             <x-ui.odoo-form-ui type="table">
                 <thead class="table-light fs-11 text-uppercase text-muted">
-                    <tr><th>Receipt</th><th>When / where</th><th class="text-end">Received</th><th class="text-end">Good</th><th class="text-end">Rejected</th><th class="text-end">Scrapped</th><th>Status</th><th>System GRN</th></tr>
+                    <tr><th>Receipt</th><th>When / where</th><th class="text-end">Received</th><th class="text-end">Good</th><th class="text-end">Rejected</th><th class="text-end">Scrapped</th><th>Status</th><th>GRN</th><th>Vendor bill</th></tr>
                 </thead>
                 <tbody>
                     @forelse($receipts as $r)
@@ -122,10 +127,20 @@
                             <td class="text-end font-monospace text-danger">{{ $fmt($r->rejected_qty) }}</td>
                             <td class="text-end font-monospace">{{ $fmt($r->scrapped_qty) }}</td>
                             <td><span class="badge {{ $r->status === 'qc_pending' ? 'bg-soft-warning text-dark' : 'bg-soft-success text-success' }}">{{ $r->status === 'qc_pending' ? 'Waiting for QC' : ($r->status === 'rejected_in_qc' ? 'Rejected in QC' : 'Booked') }}</span></td>
-                            <td class="font-monospace fs-12">{{ $r->grn?->grn_number ?? ($challan->type === 'vendor_rework' ? 'not billed (rework)' : '—') }}</td>
+                            <td class="font-monospace fs-12">{{ $r->grn?->grn_number ?? '—' }}</td>
+                            @php $bill = $r->grn?->vendorBills->firstWhere(fn ($b) => strcasecmp((string) $b->status, 'Cancelled') !== 0); @endphp
+                            <td class="fs-12">
+                                @if($bill)
+                                    <a href="{{ route('purchase.bills.show', $bill->id) }}" class="font-monospace fw-bold">{{ $bill->bill_number }}</a>
+                                @elseif($r->grn)
+                                    <a href="{{ route('purchase.bills.create-service', ['mode' => 'inbound', 'grn_id' => $r->grn->id, 'vendor_id' => $r->grn->vendor_id, 'service_head' => 'Job Work']) }}" class="btn btn-sm btn-outline-primary py-0 px-2 fs-11"><i class="feather-file-plus me-1"></i>Create vendor bill</a>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="text-center text-muted py-3">Nothing received yet.</td></tr>
+                        <tr><td colspan="9" class="text-center text-muted py-3">Nothing received yet.</td></tr>
                     @endforelse
                 </tbody>
             </x-ui.odoo-form-ui>
@@ -136,37 +151,5 @@
         @endif
     </x-ui.odoo-form-ui>
 
-    @if($atVendor)
-        <x-ui.modal id="receiveItemsModal" title="Receive from vendor — {{ $challan->challan_number }}" :centered="true" size="lg"
-            formAction="{{ route('production.subcontract.delivery-challans.receive', $challan->id) }}" formMethod="POST"
-            submitText="Record receipt" closeText="Cancel">
-            <div class="alert alert-soft-info border border-info-subtle fs-12 mb-3">
-                <i class="feather-info me-1"></i>
-                {{ $fmt($challan->unitsAtVendor()) }} unit(s) are still with the vendor. The receipt books the good units on the operation, records the material the vendor used, updates the subcontract PO (system GRN) and makes the vendor bill possible.
-                No stock is moved and nothing is backflushed.
-                @if($qcRequired) <strong>This operation has QC:</strong> the units wait for "Run QC" on the shop floor before they count. @endif
-            </div>
-            <div class="row">
-                <div class="col-md-4"><x-ui.input label="Received" name="received_qty" type="number" step="any" min="0" value="{{ $fmt($challan->unitsAtVendor()) }}" :required="true" /></div>
-                <div class="col-md-4"><x-ui.input label="Rejected" name="rejected_qty" type="number" step="any" min="0" value="0" /></div>
-                <div class="col-md-4"><x-ui.input label="Scrapped" name="scrapped_qty" type="number" step="any" min="0" value="0" /></div>
-            </div>
-            @php $materialLines = $challan->items->where('item_type', 'material'); @endphp
-            @if($materialLines->isNotEmpty())
-                <div class="fs-12 fw-bold mt-2 mb-1">Unused material sent back (optional)</div>
-                @foreach($materialLines as $item)
-                    <div class="row align-items-center mb-1">
-                        <div class="col-md-8 fs-12">{{ $item->product?->name }} <span class="text-muted">(at vendor {{ $fmt(max(0, (float) $item->quantity - (float) $item->consumed_qty - (float) $item->returned_qty - (float) $item->scrapped_qty)) }} {{ $item->unit_of_measure }})</span></div>
-                        <div class="col-md-4"><input type="number" step="any" min="0" class="form-control form-control-sm" name="returns[{{ $item->product_id }}]" value="0"></div>
-                    </div>
-                @endforeach
-            @endif
-            <label class="form-check fs-12 mt-2">
-                <input type="checkbox" class="form-check-input" name="final" value="1">
-                <span class="form-check-label">Last receipt on this slip (close it even if units are missing)</span>
-            </label>
-            <x-ui.textarea label="Remarks" name="remarks" rows="2" placeholder="Vendor delivery note / invoice reference…" />
-        </x-ui.modal>
-    @endif
 </div>
 @endsection

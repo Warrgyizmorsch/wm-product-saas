@@ -394,6 +394,11 @@
                                         @if ($op->vendor)
                                             <small class="text-muted d-block fs-10">{{ $op->vendor->name }}</small>
                                         @endif
+                                        {{-- SF-1: dispatch / processing / receipt time (calendar) --}}
+                                        @php $fmtH = [\App\Domains\Production\Services\SubcontractDates::class, 'formatHours']; @endphp
+                                        <small class="text-muted d-block fs-10" title="Dispatch time · processing time · receipt time">
+                                            <i class="feather-clock me-1"></i>{{ $fmtH($op->vendor_dispatch_hours) }} · {{ $fmtH($op->vendor_processing_hours) }} · {{ $fmtH($op->vendor_receipt_hours) }}
+                                        </small>
                                     @elseif ($op->machine)
                                         @php
                                             // RT-IMPL-14: saved figures only (no live calculation); capacity / speed from the saved snapshot

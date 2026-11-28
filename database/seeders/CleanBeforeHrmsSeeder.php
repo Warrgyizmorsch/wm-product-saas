@@ -27,6 +27,9 @@ use Illuminate\Support\Facades\Schema;
  *   5. warehouses        every warehouse of the tenant except those InventoryMasterDemoSeeder creates
  *   6. uoms              every unit of the tenant (AddTestMastersSeeder and the tenant provisioner add them back)
  *   7. stock journals    the accounting journals that stock seeding posted (opening stock, production consumption)
+ *   8. subcontract docs  the Purchase side of subcontract receipts (TestProductionOrderSeeder): GRNs with source
+ *                        subcontract_receipt, their lines, the vendor bills made from them (lines, bill references) and
+ *                        those bills' journals. Other GRNs, bills and journals are never touched.
  *
  * Ids: a table is TRUNCATEd (ids restart at 1) unless it holds rows of another tenant or system rows without a tenant; then only
  * the tenant's rows are deleted and the auto-increment is moved back to max(id)+1, so the next ids are the same on every run.
@@ -139,6 +142,7 @@ class CleanBeforeHrmsSeeder extends Seeder
             $this->wipeWarehouses($tenantId);
             $this->wipe('uoms', $tenantId);
             $this->wipeStockJournals($tenantId);
+            $this->wipeSubcontractPurchaseDocuments($tenantId);
         } finally {
             Schema::enableForeignKeyConstraints();
         }
@@ -225,6 +229,55 @@ class CleanBeforeHrmsSeeder extends Seeder
         }
 
         $this->deleteTenantRows('tenant_sequences', $tenantId, fn ($q) => $q->whereIn('key', self::PRODUCTION_SEQUENCE_KEYS));
+    }
+
+    /**
+     * The Purchase / Accounting rows of subcontract receipts (SF-4 / SF-5): each booked receipt writes a stock-free GRN
+     * (source_type subcontract_receipt) and its vendor bill is a Service Bill linked to that GRN. The receipts themselves
+     * are production rows (wiped above); left behind, these would point at deleted receipts and double the 5034 balance on
+     * the next seed. Only rows reachable from a subcontract-receipt GRN are removed.
+     */
+    private function wipeSubcontractPurchaseDocuments(int $tenantId): void
+    {
+        if (! Schema::hasTable('goods_receipt_notes') || ! Schema::hasColumn('goods_receipt_notes', 'source_type')) {
+            return;
+        }
+
+        $grnIds = DB::table('goods_receipt_notes')->where('tenant_id', $tenantId)->where('source_type', 'subcontract_receipt')->pluck('id')->all();
+        if ($grnIds === []) {
+            return;
+        }
+        $billIds = Schema::hasTable('vendor_bills')
+            ? DB::table('vendor_bills')->where('tenant_id', $tenantId)->whereIn('goods_receipt_note_id', $grnIds)->pluck('id')->all()
+            : [];
+
+        $steps = [];
+        if ($billIds !== []) {
+            $journalIds = Schema::hasTable('journals')
+                ? DB::table('journals')->where('tenant_id', $tenantId)->where('reference_type', 'vendor_bill')->whereIn('reference_id', $billIds)->pluck('id')->all()
+                : [];
+            if ($journalIds !== []) {
+                $steps['journal_entries'] = fn ($q) => $q->whereIn('journal_id', $journalIds);
+                $steps['journals'] = fn ($q) => $q->whereIn('id', $journalIds);
+            }
+            $steps['bill_references'] = fn ($q) => $q->where('tenant_id', $tenantId)->whereIn('source_id', $billIds)
+                ->whereIn('source_type', ['vendor_bill', \App\Domains\Purchase\Models\VendorBill::class]);
+            $steps['vendor_bill_items'] = fn ($q) => $q->whereIn('vendor_bill_id', $billIds);
+            $steps['vendor_bills'] = fn ($q) => $q->whereIn('id', $billIds);
+        }
+        $steps['goods_receipt_note_items'] = fn ($q) => $q->whereIn('goods_receipt_note_id', $grnIds);
+        $steps['goods_receipt_notes'] = fn ($q) => $q->whereIn('id', $grnIds);
+
+        $rows = 0;
+        foreach ($steps as $table => $scope) {
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
+            $this->backup($table, $scope);
+            $rows += $scope(DB::table($table))->delete();
+        }
+
+        $this->report['subcontract GRNs / bills / journals'] = ['mode' => 'tenant rows', 'rows' => $rows];
     }
 
     /** Warehouses of the tenant except the ones InventoryMasterDemoSeeder creates. */

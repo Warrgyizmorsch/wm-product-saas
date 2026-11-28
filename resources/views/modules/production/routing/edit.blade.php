@@ -667,56 +667,7 @@
                                      <tr x-show="operation.is_external" class="bg-light-subtle">
                                          <td colspan="15" class="p-2 border-top-0">
                                              <div class="row g-2 align-items-center fs-12 px-2 py-2 bg-white rounded border">
-                                                 <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="select" label="Vendor *" x-bind:name="'operations['+index+'][vendor_id]'" class="form-select form-select-sm fs-11" x-model="operation.vendor_id" x-bind:required="operation.is_external" x-bind:disabled="!operation.is_external">
-                                                         <option value="">Select Vendor</option>
-                                                         @foreach($vendors as $v)
-                                                             <option value="{{ $v->id }}">{{ $v->name }} ({{ $v->code }})</option>
-                                                         @endforeach
-                                                     </x-ui.odoo-form-ui>
-                                                 </div>
-                                                 <div class="col-md-3" x-show="operation.subcontract_input_type !== 'previous_operation_wip'">
-                                                     <x-ui.odoo-form-ui type="select" label="Supply Type" x-bind:name="'operations['+index+'][material_supply_type]'" class="form-select form-select-sm fs-11" x-model="operation.material_supply_type" x-bind:disabled="!operation.is_external">
-                                                         <option value="company_supplied">Company Supplied</option>
-                                                         <option value="vendor_supplied">Vendor Supplied</option>
-                                                     </x-ui.odoo-form-ui>
-                                                 </div>
-                                                 <div class="col-md-3" x-show="operation.subcontract_input_type === 'previous_operation_wip'">
-                                                     <div class="odoo-form-group mb-0">
-                                                         <label class="odoo-form-label fs-11 text-muted">Supply Type</label>
-                                                         <div class="flex-grow-1">
-                                                             <div class="form-control form-control-sm fs-11 bg-light text-primary fw-semibold d-flex align-items-center" style="height: 31px;">
-                                                                 <i class="feather-layers me-1"></i>Previous Op WIP
-                                                             </div>
-                                                         </div>
-                                                     </div>
-                                                 </div>
-                                                 <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="select" label="Subcontract Processing Mode" x-bind:name="'operations['+index+'][subcontract_input_type]'" class="form-select form-select-sm fs-11" x-model="operation.subcontract_input_type" x-bind:disabled="!operation.is_external">
-                                                         <option value="bom_raw_materials">BOM Raw Materials (From Stock)</option>
-                                                         <option value="previous_operation_wip">Previous Operation WIP (Job Work)</option>
-                                                     </x-ui.odoo-form-ui>
-                                                 </div>
-                                                 <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="input" inputType="number" label="Lead Time (Days)" min="0" x-bind:name="'operations['+index+'][subcontract_lead_time_days]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_lead_time_days" placeholder="0" x-bind:disabled="!operation.is_external" />
-                                                 </div>
-                                                 <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="input" inputType="number" step="any" min="0" label="Cost / Unit" x-bind:name="'operations['+index+'][subcontract_cost_per_unit]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_cost_per_unit" placeholder="0.00" x-bind:disabled="!operation.is_external" />
-                                                 </div>
-                                                 <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="select" label="Subcontract Service Product" x-bind:name="'operations['+index+'][subcontract_service_product_id]'" class="form-select form-select-sm fs-11" x-model="operation.subcontract_service_product_id" x-bind:disabled="!operation.is_external">
-                                                         <option value="">Select Service Product</option>
-                                                         @foreach($serviceProducts as $sp)
-                                                             <option value="{{ $sp->id }}">{{ $sp->name }} ({{ $sp->sku }})</option>
-                                                         @endforeach
-                                                     </x-ui.odoo-form-ui>
-                                                 </div>
-                                                 <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="input" inputType="number" min="0" label="Dispatch Buffer (Days)" x-bind:name="'operations['+index+'][dispatch_buffer_days]'" class="form-control form-control-sm fs-11" x-model="operation.dispatch_buffer_days" placeholder="0" x-bind:disabled="!operation.is_external" />
-                                                 </div>
-                                                 <div class="col-md-3">
-                                                     <x-ui.odoo-form-ui type="input" inputType="number" min="0" label="Return Buffer (Days)" x-bind:name="'operations['+index+'][return_buffer_days]'" class="form-control form-control-sm fs-11" x-model="operation.return_buffer_days" placeholder="0" x-bind:disabled="!operation.is_external" />
-                                                 </div>
+                                                 @include('modules.production.routing.partials._outsourced_fields')
                                              </div>
                                          </td>
                                      </tr>
@@ -804,13 +755,13 @@
                                 quality_required: op.quality_required == 1 || op.quality_required === '1' || op.quality_required === true,
                                 is_external: op.is_external == 1 || op.is_external === '1' || op.is_external === true,
                                 vendor_id: op.vendor_id || '',
-                                material_supply_type: op.material_supply_type || 'company_supplied',
-                                subcontract_input_type: op.subcontract_input_type || 'bom_raw_materials',
-                                subcontract_lead_time_days: parseInt(op.subcontract_lead_time_days || 0),
-                                subcontract_cost_per_unit: op.subcontract_cost_per_unit || '0.00',
-                                subcontract_service_product_id: op.subcontract_service_product_id || '',
-                                dispatch_buffer_days: parseInt(op.dispatch_buffer_days || 0),
-                                return_buffer_days: parseInt(op.return_buffer_days || 0),
+                                // SF-1: the three times as days + hours (stored as hours; old input posts the parts back)
+                                vendor_dispatch_days: op.vendor_dispatch_days !== undefined ? op.vendor_dispatch_days : Math.floor(parseFloat(op.vendor_dispatch_hours || 0) / 24),
+                                vendor_dispatch_hours: op.vendor_dispatch_days !== undefined ? (op.vendor_dispatch_hours || 0) : +(parseFloat(op.vendor_dispatch_hours || 0) % 24).toFixed(2),
+                                vendor_processing_days: op.vendor_processing_days !== undefined ? op.vendor_processing_days : Math.floor(parseFloat(op.vendor_processing_hours || 0) / 24),
+                                vendor_processing_hours: op.vendor_processing_days !== undefined ? (op.vendor_processing_hours || 0) : +(parseFloat(op.vendor_processing_hours || 0) % 24).toFixed(2),
+                                vendor_receipt_days: op.vendor_receipt_days !== undefined ? op.vendor_receipt_days : Math.floor(parseFloat(op.vendor_receipt_hours || 0) / 24),
+                                vendor_receipt_hours: op.vendor_receipt_days !== undefined ? (op.vendor_receipt_hours || 0) : +(parseFloat(op.vendor_receipt_hours || 0) % 24).toFixed(2),
                                 queue_threshold_enabled: op.queue_threshold_enabled == 1 || op.queue_threshold_enabled === '1' || op.queue_threshold_enabled === true,
                                 overlap_enabled: op.overlap_enabled == 1 || op.overlap_enabled === '1' || op.overlap_enabled === true,
                                 transfer_batch_quantity: op.transfer_batch_quantity || '0.00',
@@ -869,13 +820,13 @@
                                 quality_required: {{ $op->quality_required ? 'true' : 'false' }},
                                 is_external: {{ $op->is_external ? 'true' : 'false' }},
                                 vendor_id: "{{ $op->vendor_id ?? '' }}",
-                                material_supply_type: "{{ $op->material_supply_type ?? 'company_supplied' }}",
-                                subcontract_input_type: "{{ $op->subcontract_input_type ?? 'bom_raw_materials' }}",
-                                subcontract_lead_time_days: {{ (int) ($op->subcontract_lead_time_days ?? 0) }},
-                                subcontract_cost_per_unit: "{{ format_decimal(convert_from_base($op->subcontract_cost_per_unit ?? 0), 4) }}",
-                                subcontract_service_product_id: "{{ $op->subcontract_service_product_id ?? '' }}",
-                                dispatch_buffer_days: {{ (int) ($op->dispatch_buffer_days ?? 0) }},
-                                return_buffer_days: {{ (int) ($op->return_buffer_days ?? 0) }},
+                                // SF-1: the three times as days + hours (stored as hours)
+                                vendor_dispatch_days: {{ (int) floor((float) $op->vendor_dispatch_hours / 24) }},
+                                vendor_dispatch_hours: {{ round(fmod((float) $op->vendor_dispatch_hours, 24), 2) }},
+                                vendor_processing_days: {{ (int) floor((float) $op->vendor_processing_hours / 24) }},
+                                vendor_processing_hours: {{ round(fmod((float) $op->vendor_processing_hours, 24), 2) }},
+                                vendor_receipt_days: {{ (int) floor((float) $op->vendor_receipt_hours / 24) }},
+                                vendor_receipt_hours: {{ round(fmod((float) $op->vendor_receipt_hours, 24), 2) }},
                                 queue_threshold_enabled: {{ ($op->queue_threshold_enabled ?? $op->overlap_enabled) ? 'true' : 'false' }},
                                 overlap_enabled: {{ ($op->queue_threshold_enabled ?? $op->overlap_enabled) ? 'true' : 'false' }},
                                 transfer_batch_quantity: "{{ number_format($op->transfer_batch_quantity ?? 0, 2, '.', '') }}",
@@ -982,13 +933,9 @@
                         quality_required: false,
                         is_external: false,
                         vendor_id: '',
-                        material_supply_type: 'company_supplied',
-                        subcontract_input_type: 'bom_raw_materials',
-                        subcontract_lead_time_days: 0,
-                        subcontract_cost_per_unit: '0.00',
-                        subcontract_service_product_id: '',
-                        dispatch_buffer_days: 0,
-                        return_buffer_days: 0,
+                        vendor_dispatch_days: 0, vendor_dispatch_hours: 0,
+                        vendor_processing_days: 0, vendor_processing_hours: 0,
+                        vendor_receipt_days: 0, vendor_receipt_hours: 0,
                         queue_threshold_enabled: false,
                         overlap_enabled: false,
                         transfer_batch_quantity: '0.00',
@@ -1541,7 +1488,7 @@
                         return {
                             type: 'outsourced',
                             vendor_id: operation.vendor_id || null,
-                            cost_per_unit: parseFloat(operation.subcontract_cost_per_unit || 0)
+                            cost_per_unit: 0 // SF-1: charged on the vendor bill
                         };
                     }
                     const machine = this.getSelectedMachine(operation);
@@ -1609,11 +1556,7 @@
                         }
                     } else {
                         operation.vendor_id = '';
-                        operation.subcontract_cost_per_unit = '0.00';
-                        operation.subcontract_lead_time_days = 0;
-                        operation.subcontract_service_product_id = '';
-                        operation.dispatch_buffer_days = 0;
-                        operation.return_buffer_days = 0;
+                        ['vendor_dispatch', 'vendor_processing', 'vendor_receipt'].forEach(k => { operation[k + '_days'] = 0; operation[k + '_hours'] = 0; });
 
                         if ($row.length) {
                             $row.find('.routing-wc-select').prop('disabled', false).trigger('change.select2');
@@ -1763,7 +1706,7 @@
                         return {
                             processing_time_minutes: r4(operation.processing_time_minutes), labor_cost_rate: 0, machine_cost_rate: 0,
                             labor_cost_per_unit: 0, machine_cost_per_unit: 0,
-                            cost_per_unit: r4(parseFloat(operation.subcontract_cost_per_unit || 0) * yf),
+                            cost_per_unit: 0, // SF-1: charged on the vendor bill
                             setup_cost_per_run: 0, cycle_time_per_piece: 0, found: true
                         };
                     }

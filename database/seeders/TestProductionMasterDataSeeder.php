@@ -51,7 +51,7 @@ class TestProductionMasterDataSeeder extends Seeder
             Schema::enableForeignKeyConstraints();
         }
 
-        $this->seedSubcontractSettings($tenantId);
+        $this->removeOldSubcontractSettings($tenantId);
         $this->recalculateWorkCenters($tenantId);
 
         $this->command?->info("TestProductionMasterDataSeeder completed successfully for Tenant ID {$tenantId}.");
@@ -104,21 +104,15 @@ class TestProductionMasterDataSeeder extends Seeder
     }
 
     /**
-     * Production settings → Subcontract procurement (tenant settings; docs/subcontracting_module_audit_2026-11-26.md
-     * D-4): the "Raise PR / PO" button starts with a PR (manual_pr_po, the default). The auto-approval limit only
-     * matters once the tester switches to "Auto-approved PO": a PO above ₹25,000 then falls back to a Draft PO.
-     * Other settings keys of the tenant are kept.
+     * The subcontract PR / PO setting was removed (no PR / PO in subcontracting, docs/production_ui_rules_review_2026-11-27.md
+     * SF-4); an earlier seed left its two keys in the tenant settings — they are taken out. Other keys are kept.
      */
-    public const SUBCONTRACT_SETTINGS = [
-        'subcontract_procurement_workflow' => 'manual_pr_po',
-        'subcontract_auto_approval_limit' => 25000,
-    ];
-
-    private function seedSubcontractSettings(int $tenantId): void
+    private function removeOldSubcontractSettings(int $tenantId): void
     {
         $tenant = Tenant::findOrFail($tenantId);
         $settings = is_array($tenant->settings) ? $tenant->settings : [];
-        $tenant->settings = array_merge($settings, self::SUBCONTRACT_SETTINGS);
+        unset($settings['subcontract_procurement_workflow'], $settings['subcontract_auto_approval_limit']);
+        $tenant->settings = $settings;
         $tenant->save();
     }
 
@@ -221,11 +215,6 @@ class TestProductionMasterDataSeeder extends Seeder
             ['id' => 138, 'company' => 'default', 'branch' => 'HQ', 'name' => 'test-semi-10', 'sku' => 'test-semi-10', 'type' => 'semi_finished', 'default_production_model' => 'subcontract_complete', 'supplier_method' => 'manufacture', 'item_type' => 'Goods', 'variation_type' => 'Single', 'uom' => 'Pcs', 'status' => 'active', 'hsn_sac' => '73269099', 'gst_rate' => '18.00', 'selling_price' => '0.0000', 'cost_price' => '260.0000', 'sales_account' => '4010', 'purchase_account' => '5010', 'inventory_account' => '1200', 'reorder_point' => '10.0000', 'minimum_order_qty' => '0.0000', 'order_multiple' => '0.0000', 'description' => 'Powder-coated under-top support rail, made by the vendor from its own tube and powder', 'track_serial_number' => 0, 'track_batch' => 0, 'inventory_valuation_method' => 'FIFO', 'unit_cost' => '260.0000', 'created_at' => '2026-11-27 09:00:00', 'updated_at' => '2026-11-27 09:00:00'],
             ['id' => 139, 'company' => 'default', 'branch' => 'HQ', 'name' => 'test-semifinal-04', 'sku' => 'test-semifinal-04', 'type' => 'semi_finished', 'default_production_model' => 'hybrid', 'supplier_method' => 'manufacture', 'item_type' => 'Goods', 'variation_type' => 'Single', 'uom' => 'Pcs', 'status' => 'active', 'hsn_sac' => '94039000', 'gst_rate' => '18.00', 'selling_price' => '0.0000', 'cost_price' => '2100.0000', 'sales_account' => '4010', 'purchase_account' => '5010', 'inventory_account' => '1200', 'reorder_point' => '5.0000', 'minimum_order_qty' => '0.0000', 'order_multiple' => '0.0000', 'description' => 'Welded outdoor table frame, hot-dip galvanised by job work, then powder coated', 'track_serial_number' => 0, 'track_batch' => 0, 'inventory_valuation_method' => 'FIFO', 'unit_cost' => '2100.0000', 'created_at' => '2026-11-27 09:00:00', 'updated_at' => '2026-11-27 09:00:00'],
             ['id' => 140, 'company' => 'default', 'branch' => 'HQ', 'name' => 'test-final-03', 'sku' => 'test-final-03', 'type' => 'finished_good', 'default_production_model' => 'pure_manufacturing', 'supplier_method' => 'manufacture', 'item_type' => 'Goods', 'variation_type' => 'Single', 'uom' => 'Pcs', 'status' => 'active', 'hsn_sac' => '94032000', 'gst_rate' => '18.00', 'selling_price' => '6400.0000', 'cost_price' => '3700.0000', 'sales_account' => '4010', 'purchase_account' => '5010', 'inventory_account' => '1200', 'reorder_point' => '5.0000', 'minimum_order_qty' => '0.0000', 'order_multiple' => '0.0000', 'description' => 'Outdoor cafe table 1200x750 with galvanised frame', 'track_serial_number' => 0, 'track_batch' => 0, 'inventory_valuation_method' => 'FIFO', 'unit_cost' => '3700.0000', 'created_at' => '2026-11-27 09:00:00', 'updated_at' => '2026-11-27 09:00:00'],
-            ['id' => 141, 'company' => 'default', 'branch' => 'HQ', 'name' => 'test-srv-laser', 'sku' => 'test-srv-laser', 'type' => 'service', 'default_production_model' => 'pure_manufacturing', 'supplier_method' => 'buy', 'item_type' => 'Service', 'variation_type' => 'Single', 'uom' => 'Pcs', 'status' => 'active', 'hsn_sac' => '9988', 'gst_rate' => '18.00', 'selling_price' => '0.0000', 'cost_price' => '18.0000', 'sales_account' => '4010', 'purchase_account' => '1204', 'inventory_account' => null, 'reorder_point' => '0.0000', 'minimum_order_qty' => '0.0000', 'order_multiple' => '0.0000', 'description' => 'Job work: laser cutting of gusset plates (per piece)', 'track_serial_number' => 0, 'track_batch' => 0, 'inventory_valuation_method' => 'FIFO', 'unit_cost' => '18.0000', 'created_at' => '2026-11-27 09:00:00', 'updated_at' => '2026-11-27 09:00:00'],
-            ['id' => 142, 'company' => 'default', 'branch' => 'HQ', 'name' => 'test-srv-zinc', 'sku' => 'test-srv-zinc', 'type' => 'service', 'default_production_model' => 'pure_manufacturing', 'supplier_method' => 'buy', 'item_type' => 'Service', 'variation_type' => 'Single', 'uom' => 'Pcs', 'status' => 'active', 'hsn_sac' => '9988', 'gst_rate' => '18.00', 'selling_price' => '0.0000', 'cost_price' => '12.0000', 'sales_account' => '4010', 'purchase_account' => '1204', 'inventory_account' => null, 'reorder_point' => '0.0000', 'minimum_order_qty' => '0.0000', 'order_multiple' => '0.0000', 'description' => 'Job work: zinc electroplating (per piece)', 'track_serial_number' => 0, 'track_batch' => 0, 'inventory_valuation_method' => 'FIFO', 'unit_cost' => '12.0000', 'created_at' => '2026-11-27 09:00:00', 'updated_at' => '2026-11-27 09:00:00'],
-            ['id' => 143, 'company' => 'default', 'branch' => 'HQ', 'name' => 'test-srv-galva', 'sku' => 'test-srv-galva', 'type' => 'service', 'default_production_model' => 'pure_manufacturing', 'supplier_method' => 'buy', 'item_type' => 'Service', 'variation_type' => 'Single', 'uom' => 'Pcs', 'status' => 'active', 'hsn_sac' => '9988', 'gst_rate' => '18.00', 'selling_price' => '0.0000', 'cost_price' => '180.0000', 'sales_account' => '4010', 'purchase_account' => '1204', 'inventory_account' => null, 'reorder_point' => '0.0000', 'minimum_order_qty' => '0.0000', 'order_multiple' => '0.0000', 'description' => 'Job work: hot-dip galvanising of table frames (per frame)', 'track_serial_number' => 0, 'track_batch' => 0, 'inventory_valuation_method' => 'FIFO', 'unit_cost' => '180.0000', 'created_at' => '2026-11-27 09:00:00', 'updated_at' => '2026-11-27 09:00:00'],
-            ['id' => 144, 'company' => 'default', 'branch' => 'HQ', 'name' => 'test-srv-coat', 'sku' => 'test-srv-coat', 'type' => 'service', 'default_production_model' => 'pure_manufacturing', 'supplier_method' => 'buy', 'item_type' => 'Service', 'variation_type' => 'Single', 'uom' => 'Pcs', 'status' => 'active', 'hsn_sac' => '9988', 'gst_rate' => '18.00', 'selling_price' => '0.0000', 'cost_price' => '110.0000', 'sales_account' => '4010', 'purchase_account' => '1204', 'inventory_account' => null, 'reorder_point' => '0.0000', 'minimum_order_qty' => '0.0000', 'order_multiple' => '0.0000', 'description' => 'Job work: powder coating of table frames with our powder (per frame)', 'track_serial_number' => 0, 'track_batch' => 0, 'inventory_valuation_method' => 'FIFO', 'unit_cost' => '110.0000', 'created_at' => '2026-11-27 09:00:00', 'updated_at' => '2026-11-27 09:00:00'],
-            ['id' => 145, 'company' => 'default', 'branch' => 'HQ', 'name' => 'test-srv-rail', 'sku' => 'test-srv-rail', 'type' => 'service', 'default_production_model' => 'pure_manufacturing', 'supplier_method' => 'buy', 'item_type' => 'Service', 'variation_type' => 'Single', 'uom' => 'Pcs', 'status' => 'active', 'hsn_sac' => '9988', 'gst_rate' => '18.00', 'selling_price' => '0.0000', 'cost_price' => '240.0000', 'sales_account' => '4010', 'purchase_account' => '1204', 'inventory_account' => null, 'reorder_point' => '0.0000', 'minimum_order_qty' => '0.0000', 'order_multiple' => '0.0000', 'description' => 'Job work: support rail made and coated by the vendor from its own material (per piece)', 'track_serial_number' => 0, 'track_batch' => 0, 'inventory_valuation_method' => 'FIFO', 'unit_cost' => '240.0000', 'created_at' => '2026-11-27 09:00:00', 'updated_at' => '2026-11-27 09:00:00'],
         ];
     }
 

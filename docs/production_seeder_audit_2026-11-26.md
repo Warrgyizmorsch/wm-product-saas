@@ -729,3 +729,56 @@ An order of a product always runs that product's own routing, so a semi-09 / sem
 - `tests/Feature/Seeding/TestProductionDataTest.php`: 30 plans, vendor and outsourced-operation checks, services without stock (not run).
 
 `php -l` is clean on all 8 files. I seeded nothing, ran no tests and committed nothing.
+
+### C10. Changed by the subcontracting simplification (2026-11-28, Applied, not run by me)
+See `docs/production_ui_rules_review_2026-11-27.md` (SF-1..SF-5). In the test data:
+- **Removed:** the 5 `test-srv-*` service products and the subcontract setting (manual PR → PO, ₹25,000). A reseed takes the two old setting keys out of the tenant settings. The 4 `VEND-JW-*` vendors stay.
+- **Routings 010–012:** each outsourced operation holds only the vendor and three times in hours (dispatch · processing · receipt): laser 6 · 48 · 6, zinc 4 · 72 · 4, rail 0 · 96 · 24, galvanising 24 · 120 · 36, coating job work 8 · 72 · 8. No rate, so job-work ops cost ₹0 in routing / BOM.
+- **BOMs:** a material row is always ours. semi-09 loses the raw-25 vendor row; its OP-030 gets the "Vendor-supplied materials" tick (deburred plates go via Previous OP materials). semi-10 has no rows; its OP-010 has the tick, so it needs no dispatch slip.
+- **How to check now:** receive from the receipt page (slip "Receive from vendor", order Subcontract tab "Receive", MES button); each booked receipt writes a GRN without a PO; "Create vendor bill" opens the Service Bill with head "Job Work" (account 5034); the order's Subcontract tab shows the billed amount.
+
+## Part D. Production orders (TestProductionOrderSeeder, 2026-11-28, Applied, run on the local DB)
+
+**User (verbatim):** "update the seeder if needed, and then also create the data for production orders that has completed all these things. So accordingly, QC data will be created. Everything needs to be created, and also keep some production order in multiple stages, like in scheduled, like before scheduling, at subcontracting stages… a few mid stages ready production order needs to be in the seeder, and few complete production orders need to be in the seeder, and all the data related to those needs to be in the seeder."
+
+**How it works:**
+- Every step calls the service its screen calls:
+  - `createDirect`, then `sendMaterialRequest`
+  - store `MaterialRequestService::reserve` / `issue`
+  - `release` + `SchedulingService::generateSchedule` + schedule released
+  - MES `startOperation` / `completeOperation`
+  - `performOperationInspection` (QD)
+  - dispatch slip (`prefillLines` → `dispatchProblems` → repository create → `processDispatchActions`)
+  - `SubcontractReceiptService::receive`
+  - `VendorBillController::storeService` (head Job Work)
+  - `recordFinalInspection` when the product has plans, then `receiveFinishedGoods`, then `complete`
+- Acting user: admin@example.com, branch HQ.
+- One transaction per order. Called last by `ProductionE2EDemoSeeder`.
+
+| Order | Product · qty | Stage |
+|---|---|---|
+| ORD-2026-000001 | semi-02 · 20 | **Completed.** In-house; QC in parts: OP-020 12 + 8, OP-040 10 + 10 passed; output into WH-WIP-TBL |
+| ORD-2026-000002 | semi-09 · 40 | **Completed.** Laser job work (slip, receipt 40, QC, GRN, bill ₹720 + GST) → deburr (QC) → zinc job work (slip, receipts 25 + 15, two QC records, two GRNs, two bills ₹300 / ₹180) |
+| ORD-2026-000003 | semi-10 · 20 | **Completed.** Vendor-made, no slip: receipt 20 → QC → GRN → bill ₹4,800 |
+| ORD-2026-000004 | final-01 · 10 | Draft |
+| ORD-2026-000005 | semi-06 · 30 | Material requested (Locked), nothing issued |
+| ORD-2026-000006 | semi-01 · 50 | Issued + released, not scheduled |
+| ORD-2026-000007 | semi-04 · 20 | Scheduled + released to the floor, not started |
+| ORD-2026-000008 | semi-02 · 30 | Running: OP-010 done, OP-020 logged 20 → **waiting for QC** (open record) |
+| ORD-2026-000009 | semi-01 · 40 | OP-010: **30 passed + 10 failed** (two records, NCR); the cut stays open (the next op can't start before it completes) |
+| ORD-2026-000010 | semi-09 · 40 | Laser job work **at the vendor** (slip dispatched) |
+| ORD-2026-000011 | semi-09 · 24 | **Received from the vendor, waiting for QC** (receipt qc_pending, no GRN yet) |
+| ORD-2026-000012 | semi-10 · 10 | Vendor-made, scheduled, **waiting for the receipt** |
+
+**Checked (2026-11-28):**
+- 4 job-work bills post ₹6,000 to 5034 Job Work Charges, with 0 posting failures.
+- Every order page (all tabs), the MES board, the operator screen, the receipt pages, the slips, analytics, inspections, WIP, schedules, settings and bills load (HTTP 200).
+- An over-quantity inspection submit is refused with no change.
+
+**Reset:** `CleanBeforeHrmsSeeder` now also removes the subcontract Purchase documents (GRNs with source `subcontract_receipt`, their bills, bill references and bill journals). Otherwise they would stay orphaned and double the 5034 balance on the next seed.
+- The full `php artisan db:seed` (with the reset) was **not run by me**: it was blocked as destructive. I ran only `php artisan db:seed --class=TestProductionOrderSeeder` on the existing test data (additive).
+
+**Limits:**
+- Timestamps of logs, receipts and bills are "now" (the services stamp now()); only order and schedule dates are in the past / future.
+- Order ids start at 83: dry runs used up auto-increment ids. A full reseed restarts them.
+- `notifications` rows from the seeded orders are not removed by the reset.

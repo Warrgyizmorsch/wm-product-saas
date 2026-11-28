@@ -26,6 +26,8 @@ class VendorBillController extends Controller
     {
         return GoodsReceiptNote::where('tenant_id', $tenantId)
             ->whereIn('status', ['Approved', 'Completed'])
+            // a Production subcontract receipt's GRN is billed as a Service Bill ("Job Work") from the receipt page
+            ->where(fn ($q) => $q->whereNull('source_type')->orWhere('source_type', '!=', \App\Domains\Purchase\Services\GoodsReceiptNoteService::SOURCE_SUBCONTRACT_RECEIPT))
             ->where(function ($q) {
                 // Either missing Material Bill (vendorBill where vendor_id == grns.vendor_id)
                 $q->whereDoesntHave('vendorBills', function ($vbq) {
@@ -400,7 +402,10 @@ class VendorBillController extends Controller
             $prefilledTaxRate     = $prefilledTaxRate     ?: 5;
         } elseif ($selectedGrn) {
             $prefilledVendorId    = $prefilledVendorId    ?: $selectedGrn->vendor_id;
-            $prefilledServiceHead = $prefilledServiceHead ?: 'Freight & Transport';
+            // a Production subcontract receipt's GRN is billed as job work
+            $isJobWork = $selectedGrn->source_type === \App\Domains\Purchase\Services\GoodsReceiptNoteService::SOURCE_SUBCONTRACT_RECEIPT;
+            $prefilledServiceHead = $prefilledServiceHead ?: ($isJobWork ? 'Job Work' : 'Freight & Transport');
+            $prefilledNotes       = $prefilledNotes       ?: ($isJobWork ? (string) $selectedGrn->notes : null);
         }
 
         $grns = GoodsReceiptNote::where('tenant_id', $tenantId)

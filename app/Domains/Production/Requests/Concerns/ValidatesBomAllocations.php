@@ -173,9 +173,10 @@ trait ValidatesBomAllocations
             'items.*.priority'                  => 'nullable|integer|min:1',
             'items.*.sequence'                  => 'nullable|integer|min:1',
             'items.*.notes'                     => 'nullable|string|max:1000',
-            'items.*.supplied_by'               => 'nullable|in:company,vendor', // TF-02
             'operation_input_flags'             => 'nullable|array',          // TF-01 {routing_operation_id: 0|1}
             'operation_input_flags.*'           => 'nullable|boolean',
+            'operation_vendor_material_flags'   => 'nullable|array',          // SF-2 {routing_operation_id: 0|1}
+            'operation_vendor_material_flags.*' => 'nullable|boolean',
         ];
     }
 
@@ -356,6 +357,29 @@ trait ValidatesBomAllocations
 
         if (count($items) > 0 && $primaryCount === 0) {
             $validator->errors()->add('items', 'A BOM must include at least one primary material allocation.');
+        }
+
+        // SF-2: an outsourced operation must say what the vendor works on — the previous operation's output, our
+        // materials (rows on the operation) or the vendor's own materials (tick)
+        if ($routing) {
+            $inputFlags = (array) $this->input('operation_input_flags', []);
+            $vendorFlags = (array) $this->input('operation_vendor_material_flags', []);
+            $opsWithRows = collect($items)->pluck('routing_operation_id')->filter()->map(fn ($id) => (int) $id)->unique()->all();
+            foreach ($routing->operations as $op) {
+                if (! $op->isOutsourced()) {
+                    continue;
+                }
+                $usesPrevious = array_key_exists($op->id, $inputFlags)
+                    ? filter_var($inputFlags[$op->id], FILTER_VALIDATE_BOOLEAN)
+                    : (! empty($op->previous_operation_id) && ! $op->is_parallel);
+                $vendorOwn = filter_var($vendorFlags[$op->id] ?? false, FILTER_VALIDATE_BOOLEAN);
+                if (! $usesPrevious && ! $vendorOwn && ! in_array((int) $op->id, $opsWithRows, true)) {
+                    $validator->errors()->add(
+                        "operation_vendor_material_flags.{$op->id}",
+                        "Op {$op->operation_number} ({$op->name}) is outsourced: tell what the vendor works on — previous output, our materials, or vendor-supplied materials."
+                    );
+                }
+            }
         }
 
         // BM-07: Alternative target, same-operation constraint & per-group priority uniqueness

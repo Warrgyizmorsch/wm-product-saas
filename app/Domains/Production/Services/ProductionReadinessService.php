@@ -1534,10 +1534,7 @@ class ProductionReadinessService
         $inspections = ProductionQualityInspection::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('production_order_id', $op->production_order_id)
-            ->where(function ($q) use ($op) {
-                $q->where('production_order_operation_id', $op->id)
-                  ->orWhereNull('production_order_operation_id');
-            })
+            ->where('production_order_operation_id', $op->id) // QF-01: the operation's own inspections only
             ->get();
 
         if ($inspections->isEmpty()) {
@@ -1555,7 +1552,9 @@ class ProductionReadinessService
             ];
         }
 
-        $failedInspection = $inspections->first(fn($i) => strtolower((string)$i->result) === 'failed' || strtolower((string)$i->status) === 'rejected');
+        // QD: one record = one quantity with one result — a failed record blocks only while no quantity has passed
+        $hasPassed = $inspections->contains(fn($i) => strtolower((string)$i->status) === 'approved' && in_array(strtolower((string)$i->result), ['passed', 'partially_passed'], true));
+        $failedInspection = $hasPassed ? null : $inspections->first(fn($i) => strtolower((string)$i->result) === 'failed' || strtolower((string)$i->status) === 'rejected');
         if ($failedInspection) {
             return [
                 'status' => self::STATUS_BLOCKED,

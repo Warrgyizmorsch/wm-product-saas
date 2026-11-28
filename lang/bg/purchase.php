@@ -626,6 +626,7 @@ return array (
   'service_head_handling' => 'Разходи за логистика и обработка',
   'service_head_insurance' => 'Застраховка при транзит',
   'service_head_other' => 'Други такси за услуги',
+  'service_head_job_work' => 'Ишлеме (подизпълнител)',
   'service_amount' => 'Сума за услуга',
   'gst_mechanism' => 'Механизъм за ДДС',
   'gst_cgst_sgst' => 'Вътрешнощатски CGST + SGST (FCM)',

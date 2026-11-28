@@ -44,8 +44,7 @@ class RoutingDetailResource extends JsonResource
                 'setup_cost_per_run'          => round((float) $primary->sum(fn($o) => (float) ($o->setup_cost_per_run ?? 0)), 4),
                 'setup_time_minutes_per_run'  => round((float) $primary->sum(fn($o) => (float) $o->setup_time_minutes), 4),
                 'cycle_time_minutes_per_unit' => round((float) $primary->sum(fn($o) => (float) ($o->setup_time_per_piece_minutes ?? 0) + (float) $o->processing_time_minutes), 4),
-                // M-04: subcontract charge per unit (rate × 100 ÷ yield, primary route only)
-                'subcontract_cost_per_unit'   => round((float) $primary->where('is_external', true)->sum(fn($o) => (float) $o->subcontract_cost_per_unit * (((float) ($o->expected_yield_percentage ?: 100)) > 0 ? 100 / (float) ($o->expected_yield_percentage ?: 100) : 1)), 4),
+
                 'costs_not_calculated'        => $ops->contains(fn($o) => $o->costsNotCalculated()),
             ]),
             'costs_outdated' => $this->whenLoaded('operations', fn () => (bool) (app(\App\Domains\Production\Services\RoutingCostStatusService::class)->check($this->resource)['outdated'] ?? false)),
@@ -107,13 +106,10 @@ class RoutingDetailResource extends JsonResource
                 // external
                 'is_external'                    => (bool) $op->is_external,
                 'vendor'                         => $op->is_external && $op->vendor ? ['id' => $op->vendor->id, 'name' => $op->vendor->name] : null,
-                'subcontract_cost_per_unit'      => $op->is_external ? $num($op->subcontract_cost_per_unit) : null,
-                'subcontract_lead_time_days'     => $op->is_external ? (int) $op->subcontract_lead_time_days : null,
-                'dispatch_buffer_days'           => $op->is_external ? (int) $op->dispatch_buffer_days : null,
-                'return_buffer_days'             => $op->is_external ? (int) $op->return_buffer_days : null,
-                'material_supply_type'           => $op->is_external ? $op->material_supply_type : null,
-                'subcontract_input_type'         => $op->is_external ? $op->subcontract_input_type : null, // M-04
-                'subcontract_service_product_id' => $op->is_external ? $op->subcontract_service_product_id : null,
+                // SF-1: the outsourced operation's three times, hours of calendar time
+                'vendor_dispatch_hours'          => $op->is_external ? (float) $op->vendor_dispatch_hours : null,
+                'vendor_processing_hours'        => $op->is_external ? (float) $op->vendor_processing_hours : null,
+                'vendor_receipt_hours'           => $op->is_external ? (float) $op->vendor_receipt_hours : null,
                 // traceability
                 'resource_snapshot'       => $op->resource_snapshot,
                 'section_calculation_id'  => $op->section_calculation_id,

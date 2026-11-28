@@ -46,7 +46,6 @@ class RoutingController extends Controller
 
         $workCenters = \App\Domains\Production\Models\WorkCenter::with(['sections' => fn($q) => $q->where('status', 'active')])->where('status', 'active')->get();
         $vendors     = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
-        $serviceProducts = Product::where('type', 'service')->get();
         $operationTypes = config('production.operation_types', []);
 
         // RT-IMPL-20: Duplicate Version opens this create form pre-filled from the source routing — nothing is saved
@@ -64,12 +63,12 @@ class RoutingController extends Controller
             [$workCenters, $keptResources] = $this->keepUsedInactiveResources($workCenters, $routing);
 
             return view('modules.production.routing.edit', compact(
-                'routing', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'copyMode', 'newVersion', 'keptResources'
+                'routing', 'workCenters', 'vendors', 'operationTypes', 'copyMode', 'newVersion', 'keptResources'
             ) + $this->qcFormData($routing));
         }
 
         return view('modules.production.routing.create', compact(
-            'workCenters', 'vendors', 'serviceProducts', 'operationTypes'
+            'workCenters', 'vendors', 'operationTypes'
         ) + $this->qcFormData(null));
     }
 
@@ -191,7 +190,6 @@ class RoutingController extends Controller
 
         $workCenters    = \App\Domains\Production\Models\WorkCenter::with(['sections' => fn($q) => $q->where('status', 'active')])->where('status', 'active')->get();
         $vendors        = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
-        $serviceProducts = Product::where('type', 'service')->get();
 
         $operationTypes = config('production.operation_types', []);
 
@@ -207,7 +205,7 @@ class RoutingController extends Controller
         }
 
         return view('modules.production.routing.edit', compact(
-            'routing', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'operationBomUsage', 'keptResources'
+            'routing', 'workCenters', 'vendors', 'operationTypes', 'operationBomUsage', 'keptResources'
         ) + $this->qcFormData($routing));
     }
 

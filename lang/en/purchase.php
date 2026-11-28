@@ -629,6 +629,7 @@ return array (
   'service_head_handling' => 'Logistics & Handling Charges',
   'service_head_insurance' => 'Transit Insurance Premium',
   'service_head_other' => 'Other Service Charges',
+  'service_head_job_work' => 'Job Work (subcontract)',
   'service_amount' => 'Service Amount',
   'gst_mechanism' => 'GST Mechanism',
   'gst_cgst_sgst' => 'Intra-State CGST + SGST (FCM)',

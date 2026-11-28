@@ -34,13 +34,10 @@ class RoutingOperationDTO
         public readonly bool    $overlap_enabled = false,
         public readonly float   $transfer_batch_quantity = 0.0,
         public readonly int     $transfer_lag_minutes = 0,
-        public readonly int     $subcontract_lead_time_days = 0,
-        public readonly float   $subcontract_cost_per_unit = 0.0,
-        public readonly ?int    $subcontract_service_product_id = null,
-        public readonly ?string $material_supply_type = null,
-        public readonly ?string $subcontract_input_type = 'bom_raw_materials',
-        public readonly int     $dispatch_buffer_days = 0,
-        public readonly int     $return_buffer_days = 0,
+        // SF-1: outsourced operation times in hours (the form posts days + hours, see fromArray)
+        public readonly float   $vendor_dispatch_hours = 0.0,
+        public readonly float   $vendor_processing_hours = 0.0,
+        public readonly float   $vendor_receipt_hours = 0.0,
         public readonly ?int    $material_id = null,
         public readonly bool    $is_parallel = false,
         public readonly ?string $parallel_group = null,
@@ -128,13 +125,9 @@ class RoutingOperationDTO
             overlap_enabled:                $queueEnabled,
             transfer_batch_quantity:        isset($data['transfer_batch_quantity']) ? (float) $data['transfer_batch_quantity'] : 0.0,
             transfer_lag_minutes:           isset($data['transfer_lag_minutes']) ? (int) $data['transfer_lag_minutes'] : 0,
-            subcontract_lead_time_days:     isset($data['subcontract_lead_time_days']) ? (int) $data['subcontract_lead_time_days'] : 0,
-            subcontract_cost_per_unit:      isset($data['subcontract_cost_per_unit']) ? (float) $data['subcontract_cost_per_unit'] : 0.0,
-            subcontract_service_product_id: !empty($data['subcontract_service_product_id']) ? (int) $data['subcontract_service_product_id'] : null,
-            material_supply_type:           $data['material_supply_type'] ?? (!empty($data['is_external']) ? 'company_supplied' : 'none'),
-            subcontract_input_type:         $data['subcontract_input_type'] ?? 'bom_raw_materials',
-            dispatch_buffer_days:          isset($data['dispatch_buffer_days']) ? (int) $data['dispatch_buffer_days'] : 0,
-            return_buffer_days:            isset($data['return_buffer_days']) ? (int) $data['return_buffer_days'] : 0,
+            vendor_dispatch_hours:         $isExternal ? self::vendorHours($data, 'vendor_dispatch') : 0.0,
+            vendor_processing_hours:       $isExternal ? self::vendorHours($data, 'vendor_processing') : 0.0,
+            vendor_receipt_hours:          $isExternal ? self::vendorHours($data, 'vendor_receipt') : 0.0,
             material_id:                   $primaryMaterialId,
             is_parallel:                   !empty($data['is_parallel']),
             parallel_group:                !empty($data['parallel_group']) ? trim((string) $data['parallel_group']) : null,
@@ -198,18 +191,26 @@ class RoutingOperationDTO
             'overlap_enabled'               => $this->overlap_enabled,
             'transfer_batch_quantity'        => $this->transfer_batch_quantity,
             'transfer_lag_minutes'           => $this->transfer_lag_minutes,
-            'subcontract_lead_time_days'     => $this->subcontract_lead_time_days,
-            'subcontract_cost_per_unit'      => $this->subcontract_cost_per_unit,
-            'subcontract_service_product_id' => $this->subcontract_service_product_id,
-            'material_supply_type'           => $this->material_supply_type,
-            'subcontract_input_type'         => $this->subcontract_input_type,
-            'dispatch_buffer_days'           => $this->dispatch_buffer_days,
-            'return_buffer_days'             => $this->return_buffer_days,
+            'vendor_dispatch_hours'          => $this->vendor_dispatch_hours,
+            'vendor_processing_hours'        => $this->vendor_processing_hours,
+            'vendor_receipt_hours'           => $this->vendor_receipt_hours,
             'material_id'                    => $this->material_id,
             'is_parallel'                    => $this->is_parallel,
             'parallel_group'                 => $this->parallel_group,
             'previous_operation_id'         => $this->previous_operation_id,
             'materials'                      => $this->materials,
         ];
+    }
+
+    /**
+     * SF-1: an outsourced time is posted as {key}_days + {key}_hours (the form) or as {key}_hours alone (API / import);
+     * stored as hours, calendar time.
+     */
+    private static function vendorHours(array $data, string $key): float
+    {
+        $days = isset($data[$key . '_days']) && $data[$key . '_days'] !== '' ? (float) $data[$key . '_days'] : 0.0;
+        $hours = isset($data[$key . '_hours']) && $data[$key . '_hours'] !== '' ? (float) $data[$key . '_hours'] : 0.0;
+
+        return round(max(0.0, $days * 24 + $hours), 2);
     }
 }

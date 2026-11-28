@@ -283,16 +283,16 @@ The 4 open business decisions in section 7 are answered by D-1..D-4 and SC-01..S
 | # | Rule | Source | Status |
 |---|---|---|---|
 | TF-01 | **BOM:** every operation gets a **"Previous OP materials"** option (the operation works on the previous operation's output). It is on by default for operations that depend on the previous one and can be unticked; parallel operations may use it too. The operation can still carry raw materials. | SC-01, SC-05 | Applied 2026-11-27 |
-| TF-02 | **BOM, outsourced operation:** materials the vendor brings are marked with a term still to name (e.g. "Vendor-supplied"). They are shown in the BOM and elsewhere, but are not requested from the store and never block readiness. | SC-01 | Applied 2026-11-27 |
+| TF-02 | **BOM, outsourced operation:** materials the vendor brings are marked with a term still to name (e.g. "Vendor-supplied"). They are shown in the BOM and elsewhere, but are not requested from the store and never block readiness. | SC-01 | **Replaced 2026-11-28** (see §14) |
 | TF-03 | **Company material for the vendor:** raw materials on an outsourced operation are requested through the normal Material Requisition and issued to the production floor. The store issue is the **only** stock-out. | SC-01 | Applied 2026-11-27 |
 | TF-04 | **Dispatch slip:** a Delivery Challan is made from a floor "Dispatch" option, from the material issued for that operation (plus the previous operation's output for WIP job work). **No second stock deduction.** The slip records which material or WIP is at which vendor, against which operation. | SC-01 | Applied 2026-11-27 |
-| TF-05 | **PR/PO by button only** (order screen and MES floor), linked to the operation, with the operation's vendor and subcontract rate. Every automatic path is removed (draft save, release, WIP transfer, auto-PO modes). | D-4 | Applied 2026-11-27 |
-| TF-06 | **Receipt only from the Subcontracting menu or the shop floor.** Each receipt creates a stock-free **system GRN** with the accepted quantity. It moves the PO's received quantity and status, and the bill and 3-way match work from it. The system GRN must not re-run the production receipt (no double count). | SC-02, SC-03 | Applied 2026-11-27 |
-| TF-07 | The subcontract bill posts as a service / WIP cost, not Inventory (subcontract PO lines get a non-stock `line_type`). | follows SC-03 | Applied 2026-11-27 |
+| TF-05 | **PR/PO by button only** (order screen and MES floor), linked to the operation, with the operation's vendor and subcontract rate. Every automatic path is removed (draft save, release, WIP transfer, auto-PO modes). | D-4 | **Replaced 2026-11-28** (see §14) |
+| TF-06 | **Receipt only from the Subcontracting menu or the shop floor.** Each receipt creates a stock-free **system GRN** with the accepted quantity. It moves the PO's received quantity and status, and the bill and 3-way match work from it. The system GRN must not re-run the production receipt (no double count). | SC-02, SC-03 | **Replaced 2026-11-28** (see §14) |
+| TF-07 | The subcontract bill posts as a service / WIP cost, not Inventory (subcontract PO lines get a non-stock `line_type`). | follows SC-03 | **Replaced 2026-11-28** (see §14) |
 | TF-08 | **No backflush at receipt** (the material was already issued). The receipt records consumed / returned / scrapped against the dispatch slip, and unused material comes back to the floor or store. | follows SC-01 | Applied 2026-11-27 |
 | TF-09 | **No FG stock** at an intermediate outsourced operation; FG enters only through the order's normal finished-goods receipt. | follows SC-01 | Applied 2026-11-27 |
 | TF-10 | **QC on receipt** works as for an in-house operation (the operation's QC plans, accepted quantity only). | proposal | Applied 2026-11-27 |
-| TF-11 | **Receipt with no approved PO:** blocked, with a button to raise the PR/PO. | SC-04 | Applied 2026-11-27 |
+| TF-11 | **Receipt with no approved PO:** blocked, with a button to raise the PR/PO. | SC-04 | **Replaced 2026-11-28** (see §14) |
 
 **Still open:**
 - D-3b
@@ -566,3 +566,18 @@ stateDiagram-v2
 | Subcontract receipt | none (FG only through the order's normal FG receipt) | none | creates the system GRN |
 | System GRN | none | none | PO received qty and status |
 | Vendor bill | — | Dr WIP 1204 (expense line, account 1204) | 3-way match on the system GRN |
+
+## 14. Simplified flow (2026-11-28) — replaces parts of §10–13
+
+Dictated by the user and logged verbatim in `docs/production_ui_rules_review_2026-11-27.md` (SF-1..SF-5). Status: **Applied 2026-11-28** (not run or tested).
+
+| Area | Rule now |
+|---|---|
+| Routing | Outsourced op = Vendor · Dispatch time · Processing time · Receipt time (days + hours, stored as hours, calendar time, ⓘ hints). No supply type, processing mode, rate or service product. Leaves our floor at op start; back = start + dispatch + processing + receipt. |
+| BOM | Outsourced op: "Previous OP materials" tick + "Vendor-supplied materials" tick (op level) + material rows (always ours). At least one is required. The per-row vendor switch (TF-02 / A-02) is gone. |
+| PR / PO | None. D-4, TF-05, TF-07 and the procurement setting are removed. |
+| Dispatch | Only when something of ours goes (rows or previous output). Buttons redirect to the slip page. |
+| Receipt | Receipt page (MES redirects, no popup). Writes a stock-free GRN without a PO (`source_type subcontract_receipt`). Qty typed by the user, ≤ units still at the vendor (no slip: ≤ op target still open); rejects → rework slip or scrap; returned / lost leftovers; partial receipts + "final". No PO check (TF-11 / SC-04 / A-07 replaced). |
+| Vendor bill (interim) | "Create vendor bill" on the receipt → Service Bill pre-filled, head "Job Work" → account 5034 Job Work Charges. Order cost and analytics read job-work cost from bills linked to receipt GRNs. |
+| Cost | Outsourced ops cost ₹0 in routing / BOM ("charged on vendor bill"). |
+| Still open | GST job-work items, N-22, N-28, scrap_adjustment, API endpoints, Dispatch Board lane. |

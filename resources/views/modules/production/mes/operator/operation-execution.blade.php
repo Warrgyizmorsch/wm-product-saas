@@ -272,13 +272,6 @@
                     $canQuality = $user && $accessService->allows($user, 'production.quality.view');
                     $canInventory = $user && $accessService->allows($user, 'inventory.transfers.view');
 
-                    // N-16: this operation's PR / PO (operation link, cancelled ones never count)
-                    $poItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('production_order_operation_id', $op->id)
-                        ->whereHas('order', fn ($q) => $q->where('status', '!=', 'Cancelled'))->latest('id')->first();
-                    $po = $poItem?->order;
-                    $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::where('production_order_operation_id', $op->id)
-                        ->whereHas('requisition', fn ($q) => $q->where('status', '!=', 'Cancelled'))->latest('id')->first();
-                    $pr = $prItem?->requisition;
 
                     // H-06: from the dispatch slips / receipts of this operation
                     $scBalance = app(\App\Domains\Production\Services\SubcontractMaterialBalanceService::class)->getMaterialBalance($order->tenant_id, $order->id, $op->id);
@@ -305,15 +298,19 @@
                             <i class="feather-external-link text-warning fs-24 me-3"></i>
                             <div>
                                 <h5 class="fw-bold text-dark mb-0">External Subcontracted Operation</h5>
-                                <small class="text-dark">This operation is executed off-site by vendor <strong>{{ $op->vendor->name ?? 'Subcontractor' }}</strong>. Shop-floor machine execution is disabled; execution is tracked via Procurement & GRN.</small>
+                                <small class="text-dark">This operation is executed off-site by vendor <strong>{{ $op->vendor->name ?? 'Subcontractor' }}</strong>. Shop-floor machine execution is disabled; the work goes out on a dispatch slip and comes back on a receipt.</small>
                             </div>
                         </div>
                         <div class="d-flex gap-2">
-                            @if($canPurchase && $po && \Illuminate\Support\Facades\Route::has('purchase.orders.show'))
-                                <a href="{{ route('purchase.orders.show', $po->id) }}" class="btn btn-sm btn-outline-dark fw-semibold">
-                                    <i class="feather-shopping-cart me-1"></i>View PO
+                            {{-- SF-4: no PR / PO — dispatch slip and receipt page (redirects, no popup) --}}
+                            @if($op->needsDispatchSlip())
+                                <a href="{{ route('production.subcontract.delivery-challans.create', ['production_order_id' => $order->id, 'operation_id' => $op->id]) }}" class="btn btn-sm btn-outline-primary fw-semibold">
+                                    <i class="feather-send me-1"></i>Dispatch slip
                                 </a>
                             @endif
+                            <a href="{{ route('production.subcontract.receipts.create', ['operation_id' => $op->id, 'source' => 'shop_floor']) }}" class="btn btn-sm btn-outline-success fw-semibold">
+                                <i class="feather-download-cloud me-1"></i>Receive from vendor
+                            </a>
                             @if($canQuality && \Illuminate\Support\Facades\Route::has('production.quality.rework.index'))
                                 <a href="{{ route('production.quality.rework.index') }}" class="btn btn-sm btn-outline-warning fw-semibold">
                                     <i class="feather-shield me-1"></i>Quality & Rework
@@ -326,12 +323,12 @@
                         <div class="col-md-3">
                             <span class="text-muted text-uppercase fs-10 fw-bold d-block">Subcontractor</span>
                             <strong class="text-dark">{{ $op->vendor->name ?? 'N/A' }} ({{ $op->vendor->code ?? '' }})</strong>
-                            <div class="text-muted fs-11 mt-0.5">Supply: {{ ucwords(str_replace('_', ' ', $op->material_supply_type ?? 'company_supplied')) }}</div>
+                            @if($op->vendor_supplies_materials)<div class="text-muted fs-11 mt-0.5"><i class="feather-package me-1"></i>Vendor uses own materials</div>@endif
                         </div>
                         <div class="col-md-3">
-                            <span class="text-muted text-uppercase fs-10 fw-bold d-block">Procurement Status</span>
-                            <div>PR: <strong>{{ $pr ? $pr->requisition_number . ' (' . ucfirst($pr->status) . ')' : 'Awaiting PR' }}</strong></div>
-                            <div>PO: <strong>{{ $po ? $po->po_number . ' (' . ucfirst($po->status) . ')' : 'Awaiting PO' }}</strong></div>
+                            <span class="text-muted text-uppercase fs-10 fw-bold d-block">Vendor times</span>
+                            <div>Dispatch <strong>{{ \App\Domains\Production\Services\SubcontractDates::formatHours($op->vendor_dispatch_hours) }}</strong> · processing <strong>{{ \App\Domains\Production\Services\SubcontractDates::formatHours($op->vendor_processing_hours) }}</strong></div>
+                            <div>Receipt <strong>{{ \App\Domains\Production\Services\SubcontractDates::formatHours($op->vendor_receipt_hours) }}</strong></div>
                         </div>
                         <div class="col-md-3">
                             <span class="text-muted text-uppercase fs-10 fw-bold d-block">Dispatch & Timing</span>
@@ -439,8 +436,8 @@
                                     @if($isQcRequired && $touchPendingQcQty > 0)
                                         <div class="col">
                                             <x-ui.button variant="warning" icon="feather-shield-check"
-                                                class="btn-touch-large w-100 text-dark btn-badge-container" data-bs-toggle="modal"
-                                                data-bs-target="#quickQcModal">
+                                                class="btn-touch-large w-100 text-dark btn-badge-container"
+                                                href="{{ route('production.quality.operation-inspection.show', ['op' => $op->id, 'source' => 'operator']) }}">
                                                 QC CHECK
                                                 <span class="btn-badge-count">{{ number_format($touchPendingQcQty, 0) }}</span>
                                             </x-ui.button>
@@ -693,72 +690,7 @@
         $touchRejectedQty = (float) ($op->quantity_rejected ?? 0.0);
     @endphp
 
-    <x-ui.modal id="quickQcModal" title="Shopfloor Quality Inspection Check" centered="true" size="lg"
-        formAction="{{ route('production.mes.quality-inspection', $op->id) }}" submitText="Submit QC Inspection"
-        closeText="Cancel">
-        <div class="bg-soft-warning p-3 rounded mb-3 border border-warning-subtle d-flex justify-content-between align-items-center">
-            <div>
-                <h6 class="fw-bold text-dark mb-1"><i class="feather-shield-check text-warning me-2"></i>{{ __('production.in_process_qc_inspection') }}</h6>
-                <span class="fs-11 text-muted">Order: <strong>{{ $order->order_number }}</strong> | Item: <strong>{{ $op->sourceProduct->name ?? $order->product->name }}</strong></span>
-            </div>
-            <span class="badge bg-warning text-dark fs-12 px-3 py-2 font-monospace">Pending QC: {{ number_format($touchPendingQcQty, 0) }}</span>
-        </div>
-
-        {{-- QR-16 / QP-04: the operation's own Quality Plans (order snapshot) — every value is saved and checked --}}
-        <div class="row g-3 text-start">
-            <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Quality Auditor / Inspector" name="audited_by" :required="true">
-                    @foreach($operators as $opUser)
-                        <option value="{{ $opUser->id }}" {{ (auth()->id() == $opUser->id) ? 'selected' : '' }}>
-                            {{ $opUser->name }} ({{ ucfirst($opUser->role ?? 'Operator') }})
-                        </option>
-                    @endforeach
-                </x-ui.odoo-form-ui>
-            </div>
-            <div class="col-md-6 fs-12 text-muted d-flex align-items-center">
-                {{ ($checklistPlans ?? collect())->count() }} quality plan(s) ·
-                {{ ($checklistPlans ?? collect())->where('is_mandatory', true)->count() }} mandatory
-            </div>
-
-            <div class="col-md-12">
-                <label class="form-label fw-semibold fs-11 text-uppercase text-dark mb-1">
-                    <i class="feather-check-square text-primary me-1"></i>Quality Specification Checklist Parameters
-                </label>
-                @include('modules.production.quality.partials.checklist-inputs', ['checklistPlans' => $checklistPlans ?? collect(), 'idPrefix' => 'op' . $op->id])
-                @if ($errors->has('parameter_values'))
-                    <div class="text-danger fs-12 mt-1">{{ $errors->first('parameter_values') }}</div>
-                @endif
-                <div class="form-check mt-2 fs-12">
-                    <input class="form-check-input" type="checkbox" name="confirm_failed_accept" value="1" id="confirm_failed_accept_{{ $op->id }}">
-                    <label class="form-check-label" for="confirm_failed_accept_{{ $op->id }}">
-                        I confirm accepting units even if a mandatory check fails (needed only when a mandatory check fails and 0 units are rejected)
-                    </label>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="Accepted Qty (Good Usable Output)" name="accepted_qty" id="operator_qc_accepted_qty" inputType="number" step="any" min="0" max="{{ (float) $touchPendingQcQty }}" value="{{ (float) $touchPendingQcQty }}" :required="true" />
-            </div>
-            <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="Rejected Qty (Defective Output)" name="rejected_qty" id="operator_qc_rejected_qty" inputType="number" step="any" min="0" max="{{ (float) $touchPendingQcQty }}" value="0" :required="true" />
-            </div>
-            <div class="col-md-4">
-                <x-ui.odoo-form-ui type="select" label="Defect Reason (If Rejected)" name="defect_reason">
-                    <option value="">-- None / Meets Quality Standard --</option>
-                    <option value="Surface Scratch / Coating Damage">{{ __('production.surface_scratch_defect') }}</option>
-                    <option value="Out of Dimension / Thickness Error">{{ __('production.dimension_thickness_error') }}</option>
-                    <option value="Chipped Edge / Structural Defect">{{ __('production.chipped_edge_defect') }}</option>
-                    <option value="Raw Material Defect">{{ __('production.raw_material_defect') }}</option>
-                    <option value="Machine Calibration Error">Machine Calibration Error</option>
-                    <option value="Operator Assembly Error">Operator Assembly Error</option>
-                </x-ui.odoo-form-ui>
-            </div>
-
-            <div class="col-md-12">
-                <x-ui.odoo-form-ui type="textarea" label="Inspection Remarks & Quality Notes" name="remarks" placeholder="Enter measured dimensions, batch details, or quality observations..." rows="2" />
-            </div>
-        </div>
-    </x-ui.modal>
+    {{-- QD: QC is done on the operation's inspection page (QC CHECK button) --}}
     {{-- Unified Material Disposition Modal (Scrap, Offcut, Return Unused) --}}
     @include('modules.production.partials.material-disposition-modal', [
         'op' => $op,
@@ -925,151 +857,6 @@
                     });
                 }
 
-                // Dynamic Quality Plan Checklist Synchronization (aligned with Shopfloor MES)
-                const qualityPlansMap = @json($qualityPlans->keyBy('id'));
-
-                function updateQualityChecklist(selectEl) {
-                    if (!selectEl) return;
-                    const form = selectEl.closest('form');
-                    const container = form ? form.querySelector('[id^="qualityChecklistContainer_"]') : null;
-                    if (!container) return;
-
-                    const opId = container.id.replace('qualityChecklistContainer_', '');
-                    const planId = selectEl.value;
-
-                    // Toggle pre-rendered odoo-form-ui parameter groups
-                    const allGroups = container.querySelectorAll('.qc-plan-group');
-                    if (allGroups.length > 0) {
-                        allGroups.forEach(group => {
-                            group.style.display = 'none';
-                            group.querySelectorAll('input, select, textarea').forEach(input => {
-                                input.disabled = true;
-                            });
-                        });
-
-                        const targetGroup = planId
-                            ? container.querySelector('#qc_plan_group_' + opId + '_' + planId)
-                            : container.querySelector('#qc_plan_group_' + opId + '_none');
-
-                        if (targetGroup) {
-                            targetGroup.style.display = 'block';
-                            targetGroup.querySelectorAll('input, select, textarea').forEach(input => {
-                                input.disabled = false;
-                            });
-                            return;
-                        }
-
-                        const fallback = container.querySelector('#qc_plan_group_' + opId + '_none');
-                        if (fallback) {
-                            fallback.style.display = 'block';
-                            fallback.querySelectorAll('input, select, textarea').forEach(input => {
-                                input.disabled = false;
-                            });
-                            return;
-                        }
-                    }
-
-                    // Dynamic fallback using identical odoo-form-ui structure
-                    const plan = qualityPlansMap[planId];
-                    if (plan && plan.parameters && plan.parameters.length > 0) {
-                        let html = '';
-                        plan.parameters.forEach((param) => {
-                            const isMandatory = param.is_mandatory ? '<span class="text-danger">*</span>' : '';
-                            const uom = param.unit_of_measure || param.uom || '';
-                            const hasMin = param.min_value !== null && param.min_value !== undefined && param.min_value !== '';
-                            const hasMax = param.max_value !== null && param.max_value !== undefined && param.max_value !== '';
-                            const specInfo = (hasMin || hasMax) ? ` [Spec: ${hasMin ? param.min_value : ''} - ${hasMax ? param.max_value : ''} ${uom}]` : (uom ? ` (${uom})` : '');
-                            const label = `${param.name}${specInfo}`;
-
-                            if (param.type === 'numeric') {
-                                html += `
-                                <div class="odoo-form-group">
-                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">
-                                        ${label} ${isMandatory}
-                                    </label>
-                                    <div class="flex-grow-1">
-                                        <input type="number" step="any" class="odoo-form-control" name="parameter_values[${param.id}]" id="param_${opId}_${param.id}" placeholder="Enter measured value (${uom})" ${param.is_mandatory ? 'required' : ''}>
-                                    </div>
-                                </div>
-                            `;
-                            } else if (param.type === 'text') {
-                                html += `
-                                <div class="odoo-form-group">
-                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">
-                                        ${label} ${isMandatory}
-                                    </label>
-                                    <div class="flex-grow-1">
-                                        <input type="text" class="odoo-form-control" name="parameter_values[${param.id}]" id="param_${opId}_${param.id}" placeholder="Enter observation / inspection notes..." ${param.is_mandatory ? 'required' : ''}>
-                                    </div>
-                                </div>
-                            `;
-                            } else {
-                                html += `
-                                <div class="odoo-form-group">
-                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">${param.name}</label>
-                                    <div class="flex-grow-1">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" checked name="parameter_values[${param.id}]" value="pass" id="param_${opId}_${param.id}">
-                                            <label class="form-check-label" for="param_${opId}_${param.id}">${param.name} (Pass)</label>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                            }
-                        });
-                        container.innerHTML = html;
-                    } else {
-                        container.innerHTML = `
-                        <div class="odoo-form-group">
-                            <label class="odoo-form-label" for="chkVisual${opId}">Visual Finish</label>
-                            <div class="flex-grow-1">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[visual]" value="pass" id="chkVisual${opId}">
-                                    <label class="form-check-label" for="chkVisual${opId}">Visual Surface Finish & Coating Inspection (Pass)</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="odoo-form-group">
-                            <label class="odoo-form-label" for="chkDim${opId}">Dimensional Spec</label>
-                            <div class="flex-grow-1">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[dimensional]" value="pass" id="chkDim${opId}">
-                                    <label class="form-check-label" for="chkDim${opId}">Dimensional & Thickness Tolerance Within Specification (Pass)</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="odoo-form-group">
-                            <label class="odoo-form-label" for="chkFunc${opId}">Structural Test</label>
-                            <div class="flex-grow-1">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[structural]" value="pass" id="chkFunc${opId}">
-                                    <label class="form-check-label" for="chkFunc${opId}">Assembly & Structural Integrity Test (Pass)</label>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    }
-                }
-
-                if (window.jQuery) {
-                    window.jQuery(document).on('change change.select2', 'select[name="quality_plan_id"]', function () {
-                        updateQualityChecklist(this);
-                    });
-
-                    window.jQuery(document).on('shown.bs.modal', function (e) {
-                        const select = e.target.querySelector('select[name="quality_plan_id"]');
-                        if (select) {
-                            updateQualityChecklist(select);
-                        }
-                    });
-                }
-
-                document.querySelectorAll('select[name="quality_plan_id"]').forEach(selectEl => {
-                    selectEl.addEventListener('change', function () {
-                        updateQualityChecklist(this);
-                    });
-                    updateQualityChecklist(selectEl);
-                });
 
                 // Live Operation Timer (HH:MM:SS format)
                 const liveTimerEl = document.getElementById('opLiveTimer');
@@ -1142,54 +929,6 @@
                     });
                 }
 
-                // Operator Quick QC Modal Form Validation
-                const quickQcForm = document.querySelector('#quickQcModal form');
-                if (quickQcForm) {
-                    quickQcForm.addEventListener('submit', function (e) {
-                        const acceptedInput = quickQcForm.querySelector('input[name="accepted_qty"]');
-                        const rejectedInput = quickQcForm.querySelector('input[name="rejected_qty"]');
-                        const accepted = parseFloat(acceptedInput ? acceptedInput.value : 0) || 0;
-                        const rejected = parseFloat(rejectedInput ? rejectedInput.value : 0) || 0;
-                        const total = accepted + rejected;
-                        const maxPending = {{ (float) $touchPendingQcQty }};
-
-                        const showWarning = function (msg) {
-                            if (typeof window.confirmAction === 'function') {
-                                window.confirmAction({
-                                    title: 'Quality Inspection Alert',
-                                    message: msg,
-                                    variant: 'warning',
-                                    confirmButtonText: 'OK',
-                                    hideCancel: true,
-                                    cancelButtonText: ''
-                                });
-                            } else {
-                                alert(msg);
-                            }
-                        };
-
-                        if (maxPending <= 0) {
-                            e.preventDefault();
-                            showWarning('Quality inspection cannot be logged: There are no units pending QC for this operation. Output must be logged first.');
-                            return false;
-                        }
-                        if (accepted < 0 || rejected < 0) {
-                            e.preventDefault();
-                            showWarning('Quantities cannot be negative.');
-                            return false;
-                        }
-                        if (total <= 0) {
-                            e.preventDefault();
-                            showWarning('Total inspected quantity (Accepted + Rejected) must be greater than zero.');
-                            return false;
-                        }
-                        if (total > maxPending + 0.0001) {
-                            e.preventDefault();
-                            showWarning('Total units logged for QC (' + total + ') cannot exceed the pending QC units (' + maxPending + ').');
-                            return false;
-                        }
-                    });
-                }
             });
         </script>
     @endpush

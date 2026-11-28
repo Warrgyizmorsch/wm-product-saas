@@ -530,3 +530,120 @@ A **button** (my recommendation, which the user left to me). It is not answered 
 
 ## Verification (when implemented)
 The user checks in the UI themself (no tests run by me unless asked). `php -l` / `view:clear` only.
+
+# QC flow review 2026-11-28 (findings; nothing fixed yet)
+
+The user asked what is left in quality inspection, where it shows on the MES board, and how it affects the flow. "Let's fix that flow quickly." The findings are below. Fixes wait for the user's go-ahead.
+
+**Where QC shows on the MES board** (`mes/dashboard.blade.php`)
+- **Process column:**
+  - a "QC" badge next to Seq
+  - "QC: N" in the metrics bar (yellow while units wait)
+  - Acc / Rej counts
+- **Actions column:**
+  - a yellow "Run QC (N)" button while units wait
+  - "QC Passed" once the operation is completed
+  - a red "Rework / Scrap (N)" button for rejected units
+- **Add production modal:** the quantity is "Processed Output Qty (Pending QC)", with a yellow notice.
+- **Run QC modal:**
+  - the operation's own plan checklist
+  - inspector
+  - accepted / rejected / defect reason / remarks
+  - the confirmation tick for a failed mandatory check
+- **Same form elsewhere:** the operator screen (`mes/operator/operation-execution.blade.php`) has it too. The WIP screen has "Final QC (N pending)" for the finished product. Quality → Inspections is a separate, older path.
+
+**How it affects the flow (code)**
+1. **Logged output waits for QC:** on a QC operation, logged output does not count as made. Waiting = logged − inspected (`MesExecutionService::getPendingQcQuantity`).
+2. **Run QC books the result** (`QualityInspectionService::processShopfloorInspection`):
+   - accepted units are added to the operation's output and WIP, then passed to the next operation
+   - rejected units get an NCR plus Rework / Scrap
+   - the operation completes when the accepted quantity reaches the target
+   - on an outsourced operation, the waiting receipts are booked and their GRN is written (`bookAfterQc`)
+3. **Next operation can't start before QC:** it can't start while a completed predecessor's QC gate is pending or failed (`qualityGateIsPendingOrFailed`).
+
+**Gaps found**
+
+| # | Gap | Effect | Proposed fix |
+|---|---|---|---|
+| QF-01 | The QC gate also counts inspections with no operation (`orWhereNull('production_order_operation_id')`): the WIP final QC, or one made from Quality → Inspections. | A passed final / manual inspection opens the gate of every QC operation of that order. | Count only the operation's own inspections. |
+| QF-02 | The gate is "any passed inspection exists", not "nothing waiting". | After one partial pass, "force complete" completes the operation while units still wait for QC. | Gate also fails while units are waiting for QC. |
+| QF-03 | Quality → Inspections (create → results → approve) can target an order operation but has no accepted / rejected quantity. | In-house op: adds no output, but opens the gate (QF-01/02). Outsourced op: approve runs the old `SubcontractReceiptOrchestrator::processQcApproval`, which adds passed qty, or else the inspected / order qty, to the operation outside the receipt / GRN flow, so it can be booked twice. | That menu no longer takes an order operation (in-process QC of an operation = Run QC on the MES board / operator screen). Remove the `processQcApproval` call and the leftover orchestrator. |
+| QF-04 | `approveInspection` still moves stock out of a "Quarantine" warehouse (QR-04 removed quarantine). | Dead path, which could move stock if such a warehouse exists. | Remove. |
+| QF-05 | Old plan-picker JS (`updateQualityChecklist`, a hard-coded "Visual Surface Finish" fallback checklist) is left on the MES board and operator screen. `MesController` still loads `$qualityPlans` for it. No plan dropdown exists any more (QR-16). | Dead code / clutter. | Remove. |
+
+**User 2026-11-28 (verbatim):** "Yes, fix all five, and we will do the same thing with QC that we done with the subcontracting. The button on the shop floor will not open up pop up. It will redirect us to the inspection create page. You can say on that page the inspections will already be created, or you can say yeah, we won't be creating new inspection from that page. For an operation, when operation is started and it needs a QC, its inspection will already get created with the rules that are there. Additional inspections can be created for that QC, depending upon the process and other things if it is needed. Otherwise, uh, it will work like that. So each operations inspection will get recorded in our inspection page, and performing a QC will need to be done from the inspection page following the inspection algorithm and inspection rules. Did you understand that? Now it wouldn't be no longer just enter the amount that passed QC and all those. Not that basic thing. It will be a detailed one, a proper QC one. Okay."
+
+**Fix status (Applied 2026-11-28, `php -l` clean, views compile, not run)**
+- **QF-01 Applied:** the QC gate counts only the operation's own inspections. The `orWhereNull` was removed in 4 places:
+  - `MesExecutionService::qualityGateIsPendingOrFailed`
+  - `ProductionExecutionService::ensureQualityGatePassed`
+  - `ProductionReadinessService` (QC readiness)
+  - `ProductionWipService` (batch journey QC badge)
+- **QF-02 Applied:** in `MesExecutionService` (log / complete), a QC operation is not completed while units are still waiting for QC. "Force complete" is refused with "N unit(s) of this operation are waiting for QC. Inspect them before completing the operation."
+- **QF-03 Applied (part):** `approveInspection` no longer calls `SubcontractReceiptOrchestrator::processQcApproval`, and that file is deleted (it had no other caller). An outsourced operation's units are booked only by its shop-floor QC (`bookAfterQc`).
+  - **Held:** "Quality → Inspections stops taking an order operation". The QD design below makes the inspection page the QC path, so this part is replaced by QD.
+- **QF-04 Applied:** the quarantine stock-transfer block was removed from `approveInspection`, together with its two unused imports.
+- **QF-05 Applied:** removed the old plan-picker JS (`qualityPlansMap`, `updateQualityChecklist`, the hard-coded fallback checklist, the `quality_plan_id` handlers) from `mes/dashboard.blade.php` and `mes/operator/operation-execution.blade.php`. `MesController` no longer loads `$qualityPlans` for them (dashboard + operator screen).
+- **Old tests:** `ComplexIndustrialManufacturingScenarioTest`, `MultiModelPhase3CoverageTest`, `MultiModelPhase3Test` and `MultiModelPhase4Test` still use the deleted orchestrator (they were already among the 20 old tests).
+
+## QD: QC done on the inspection page (user's design 2026-11-28, understood, NOT coded; questions open)
+
+**My understanding:**
+- **QD-01 Redirect, no popup:** the shop-floor "Run QC" button (MES board + operator screen) no longer opens a popup. It goes to the operation's inspection page, as dispatch and receipt do for subcontracting.
+- **QD-02 Created at start:** when an operation that needs QC is started, its inspection is created automatically from the operation's plans:
+  - the order snapshot: routing plans plus the semi's plans on a looped semi
+  - every check of those plans, with their rules (limits, pass / fail, mandatory)
+
+  Nobody creates it by hand.
+- **QD-03 Extra inspections:** more inspections for the same operation can be added on that page when the process needs them.
+- **QD-04 All on the inspection page:** every operation's inspections are listed in Quality → Inspections. QC is performed there following the plan rules, as a detailed QC, not just "accepted / rejected quantity".
+- **QD-05 Popup removed:** the quick Run QC popup goes. Its results (units move on, NCR + Rework / Scrap for rejects, subcontract receipts booked) are then produced by the inspection page.
+
+**Open questions:** see the chat of 2026-11-28; the answers are recorded here.
+
+### QD: user's follow-up 2026-11-28 (verbatim)
+> "Check the current structure. Tell me exactly how the current structure works. Because a QC can only be done when goods production is logged. So I think currently it can only be done when all the goods are completely produced. So either we can follow that, and so after all the goods are produced, there will be one single QC check. And if we want to do QC checks in parts for the goods that are produced, like if 10 goods are produced, 10 QC checks, then there will be multiple check records. You can say each QC check record will be linked via the operation ID, you can say, or the order ID. I mean the both the order ID and the order's operation ID. It will be linked by both. So it would be like a table. So it can have multiple QCs for same operation. That won't be an issue. So technically it would be per order. So now, so it doesn't matter. Uh, for those operations. For more, what we need to do is we will need to maintain the QC for items also. As the thing is, if see, currently it's a batch wise production. If it's produced by item number, then we need to check how item numbers are generated and how they can be logged per QC. Because if items are generated, then which items are rejected, we need to log those too. If they are being managed serial number wise, if they are managed lot wise, then we will see what need to be done."
+
+### Current structure (from code, 2026-11-28)
+- **QC in parts already works:** every output log on a QC operation goes to "waiting for QC" (waiting = logged − inspected, `getPendingQcQuantity`). Run QC can be done whenever units are waiting, for up to that many. Each Run QC writes one inspection record. Example: log 10 → QC 10 → log 30 → QC 30 gives 2 records. The operation completes when the accepted quantity reaches the target. It does **not** wait for all goods to be produced.
+- **Inspection record** (`production_quality_inspections`):
+  - links: `production_order_id` + `production_order_operation_id`, `batch_id`, `serial_number_id` (one only), machine, operator
+  - state: stage (incoming / in_process / final), status (draft / submitted / approved), result
+  - quantities: `inspected_quantity` / `passed_qty` / `failed_qty`, plus `sample_size` (a column, never filled from the floor)
+
+  Many records per operation are allowed. Plans: many per record (`production_quality_inspection_plans`). Readings: **one value per check** per record (`production_quality_inspection_results`), not per sample piece or per unit.
+- **How a product is tracked:** `products.track_batch` / `track_serial_number` set the order's `production_mode` (standard / batch / serial / batch_and_serial).
+- **Batches:** made by hand on the order (`BatchProductionService::createBatch`, split / merge, auto batch number).
+  - Output logs carry `production_batch_id`. Inspections carry `batch_id`, and the waiting-for-QC count can be per batch.
+  - The MES board counts per operation, not per batch.
+- **Serials** (`production_serial_numbers`): made on the operator screen's Serial tab, either a generated range (prefix + 6 digits, e.g. SN000001) or typed by hand. Each serial has status planned / produced / packed / shipped / returned / scrapped / reworked.
+  - **Gaps:**
+    - logging output never says which serials were made
+    - QC never records which serials passed or were rejected
+    - no QC path sets a serial to scrapped or reworked
+    - serials are only picked at finished-goods receipt (checked against the order)
+- **Lots:** production has no lot concept separate from the batch. The inventory batch is created at the finished-goods receipt.
+
+### QD: user's rule for the record quantity (2026-11-28, verbatim)
+> "For quantity per inspection, there will be a fixed quantity. So all the checks will be for a quantity. So if like 20 quantities passed, all three checks, those will be in a single quality check record. And then if another 20 quantities doesn't pass, those will be in the separate inspection record, even though those both quantities belong to the same OP of the same order. Did you understand that? And we will display this as a tooltip also. Those quantities that pass the QC will move to the next operation, as QC is done after the completion of those operations. So it will move to the next operation. If that doesn't pass a QC, I think their NCR should be generated, or you can say a link in the NCR will be there to generate, or maybe no need for NCR. We will see what needs to be the further stage. This for the failed quantity we will discuss it. First, let's implement the quantity that have been passed."
+>
+> Then: "For serial number items, we will discuss it later. For now, just fix it and then update the seeder if needed, and then also create the data for production orders…"
+
+### QD: what was built (Applied 2026-11-28; `php -l` clean, views compile, seeder run, pages checked in the browser)
+
+| # | Rule | Where |
+|---|---|---|
+| QD-01 | Shop-floor QC buttons go to the operation's inspection page, with no popup. This covers the MES board "Run QC (N)" and the operator screen "QC CHECK". | `mes/dashboard.blade.php`, `mes/operator/operation-execution.blade.php` → route `production.quality.operation-inspection.show` |
+| QD-02 | A QC operation always has one **open** record (status draft, result pending) with its plans. It is made when the operation starts (`MesExecutionService::startOperation`), when a subcontract receipt waits for QC (`SubcontractReceiptService::receive`), after each performed record, and when the page opens (older orders). | `QualityInspectionService::openOperationInspection` |
+| QD-03 | "Add inspection" on the page adds another open record. Quality → Inspections → Create with an order operation does the same, then redirects to the page. | `OperationInspectionController::add`, `QualityInspectionController::store` |
+| QD-04 | **One record = one quantity with one result.** The inspector enters the quantity (≤ waiting) and every check of the operation's plans (mandatory checks required). All recorded checks inside limits → the whole quantity passed; **any** failed check → the whole quantity failed. With no plan attached, the inspector picks Passed / Failed. A tooltip on the page, on the record badges and on the MES QC badge explains the rule. | `QualityInspectionService::performOperationInspection`, `quality/inspections/operation.blade.php` |
+| QD-05 | **Passed:** units added to the operation's output and WIP, then on to the next operation. The operation completes at target. On an outsourced operation the waiting receipts are booked and their GRN is written. **Failed:** counted as rejected, NCR, Rework / Scrap as before (**open, to discuss**). | same |
+| | Removed: the QC popups and their JS, `MesController::recordQualityInspection` + route `production.mes.quality-inspection`, `processShopfloorInspection` (accepted + rejected in one record). | |
+| | Readiness: a failed record blocks the operation's QC readiness only while no quantity has passed. | `ProductionReadinessService::evaluateQualityDimension` |
+
+**My decisions (please check):**
+1. **Optional checks count:** "any failed check fails the record" includes a failed reading on a non-mandatory parameter or an optional plan that was ticked. Mandatory = must be filled.
+2. **Inspection numbers:** `INSP-YYYYMMDD-0001` (per tenant, per day).
+3. **Unchanged:** the WIP final QC (finished product) keeps its accepted + rejected form. Serial / batch QC is left for later (user).
+4. **Gap found while seeding:** `ProductionOrderOperation::needsDispatchSlip()` was missing from the model while five places called it, so the MES board crashed. I added it back as the subcontract plan defined it: outsourced and (previous output or BOM rows).
+5. **Outdated guides:** `app/Domains/Production/docs/SHOPFLOOR_QC_GUIDE.md` and `DEVELOPER_ONBOARDING.md` still describe the old popup / `processShopfloorInspection`.

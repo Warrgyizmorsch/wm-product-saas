@@ -63,8 +63,10 @@ Route::prefix('production')
         Route::get('orders/{order}/variance', [\App\Domains\Production\Controllers\ProductionVarianceController::class, 'show'])->name('orders.variance');
         Route::post('variances/create-eco', [\App\Domains\Production\Controllers\ProductionVarianceController::class, 'createEco'])->name('variances.create-eco');
 
-        // ── Tenant Subcontract Settings ───────────────────────────────────────
+        // ── Production Settings (remnant policy; the subcontract PR/PO modes were removed, SF-4) ──
         Route::get('settings', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'index'])->name('settings.index');
+        // Old Subcontract Settings page, restored 2026-11-28 at the user's request (kept for discussion; its values are not read anywhere since SF-4)
+        Route::get('settings/subcontract', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'subcontract'])->name('settings.subcontract');
         Route::post('settings/subcontract', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'updateSubcontract'])->name('settings.subcontract.update');
         Route::post('settings/remnant-policy', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'updateRemnantPolicy'])->name('settings.remnant-policy.update');
 
@@ -79,7 +81,9 @@ Route::prefix('production')
         Route::get('subcontract/delivery-challans/{challan}', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'show'])->name('subcontract.delivery-challans.show');
         Route::get('subcontract/delivery-challans/{challan}/print', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'print'])->name('subcontract.delivery-challans.print');
         Route::post('subcontract/delivery-challans/{challan}/dispatch', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'dispatch'])->name('subcontract.delivery-challans.dispatch');
-        Route::post('subcontract/delivery-challans/{challan}/receive', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'receive'])->name('subcontract.delivery-challans.receive');
+        // SF-4: the one receipt page (Subcontracting menu, order screen and MES floor all open it — no popup)
+        Route::get('subcontract/receipts/create', [\App\Domains\Production\Controllers\SubcontractReceiptController::class, 'create'])->name('subcontract.receipts.create');
+        Route::post('subcontract/receipts', [\App\Domains\Production\Controllers\SubcontractReceiptController::class, 'store'])->name('subcontract.receipts.store');
 
         // ── Import/Export (Centralized Master Data) ───────────────────────────
         Route::get('import-export/download-template/{type}', [ProductionImportExportController::class, 'downloadTemplate'])
@@ -228,7 +232,6 @@ Route::prefix('production')
         Route::put('cost-adjustments/{adjustment}', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'update'])->name('cost-adjustments.update');
         Route::delete('cost-adjustments/{adjustment}', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'destroy'])->name('cost-adjustments.destroy');
         Route::get('cost-adjustments/{adjustment}/download', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'downloadAttachment'])->name('cost-adjustments.download');
-        Route::post('orders/{order}/generate-subcontract-pr/{operation}', [ProductionOrderController::class, 'generateSubcontractPr'])->name('orders.generate-subcontract-pr');
         Route::resource('orders', ProductionOrderController::class);
 
         // ── Work-in-Progress (WIP) Management ───────────────────────────────
@@ -300,10 +303,7 @@ Route::prefix('production')
         Route::post('mes/{op}/hold', [MesController::class, 'hold'])->name('mes.hold');
         Route::post('mes/{op}/cancel', [MesController::class, 'cancel'])->name('mes.cancel');
         Route::post('mes/{op}/andon-alert', [MesController::class, 'reportAndonAlert'])->name('mes.andon-alert');
-        // SC-02 / D-4: outsourced work on the shop floor — receive it, or raise its PR / PO (order-operation id)
-        Route::post('mes/subcontract/{orderOp}/receive', [MesController::class, 'recordSubcontractReceipt'])->name('mes.subcontract-receive');
-        Route::post('mes/subcontract/{orderOp}/procure', [MesController::class, 'raiseSubcontractPurchasing'])->name('mes.subcontract-procure');
-        Route::post('mes/{op}/quality-inspection', [MesController::class, 'recordQualityInspection'])->name('mes.quality-inspection');
+
         Route::post('mes/{op}/scrap', [MesController::class, 'recordOperationalScrap'])->name('mes.scrap');
         Route::post('mes/{op}/disposition', [MesController::class, 'recordDisposition'])->name('mes.disposition');
         Route::post('mes/{op}/remnant', [MesController::class, 'saveRemnant'])->name('mes.remnant');
@@ -372,6 +372,10 @@ Route::prefix('production')
         // ── Phase 4 Quality Management ──────────────────────────────────────
         Route::get('quality/dashboard', [QualityDashboardController::class, 'index'])->name('quality.dashboard');
 
+        // QD: an order operation's QC is done on its inspection page (the MES board and operator screen redirect here)
+        Route::get('quality/operations/{op}/inspection', [\App\Domains\Production\Controllers\OperationInspectionController::class, 'show'])->name('quality.operation-inspection.show');
+        Route::post('quality/operations/{op}/inspection/add', [\App\Domains\Production\Controllers\OperationInspectionController::class, 'add'])->name('quality.operation-inspection.add');
+        Route::post('quality/inspections/{inspection}/perform', [\App\Domains\Production\Controllers\OperationInspectionController::class, 'perform'])->name('quality.operation-inspection.perform');
         Route::post('quality/quick-inspection', [QualityInspectionController::class, 'operatorQuickInspection'])->name('quality.inspections.quick');
         Route::post('quality/inspections/{id}/results', [QualityInspectionController::class, 'saveResults'])->name('quality.inspections.results');
         Route::post('quality/inspections/{id}/approve', [QualityInspectionController::class, 'approve'])->name('quality.inspections.approve');

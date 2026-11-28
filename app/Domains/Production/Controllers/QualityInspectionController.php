@@ -51,6 +51,18 @@ class QualityInspectionController extends Controller
         $tenantId = require_tenant_id();
         $data = $request->validated();
 
+        // QD / QF-03: an order operation's inspections are records on its QC page (one quantity, one result)
+        if (!empty($data['production_order_operation_id'])) {
+            $orderOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($data['production_order_operation_id']);
+            if (!$this->inspectionService->operationNeedsQc($orderOp)) {
+                return redirect()->back()->withInput()->with('error', "Operation {$orderOp->operation_number} does not need QC.");
+            }
+            $open = $this->inspectionService->openOperationInspection($orderOp, auth()->id(), true);
+
+            return redirect()->route('production.quality.operation-inspection.show', ['op' => $orderOp->id, 'inspection' => $open?->id])
+                ->with('success', 'Inspection added for the operation — perform it here.');
+        }
+
         $inspection = $this->inspectionService->createInspection($tenantId, $data);
 
         return redirect()->route('production.inspections.show', $inspection->id)
@@ -63,6 +75,11 @@ class QualityInspectionController extends Controller
 
         $inspection = $this->qualityRepository->findInspection($id);
         abort_if(!$inspection, 404, 'Quality inspection record not found.');
+
+        // QD: an open operation record is performed on the operation's QC page
+        if ($inspection->status === 'draft' && $inspection->production_order_operation_id) {
+            return redirect()->route('production.quality.operation-inspection.show', ['op' => $inspection->production_order_operation_id, 'inspection' => $inspection->id]);
+        }
 
         return view('modules.production.quality.inspections.show', compact('inspection'));
     }

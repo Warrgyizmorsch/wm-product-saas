@@ -102,24 +102,10 @@
                                                     @if($op->is_external)
                                                         <span class="badge bg-soft-warning text-dark border border-warning ms-1"><i
                                                                 class="feather-external-link me-1"></i>{{ __('production.subcontract') }}</span>
-                                                        @if($op->purchaseOrder)
-                                                            @if($op->purchaseOrder->status === 'Approved')
-                                                                <a href="{{ route('purchase.orders.show', $op->purchaseOrder->id) }}"
-                                                                    class="badge bg-soft-success text-success border border-success-subtle text-decoration-none ms-1"
-                                                                    title="Subcontract PO Approved">
-                                                                    <i class="feather-check-circle me-1"></i>{{ __('production.po_approved') }}
-                                                                    (#{{ $op->purchaseOrder->purchase_order_number }})
-                                                                </a>
-                                                            @else
-                                                                <a href="{{ route('purchase.orders.show', $op->purchaseOrder->id) }}"
-                                                                    class="badge bg-soft-info text-info border border-info-subtle text-decoration-none ms-1"
-                                                                    title="Subcontract PO {{ $op->purchaseOrder->status }}">
-                                                                    <i class="feather-file-text me-1"></i>PO {{ $op->purchaseOrder->status }}
-                                                                    (#{{ $op->purchaseOrder->purchase_order_number }})
-                                                                </a>
-                                                            @endif
+                                                        @if($op->vendor_supplies_materials)
+                                                            <span class="badge bg-soft-info text-info border ms-1" title="The vendor uses its own materials"><i class="feather-package me-1"></i>Vendor's materials</span>
                                                         @endif
-                                                        @if(($op->material_supply_type ?? 'company_supplied') === 'company_supplied')
+                                                        @if($op->needsDispatchSlip())
                                                             <div class="mt-1">
                                                                 @php
                                                                     $existingChallan = $op->latestDeliveryChallan;
@@ -162,7 +148,7 @@
                                                     @if($op->is_external)
                                                         <span class="fw-semibold text-dark"><i
                                                                 class="feather-truck me-1 text-primary"></i>{{ $op->vendor->name ?? __('production.subcontract_vendor') }}</span>
-                                                        <div class="fs-10 text-muted">{{ __('production.lead') }}: {{ $op->subcontract_lead_time_days ?? 0 }}d
+                                                        <div class="fs-10 text-muted">Processing: {{ \App\Domains\Production\Services\SubcontractDates::formatHours($op->vendor_processing_hours) }}
                                                         </div>
                                                     @else
                                                         {{ $op->workCenter?->name ?? 'Unassigned' }}
@@ -263,15 +249,15 @@
                                                 </td>
                                                 <td class="text-center text-muted">
                                                     @if($op->is_external)
-                                                        Lead: {{ $op->subcontract_lead_time_days ?? 0 }}d
+                                                        Processing: {{ \App\Domains\Production\Services\SubcontractDates::formatHours($op->vendor_processing_hours) }}
                                                     @else
                                                         {{ format_duration($op->setup_time_planned) }} / {{ format_duration($op->processing_time_planned) }}
                                                     @endif
                                                 </td>
                                                 <td class="text-center fw-semibold text-dark">
                                                     @if($op->is_external)
-                                                        Disp: {{ $op->dispatch_buffer_days ?? 0 }}d / Ret:
-                                                        {{ $op->return_buffer_days ?? 0 }}d
+                                                        Dispatch: {{ \App\Domains\Production\Services\SubcontractDates::formatHours($op->vendor_dispatch_hours) }} / Receipt:
+                                                        {{ \App\Domains\Production\Services\SubcontractDates::formatHours($op->vendor_receipt_hours) }}
                                                     @else
                                                         {{ format_duration($op->setup_time_actual) }} / {{ format_duration($op->processing_time_actual) }}
                                                     @endif

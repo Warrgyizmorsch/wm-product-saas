@@ -1872,30 +1872,7 @@
                                     <span class="fs-11 text-muted">{{ __('production.outside_subcontracting_pipeline') }}</span>
                                 </div>
                                 <div class="row g-2 text-center">
-                                    <div class="col">
-                                        <a href="{{ route('production.orders.index', ['filter' => 'subcontract_awaiting_pr']) }}"
-                                            class="text-decoration-none">
-                                            <div
-                                                class="dash-tile dash-tile-default subcontract-pipeline-box border hover-shadow">
-                                                <span class="fs-10 text-muted text-uppercase fw-bold d-block mb-0.5">{{ __('production.awaiting_pr') }}</span>
-                                                <h5 class="text-dark fw-bold mb-0 my-1 font-monospace fs-15">
-                                                    {{ number_format($subcontractMetrics['awaiting_subcontract_pr'] ?? 0) }}
-                                                </h5>
-                                            </div>
-                                        </a>
-                                    </div>
-                                    <div class="col">
-                                        <a href="{{ route('purchase.orders.index', ['type' => 'subcontract', 'status' => 'draft']) }}"
-                                            class="text-decoration-none">
-                                            <div
-                                                class="dash-tile dash-tile-default subcontract-pipeline-box border hover-shadow">
-                                                <span class="fs-10 text-muted text-uppercase fw-bold d-block mb-0.5">{{ __('production.po_awaiting') }}</span>
-                                                <h5 class="text-dark fw-bold mb-0 my-1 font-monospace fs-15">
-                                                    {{ number_format($subcontractMetrics['po_awaiting_approval'] ?? 0) }}
-                                                </h5>
-                                            </div>
-                                        </a>
-                                    </div>
+                                    {{-- SF-4: no PR / PO in subcontracting — the "awaiting PR" and "PO awaiting" tiles were removed --}}
                                     <div class="col">
                                         <a href="{{ route('production.orders.index', ['filter' => 'subcontract_ready_dispatch']) }}"
                                             class="text-decoration-none">

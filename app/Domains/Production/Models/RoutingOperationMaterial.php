@@ -32,7 +32,7 @@ class RoutingOperationMaterial extends BaseModel
         'consumption_type',
         'sequence',
         'notes',
-        'supplied_by', // TF-02 company | vendor
+
     ];
 
     protected $casts = [

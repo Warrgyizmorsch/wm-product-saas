@@ -1771,10 +1771,7 @@ class ProductionWipService
                 $qcRequired = (bool) ($op->routingOperation?->quality_required);
                 $qcInspection = \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $order->tenant_id)
                     ->where('production_order_id', $order->id)
-                    ->where(function ($q) use ($op) {
-                        $q->where('production_order_operation_id', $op->id)
-                            ->orWhereNull('production_order_operation_id');
-                    })
+                    ->where('production_order_operation_id', $op->id) // QF-01: the operation's own inspections only
                     ->when($batch->id, function ($q) use ($batch) {
                         $q->where(fn($sub) => $sub->whereNull('batch_id')->orWhere('batch_id', $batch->id));
                     })

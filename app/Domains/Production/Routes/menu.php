@@ -46,7 +46,8 @@ return [
         'children' => [
             ['label' => 'production.delivery_challans_gate_passes', 'default' => 'Delivery Challans / Gate Passes', 'route' => 'production.subcontract.delivery-challans.index', 'permission' => 'production.mes.execute', 'active_routes' => ['production.subcontract.delivery-challans.*']],
             ['label' => 'production.vendor_sla_analytics', 'default' => 'Vendor SLA & Analytics', 'route' => 'production.subcontract.analytics', 'active_routes' => ['production.subcontract.analytics']],
-            ['label' => 'production.subcontract_settings', 'default' => 'Subcontract Settings', 'route' => 'production.settings.index', 'permission' => 'production.work_center.manage', 'active_routes' => ['production.settings.*']],
+            ['label' => 'production.subcontract_settings', 'default' => 'Subcontract Settings', 'route' => 'production.settings.subcontract', 'permission' => 'production.work_center.manage', 'active_routes' => ['production.settings.subcontract', 'production.settings.subcontract.*']],
+            ['label' => 'production.production_settings', 'default' => 'Production Settings', 'route' => 'production.settings.index', 'permission' => 'production.work_center.manage', 'active_routes' => ['production.settings.index', 'production.settings.remnant-policy.*']],
         ],
     ],
     [

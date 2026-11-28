@@ -24,7 +24,6 @@ class PurchaseRequisitionItem extends Model
         'branch_id',
         'sales_order_item_id',
         'project_task_id',
-        'production_order_operation_id', // subcontract service line → its outsourced production operation
         'product_id',
         'warehouse_id',
         'quantity',

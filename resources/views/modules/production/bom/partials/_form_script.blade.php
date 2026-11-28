@@ -16,6 +16,8 @@
             availableOperations: [],
             // TF-01: per routing operation, 1 = works on the previous operation's output ("Previous OP materials")
             operationInputFlags: @json((object) (old('operation_input_flags') ?? ($isEdit ? ($bom->operation_input_flags ?? []) : (($copyFromBom ?? null)?->operation_input_flags ?? [])))),
+            // SF-2: per outsourced routing operation, 1 = the vendor uses its own materials ("Vendor-supplied materials")
+            operationVendorFlags: @json((object) (old('operation_vendor_material_flags') ?? ($isEdit ? ($bom->operation_vendor_material_flags ?? []) : (($copyFromBom ?? null)?->operation_vendor_material_flags ?? [])))),
             expandedOps: {},
             expandedSummaryRows: {},
             activeTab: 'components',
@@ -58,7 +60,7 @@
                 this.saveDraft && this.saveDraft();
             },
 
-            // ── TF-02 vendor-supplied materials (outsourced operations only) ──
+            // ── SF-2 "Vendor-supplied materials" (outsourced operations only): an operation tick, never material rows ──
             opById(opId) {
                 return (this.availableOperations || []).find(o => String(o.id) === String(opId)) || null;
             },
@@ -66,9 +68,25 @@
                 const op = this.opById(opId);
                 return !!(op && (op.is_external === true || op.is_external === 1 || String(op.is_external) === '1'));
             },
-            defaultSuppliedBy(opId) {
-                const op = this.opById(opId);
-                return (this.isExternalOpId(opId) && op && op.material_supply_type === 'vendor_supplied') ? 'vendor' : 'company';
+            vendorSuppliesMaterials(op) {
+                if (!op || !this.isExternalOpId(op.id)) return false;
+                const v = (this.operationVendorFlags || {})[String(op.id)];
+                return v === true || String(v) === '1';
+            },
+            setVendorSuppliesMaterials(op, value) {
+                this.operationVendorFlags = Object.assign({}, this.operationVendorFlags || {}, { [String(op.id)]: value ? 1 : 0 });
+                this.saveDraft && this.saveDraft();
+            },
+            // the visible note on an outsourced operation (RV-01): what goes to the vendor, case by case
+            outsourcedNote(op) {
+                const parts = [];
+                if (this.usesPreviousOp(op)) parts.push("the previous operation's output");
+                if (this.getItemsForOp(op.id).length > 0) parts.push('our materials listed below');
+                const sends = parts.length ? ('Outsourced: ' + parts.join(' and ') + ' go to the vendor on the dispatch slip') : 'Outsourced: nothing of ours goes to the vendor (no dispatch slip)';
+                return sends + (this.vendorSuppliesMaterials(op) ? '; the vendor also uses its own materials.' : '.');
+            },
+            outsourcedNeedsChoice(op) {
+                return this.isExternalOpId(op.id) && !this.usesPreviousOp(op) && !this.vendorSuppliesMaterials(op) && this.getItemsForOp(op.id).length === 0;
             },
 
             get visibleOperations() {
@@ -482,8 +500,7 @@
                         material_scrap_percentage: it.material_scrap_percentage || 0,
                         is_alternative: !!it.is_alternative,
                         replaces_row_uid: it.replaces_row_uid || '',
-                        priority: it.is_alternative ? (it.priority || '') : '',
-                        supplied_by: it.supplied_by === 'vendor' ? 'vendor' : 'company'
+                        priority: it.is_alternative ? (it.priority || '') : ''
                     }));
 
                     if (!prodId && !routId && !bomName && !itemsToSave.some(it => it.material_id)) {
@@ -581,7 +598,6 @@
                     is_alternative: !!parseInt(item.is_alternative) || item.is_alternative === true,
                     replaces_row_uid: replacesUid,
                     priority: item.priority || "",
-                    supplied_by: item.supplied_by === 'vendor' ? 'vendor' : 'company',
                     child_bom_status: 'none',
                     child_bom_versions: [],
                     child_bom_loading: false,
@@ -916,7 +932,6 @@
                     is_alternative: false,
                     replaces_row_uid: '',
                     priority: 1,
-                    supplied_by: this.defaultSuppliedBy(opId),
                     child_bom_status: 'none',
                     child_bom_versions: [],
                     child_bom_loading: false,

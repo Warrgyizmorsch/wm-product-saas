@@ -22,7 +22,7 @@ class RoutingExport implements FromCollection, WithHeadings, WithMapping
     public function collection()
     {
         $query = Routing::where('tenant_id', $this->tenantId)
-            ->with(['operations.workCenter', 'operations.section', 'operations.machine', 'operations.manualProduction', 'operations.vendor', 'operations.subcontractServiceProduct']);
+            ->with(['operations.workCenter', 'operations.section', 'operations.machine', 'operations.manualProduction', 'operations.vendor']);
 
         if (!empty($this->filters['status'])) {
             $query->where('status', $this->filters['status']);
@@ -80,13 +80,10 @@ class RoutingExport implements FromCollection, WithHeadings, WithMapping
             'cost_per_unit'      => 'Cost Per Unit',
             // M-04 / N-26: outsourced setup — headings match the import columns so an export re-imports whole
             'vendor_code'                 => 'Vendor Code',
-            'subcontract_cost_per_unit'   => 'Subcontract Cost Per Unit',
-            'material_supply_type'        => 'Material Supply Type',
-            'subcontract_input_type'      => 'Subcontract Input Type',
-            'subcontract_lead_time_days'  => 'Subcontract Lead Time Days',
-            'dispatch_buffer_days'        => 'Dispatch Buffer Days',
-            'return_buffer_days'          => 'Return Buffer Days',
-            'service_product_code'        => 'Service Product Code',
+            // SF-1: the three times in hours (calendar time)
+            'vendor_dispatch_hours'       => 'Dispatch Time Hours',
+            'vendor_processing_hours'     => 'Processing Time Hours',
+            'vendor_receipt_hours'        => 'Receipt Time Hours',
         ];
     }
 
@@ -134,14 +131,9 @@ class RoutingExport implements FromCollection, WithHeadings, WithMapping
             'is_external'        => $op ? ($op->is_external ? 'Yes' : 'No') : '',
             'cost_per_unit'      => $op?->cost_per_unit ?? '',
             'vendor_code'                 => ($op && $op->is_external) ? ($op->vendor?->code ?? '') : '',
-            // the import converts this from the active currency to base, so export it in the active currency
-            'subcontract_cost_per_unit'   => ($op && $op->is_external) ? round(convert_from_base((float) $op->subcontract_cost_per_unit), 4) : '',
-            'material_supply_type'        => ($op && $op->is_external) ? ($op->material_supply_type ?? '') : '',
-            'subcontract_input_type'      => ($op && $op->is_external) ? ($op->subcontract_input_type ?? '') : '',
-            'subcontract_lead_time_days'  => ($op && $op->is_external) ? (int) $op->subcontract_lead_time_days : '',
-            'dispatch_buffer_days'        => ($op && $op->is_external) ? (int) $op->dispatch_buffer_days : '',
-            'return_buffer_days'          => ($op && $op->is_external) ? (int) $op->return_buffer_days : '',
-            'service_product_code'        => ($op && $op->is_external) ? ($op->subcontractServiceProduct?->sku ?? '') : '',
+            'vendor_dispatch_hours'       => ($op && $op->is_external) ? (float) $op->vendor_dispatch_hours : '',
+            'vendor_processing_hours'     => ($op && $op->is_external) ? (float) $op->vendor_processing_hours : '',
+            'vendor_receipt_hours'        => ($op && $op->is_external) ? (float) $op->vendor_receipt_hours : '',
         ];
 
         return array_map(fn($col) => $values[$col] ?? '', $this->getActiveColumns());

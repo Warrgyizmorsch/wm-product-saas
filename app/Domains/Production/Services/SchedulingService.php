@@ -422,8 +422,7 @@ class SchedulingService
 
             foreach ($operations as $op) {
                 if ($op->is_external || $op->isOutsourced()) {
-                    $totalDays = (int) ($op->dispatch_buffer_days ?? 0) + (int) ($op->subcontract_lead_time_days ?? 0) + (int) ($op->return_buffer_days ?? 0);
-                    $duration = $totalDays * 1440.0;
+                    $duration = $op->vendorTotalHours() * 60.0; // SF-1: dispatch + processing + receipt, calendar hours
 
                     $earliestStart = $this->calculateEarliestStartFromPredecessors(
                         $scheduledData,
@@ -622,8 +621,7 @@ class SchedulingService
 
             foreach ($reversedOps as $op) {
                 if ($op->is_external || $op->isOutsourced()) { // H-01: same test as the forward schedule
-                    $totalDays = (int) ($op->dispatch_buffer_days ?? 0) + (int) ($op->subcontract_lead_time_days ?? 0) + (int) ($op->return_buffer_days ?? 0);
-                    $duration = $totalDays * 1440.0;
+                    $duration = $op->vendorTotalHours() * 60.0; // SF-1: dispatch + processing + receipt, calendar hours
 
                     $latestFinish = $this->calculateLatestFinishFromSuccessors(
                         $scheduledData,
@@ -830,7 +828,7 @@ class SchedulingService
 
                 if ($orderOp && $orderOp->is_external) {
                     // H-01: an outsourced operation has no machine / batch here — its vendor lead time runs on the calendar
-                    $duration = (float) (app(SubcontractDates::class)->totalDays($orderOp) * 1440) ?: (float) $op->planned_duration_minutes;
+                    $duration = (float) (app(SubcontractDates::class)->totalHours($orderOp) * 60) ?: (float) $op->planned_duration_minutes;
                     $alloc = [
                         'start' => $earliestStart->copy(),
                         'finish' => $this->addWorkingMinutes(null, $earliestStart->copy(), $duration), // no work centre = calendar time
@@ -1898,8 +1896,7 @@ class SchedulingService
         float $orderQuantity
     ): Carbon {
         if ((bool) ($orderOp->is_external || $orderOp->isOutsourced())) {
-            $totalDays = (int) ($orderOp->dispatch_buffer_days ?? 0) + (int) ($orderOp->subcontract_lead_time_days ?? 0) + (int) ($orderOp->return_buffer_days ?? 0);
-            $durationMinutes = $totalDays * 1440.0;
+            $durationMinutes = $orderOp->vendorTotalHours() * 60.0; // SF-1: calendar hours
             return $plannedStart->copy()->addMinutes((int) ceil($durationMinutes));
         }
 
@@ -2788,7 +2785,7 @@ class SchedulingService
 
                     // Find slot (H-01: an outsourced operation keeps its vendor lead time, calendar days, no resource)
                     if ($op->orderOperation?->is_external) {
-                        $duration = (float) (app(SubcontractDates::class)->totalDays($op->orderOperation) * 1440) ?: (float) $op->planned_duration_minutes;
+                        $duration = (float) (app(SubcontractDates::class)->totalHours($op->orderOperation) * 60) ?: (float) $op->planned_duration_minutes;
                         $alloc = ['start' => $earliestStart->copy(), 'finish' => $this->addWorkingMinutes(null, $earliestStart->copy(), $duration), 'warnings' => []];
                     } else {
                         $alloc = $this->allocateOperationSlot($op->orderOperation, $earliestStart, $duration, $tenantId, true, [$op->id]);
@@ -2877,7 +2874,7 @@ class SchedulingService
 
                     if ($op->orderOperation?->is_external) {
                         // H-01: vendor lead time backwards from the latest finish, calendar days, no resource
-                        $duration = (float) (app(SubcontractDates::class)->totalDays($op->orderOperation) * 1440) ?: (float) $op->planned_duration_minutes;
+                        $duration = (float) (app(SubcontractDates::class)->totalHours($op->orderOperation) * 60) ?: (float) $op->planned_duration_minutes;
                         $alloc = ['start' => $latestFinish->copy()->subMinutes((int) ceil($duration)), 'finish' => $latestFinish->copy(), 'warnings' => []];
                     } else {
                         $alloc = $this->allocateOperationSlot($op->orderOperation, $latestFinish, $duration, $tenantId, false, [$op->id]);

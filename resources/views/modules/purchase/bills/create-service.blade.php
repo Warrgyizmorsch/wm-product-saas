@@ -117,6 +117,8 @@
                         <option value="Handling Charges" @selected(old('service_head', $prefilled['service_head'] ?? request('service_head')) === 'Handling Charges')>{{ __('purchase.service_head_handling') }}</option>
                         <option value="Insurance" @selected(old('service_head', $prefilled['service_head'] ?? request('service_head')) === 'Insurance')>{{ __('purchase.service_head_insurance') }}</option>
                         <option value="Other Service Charges" @selected(old('service_head', $prefilled['service_head'] ?? request('service_head')) === 'Other Service Charges')>{{ __('purchase.service_head_other') }}</option>
+                        {{-- Production subcontract receipt (job work + the vendor's own materials) → 5034 Job Work Charges --}}
+                        <option value="Job Work" @selected(old('service_head', $prefilled['service_head'] ?? request('service_head')) === 'Job Work')>{{ __('purchase.service_head_job_work') }}</option>
                     </x-ui.odoo-form-ui>
 
                     <div class="row g-2">

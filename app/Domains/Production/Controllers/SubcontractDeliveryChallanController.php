@@ -11,7 +11,6 @@ use App\Domains\Production\Models\ProductionSubcontractReceipt;
 use App\Domains\Production\Repositories\DeliveryChallanRepositoryInterface;
 use App\Domains\Production\Services\SubcontractDates;
 use App\Domains\Production\Services\SubcontractMaterialBalanceService;
-use App\Domains\Production\Services\SubcontractReceiptService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -51,6 +50,12 @@ class SubcontractDeliveryChallanController extends Controller
         $order = $operation?->order ?? ($request->filled('production_order_id')
             ? ProductionOrder::where('tenant_id', $tenantId)->with('product')->find($request->production_order_id)
             : null);
+
+        if ($operation && !$operation->needsDispatchSlip()) {
+            // SF-2: nothing of ours goes to the vendor (vendor-supplied only) — receive the work straight away
+            return redirect()->route('production.subcontract.receipts.create', ['operation_id' => $operation->id])
+                ->with('success', "Op #{$operation->operation_number} sends nothing of ours to the vendor, so it needs no dispatch slip. Record the receipt when the work comes back.");
+        }
 
         if ($operation) {
             $existingDraft = DeliveryChallan::where('tenant_id', $tenantId)
@@ -172,7 +177,7 @@ class SubcontractDeliveryChallanController extends Controller
 
         $receipts = ProductionSubcontractReceipt::where('tenant_id', $tenantId)
             ->where('delivery_challan_id', $challan->id)
-            ->with(['grn', 'receiver'])
+            ->with(['grn.vendorBills', 'receiver'])
             ->orderBy('id')
             ->get();
 
@@ -213,43 +218,5 @@ class SubcontractDeliveryChallanController extends Controller
         app(\App\Domains\Production\Services\ProductionNotificationService::class)->notifySubcontractChallanDispatched($challan->fresh());
 
         return redirect()->back()->with('success', "Dispatch slip {$challan->challan_number} sent to the vendor.");
-    }
-
-    /** SC-02 / TF-06: the Subcontracting-menu receipt — the same receipt as the shop floor */
-    public function receive(Request $request, $id)
-    {
-        $tenantId = require_tenant_id();
-        $challan = $this->repository->findOrFail((int) $id, $tenantId);
-
-        if (!$challan->isAtVendor()) {
-            return redirect()->back()->with('warning', "Dispatch slip {$challan->challan_number} is {$challan->status}: nothing can be received on it.");
-        }
-        $this->authorize('receive', $challan);
-
-        $validated = $request->validate([
-            'received_qty' => 'required|numeric|gt:0',
-            'rejected_qty' => 'nullable|numeric|min:0',
-            'scrapped_qty' => 'nullable|numeric|min:0',
-            'remarks' => 'nullable|string|max:1000',
-            'returns' => 'nullable|array',
-            'returns.*' => 'nullable|numeric|min:0',
-            'final' => 'nullable|boolean',
-        ]);
-
-        $op = $challan->operation;
-        if (!$op) {
-            return redirect()->back()->with('error', 'This slip has no outsourced operation.');
-        }
-
-        try {
-            $receipt = app(SubcontractReceiptService::class)->receive($op, $validated, (int) auth()->id(), ProductionSubcontractReceipt::SOURCE_CHALLAN, $challan);
-        } catch (\InvalidArgumentException $e) {
-            return redirect()->back()->withInput()->with('error', $e->getMessage());
-        }
-
-        return redirect()->route('production.subcontract.delivery-challans.show', $challan->id)->with('success',
-            $receipt->status === ProductionSubcontractReceipt::STATUS_QC_PENDING
-                ? "Receipt {$receipt->receipt_number} recorded — the units wait for this operation's QC on the shop floor."
-                : "Receipt {$receipt->receipt_number} recorded: good units booked, subcontract PO updated.");
     }
 }

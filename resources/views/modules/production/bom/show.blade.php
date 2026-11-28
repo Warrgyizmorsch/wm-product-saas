@@ -628,6 +628,10 @@
                                                     {{-- TF-01 --}}
                                                     <span class="badge bg-soft-info text-info fs-10" title="Works on the previous operation's output">Previous OP materials</span>
                                                 @endif
+                                                @if ($bom->vendorSuppliesMaterials($op))
+                                                    {{-- SF-2 --}}
+                                                    <span class="badge bg-soft-warning text-dark border fs-10" title="The vendor uses its own materials — not in our stock, they come on the vendor's bill"><i class="feather-package me-1"></i>Vendor uses own materials</span>
+                                                @endif
                                             </div>
                                             @if ($op->description)
                                                 <small class="text-muted d-block mt-1">{{ $op->description }}</small>
@@ -674,9 +678,9 @@
                                                                 @if($opMat->consumption_type)
                                                                     <span class="badge bg-light text-dark border fs-10 ms-1">{{ $opMat->consumption_type }}</span>
                                                                 @endif
-                                                                @if(\App\Domains\Production\Services\ProductionOrderEngineeringService::isVendorSuppliedAllocation($opMat, $op))
-                                                                    {{-- TF-02 --}}
-                                                                    <span class="badge bg-soft-purple text-purple fs-10 ms-1" title="The vendor brings it — not requested from the store">Vendor-supplied</span>
+                                                                @if($op->is_external)
+                                                                    {{-- SF-2: a row on an outsourced operation is our material sent to the vendor --}}
+                                                                    <span class="badge bg-soft-primary text-primary fs-10 ms-1" title="Our material, sent to the vendor on the dispatch slip">Sent to vendor</span>
                                                                 @endif
                                                             </li>
                                                         @endforeach

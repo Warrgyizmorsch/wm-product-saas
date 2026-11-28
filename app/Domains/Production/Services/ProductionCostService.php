@@ -91,7 +91,7 @@ class ProductionCostService
             return [
                 'labor' => 0.0,
                 'machine' => 0.0,
-                'subcontract' => (float) ($operation->subcontract_cost_per_unit ?? 0.0) * $yieldFactor,
+                'subcontract' => 0.0, // SF-1: no rate on the routing — the job work is charged on the vendor bill
                 'setup_per_run' => 0.0,
             ];
         }
@@ -291,67 +291,29 @@ class ProductionCostService
     }
 
     /**
-     * Calculate subcontract cost for a ProductionOrder using authoritative cost hierarchy:
-     * Actual (Vendor Bill) -> Committed (Approved PO) -> Estimated (Routing Snapshot).
+     * Job-work cost of a production order (SF-5, docs/production_ui_rules_review_2026-11-27.md). There is no rate on
+     * the routing and no PO, so the only figure is what the vendors billed: Service Bills made from the order's
+     * subcontract receipt GRNs (pre-tax subtotal, cancelled bills left out). estimated / committed keep the callers' shape.
      */
     public function calculateSubcontractCost(\App\Domains\Production\Models\ProductionOrder $order): array
     {
-        $tenantId = $order->tenant_id;
-        $externalOps = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+        $receiptIds = \App\Domains\Production\Models\ProductionSubcontractReceipt::where('tenant_id', $order->tenant_id)
             ->where('production_order_id', $order->id)
-            ->where('is_external', true)
-            ->get();
+            ->pluck('id');
 
-        $estimatedCost = 0.0;
-        $committedCost = 0.0;
-        $actualCost = 0.0;
-
-        foreach ($externalOps as $op) {
-            $opTarget = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1.0));
-            $opEstimated = (float) ($op->subcontract_cost_per_unit * $opTarget);
-            $estimatedCost += $opEstimated;
-
-            $poItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('purchase_order_id', function ($q) use ($tenantId, $order) {
-                $q->select('id')->from('purchase_orders')
-                    ->where('tenant_id', $tenantId)
-                    ->where('production_order_id', $order->id);
-            })->where('production_order_operation_id', $op->id)->first();
-
-            if ($poItem) {
-                $opCommitted = (float) ($poItem->total_amount ?? ($poItem->quantity * $poItem->rate));
-                $committedCost += $opCommitted;
-
-                $vendorBillItem = \Illuminate\Support\Facades\DB::table('vendor_bill_items')
-                    ->join('vendor_bills', 'vendor_bill_items.vendor_bill_id', '=', 'vendor_bills.id')
-                    ->where('vendor_bills.tenant_id', $tenantId)
-                    ->where('vendor_bills.purchase_order_id', $poItem->purchase_order_id)
-                    ->where('vendor_bills.product_id', $poItem->product_id)
-                    ->select('vendor_bill_items.*')
-                    ->first();
-
-                if ($vendorBillItem && isset($vendorBillItem->total_amount)) {
-                    $actualCost += (float) $vendorBillItem->total_amount;
-                } else {
-                    $actualCost += $opCommitted;
-                }
-            } else {
-                $committedCost += $opEstimated;
-                $actualCost += $opEstimated;
-            }
-        }
-
-        // Authoritative cost selection: alternatives by lifecycle stage, NOT additive!
-        $authoritativeCost = match (true) {
-            $actualCost > 0.0 => $actualCost,
-            $committedCost > 0.0 => $committedCost,
-            default => $estimatedCost,
-        };
+        $actualCost = $receiptIds->isEmpty() ? 0.0 : (float) \Illuminate\Support\Facades\DB::table('vendor_bills')
+            ->join('goods_receipt_notes', 'goods_receipt_notes.id', '=', 'vendor_bills.goods_receipt_note_id')
+            ->where('vendor_bills.tenant_id', $order->tenant_id)
+            ->where('goods_receipt_notes.source_type', \App\Domains\Purchase\Services\GoodsReceiptNoteService::SOURCE_SUBCONTRACT_RECEIPT)
+            ->whereIn('goods_receipt_notes.source_id', $receiptIds)
+            ->whereRaw("LOWER(COALESCE(vendor_bills.status, '')) != ?", ['cancelled'])
+            ->sum('vendor_bills.subtotal');
 
         return [
-            'estimated' => $estimatedCost,
-            'committed' => $committedCost,
-            'actual' => $actualCost,
-            'authoritative' => $authoritativeCost,
+            'estimated' => 0.0,
+            'committed' => 0.0,
+            'actual' => round($actualCost, 4),
+            'authoritative' => round($actualCost, 4),
         ];
     }
 

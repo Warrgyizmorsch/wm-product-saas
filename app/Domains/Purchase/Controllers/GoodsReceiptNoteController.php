@@ -51,8 +51,6 @@ class GoodsReceiptNoteController extends Controller
 
         $pendingOrders = $allOrders->filter(function ($order) {
             $rem = $order->items->sum(function ($item) {
-                // SC-02: subcontract (job-work) lines are received from Production, never on this screen
-                if (!empty($item->production_order_operation_id)) return 0;
                 return max(0, (float)$item->quantity - (float)($item->received_qty ?? 0));
             });
             return $rem > 0;
@@ -97,7 +95,6 @@ class GoodsReceiptNoteController extends Controller
             ->get()
             ->filter(function ($order) {
                 $rem = $order->items->sum(function ($item) {
-                    if (!empty($item->production_order_operation_id)) return 0; // SC-02: received from Production
                     return max(0, (float)$item->quantity - (float)($item->received_qty ?? 0));
                 });
                 return $rem > 0;
@@ -196,8 +193,7 @@ class GoodsReceiptNoteController extends Controller
         // Group by product_id + line_type, not product_id alone — otherwise a split
         // purchase of the same product (e.g. 8 units to Stock, 2 to Asset) would
         // incorrectly merge into a single GRN receiving line.
-        // SC-02: subcontract (job-work) lines are received from Production (system GRN), not here
-        $items = $order->items->filter(fn ($item) => empty($item->production_order_operation_id))->groupBy(fn ($item) => $item->product_id . '|' . $item->line_type)->map(function ($productItems) use ($order) {
+        $items = $order->items->groupBy(fn ($item) => $item->product_id . '|' . $item->line_type)->map(function ($productItems) use ($order) {
             $first = $productItems->first();
             $orderedQty = (float)$productItems->sum('quantity');
             $prevReceived = (float)$productItems->sum('received_qty');

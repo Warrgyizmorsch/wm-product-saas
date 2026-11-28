@@ -998,9 +998,8 @@
                                                     <th>{{ __('production.op_hash') }}</th>
                                                     <th>{{ __('production.operation') }}</th>
                                                     <th>{{ __('production.vendor_supply_type') }}</th>
-                                                    <th>{{ __('production.lead_and_buffers') }}</th>
-                                                    <th>{{ __('production.pr_reference') }}</th>
-                                                    <th>{{ __('production.po_reference') }}</th>
+                                                    <th>Dispatch · processing · receipt</th>
+                                                    <th>Dispatch slip / receipt</th>
                                                     <th>{{ __('production.timing_planned_actual') }}</th>
                                                     <th>{{ __('production.quantity_qc_status') }}</th>
                                                     <th>{{ __('production.subcontract_cost') }}</th>
@@ -1009,13 +1008,14 @@
                                             <tbody>
                                                 @forelse($order->operations->where('is_external', true) as $extOp)
                                                     @php
-                                                        // N-16: the PR / PO of THIS operation (operation link; cancelled ones never count)
-                                                        $poItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('production_order_operation_id', $extOp->id)
-                                                            ->whereHas('order', fn ($q) => $q->where('status', '!=', 'Cancelled'))->latest('id')->first();
-                                                        $po = $poItem?->order;
-                                                        $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::where('production_order_operation_id', $extOp->id)
-                                                            ->whereHas('requisition', fn ($q) => $q->where('status', '!=', 'Cancelled'))->latest('id')->first();
-                                                        $pr = $prItem?->requisition;
+                                                        // SF-5: job-work cost = vendor bills made from this operation's receipt GRNs (no rate, no PO)
+                                                        $opReceiptIds = \App\Domains\Production\Models\ProductionSubcontractReceipt::where('production_order_operation_id', $extOp->id)->pluck('id');
+                                                        $billedCost = $opReceiptIds->isEmpty() ? 0.0 : (float) \Illuminate\Support\Facades\DB::table('vendor_bills')
+                                                            ->join('goods_receipt_notes', 'goods_receipt_notes.id', '=', 'vendor_bills.goods_receipt_note_id')
+                                                            ->where('goods_receipt_notes.source_type', 'subcontract_receipt')
+                                                            ->whereIn('goods_receipt_notes.source_id', $opReceiptIds)
+                                                            ->whereRaw("LOWER(COALESCE(vendor_bills.status, '')) != 'cancelled'")
+                                                            ->sum('vendor_bills.subtotal');
 
                                                         // H-06: quantities from the dispatch slips and receipts of this operation
                                                         $scBalance = $matBalanceService->getMaterialBalance($order->tenant_id, $order->id, $extOp->id);
@@ -1046,74 +1046,33 @@
                                                             <div class="fw-bold text-dark"><i
                                                                     class="feather-truck me-1 text-primary"></i>{{ $extOp->vendor->name ?? __('production.subcontractor') }}
                                                             </div>
+                                                            {{-- SF-2: what goes to the vendor, from the BOM --}}
                                                             @if($extOp->isWipJobWork())
-                                                                <span
-                                                                    class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 mt-1"><i
-                                                                        class="feather-layers me-1"></i>{{ __('production.previous_op_wip') }}</span>
-                                                            @elseif(($extOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied')
-                                                                <span
-                                                                    class="badge bg-soft-info text-info border border-info-subtle fs-10 mt-1"><i
-                                                                        class="feather-box me-1"></i>{{ __('production.vendor_supplied') }}</span>
-                                                            @else
-                                                                <span
-                                                                    class="badge bg-soft-warning text-dark border border-warning-subtle fs-10 mt-1"><i
-                                                                        class="feather-truck me-1"></i>{{ __('production.company_supplied_raw') }}</span>
+                                                                <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 mt-1"><i class="feather-layers me-1"></i>{{ __('production.previous_op_wip') }}</span>
+                                                            @endif
+                                                            @if($extOp->bomMaterialRows()->isNotEmpty())
+                                                                <span class="badge bg-soft-warning text-dark border border-warning-subtle fs-10 mt-1"><i class="feather-truck me-1"></i>Our materials</span>
+                                                            @endif
+                                                            @if($extOp->vendor_supplies_materials)
+                                                                <span class="badge bg-soft-info text-info border border-info-subtle fs-10 mt-1"><i class="feather-package me-1"></i>Vendor uses own materials</span>
                                                             @endif
                                                         </td>
                                                         <td class="align-top font-monospace fs-11">
-                                                            <div>{{ __('production.lead') }}: <strong>{{ $extOp->subcontract_lead_time_days ?? 0 }}d</strong>
-                                                            </div>
-                                                            <div class="text-muted">{{ __('production.buffers') }}: {{ $extOp->dispatch_buffer_days ?? 0 }}d
-                                                                {{ __('production.disp') }} / {{ $extOp->return_buffer_days ?? 0 }}d {{ __('production.ret') }}</div>
+                                                            @php $fmtH = [\App\Domains\Production\Services\SubcontractDates::class, 'formatHours']; @endphp
+                                                            <div>{{ $fmtH($extOp->vendor_dispatch_hours) }} · <strong>{{ $fmtH($extOp->vendor_processing_hours) }}</strong> · {{ $fmtH($extOp->vendor_receipt_hours) }}</div>
+                                                            <div class="text-muted fs-10">total {{ $fmtH($extOp->vendorTotalHours()) }} (calendar)</div>
                                                         </td>
                                                         <td class="align-top">
-                                                            @if($pr)
-                                                                @if($canPurchase && \Illuminate\Support\Facades\Route::has('purchase.requisitions.show'))
-                                                                    <a href="{{ route('purchase.requisitions.show', $pr->id) }}"
-                                                                        class="fw-bold text-primary">
-                                                                        {{ $pr->requisition_number }}
-                                                                    </a>
-                                                                @else
-                                                                    <span class="fw-bold text-dark">{{ $pr->requisition_number }}</span>
-                                                                @endif
-                                                                <div class="fs-10"><span
-                                                                        class="badge bg-soft-info text-info">{{ ucfirst($pr->status) }}</span>
+                                                            {{-- SF-4: no PR / PO — dispatch slip (only when something of ours goes) and the receipt page --}}
+                                                            @if(!in_array($extOp->status, ['completed', 'cancelled', 'skipped'], true) && in_array($order->status, ['released', 'in_progress'], true))
+                                                                <div class="d-flex flex-column gap-1">
+                                                                    @if($extOp->needsDispatchSlip())
+                                                                        <a href="{{ route('production.subcontract.delivery-challans.create', ['production_order_id' => $order->id, 'operation_id' => $extOp->id]) }}" class="btn btn-xs btn-outline-primary py-0.5 px-1.5"><i class="feather-send me-1"></i>Dispatch slip</a>
+                                                                    @endif
+                                                                    <a href="{{ route('production.subcontract.receipts.create', ['operation_id' => $extOp->id]) }}" class="btn btn-xs btn-outline-success py-0.5 px-1.5"><i class="feather-download-cloud me-1"></i>Receive</a>
                                                                 </div>
                                                             @else
-                                                                <div class="mb-1"><span
-                                                                        class="badge bg-soft-secondary text-secondary">{{ __('production.awaiting_pr') }}</span>
-                                                                </div>
-                                                                @if(!$po && $canPurchase && \Illuminate\Support\Facades\Route::has('production.orders.generate-subcontract-pr'))
-                                                                    {{-- D-4 / TF-05: the only way subcontract purchasing is raised (PR / Draft PO / Approved PO per Settings) --}}
-                                                                    <form
-                                                                        action="{{ route('production.orders.generate-subcontract-pr', ['order' => $order->id, 'operation' => $extOp->id]) }}"
-                                                                        method="POST" class="d-inline">
-                                                                        @csrf
-                                                                        <button type="submit"
-                                                                            class="btn btn-xs btn-outline-primary py-0.5 px-1.5 shadow-sm"
-                                                                            title="Raise the subcontract PR / PO for this operation (follows Production → Settings)">
-                                                                            <i class="feather-plus-circle me-1"></i> Raise PR / PO
-                                                                        </button>
-                                                                    </form>
-                                                                @endif
-                                                            @endif
-                                                        </td>
-                                                        <td class="align-top">
-                                                            @if($po)
-                                                                @if($canPurchase && \Illuminate\Support\Facades\Route::has('purchase.orders.show'))
-                                                                    <a href="{{ route('purchase.orders.show', $po->id) }}"
-                                                                        class="fw-bold text-primary">
-                                                                        {{ $po->purchase_order_number ?? $po->po_number }}
-                                                                    </a>
-                                                                @else
-                                                                    <span
-                                                                        class="fw-bold text-dark">{{ $po->purchase_order_number ?? $po->po_number }}</span>
-                                                                @endif
-                                                                <div class="fs-10"><span
-                                                                        class="badge bg-soft-success text-success">{{ ucfirst($po->status) }}</span>
-                                                                </div>
-                                                            @else
-                                                                <span class="text-muted fs-11">{{ __('production.awaiting_po') }}</span>
+                                                                <a href="{{ route('production.subcontract.receipts.create', ['operation_id' => $extOp->id]) }}" class="fs-11">Receipts</a>
                                                             @endif
                                                         </td>
                                                         <td class="align-top fs-11 font-monospace">
@@ -1164,15 +1123,13 @@
                                                             @endif
                                                         </td>
                                                         <td class="align-top font-monospace fw-bold text-end">
-                                                            {{ format_currency($extOp->subcontract_cost_per_unit * $order->quantity_ordered) }}
-                                                            <div class="fs-10 text-muted">@
-                                                                {{ format_currency($extOp->subcontract_cost_per_unit) }}{{ __('production.per_unit') }}
-                                                            </div>
+                                                            {{ format_currency($billedCost) }}
+                                                            <div class="fs-10 text-muted fw-normal">billed by the vendor</div>
                                                         </td>
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="9" class="text-center text-muted py-3">{{ __('production.no_outsourced_ops_defined') }}</td>
+                                                        <td colspan="8" class="text-center text-muted py-3">{{ __('production.no_outsourced_ops_defined') }}</td>
                                                     </tr>
                                                 @endforelse
                                             </tbody>
@@ -1183,7 +1140,7 @@
                                 {{-- Company Material Balance Section (For Company Supplied Materials) --}}
                                 @php
                                     $hasCompanyMaterialOps = $order->operations->contains(function ($op) {
-                                        return $op->is_external && !$op->isWipJobWork() && ($op->material_supply_type === 'company_supplied' || is_null($op->material_supply_type));
+                                        return $op->is_external && $op->bomMaterialRows()->isNotEmpty(); // SF-2: our materials go to the vendor
                                     });
                                 @endphp
 

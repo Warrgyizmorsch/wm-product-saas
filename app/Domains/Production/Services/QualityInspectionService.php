@@ -2,8 +2,6 @@
 
 namespace App\Domains\Production\Services;
 
-use App\Domains\Inventory\Services\StockService;
-use App\Domains\Production\Models\ProductionOrderReceipt;
 use App\Domains\Production\Models\ProductionQualityInspection;
 use App\Domains\Production\Models\ProductionQualityInspectionResult;
 use App\Domains\Production\Models\ProductionQualityPlan;
@@ -247,10 +245,9 @@ class QualityInspectionService
                 $this->ncrService->createAutoNcr($inspection->id);
             }
 
-            // Handle subcontract operation QC disposition
+            // QF-03: no quantities are booked here — an outsourced operation's units are booked only by its shop-floor QC
+            // (performOperationInspection → SubcontractReceiptService::bookAfterQc); the old PO-path hook is removed
             if ($inspection->production_order_operation_id) {
-                app(SubcontractReceiptOrchestrator::class)->processQcApproval($inspection);
-
                 if ($newResult === 'passed') {
                     app(ProductionWipService::class)->evaluateAndExecuteWipTransfers(
                         $inspection->production_order_operation_id,
@@ -263,101 +260,132 @@ class QualityInspectionService
                     }
                 }
             }
-
-            // If inspection passed, clear quarantine status on receipts and transfer stock from Quarantine Warehouse to Main FG Warehouse
-            if ($newResult === 'passed' && $inspection->production_order_id) {
-                $quarantineWh = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $inspection->tenant_id)
-                    ->where(function ($q) {
-                        $q->where('code', 'QUARANTINE')->orWhere('name', 'LIKE', '%Quarantine%');
-                    })->first();
-
-                $quarantineWhId = $quarantineWh?->id;
-
-                $quarantineReceipts = ProductionOrderReceipt::where('tenant_id', $inspection->tenant_id)
-                    ->where('production_order_id', $inspection->production_order_id)
-                    ->where(function ($q) use ($quarantineWhId) {
-                        $q->where('quality_status', 'quarantine');
-                        if ($quarantineWhId) {
-                            $q->orWhere('warehouse_id', $quarantineWhId);
-                        }
-                    })
-                    ->get();
-
-                foreach ($quarantineReceipts as $quarantineReceipt) {
-                    $executionService = app(ProductionExecutionService::class);
-                    $mainWarehouseId = $executionService->defaultWarehouseId($inspection->tenant_id);
-
-                    if ($mainWarehouseId && $quarantineReceipt->warehouse_id !== $mainWarehouseId) {
-                        // Transfer stock out of Quality Quarantine Warehouse
-                        StockService::recordOutflow(
-                            $inspection->tenant_id,
-                            $quarantineReceipt->product_id,
-                            $quarantineReceipt->warehouse_id,
-                            $quarantineReceipt->quantity_received,
-                            'Quarantine Inspection Passed - Stock Transfer Out',
-                            $inspection->production_order_id
-                        );
-
-                        $unitCost = (float) ($quarantineReceipt->product?->unit_cost ?? $quarantineReceipt->product?->cost_price ?? 0);
-
-                        // Transfer stock into Main Finished Goods Warehouse
-                        StockService::recordInflow(
-                            $inspection->tenant_id,
-                            $quarantineReceipt->product_id,
-                            $mainWarehouseId,
-                            $quarantineReceipt->quantity_received,
-                            $unitCost,
-                            'Quarantine Inspection Passed - Stock Transfer In to FG Warehouse',
-                            $inspection->production_order_id
-                        );
-                    }
-
-                    $quarantineReceipt->update([
-                        'quality_status' => 'passed',
-                        'warehouse_id'   => $mainWarehouseId ?: $quarantineReceipt->warehouse_id,
-                    ]);
-                }
-            }
         });
     }
 
-    /**
-     * Record a Shopfloor QC Inspection with accepted and rejected quantities.
-     */
-    public function processShopfloorInspection(int $tenantId, array $data, ?int $userId = null): ProductionQualityInspection
+    /** QD: does this order operation need QC (order snapshot first, the routing for older orders)? */
+    public function operationNeedsQc(\App\Domains\Production\Models\ProductionOrderOperation $op): bool
     {
-        return DB::transaction(function () use ($tenantId, $data, $userId) {
-            $orderOpId = $data['production_order_operation_id'];
-            $orderOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($orderOpId);
+        return (bool) ($op->quality_required || ($op->routingOperation?->quality_required ?? false));
+    }
+
+    /**
+     * QD-02 / QD-03: the open (not yet performed) inspection record of a QC operation, created with the operation's
+     * plans (order snapshot). A QC operation keeps one open record while it can still give units for QC: it is made
+     * when the operation starts, when a subcontract receipt waits for QC, after each performed record and when the
+     * operation's QC page is opened. $extra = true adds another open record by hand (QD-03).
+     */
+    public function openOperationInspection(\App\Domains\Production\Models\ProductionOrderOperation $op, ?int $userId = null, bool $extra = false): ?ProductionQualityInspection
+    {
+        if (!$this->operationNeedsQc($op)) {
+            return null;
+        }
+
+        if (!$extra) {
+            $open = ProductionQualityInspection::where('tenant_id', $op->tenant_id)
+                ->where('production_order_operation_id', $op->id)
+                ->where('status', 'draft')
+                ->orderBy('id')
+                ->first();
+            if ($open) {
+                return $open;
+            }
+            $waiting = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($op->id);
+            if ($op->status === \App\Domains\Production\Models\ProductionOrderOperation::STATUS_COMPLETED && $waiting <= 0.0001) {
+                return null; // nothing more will come for QC
+            }
+        }
+
+        return DB::transaction(function () use ($op, $userId) {
+            $checklist = app(OrderOperationQualityService::class)->checklistFor($op);
+
+            $inspection = ProductionQualityInspection::create([
+                'tenant_id' => $op->tenant_id,
+                'company_id' => $op->company_id ?? $op->order?->company_id ?? company_id(),
+                'branch_id' => $op->branch_id ?? $op->order?->branch_id ?? branch_id(),
+                'quality_plan_id' => $checklist->first()?->quality_plan_id,
+                'inspection_number' => $this->nextInspectionNumber((int) $op->tenant_id),
+                'stage' => 'in_process',
+                'status' => 'draft',
+                'result' => 'pending',
+                'inspected_quantity' => 0,
+                'passed_qty' => 0,
+                'failed_qty' => 0,
+                'production_order_id' => $op->production_order_id,
+                'production_order_operation_id' => $op->id,
+                'machine_id' => $op->machine_used_id ?? $op->machine_id,
+                'operator_id' => $userId ?? auth()->id(),
+            ]);
+
+            foreach ($checklist as $link) {
+                if (!$link->plan) {
+                    continue;
+                }
+                \App\Domains\Production\Models\ProductionQualityInspectionPlan::firstOrCreate(
+                    ['quality_inspection_id' => $inspection->id, 'quality_plan_id' => $link->plan->id],
+                    ['tenant_id' => $inspection->tenant_id, 'is_mandatory' => (bool) $link->is_mandatory]
+                );
+            }
+
+            return $inspection;
+        });
+    }
+
+    /** INSP-YYYYMMDD-0001: next number of the day, per tenant (soft-deleted rows included, so numbers never repeat) */
+    private function nextInspectionNumber(int $tenantId): string
+    {
+        $prefix = 'INSP-' . now()->format('Ymd') . '-';
+        $last = ProductionQualityInspection::withoutGlobalScopes()->withTrashed()
+            ->where('tenant_id', $tenantId)
+            ->where('inspection_number', 'like', $prefix . '%')
+            ->orderByDesc('inspection_number')
+            ->value('inspection_number');
+        $next = $last && preg_match('/-(\d+)$/', $last, $m) ? ((int) $m[1]) + 1 : 1;
+
+        return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * QD-04 (user 2026-11-28): perform an operation's open inspection record. One record = one fixed quantity with one
+     * result: every check of the operation's plans is taken for that quantity; when every recorded check passes the
+     * whole quantity passes, when any check fails the whole quantity fails. Units of another result go in another record
+     * of the same operation. Passed units move on at once (output, WIP, next operation; on an outsourced operation the
+     * waiting receipts are booked and get their GRN). Failed units: counted as rejected, NCR + Rework / Scrap as before
+     * (the failed-quantity flow is to be discussed — QD open point).
+     *
+     * @param  array{quantity: float|int|string, parameter_values?: array, inspected_plans?: array, remarks?: ?string, batch_id?: ?int}  $data
+     */
+    public function performOperationInspection(ProductionQualityInspection $inspection, array $data, int $userId): ProductionQualityInspection
+    {
+        return DB::transaction(function () use ($inspection, $data, $userId) {
+            $inspection = ProductionQualityInspection::whereKey($inspection->id)->lockForUpdate()->firstOrFail();
+            if ($inspection->status !== 'draft' || !$inspection->production_order_operation_id) {
+                throw new \InvalidArgumentException("Inspection {$inspection->inspection_number} is already performed.");
+            }
+
+            $orderOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $inspection->tenant_id)
+                ->findOrFail($inspection->production_order_operation_id);
             $orderId = $orderOp->production_order_id;
+            $tenantId = (int) $inspection->tenant_id;
             $batchId = $data['batch_id'] ?? null;
 
-            $acceptedQty = max(0.0, (float) ($data['accepted_qty'] ?? 0));
-            $rejectedQty = max(0.0, (float) ($data['rejected_qty'] ?? 0));
-            $inspectedQty = $acceptedQty + $rejectedQty;
-
-            if ($inspectedQty <= 0) {
-                throw new \InvalidArgumentException('Inspected quantity must be greater than zero.');
+            if (!$this->operationNeedsQc($orderOp)) {
+                throw new \InvalidArgumentException("Operation {$orderOp->operation_number} does not need QC.");
             }
 
-            $skipPendingQcCheck = (bool) ($data['skip_pending_qc_check'] ?? false);
-            $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
-
-            if (!$skipPendingQcCheck) {
-                if (!$isQcRequired) {
-                    throw new \InvalidArgumentException("Quality inspection cannot be recorded for operation #{$orderOp->operation_number} because Quality Control is not required.");
-                }
-
-                $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($orderOpId, $batchId);
-                if ($pendingQcQty <= 0) {
-                    throw new \InvalidArgumentException("Cannot record quality inspection: There are no pending QC units for operation #{$orderOp->operation_number}. Output must be logged first.");
-                }
-                if ($inspectedQty > ($pendingQcQty + 0.0001)) {
-                    throw new \InvalidArgumentException("Total inspected quantity ({$inspectedQty}) cannot exceed pending QC units ({$pendingQcQty}) for operation #{$orderOp->operation_number}.");
-                }
+            $qty = round((float) ($data['quantity'] ?? 0), 4);
+            if ($qty <= 0) {
+                throw new \InvalidArgumentException('Enter the quantity this inspection covers.');
+            }
+            $waiting = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($orderOp->id, $batchId);
+            if ($waiting <= 0.0001) {
+                throw new \InvalidArgumentException("No units of operation {$orderOp->operation_number} are waiting for QC. Output must be logged (or received from the vendor) first.");
+            }
+            if ($qty > $waiting + 0.0001) {
+                throw new \InvalidArgumentException('The quantity (' . $this->qtyLabel($qty) . ') is more than the units waiting for QC (' . $this->qtyLabel($waiting) . ').');
             }
 
-            // QR-16 / QP-04: the operation's own plans (order snapshot) — readings are saved and evaluated
+            // every check of the operation's plans, judged by the plan rules; mandatory checks must be filled
             $checklist = app(OrderOperationQualityService::class)->checklistFor($orderOp)
                 ->map(fn ($link) => ['plan' => $link->plan, 'is_mandatory' => (bool) $link->is_mandatory])
                 ->values();
@@ -365,57 +393,48 @@ class QualityInspectionService
                 $checklist,
                 (array) ($data['parameter_values'] ?? []),
                 (array) ($data['inspected_plans'] ?? []),
-                !empty($data['enforce_checklist'])
+                true
             );
-            // A3: a failed mandatory check with nothing rejected needs the inspector's explicit confirmation
-            if (!empty($data['enforce_checklist']) && $evaluation['mandatory_failed'] && $rejectedQty <= 0 && empty($data['confirm_failed_accept'])) {
-                throw new \InvalidArgumentException(
-                    'A mandatory check failed (' . implode(', ', $evaluation['failed_names']) . '). Reject the affected units, or tick the confirmation to accept them anyway.'
-                );
+            $failedChecks = collect($evaluation['results'])->filter(fn ($row) => !$row['passed']);
+            if (empty($evaluation['plans'])) {
+                // a QC operation with no plan attached: the inspector states the result for the quantity
+                $stated = $data['result'] ?? null;
+                if (!in_array($stated, ['passed', 'failed'], true)) {
+                    throw new \InvalidArgumentException('This operation has no quality plan: choose whether the quantity passed or failed.');
+                }
+                $passed = $stated === 'passed';
+            } else {
+                $passed = $failedChecks->isEmpty();
             }
 
-            $result = ($rejectedQty > 0 || $evaluation['mandatory_failed'])
-                ? ($acceptedQty > 0 ? 'partially_passed' : 'failed')
-                : 'passed';
-            $planId = $evaluation['plans'][0]['plan']->id ?? null;
-
-            $inspection = ProductionQualityInspection::create([
-                'tenant_id' => $tenantId,
-                'company_id' => $data['company_id'] ?? $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
-                'branch_id' => $data['branch_id'] ?? $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
-                'quality_plan_id' => $planId,
-                'inspection_number' => 'INSP-SF-' . date('Ymd') . '-' . rand(1000, 9999),
-                'stage' => 'in_process',
+            $inspection->fill([
+                'quality_plan_id' => $evaluation['plans'][0]['plan']->id ?? $inspection->quality_plan_id,
                 'status' => 'approved',
-                'result' => $result,
-                'inspected_quantity' => $inspectedQty,
-                'passed_qty' => $acceptedQty,
-                'failed_qty' => $rejectedQty,
-                'production_order_id' => $orderId,
-                'production_order_operation_id' => $orderOpId,
-                'machine_id' => $orderOp->machine_used_id ?? $orderOp->machine_id,
-                'operator_id' => $userId ?? auth()->id() ?? 1,
-                'batch_id' => $batchId,
-                'remarks' => $data['remarks'] ?? "Shopfloor QC inspection: {$acceptedQty} accepted, {$rejectedQty} rejected.",
+                'result' => $passed ? 'passed' : 'failed',
+                'inspected_quantity' => $qty,
+                'passed_qty' => $passed ? $qty : 0,
+                'failed_qty' => $passed ? 0 : $qty,
+                'batch_id' => $batchId ?? $inspection->batch_id,
+                'machine_id' => $inspection->machine_id ?? $orderOp->machine_used_id ?? $orderOp->machine_id,
+                'remarks' => $data['remarks'] ?? null,
                 'inspected_at' => now(),
-                'audited_by' => $userId ?? auth()->id() ?? 1,
+                'audited_by' => $userId,
                 'audited_at' => now(),
-            ]);
+            ])->save();
 
+            // the results of this performance replace any earlier rows (none for an open record)
+            ProductionQualityInspectionResult::where('quality_inspection_id', $inspection->id)->delete();
             $this->storeChecklistResults($inspection, $evaluation);
 
-            // Increment good output quantity_produced on operation for accepted units
-            if ($acceptedQty > 0) {
-                $orderOp->quantity_produced += $acceptedQty;
-            }
-            if ($rejectedQty > 0) {
-                $orderOp->quantity_rejected += $rejectedQty;
+            if ($passed) {
+                $orderOp->quantity_produced += $qty;
+            } else {
+                $orderOp->quantity_rejected += $qty;
             }
 
-            // Target check: if accepted good output meets or exceeds target_produced_qty, mark COMPLETED
+            // the operation completes when the passed quantity reaches its target
             $targetQty = (float) ($orderOp->target_produced_qty > 0 ? $orderOp->target_produced_qty : ($orderOp->order->quantity_ordered ?? 0));
-            $totalProcessed = max((float) $orderOp->quantity_produced, (float) ($inspection->inspected_quantity ?? 0), $acceptedQty);
-            if ($targetQty > 0 && ((float) $orderOp->quantity_produced >= ($targetQty - 0.0001) || ($orderOp->is_external && $totalProcessed >= ($targetQty - 0.0001)))) {
+            if ($targetQty > 0 && (float) $orderOp->quantity_produced >= ($targetQty - 0.0001)) {
                 $orderOp->status = \App\Domains\Production\Models\ProductionOrderOperation::STATUS_COMPLETED;
                 $orderOp->actual_end_time = now();
 
@@ -427,15 +446,14 @@ class QualityInspectionService
             }
             $orderOp->save();
 
-            // TF-10: QC of outsourced work — the waiting subcontract receipts are booked now and get their system GRN
+            // TF-10: QC of outsourced work — the waiting subcontract receipts are booked now and get their GRN
             if ($orderOp->is_external) {
-                app(SubcontractReceiptService::class)->bookAfterQc($orderOp, $acceptedQty, $rejectedQty, (int) ($userId ?? auth()->id() ?? 1));
+                app(SubcontractReceiptService::class)->bookAfterQc($orderOp, $passed ? $qty : 0.0, $passed ? 0.0 : $qty, $userId);
             }
 
-            // Update WIP tracking so successor operations can consume accepted WIP
-            if ($acceptedQty > 0) {
+            // passed units move to the next operation
+            if ($passed) {
                 $effectiveBatchId = $batchId ?? $inspection->batch_id;
-                $batch = $effectiveBatchId ? \App\Domains\Production\Models\ProductionBatch::find($effectiveBatchId) : null;
                 $wip = ($effectiveBatchId && $orderOp->routing_operation_id) ? app(ProductionWipService::class)->getOrCreateWipForBatchOperation(
                     $orderId,
                     $effectiveBatchId,
@@ -444,20 +462,19 @@ class QualityInspectionService
                 ) : \App\Domains\Production\Models\ProductionWip::where('production_order_id', $orderId)->first();
 
                 if ($wip) {
-                    $wip->available_quantity += $acceptedQty;
-                    $wip->completed_quantity += $acceptedQty;
+                    $wip->available_quantity += $qty;
+                    $wip->completed_quantity += $qty;
                     $wip->save();
                 }
 
-                // Unlock successor operations for partial/full WIP transfer
-                app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($orderOpId, $userId, $effectiveBatchId);
+                app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($orderOp->id, $userId, $effectiveBatchId);
                 app(\App\Domains\Production\Services\ProductionOrderService::class)->reconcileOperationReadiness($orderId);
                 app(\App\Domains\Production\Services\ProductionOrderService::class)->evaluateAndAutoCompleteOrder($orderId, $userId);
             }
 
-            // Auto-create NCR for rejected quantity
+            // failed units (flow to be discussed): NCR + Rework / Scrap as before
             $ncr = null;
-            if ($rejectedQty > 0) {
+            if (!$passed) {
                 $ncr = \App\Domains\Production\Models\ProductionNcr::create([
                     'tenant_id' => $tenantId,
                     'ncr_number' => 'NCR-SF-' . strtoupper(uniqid()),
@@ -465,34 +482,39 @@ class QualityInspectionService
                     'status' => 'open',
                     'disposition_type' => 'pending',
                     'production_order_id' => $orderId,
-                    'production_order_operation_id' => $orderOpId,
+                    'production_order_operation_id' => $orderOp->id,
+                    'quality_inspection_id' => $inspection->id,
                     'batch_id' => $batchId,
                     'machine_id' => $orderOp->machine_used_id ?? $orderOp->machine_id,
-                    'operator_id' => $userId ?? auth()->id() ?? 1,
-                    'description' => "Shopfloor Quality Inspection failed for {$rejectedQty} units on operation #{$orderOp->operation_number}.",
+                    'operator_id' => $userId,
+                    'description' => "Inspection {$inspection->inspection_number} failed for " . $this->qtyLabel($qty) . " unit(s) on operation {$orderOp->operation_number}: " . $failedChecks->map(fn ($row) => $row['parameter']->name)->unique()->implode(', ') . '.',
                 ]);
 
                 app(ProductionNotificationService::class)->notifyNcrCreated($ncr);
-            }
-
-            if ($result === 'failed' || $rejectedQty > 0) {
-                $holdReason = $data['remarks'] ?? "Shopfloor inspection failed with {$rejectedQty} rejected units.";
-                app(ProductionNotificationService::class)->notifyQualityHold($orderOp, $holdReason, $ncr?->id);
+                app(ProductionNotificationService::class)->notifyQualityHold($orderOp, $data['remarks'] ?? "Inspection {$inspection->inspection_number} failed.", $ncr->id);
             }
 
             $this->eventService->writeEvent($tenantId, [
                 'production_order_id' => $orderId,
-                'production_order_operation_id' => $orderOpId,
-                'operator_id' => $userId ?? auth()->id() ?? 1,
-                'event_type' => 'Shopfloor QC Inspection',
-                'title' => 'Shopfloor QC Inspection Recorded',
-                'description' => "Inspection recorded: {$acceptedQty} accepted, {$rejectedQty} rejected for Op #{$orderOp->operation_number}.",
-                'severity' => ($result === 'passed') ? 'success' : 'warning',
+                'production_order_operation_id' => $orderOp->id,
+                'operator_id' => $userId,
+                'event_type' => 'Operation QC Inspection',
+                'title' => 'Operation QC inspection performed',
+                'description' => "Inspection {$inspection->inspection_number}: " . $this->qtyLabel($qty) . ' unit(s) ' . ($passed ? 'passed' : 'failed') . " on operation {$orderOp->operation_number}.",
+                'severity' => $passed ? 'success' : 'warning',
                 'event_source' => 'QualityInspectionService',
             ]);
 
+            // QD-02: keep one open record while units can still come for QC
+            $this->openOperationInspection($orderOp->fresh(), $userId);
+
             return $inspection;
         });
+    }
+
+    private function qtyLabel(float $qty): string
+    {
+        return rtrim(rtrim(number_format($qty, 4, '.', ''), '0'), '.');
     }
 
     /**

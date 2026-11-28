@@ -550,6 +550,12 @@
                                             $doneQty = (float) ($orderOp->quantity_produced ?? 0.0);
                                             $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
                                             $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($orderOp->id);
+                                            // QD: the operation's performed inspection records, for the QC badge tooltip
+                                            $qcStats = $isQcRequired ? \App\Domains\Production\Models\ProductionQualityInspection::where('production_order_operation_id', $orderOp->id)
+                                                ->where('status', 'approved')
+                                                ->selectRaw("COUNT(*) as records, COALESCE(SUM(CASE WHEN result = 'passed' THEN inspected_quantity ELSE 0 END), 0) as passed, COALESCE(SUM(CASE WHEN result = 'failed' THEN inspected_quantity ELSE 0 END), 0) as failed")
+                                                ->first() : null;
+                                            $qcTip = 'Waiting for QC: ' . number_format($pendingQcQty, 0) . ' · ' . (int) ($qcStats->records ?? 0) . ' inspection record(s): ' . number_format((float) ($qcStats->passed ?? 0), 0) . ' passed, ' . number_format((float) ($qcStats->failed ?? 0), 0) . ' failed. One record = one quantity with one result.';
                                             $acceptedQty = (float) ($orderOp->quantity_produced ?? 0.0);
                                             $rejectedQty = (float) ($orderOp->quantity_rejected ?? 0.0);
                                             $scrappedQty = (float) ($orderOp->quantity_scrapped ?? 0.0);
@@ -609,8 +615,9 @@
                                             <td class="align-top">
                                                 @if($isOutsourced)
                                                     @php
-                                                        $opSupplyType = $orderOp->material_supply_type ?? 'company_supplied';
-                                                        $isVendorSupplied = ($opSupplyType === 'vendor_supplied');
+                                                        // SF-2: a dispatch slip only when something of ours goes (previous output or BOM rows)
+                                                        $needsSlip = $orderOp->needsDispatchSlip();
+                                                        $isVendorSupplied = !$needsSlip;
                                                      @endphp
                                                     <div class="d-flex flex-column align-items-start gap-1">
                                                         <div class="d-flex align-items-center gap-1">
@@ -624,36 +631,22 @@
                                                                 </span>
                                                             @endif
                                                             @php
-                                                                // TF-05 / TF-06: PR/PO by button; receipt only when the vendor has the work (or brings everything)
-                                                                $scDoc = app(\App\Domains\Production\Services\SubcontractProcurementOrchestrator::class)->existingDocument($orderOp, (int) $orderOp->tenant_id);
+                                                                // SF-4: no PR / PO; receipt when the vendor has the work (or nothing of ours was sent)
                                                                 $scAtVendor = \App\Domains\Production\Models\DeliveryChallan::where('production_order_operation_id', $orderOp->id)
                                                                     ->whereIn('status', \App\Domains\Production\Models\DeliveryChallan::AT_VENDOR_STATUSES)->exists();
                                                                 $scCanReceive = !$isCompleted && ($isVendorSupplied || $scAtVendor);
                                                             @endphp
-                                                            @if(!$scDoc && !$isCompleted)
-                                                                <form method="POST" action="{{ route('production.mes.subcontract-procure', $orderOp->id) }}" class="d-inline">
-                                                                    @csrf
-                                                                    <button type="submit" class="btn btn-sm btn-outline-primary fw-semibold px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 text-nowrap"
-                                                                        title="Raise the subcontract PR / PO for this operation (follows Production → Settings)">
-                                                                        <i class="feather-shopping-cart fs-12"></i>Raise PR / PO</button>
-                                                                </form>
-                                                            @elseif($scDoc)
-                                                                <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-9" title="Subcontract purchasing raised for this operation">
-                                                                    <i class="feather-shopping-cart me-1"></i>{{ $scDoc instanceof \App\Domains\Purchase\Models\PurchaseOrder ? $scDoc->purchase_order_number : $scDoc->requisition_number }} · {{ $scDoc->status }}</span>
+                                                            @if($needsSlip && !$isCompleted)
+                                                                <a href="{{ route('production.subcontract.delivery-challans.create', ['production_order_id' => $orderOp->production_order_id, 'operation_id' => $orderOp->id]) }}"
+                                                                    class="btn btn-sm btn-primary fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
+                                                                    title="Dispatch slip: send our material / the previous operation's output to the vendor">
+                                                                    <i class="feather-truck fs-12"></i>Dispatch</a>
                                                             @endif
-                                                            @unless($isVendorSupplied)
-                                                                <button type="button"
-                                                                    class="btn btn-sm btn-purple fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
-                                                                    data-bs-toggle="modal" data-bs-target="#manageChallanModal{{ $op->id }}"
-                                                                    title="Dispatch slips: send the issued material / previous operation output to the vendor">
-                                                                    <i class="feather-truck fs-12"></i>Dispatch</button>
-                                                            @endunless
                                                             @if($scCanReceive)
-                                                                <button type="button"
+                                                                <a href="{{ route('production.subcontract.receipts.create', ['operation_id' => $orderOp->id, 'source' => 'shop_floor']) }}"
                                                                     class="btn btn-sm btn-info fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
-                                                                    data-bs-toggle="modal" data-bs-target="#subcontractReceiptModal{{ $orderOp->id }}"
                                                                     title="Record the vendor's work received on the shop floor">
-                                                                    <i class="feather-download-cloud fs-12"></i>{{ __('production.record_subcontract_receipt') }}</button>
+                                                                    <i class="feather-download-cloud fs-12"></i>{{ __('production.record_subcontract_receipt') }}</a>
                                                             @endif
                                                         </div>
                                                         @if($isVendorSupplied)
@@ -688,12 +681,11 @@
                                                             <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
                                                                 @if($isQcRequired)
                                                                     @if($pendingQcQty > 0)
-                                                                        <button type="button"
-                                                                            class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container"
-                                                                            data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
-                                                                            title="Run Quality Inspection on Received Subcontract Goods">
+                                                                        <a href="{{ route('production.quality.operation-inspection.show', ['op' => $orderOp->id, 'source' => 'shop_floor']) }}"
+                                                                            class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container text-decoration-none"
+                                                                            title="Run Quality Inspection on Received Subcontract Goods — opens the operation's inspection page">
                                                                             <i class="feather-shield-check fs-11"></i>{{ __('production.run_qc') }}<span class="btn-badge-count">{{ number_format($pendingQcQty, 0) }}</span>
-                                                                        </button>
+                                                                        </a>
                                                                     @elseif($isCompleted)
                                                                         <span
                                                                             class="badge bg-soft-success text-success border border-success-subtle p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 text-nowrap">
@@ -794,12 +786,11 @@
                                                             <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
                                                                 @if($isQcRequired)
                                                                     @if($pendingQcQty > 0)
-                                                                        <button type="button"
-                                                                            class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container"
-                                                                            data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
-                                                                            title="Run Quality Inspection">
+                                                                        <a href="{{ route('production.quality.operation-inspection.show', ['op' => $orderOp->id, 'source' => 'shop_floor']) }}"
+                                                                            class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container text-decoration-none"
+                                                                            title="Run Quality Inspection — opens the operation's inspection page">
                                                                             <i class="feather-shield-check fs-11"></i>{{ __('production.run_qc') }}<span class="btn-badge-count">{{ number_format($pendingQcQty, 0) }}</span>
-                                                                        </button>
+                                                                        </a>
                                                                     @elseif($isCompleted)
                                                                         <span
                                                                             class="badge bg-soft-success text-success border border-success-subtle p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 text-nowrap">
@@ -849,7 +840,7 @@
                                                 <div class="d-flex flex-wrap align-items-center gap-1 mt-1 font-monospace fs-10">
                                                     <span class="badge bg-light text-dark border" title="Target Net Good Output">Tgt: {{ number_format($moQty, 0) }}</span>
                                                     @if($isQcRequired)
-                                                        <span class="badge {{ $pendingQcQty > 0 ? 'bg-soft-warning text-dark border border-warning' : 'bg-light text-muted border' }}" title="Pending QC Inspection">QC: {{ number_format($pendingQcQty, 0) }}</span>
+                                                        <span class="badge {{ $pendingQcQty > 0 ? 'bg-soft-warning text-dark border border-warning' : 'bg-light text-muted border' }}" title="{{ $qcTip }}" data-bs-toggle="tooltip">QC: {{ number_format($pendingQcQty, 0) }}</span>
                                                     @endif
                                                     <span class="badge bg-soft-success text-success border border-success-subtle" title="Accepted Good Usable Qty">Acc: {{ number_format($acceptedQty, 0) }}</span>
                                                     @if($rejectedQty > 0)
@@ -917,9 +908,9 @@
                                             <td class="align-top">
                                                 @if($isOutsourced)
                                                     <span
-                                                        class="badge bg-soft-purple text-purple border border-purple-subtle fs-10">Subcontract</span>
-                                                    <small class="text-muted d-block fs-9 mt-0.5">Lead Time:
-                                                        {{ $orderOp->subcontract_lead_time_days ?? 0 }}d</small>
+                                                        class="badge bg-soft-warning text-dark border fs-10">Subcontract</span>
+                                                    <small class="text-muted d-block fs-9 mt-0.5">Vendor time:
+                                                        {{ \App\Domains\Production\Services\SubcontractDates::formatHours($orderOp->vendorTotalHours()) }}</small>
                                                 @else
                                                     <span class="badge bg-soft-info text-info border fs-10" data-bs-toggle="tooltip"
                                                         data-bs-placement="top" title="Active Shift: Day Shift">{{ __('production.day_shift') }}</span>
@@ -1051,166 +1042,7 @@
                             $isActiveOutsourced = (bool) ($activeOrderOp->is_external || $activeOrderOp->isOutsourced() || ($activeOp->work_center_id === null && !config('production.temp_flow')));
                         @endphp
 
-                        @php
-                            $activeOpSupplyType = $activeOrderOp->material_supply_type ?? 'company_supplied';
-                            $isActiveCompanySupplied = $isActiveOutsourced && ($activeOpSupplyType === 'company_supplied');
-                        @endphp
-
-                        @if($isActiveCompanySupplied)
-                            @php
-                                $activeVendorName = $activeOrderOp->vendor->name ?? $activeOrderOp->vendor_name ?? 'Outsourced Vendor';
-                                $activeChallans = $activeOrderOp->relationLoaded('deliveryChallans') ? $activeOrderOp->deliveryChallans : ($activeOrderOp->deliveryChallans ?? collect());
-                                if ($activeChallans->isEmpty() && $activeOrderOp->id) {
-                                    $activeChallans = \App\Domains\Production\Models\DeliveryChallan::where('production_order_operation_id', $activeOrderOp->id)->latest()->get();
-                                }
-                            @endphp
-                            <x-ui.modal id="manageChallanModal{{ $activeOp->id }}"
-                                title="MANAGE CHALLAN — {{ html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}"
-                                class="text-start" size="xl">
-                                <div
-                                    class="d-flex justify-content-between align-items-center bg-soft-purple p-3 rounded mb-3 border border-purple-subtle">
-                                    <div>
-                                        <h6 class="fw-bold text-purple mb-1">
-                                            <i class="feather-truck me-2"></i>Outsourced Subcontract Operation ({{ ($activeOrderOp?->isWipJobWork() ?? false) ? 'Previous Op WIP Job Work' : 'Company Supplied Material' }})
-                                        </h6>
-                                        <span class="text-muted fs-11">{{ __('production.supplier_vendor') }}<strong>{{ $activeVendorName }}</strong> |
-                                            Production Order: <strong>{{ $activeOrder->order_number ?? '' }}</strong></span>
-                                    </div>
-                                    <a href="{{ route('production.subcontract.delivery-challans.create', ['production_order_id' => $activeOp->production_order_id ?? $activeOrder->id, 'operation_id' => $activeOrderOp->id]) }}"
-                                        class="btn btn-sm btn-purple fw-semibold shadow-sm">
-                                        <i class="feather-plus me-1"></i>+ New Challan
-                                    </a>
-                                </div>
-
-                                @if($activeChallans->count() > 0)
-                                    <div class="table-responsive">
-                                        <table class="table table-hover align-middle fs-12 mb-0 border">
-                                            <thead class="bg-light">
-                                                <tr>
-                                                    <th class="text-center" style="width: 5%;">{{ __('production.s_no') }}</th>
-                                                    <th style="width: 12%;">{{ __('production.date') }}</th>
-                                                    <th style="width: 16%;">{{ __('production.challan_no') }}</th>
-                                                    <th style="width: 16%;">{{ __('production.reference_no') }}</th>
-                                                    <th style="width: 22%;">{{ __('production.supplier_name') }}</th>
-                                                    <th style="width: 14%;">{{ __('production.receive_status') }}</th>
-                                                    <th class="text-end" style="width: 15%;">{{ __('production.action_operation') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($activeChallans as $chIdx => $ch)
-                                                    <tr>
-                                                        <td class="text-center fw-bold text-muted">{{ $loop->iteration }}</td>
-                                                        <td>{{ $ch->challan_date ? \Carbon\Carbon::parse($ch->challan_date)->format('d/m/Y') : '-' }}
-                                                        </td>
-                                                        <td>
-                                                            <a href="{{ route('production.subcontract.delivery-challans.show', $ch->id) }}"
-                                                                class="fw-bold text-purple text-decoration-underline">
-                                                                {{ $ch->challan_number }}
-                                                            </a>
-                                                        </td>
-                                                        <td class="text-muted">{{ $ch->reference_number ?? $activeOrder->order_number ?? '-' }}
-                                                        </td>
-                                                        <td><strong class="text-dark">{{ $ch->vendor->name ?? $activeVendorName }}</strong></td>
-                                                        <td>
-                                                            @if($ch->status === 'draft')
-                                                                <span class="badge bg-soft-warning text-dark border border-warning">Draft (Gate
-                                                                    Pass)</span>
-                                                            @elseif($ch->status === 'dispatched')
-                                                                <span class="badge bg-soft-info text-info border border-info-subtle">Dispatched (In
-                                                                    Transit)</span>
-                                                            @elseif($ch->status === 'completed')
-                                                                <span
-                                                                    class="badge bg-soft-success text-success border border-success-subtle">Received
-                                                                    & Completed</span>
-                                                            @else
-                                                                <span class="badge bg-light text-dark border">{{ ucfirst($ch->status) }}</span>
-                                                            @endif
-                                                        </td>
-                                                        <td class="text-end">
-                                                            <a href="{{ route('production.subcontract.delivery-challans.show', $ch->id) }}"
-                                                                class="btn btn-xs btn-purple fw-semibold px-2 py-1">
-                                                                <i class="feather-eye me-1"></i>{{ __('production.click_to_receive_items') }}</a>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                @else
-                                    <div class="text-center py-4 bg-light rounded border border-dashed">
-                                        <i class="feather-file-text text-muted fs-36 mb-2 d-block"></i>
-                                        <p class="text-muted fs-12 mb-2">No record available. Generate a Delivery Challan to dispatch
-                                            material to {{ $activeVendorName }}.</p>
-                                        <a href="{{ route('production.subcontract.delivery-challans.create', ['production_order_id' => $activeOp->production_order_id ?? $activeOrder->id, 'operation_id' => $activeOrderOp->id]) }}"
-                                            class="btn btn-sm btn-purple fw-semibold shadow-sm">
-                                            <i class="feather-plus me-1"></i>+ New Challan
-                                        </a>
-                                    </div>
-                                @endif
-                                <x-slot name="footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                </x-slot>
-                            </x-ui.modal>
-                        @endif
-
-                        @if($isActiveOutsourced)
-                            @php
-                                // SC-02 / TF-06: the shop-floor receipt of outsourced work (same receipt as the Subcontracting menu)
-                                $scOpenChallans = \App\Domains\Production\Models\DeliveryChallan::where('production_order_operation_id', $activeOrderOp->id)
-                                    ->whereIn('status', \App\Domains\Production\Models\DeliveryChallan::AT_VENDOR_STATUSES)
-                                    ->orderBy('id')->get();
-                                $scQcRequired = (bool) ($activeOrderOp->quality_required || ($activeOrderOp->routingOperation?->quality_required ?? false));
-                            @endphp
-                            <x-ui.modal id="subcontractReceiptModal{{ $activeOrderOp->id }}"
-                                title="RECORD SUBCONTRACT RECEIPT — {{ html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}"
-                                class="text-start" size="lg">
-                                <form method="POST" action="{{ route('production.mes.subcontract-receive', $activeOrderOp->id) }}" id="subcontractReceiptForm{{ $activeOrderOp->id }}">
-                                    @csrf
-                                    <div class="alert alert-soft-info border border-info-subtle fs-11 py-2">
-                                        <i class="feather-info me-1"></i>
-                                        Work back from <strong>{{ $activeOrderOp->vendor->name ?? 'the vendor' }}</strong>. The receipt books the good units, updates the subcontract PO and makes the bill possible (no Purchase GRN needed).
-                                        @if($scQcRequired) This operation has QC: the units wait for <strong>Run QC</strong> before they count. @endif
-                                    </div>
-                                    <div class="row g-3">
-                                        @if($scOpenChallans->isNotEmpty())
-                                            <div class="col-md-12">
-                                                <x-ui.odoo-form-ui type="select" label="Dispatch slip" name="delivery_challan_id" :searchable="false">
-                                                    @foreach($scOpenChallans as $sc)
-                                                        <option value="{{ $sc->id }}">{{ $sc->challan_number }} — {{ rtrim(rtrim(number_format($sc->unitsAtVendor(), 4, '.', ''), '0'), '.') }} unit(s) still at vendor</option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
-                                            </div>
-                                        @endif
-                                        <div class="col-md-4">
-                                            <x-ui.odoo-form-ui type="input" label="Received" name="received_qty" inputType="number" step="any" :required="true"
-                                                value="{{ $scOpenChallans->first()?->unitsAtVendor() ?? '' }}" />
-                                        </div>
-                                        <div class="col-md-4">
-                                            <x-ui.odoo-form-ui type="input" label="Rejected" name="rejected_qty" inputType="number" step="any" value="0" />
-                                        </div>
-                                        <div class="col-md-4">
-                                            <x-ui.odoo-form-ui type="input" label="Scrapped" name="scrapped_qty" inputType="number" step="any" value="0" />
-                                        </div>
-                                        @if($scOpenChallans->isNotEmpty())
-                                            <div class="col-md-12">
-                                                <label class="form-check fs-12">
-                                                    <input type="checkbox" class="form-check-input" name="final" value="1">
-                                                    <span class="form-check-label">Last receipt on this slip (close it even if units are missing)</span>
-                                                </label>
-                                            </div>
-                                        @endif
-                                        <div class="col-md-12">
-                                            <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" placeholder="Vendor delivery note / invoice reference…" rows="2" />
-                                        </div>
-                                    </div>
-                                </form>
-                                <x-slot name="footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                                    <button type="submit" class="btn btn-success px-4" onclick="document.getElementById('subcontractReceiptForm{{ $activeOrderOp->id }}').submit();">
-                                        <i class="feather-check me-1"></i>Record receipt</button>
-                                </x-slot>
-                            </x-ui.modal>
-                        @endif
+                        {{-- SF-4: dispatch slip and receipt are pages (redirects), not popups --}}
 
                         @if(!$isActiveOutsourced)
                             @php
@@ -1244,7 +1076,7 @@
                                 $activeRemainingToComplete = max(0.0, $activeTargetQty - (($activeOrderOp->quantity_produced ?? 0.0) + $activePendingQcQty + $activeScrapQty + ($activeOrderOp->quantity_rejected ?? 0.0)));
                             @endphp
                             <x-ui.modal id="completeModal{{ $activeOp->id }}"
-                                title="{{ ($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied') ? 'RECEIVE SUBCONTRACT GOODS (VENDOR SUPPLIED) — ' . html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') : 'ADD PRODUCTION OF — ' . html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}"
+                                title="{{ ($activeOrderOp->is_external && $activeOrderOp->vendor_supplies_materials) ? 'RECEIVE SUBCONTRACT GOODS (VENDOR SUPPLIED) — ' . html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') : 'ADD PRODUCTION OF — ' . html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}"
                                 class="text-start" size="lg">
                                 <form method="POST" action="{{ route('production.mes.complete', $activeOp->id) }}"
                                     id="completeForm{{ $activeOp->id }}">
@@ -1252,7 +1084,7 @@
                                     <div class="card border-0 bg-light p-3 mb-3 rounded">
                                         <h6 class="fw-bold text-primary mb-1 fs-12 text-uppercase">
                                             <i class="feather-edit me-1"></i>
-                                            @if($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied')
+                                            @if($activeOrderOp->is_external && $activeOrderOp->vendor_supplies_materials)
                                                 Receive Subcontract Goods From {{ $activeOrderOp->vendor->name ?? 'Vendor' }} -
                                                 {{ $activeOrderOp->name }}
                                             @else
@@ -1262,7 +1094,7 @@
                                             For {{ $activeOrderOp->sourceProduct->name ?? $activeOrder->product->name ?? 'Item' }}
                                         </h6>
                                         <div class="text-muted fs-11">
-                                            @if($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied')
+                                            @if($activeOrderOp->is_external && $activeOrderOp->vendor_supplies_materials)
                                                 Record completed items received from vendor (Vendor Supplied - No raw material dispatch
                                                 required).
                                             @else
@@ -1307,7 +1139,7 @@
 
                                         <div class="col-md-12">
                                             <x-ui.odoo-form-ui type="input"
-                                                label="{{ ($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied') ? 'Quantity Received' : ($activeIsQcRequired ? 'Processed Output Qty (Pending QC)' : 'Quantity Done') }}"
+                                                label="{{ ($activeOrderOp->is_external && $activeOrderOp->vendor_supplies_materials) ? 'Quantity Received' : ($activeIsQcRequired ? 'Processed Output Qty (Pending QC)' : 'Quantity Done') }}"
                                                 name="quantity_produced" inputType="number" step="any"
                                                 value="{{ $activeRemainingToComplete }}" :required="true" />
                                             <input type="hidden" name="quantity_rejected" value="0">
@@ -1331,7 +1163,7 @@
 
                                         <div class="col-md-12">
                                             <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks"
-                                                placeholder="{{ ($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied') ? 'Optional vendor invoice / delivery note reference...' : 'Optional comments...' }}"
+                                                placeholder="{{ ($activeOrderOp->is_external && $activeOrderOp->vendor_supplies_materials) ? 'Optional vendor invoice / delivery note reference...' : 'Optional comments...' }}"
                                                 rows="2" />
                                         </div>
                                     </div>
@@ -1342,7 +1174,7 @@
                                     <button type="submit" class="btn btn-success px-4"
                                         onclick="document.getElementById('completeForm{{ $activeOp->id }}').submit();">
                                         <i
-                                            class="feather-check me-1"></i>{{ ($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied') ? 'Record Subcontract Receipt' : 'Save Production Log' }}
+                                            class="feather-check me-1"></i>{{ ($activeOrderOp->is_external && $activeOrderOp->vendor_supplies_materials) ? 'Record Subcontract Receipt' : 'Save Production Log' }}
                                     </button>
                                 </x-slot>
                             </x-ui.modal>
@@ -1396,102 +1228,8 @@
                             @endif
 
                             @php
-                                $activePendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($activeOrderOp->id);
                                 $activeRejectedQty = (float) ($activeOrderOp->quantity_rejected ?? 0.0);
                             @endphp
-
-                            {{-- Run QC Inspection Modal --}}
-                            <x-ui.modal id="qcModal{{ $activeOp->id }}"
-                                title="RUN QUALITY INSPECTION — {{ html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}"
-                                class="text-start" size="lg">
-                                <form method="POST" action="{{ route('production.mes.quality-inspection', $activeOrderOp->id) }}"
-                                    id="qcForm{{ $activeOp->id }}">
-                                    @csrf
-                                    <div
-                                        class="bg-soft-warning p-3 rounded mb-3 border border-warning-subtle d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <h6 class="fw-bold text-dark mb-1"><i
-                                                    class="feather-shield-check text-warning me-2"></i>{{ __('production.in_process_qc_inspection') }}</h6>
-                                            <span class="fs-11 text-muted">Order: <strong>{{ $activeOrder->order_number }}</strong> |
-                                                Item:
-                                                <strong>{{ $activeOrderOp->sourceProduct->name ?? $activeOrder->product->name }}</strong></span>
-                                        </div>
-                                        <span class="badge bg-warning text-dark fs-12 px-3 py-2 font-monospace">Pending QC:
-                                            {{ number_format($activePendingQcQty, 0) }}</span>
-                                    </div>
-
-                                    {{-- QR-16 / QP-04: the operation's own Quality Plans (order snapshot) — every value is saved and checked --}}
-                                    @php
-                                        $dashChecklist = app(\App\Domains\Production\Services\OrderOperationQualityService::class)
-                                            ->checklistFor($activeOrderOp)
-                                            ->map(fn ($link) => ['plan' => $link->plan, 'is_mandatory' => (bool) $link->is_mandatory, 'source' => $link->source])
-                                            ->values();
-                                    @endphp
-
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <x-ui.odoo-form-ui type="select" label="Quality Auditor / Inspector" name="audited_by"
-                                                :required="true">
-                                                @foreach($operators as $opUser)
-                                                    <option value="{{ $opUser->id }}" {{ (auth()->id() == $opUser->id) ? 'selected' : '' }}>
-                                                        {{ $opUser->name }} ({{ ucfirst($opUser->role ?? 'Operator') }})
-                                                    </option>
-                                                @endforeach
-                                            </x-ui.odoo-form-ui>
-                                        </div>
-                                        <div class="col-md-6 fs-12 text-muted d-flex align-items-center">
-                                            {{ $dashChecklist->count() }} quality plan(s) · {{ $dashChecklist->where('is_mandatory', true)->count() }} mandatory
-                                        </div>
-
-                                        <div class="col-md-12">
-                                            <label class="form-label fw-semibold fs-11 text-uppercase text-dark mb-1"><i
-                                                    class="feather-check-square text-primary me-1"></i>Quality Specification Checklist
-                                                Parameters</label>
-                                            @include('modules.production.quality.partials.checklist-inputs', ['checklistPlans' => $dashChecklist, 'idPrefix' => 'dash' . $activeOp->id])
-                                            <div class="form-check mt-2 fs-12">
-                                                <input class="form-check-input" type="checkbox" name="confirm_failed_accept" value="1" id="dash_confirm_failed_accept_{{ $activeOp->id }}">
-                                                <label class="form-check-label" for="dash_confirm_failed_accept_{{ $activeOp->id }}">
-                                                    I confirm accepting units even if a mandatory check fails (needed only when a mandatory check fails and 0 units are rejected)
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-md-4">
-                                            <x-ui.odoo-form-ui type="input" label="Accepted Qty (Good Usable Output)"
-                                                name="accepted_qty" id="qc_accepted_qty_{{ $activeOp->id }}" inputType="number" step="any" min="0" max="{{ (float) $activePendingQcQty }}" value="{{ (float) $activePendingQcQty }}"
-                                                :required="true" />
-                                        </div>
-                                        <div class="col-md-4">
-                                            <x-ui.odoo-form-ui type="input" label="Rejected Qty (Defective Output)" name="rejected_qty"
-                                                id="qc_rejected_qty_{{ $activeOp->id }}" inputType="number" step="any" min="0" max="{{ (float) $activePendingQcQty }}" value="0" :required="true" />
-                                        </div>
-                                        <div class="col-md-4">
-                                            <x-ui.odoo-form-ui type="select" label="Defect Reason (If Rejected)" name="defect_reason">
-                                                <option value="">-- None / Meets Quality Standard --</option>
-                                                <option value="Surface Scratch / Coating Damage">{{ __('production.surface_scratch_defect') }}</option>
-                                                <option value="Out of Dimension / Thickness Error">{{ __('production.dimension_thickness_error') }}</option>
-                                                <option value="Chipped Edge / Structural Defect">{{ __('production.chipped_edge_defect') }}</option>
-                                                <option value="Raw Material Defect">{{ __('production.raw_material_defect') }}</option>
-                                                <option value="Machine Calibration Error">Machine Calibration Error</option>
-                                                <option value="Operator Assembly Error">Operator Assembly Error</option>
-                                            </x-ui.odoo-form-ui>
-                                        </div>
-
-                                        <div class="col-md-12">
-                                            <x-ui.odoo-form-ui type="textarea" label="Inspection Remarks & Quality Notes" name="remarks"
-                                                placeholder="Enter measured gauge dimensions, batch details, or quality observations..."
-                                                rows="2" />
-                                        </div>
-                                    </div>
-                                </form>
-                                <x-slot name="footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                                    <button type="button" class="btn btn-warning text-dark fw-bold px-4"
-                                        onclick="submitShopfloorQcInspection('{{ $activeOp->id }}', {{ (float) $activePendingQcQty }});">
-                                        <i class="feather-check-circle me-1"></i>Submit QC Inspection
-                                    </button>
-                                </x-slot>
-                            </x-ui.modal>
 
                             {{-- Unified Material Disposition Modal (Scrap, Offcut, Return Unused) --}}
                             @include('modules.production.partials.material-disposition-modal', [
@@ -1653,198 +1391,4 @@
 
     </div>
 
-    @push('scripts')
-        <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                const qualityPlansMap = @json($qualityPlans->keyBy('id'));
-
-                function updateQualityChecklist(selectEl) {
-                    if (!selectEl) return;
-                    const form = selectEl.closest('form');
-                    const container = form ? form.querySelector('[id^="qualityChecklistContainer_"]') : null;
-                    if (!container) return;
-
-                    const opId = container.id.replace('qualityChecklistContainer_', '');
-                    const planId = selectEl.value;
-
-                    // Toggle pre-rendered odoo-form-ui parameter groups
-                    const allGroups = container.querySelectorAll('.qc-plan-group');
-                    if (allGroups.length > 0) {
-                        allGroups.forEach(group => {
-                            group.style.display = 'none';
-                            group.querySelectorAll('input, select, textarea').forEach(input => {
-                                input.disabled = true;
-                            });
-                        });
-
-                        const targetGroup = planId
-                            ? container.querySelector('#qc_plan_group_' + opId + '_' + planId)
-                            : container.querySelector('#qc_plan_group_' + opId + '_none');
-
-                        if (targetGroup) {
-                            targetGroup.style.display = 'block';
-                            targetGroup.querySelectorAll('input, select, textarea').forEach(input => {
-                                input.disabled = false;
-                            });
-                            return;
-                        }
-
-                        const fallback = container.querySelector('#qc_plan_group_' + opId + '_none');
-                        if (fallback) {
-                            fallback.style.display = 'block';
-                            fallback.querySelectorAll('input, select, textarea').forEach(input => {
-                                input.disabled = false;
-                            });
-                            return;
-                        }
-                    }
-
-                    // Dynamic fallback using identical odoo-form-ui structure
-                    const plan = qualityPlansMap[planId];
-                    if (plan && plan.parameters && plan.parameters.length > 0) {
-                        let html = '';
-                        plan.parameters.forEach((param) => {
-                            const isMandatory = param.is_mandatory ? '<span class="text-danger">*</span>' : '';
-                            const uom = param.unit_of_measure || param.uom || '';
-                            const hasMin = param.min_value !== null && param.min_value !== undefined && param.min_value !== '';
-                            const hasMax = param.max_value !== null && param.max_value !== undefined && param.max_value !== '';
-                            const specInfo = (hasMin || hasMax) ? ` [Spec: ${hasMin ? param.min_value : ''} - ${hasMax ? param.max_value : ''} ${uom}]` : (uom ? ` (${uom})` : '');
-                            const label = `${param.name}${specInfo}`;
-
-                            if (param.type === 'numeric') {
-                                html += `
-                                <div class="odoo-form-group">
-                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">
-                                        ${label} ${isMandatory}
-                                    </label>
-                                    <div class="flex-grow-1">
-                                        <input type="number" step="any" class="odoo-form-control" name="parameter_values[${param.id}]" id="param_${opId}_${param.id}" placeholder="Enter measured value (${uom})" ${param.is_mandatory ? 'required' : ''}>
-                                    </div>
-                                </div>
-                            `;
-                            } else if (param.type === 'text') {
-                                html += `
-                                <div class="odoo-form-group">
-                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">
-                                        ${label} ${isMandatory}
-                                    </label>
-                                    <div class="flex-grow-1">
-                                        <input type="text" class="odoo-form-control" name="parameter_values[${param.id}]" id="param_${opId}_${param.id}" placeholder="Enter observation / inspection notes..." ${param.is_mandatory ? 'required' : ''}>
-                                    </div>
-                                </div>
-                            `;
-                            } else {
-                                html += `
-                                <div class="odoo-form-group">
-                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">${param.name}</label>
-                                    <div class="flex-grow-1">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" checked name="parameter_values[${param.id}]" value="pass" id="param_${opId}_${param.id}">
-                                            <label class="form-check-label" for="param_${opId}_${param.id}">${param.name} (Pass)</label>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                            }
-                        });
-                        container.innerHTML = html;
-                    } else {
-                        container.innerHTML = `
-                        <div class="odoo-form-group">
-                            <label class="odoo-form-label" for="chkVisual${opId}">Visual Finish</label>
-                            <div class="flex-grow-1">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[visual]" value="pass" id="chkVisual${opId}">
-                                    <label class="form-check-label" for="chkVisual${opId}">Visual Surface Finish & Coating Inspection (Pass)</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="odoo-form-group">
-                            <label class="odoo-form-label" for="chkDim${opId}">Dimensional Spec</label>
-                            <div class="flex-grow-1">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[dimensional]" value="pass" id="chkDim${opId}">
-                                    <label class="form-check-label" for="chkDim${opId}">Dimensional & Thickness Tolerance Within Specification (Pass)</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="odoo-form-group">
-                            <label class="odoo-form-label" for="chkFunc${opId}">Structural Test</label>
-                            <div class="flex-grow-1">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[structural]" value="pass" id="chkFunc${opId}">
-                                    <label class="form-check-label" for="chkFunc${opId}">Assembly & Structural Integrity Test (Pass)</label>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    }
-                }
-
-                if (window.jQuery) {
-                    window.jQuery(document).on('change change.select2', 'select[name="quality_plan_id"]', function () {
-                        updateQualityChecklist(this);
-                    });
-
-                    window.jQuery(document).on('shown.bs.modal', function (e) {
-                        const select = e.target.querySelector('select[name="quality_plan_id"]');
-                        if (select) {
-                            updateQualityChecklist(select);
-                        }
-                    });
-                }
-
-                document.querySelectorAll('select[name="quality_plan_id"]').forEach(selectEl => {
-                    selectEl.addEventListener('change', function () {
-                        updateQualityChecklist(this);
-                    });
-                    updateQualityChecklist(selectEl);
-                });
-
-                window.submitShopfloorQcInspection = function (opId, maxPending) {
-                    const form = document.getElementById('qcForm' + opId);
-                    if (!form) return;
-                    const acceptedInput = form.querySelector('input[name="accepted_qty"]');
-                    const rejectedInput = form.querySelector('input[name="rejected_qty"]');
-                    const accepted = parseFloat(acceptedInput ? acceptedInput.value : 0) || 0;
-                    const rejected = parseFloat(rejectedInput ? rejectedInput.value : 0) || 0;
-                    const total = accepted + rejected;
-
-                    const showWarning = function (msg) {
-                        if (typeof window.confirmAction === 'function') {
-                            window.confirmAction({
-                                title: 'Quality Inspection Alert',
-                                message: msg,
-                                variant: 'warning',
-                                confirmButtonText: 'OK',
-                                hideCancel: true,
-                                cancelButtonText: ''
-                            });
-                        } else {
-                            alert(msg);
-                        }
-                    };
-
-                    if (maxPending <= 0) {
-                        showWarning('Quality inspection cannot be logged: There are no units pending QC for this operation. Output must be logged first.');
-                        return false;
-                    }
-                    if (accepted < 0 || rejected < 0) {
-                        showWarning('Quantities cannot be negative.');
-                        return false;
-                    }
-                    if (total <= 0) {
-                        showWarning('Total inspected quantity (Accepted + Rejected) must be greater than zero.');
-                        return false;
-                    }
-                    if (total > maxPending + 0.0001) {
-                        showWarning('Total units logged for QC (' + total + ') cannot exceed the pending QC units (' + maxPending + ').');
-                        return false;
-                    }
-
-                    form.submit();
-                };
-            });
-        </script>
-    @endpush
 @endsection

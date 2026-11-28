@@ -174,12 +174,8 @@ class MesController extends Controller
         // Shifts assigned/active
         $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->get();
 
-        // Operators list for shopfloor operator assignment, Quality Plans, Work Centers, & Machines
+        // Operators list for shopfloor operator assignment, Work Centers, & Machines (QF-05: no plan picker any more)
         $operators = \App\Models\User::where('tenant_id', $tenantId)->get();
-        $qualityPlans = \App\Domains\Production\Models\ProductionQualityPlan::where('tenant_id', $tenantId)
-            ->approved() // QR-14
-            ->with('parameters')
-            ->get();
         $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->where(function($q) { $q->where('status', 'active')->orWhereNull('status'); })->get();
         $machines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->get();
         $warehouses = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
@@ -193,7 +189,6 @@ class MesController extends Controller
             'readyCount',
             'shifts',
             'operators',
-            'qualityPlans',
             'workCenters',
             'machines',
             'warehouses',
@@ -265,57 +260,6 @@ class MesController extends Controller
         }
     }
 
-    /**
-     * SC-02 / TF-06: outsourced work received on the shop floor — the same receipt as the Subcontracting menu
-     * (SubcontractReceiptService): accepted units, the slip at the vendor, the approved PO and its system GRN.
-     */
-    public function recordSubcontractReceipt(Request $request, int $orderOp)
-    {
-        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
-        $tenantId = require_tenant_id();
-
-        $validated = $request->validate([
-            'received_qty' => 'required|numeric|gt:0',
-            'rejected_qty' => 'nullable|numeric|min:0',
-            'scrapped_qty' => 'nullable|numeric|min:0',
-            'remarks' => 'nullable|string|max:1000',
-            'delivery_challan_id' => 'nullable|integer',
-            'final' => 'nullable|boolean',
-        ]);
-
-        $op = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($orderOp);
-        $challan = !empty($validated['delivery_challan_id'])
-            ? \App\Domains\Production\Models\DeliveryChallan::where('tenant_id', $tenantId)->findOrFail($validated['delivery_challan_id'])
-            : null;
-
-        try {
-            $receipt = app(\App\Domains\Production\Services\SubcontractReceiptService::class)->receive(
-                $op,
-                $validated,
-                (int) auth()->id(),
-                \App\Domains\Production\Models\ProductionSubcontractReceipt::SOURCE_SHOP_FLOOR,
-                $challan
-            );
-        } catch (InvalidArgumentException $e) {
-            return redirect()->back()->withInput()->with('error', $e->getMessage());
-        }
-
-        return redirect()->back()->with('success', $receipt->status === \App\Domains\Production\Models\ProductionSubcontractReceipt::STATUS_QC_PENDING
-            ? "Receipt {$receipt->receipt_number} recorded — the units wait for this operation's QC."
-            : "Receipt {$receipt->receipt_number} recorded: " . (float) $receipt->accepted_qty . ' good unit(s) booked.');
-    }
-
-    /** D-4 / TF-05: the "Raise PR / PO" button on the MES floor */
-    public function raiseSubcontractPurchasing(int $orderOp)
-    {
-        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
-        $tenantId = require_tenant_id();
-        $op = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($orderOp);
-        \Illuminate\Support\Facades\Gate::authorize('update', $op->order);
-
-        return app(ProductionOrderController::class)->raiseSubcontractPurchasing($op, $tenantId);
-    }
-
     public function logProgress(MesCompleteOperationRequest $request, int $op)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
@@ -382,74 +326,6 @@ class MesController extends Controller
             return redirect()->back()->with('success', 'Andon alert reported to supervisors successfully.');
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
-        }
-    }
-
-    public function recordQualityInspection(Request $request, int $op)
-    {
-        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
-
-        $request->validate([
-            'accepted_qty' => 'required|numeric|min:0',
-            'rejected_qty' => 'required|numeric|min:0',
-            'quality_plan_id' => 'nullable|integer',
-            'audited_by' => 'nullable|integer',
-            'defect_reason' => 'nullable|string|max:255',
-            'remarks' => 'nullable|string|max:500',
-            // QR-16 / QP-04: checklist readings per plan — saved and evaluated (mandatory checks enforced in the service)
-            'parameter_values' => 'nullable|array',
-            'parameter_values.*' => 'nullable|array',
-            'parameter_values.*.*' => 'nullable|string|max:1000',
-            'inspected_plans' => 'nullable|array',
-            'inspected_plans.*' => 'integer',
-            'confirm_failed_accept' => 'nullable|boolean',
-        ]);
-
-        try {
-            $tenantId = require_tenant_id();
-            $orderOp = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($op);
-            $batchId = $request->input('batch_id');
-
-            $acceptedQty = (float) $request->input('accepted_qty');
-            $rejectedQty = (float) $request->input('rejected_qty');
-            $totalInspected = $acceptedQty + $rejectedQty;
-
-            if ($totalInspected <= 0) {
-                return redirect()->back()->with('error', 'Total inspected quantity (Accepted + Rejected) must be greater than zero.');
-            }
-
-            $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
-            if (!$isQcRequired) {
-                return redirect()->back()->with('error', "Quality inspection cannot be recorded for operation #{$orderOp->operation_number} because Quality Control is not required.");
-            }
-
-            $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($op, $batchId);
-            if ($pendingQcQty <= 0) {
-                return redirect()->back()->with('error', "Cannot record quality inspection: There are no pending QC units for operation #{$orderOp->operation_number}. Output must be logged first.");
-            }
-
-            if ($totalInspected > ($pendingQcQty + 0.0001)) {
-                return redirect()->back()->with('error', "Total inspected quantity ({$totalInspected}) cannot exceed pending QC units ({$pendingQcQty}) for operation #{$orderOp->operation_number}.");
-            }
-
-            app(\App\Domains\Production\Services\QualityInspectionService::class)->processShopfloorInspection($tenantId, [
-                'production_order_operation_id' => $op,
-                'accepted_qty' => $acceptedQty,
-                'rejected_qty' => $rejectedQty,
-                'quality_plan_id' => $request->input('quality_plan_id'),
-                'audited_by' => $request->input('audited_by'),
-                'defect_reason' => $request->input('defect_reason'),
-                'batch_id' => $batchId,
-                'remarks' => $request->input('remarks'),
-                'parameter_values' => (array) $request->input('parameter_values', []),
-                'inspected_plans' => (array) $request->input('inspected_plans', []),
-                'confirm_failed_accept' => $request->boolean('confirm_failed_accept'),
-                'enforce_checklist' => true,
-            ], $request->input('audited_by') ?? auth()->id());
-
-            return redirect()->back()->with('success', 'Shopfloor Quality Inspection recorded successfully.');
-        } catch (InvalidArgumentException $e) {
-            return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
     }
 
@@ -1008,17 +884,7 @@ class MesController extends Controller
         // Try mapping the schedule operation if it exists
         $scheduleOp = ProductionScheduleOperation::where('production_order_operation_id', $opId)->first();
 
-        // Shared MES Master Data for aligned QC, Scrap, and Rework workflows — QR-14: approved plans only
-        $qualityPlans = \App\Domains\Production\Models\ProductionQualityPlan::where('tenant_id', $tenantId)
-            ->approved()
-            ->with('parameters')
-            ->get();
-
-        // QR-16 / QR-17: the plans this operation must run (order snapshot). Orders built before the snapshot existed get
-        // their routing operation's plans copied on first view.
-        $qcService = app(\App\Domains\Production\Services\OrderOperationQualityService::class);
-        $checklistPlans = $qcService->checklistFor($op); // existing order: linked versions kept as they are (QM-13)
-        $checklistPlans = $checklistPlans->map(fn ($link) => ['plan' => $link->plan, 'is_mandatory' => (bool) $link->is_mandatory, 'source' => $link->source])->values();
+        // QD: the QC checklist lives on the operation inspection page (QC CHECK button)
         $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->where(function($q) { $q->where('status', 'active')->orWhereNull('status'); })->get();
         $machines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->get();
         $warehouses = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
@@ -1065,8 +931,6 @@ class MesController extends Controller
             'assignment',
             'operators',
             'scheduleOp',
-            'qualityPlans',
-            'checklistPlans',
             'workCenters',
             'machines',
             'warehouses',

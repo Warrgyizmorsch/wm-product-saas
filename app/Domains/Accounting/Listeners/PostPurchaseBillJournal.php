@@ -469,6 +469,12 @@ class PostPurchaseBillJournal
                 ?? $defaultExpense;
         }
 
+        // Production subcontract job work (Service Bill head "Job Work"), docs/production_ui_rules_review_2026-11-27.md SF-5
+        if (stripos($notes, 'Job Work Service Charge') !== false) {
+            return $this->accounts->findByCode('5034', $tenantId)
+                ?? $defaultExpense;
+        }
+
         if (stripos($notes, 'Other Service') !== false) {
             return $this->accounts->findByCode('5900', $tenantId)
                 ?? $defaultExpense;
